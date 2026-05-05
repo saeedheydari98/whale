@@ -1,6 +1,21 @@
 import type { Preview } from '@storybook/nextjs-vite'
+import React from 'react';
+import { ThemeProvider } from '../app/design-system/theme/provider';
+import '../app/globals.css';
 
 const preview: Preview = {
+  decorators: [
+    (Story) =>
+      React.createElement(
+        ThemeProvider,
+        null,
+        React.createElement(
+          "div",
+          { style: { padding: "16px", minHeight: "100vh" } },
+          React.createElement(Story)
+        )
+      ),
+  ],
   parameters: {
     controls: {
       matchers: {
