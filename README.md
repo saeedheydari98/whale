@@ -154,7 +154,7 @@ NEXT-UI/
 
 ### User
 
-* پایه برای توسعه سیستم احراز هویت
+* A foundation for building an authentication system
 
 ### Conversion
 
