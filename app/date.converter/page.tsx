@@ -29,9 +29,7 @@ export default function Home() {
     const fetchCalendars = async () => {
       const res = await fetch("/api/calendars");
       const data = await res.json();
-
       setCalendars(data);
-
       if (data.length > 0) {
         setFromType(data[0].key);
         setToType(data[1]?.key || data[0].key);
@@ -43,9 +41,14 @@ export default function Home() {
   }, []);
 
   const fetchHistory = async () => {
-    const res = await fetch("/api/history");
-    const data = await res.json();
-    setHistory(data);
+    try {
+      const res = await fetch("/api/history");
+      const data = await res.json();
+      setHistory(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Error fetching history:", error);
+      setHistory([]);
+    }
   };
 
   const formatDateForAPI = (date: any, type: string) => {
@@ -75,8 +78,6 @@ export default function Home() {
 
     try {
       const formattedDate = formatDateForAPI(date, fromType);
-
-      console.log("Sending to API:", { date: formattedDate, from: fromType, to: toType });
 
       const res = await fetch("/api/convert", {
         method: "POST",
@@ -125,7 +126,6 @@ export default function Home() {
   return (
     <div className="flex justify-center items-center h-screen bg-gray-100">
       <div className="flex flex-col gap-2 w-1/3 h-[calc(100vh-50px)] bg-white/10 backdrop-blur-md shadow-2xl rounded-2xl p-6 border border-white/30" dir="rtl">
-
         <div className="flex flex-col h-[30%] justify-center items-center gap-4">
           <div className="text-2xl font-bold text-center bg-linear-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
             تبدیل تاریخ

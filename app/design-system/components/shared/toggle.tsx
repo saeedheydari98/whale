@@ -27,7 +27,7 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
     onChange?.(newValue);
   };
   return (
-    <div className="w-[60px] h-[34px] relative cursor-pointer" onClick={handleToggle}>
+    <div className="w-15 h-8.5 relative cursor-pointer" onClick={handleToggle}>
       <div
         className={`
           w-full h-full rounded-full relative overflow-hidden 
