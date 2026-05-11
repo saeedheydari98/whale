@@ -64,17 +64,19 @@ export function UserThemePanel() {
     return (
       <CustomButton
         key={item}
+        rounded="full"
         style={{
           backgroundColor: background,
           borderColor: background,
-          borderStyle: "none",
-          borderWidth: "0",
+          borderStyle: "solid",
+          borderWidth: selected ? "2px" : "0",
+          boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
           color: getContrastColor(background),
         }}
-        className=""
+        className="w-10 h-10"
         onClick={() => updateUserTheme({ style: item })}
       >
-        {item}
+        {/* {item} */}
       </CustomButton>
     );
   };
@@ -86,17 +88,19 @@ export function UserThemePanel() {
     return (
       <CustomButton
         key={color}
+        rounded="full"
         style={{
           backgroundColor: background,
           borderColor: background,
-          borderStyle: "none",
-          borderWidth: "0",
+          borderStyle: "solid",
+          borderWidth: selected ? "2px" : "0",
+          boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
           color: getContrastColor(background),
         }}
-        className=""
+        className="w-10 h-10"
         onClick={() => updateUserTheme({ preferredColor: color })}
       >
-        {color}
+        {/* {color} */}
       </CustomButton>
     );
   };
@@ -108,17 +112,19 @@ export function UserThemePanel() {
     return (
       <CustomButton
         key={tone}
+        rounded="full"
         style={{
           backgroundColor: background,
           borderColor: background,
-          borderStyle: "none",
-          borderWidth: "0",
+          borderStyle: "solid",
+          borderWidth: selected ? "2px" : "0",
+          boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
           color: getContrastColor(background),
         }}
-        className=""
+        className="w-10 h-10"
         onClick={() => updateUserTheme({ tone })}
       >
-        tone {tone}
+        {/* tone {tone} */}
       </CustomButton>
     );
   };
@@ -132,8 +138,6 @@ export function UserThemePanel() {
         color: theme.tokens.colors.text.primary,
       }}
     >
-      <div className=" text-xl font-bold">User Panel Theme</div>
-
       <div className=" flex flex-wrap items-center gap-4">
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm font-semibold text-text-secondary">

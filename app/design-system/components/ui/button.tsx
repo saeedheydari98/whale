@@ -11,7 +11,7 @@ import { borderVariants, cx, interactionStates, motionVariants, radiusVariants, 
 type BaseProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 type CustomButtonProps = BaseProps & {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 
   variant?: UICommonVariant;
   size?: keyof typeof sizeVariants;

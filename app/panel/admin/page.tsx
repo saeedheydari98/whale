@@ -14,7 +14,7 @@ export default function AdminPanelPage() {
         color: theme.tokens.colors.text.primary,
       }}
     >
-      <h1 className="mb-4 text-2xl font-bold">Admin Theme Control</h1>
+      <h1 className="mb-4 text-admin-admin-admin text-2xl font-bold">Admin Theme Control</h1>
       <AdminThemePanel />
     </main>
   );

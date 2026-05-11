@@ -42,17 +42,19 @@ export function AdminThemePanel() {
     return (
       <CustomButton
         key={color}
+        rounded="full"
         style={{
           backgroundColor: background,
           borderColor: background,
-          borderStyle: "none",
-          borderWidth: "0",
+          borderStyle: "solid",
+          borderWidth: selected ? "2px" : "0",
+          boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
           color: getContrastColor(background),
         }}
-        className=""
+        className=" w-10 h-10"
         onClick={() => updateAdminTheme({ primary: color })}
       >
-        {color}
+        {/* {color} */}
       </CustomButton>
     );
   };
@@ -64,17 +66,19 @@ export function AdminThemePanel() {
     return (
       <CustomButton
         key={item}
+        rounded="full"
         style={{
           backgroundColor: background,
           borderColor: background,
-          borderStyle: "none",
-          borderWidth: "0",
+          borderStyle: "solid",
+          borderWidth: selected ? "2px" : "0",
+          boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
           color: getContrastColor(background),
         }}
-        className=""
+        className="w-10 h-10"
         onClick={() => updateAdminTheme({ style: item })}
       >
-        {item}
+        {/* {item} */}
       </CustomButton>
     );
   };
@@ -86,17 +90,19 @@ export function AdminThemePanel() {
     return (
       <CustomButton
         key={tone}
+        rounded="full"
         style={{
           backgroundColor: background,
           borderColor: background,
-          borderStyle: "none",
-          borderWidth: "0",
+          borderStyle: "solid",
+          borderWidth: selected ? "2px" : "0",
+          boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
           color: getContrastColor(background),
         }}
-        className=""
+        className="w-10 h-10"
         onClick={() => updateAdminTheme({ tone })}
       >
-        tone {tone}
+        {/* tone {tone} */}
       </CustomButton>
     );
   };
@@ -110,8 +116,6 @@ export function AdminThemePanel() {
         color: theme.tokens.colors.text.primary,
       }}
     >
-      <h2 className=" text-xl font-bold">Admin Panel Theme</h2>
-
       <div className=" flex flex-wrap gap-2">
         {colorOptions.map(renderColorButton)}
       </div>
