@@ -34,6 +34,7 @@ const hexToRgba = (hex: string, alpha: number) => {
 export function AdminThemePanel() {
   const { adminTheme, updateAdminTheme, theme } = useTheme();
   const adminColor = resolveColor(adminTheme.primary, adminTheme.style, adminTheme.tone);
+  const selectedAdminThemeLabel = `${adminTheme.primary}-${adminTheme.style}-${adminTheme.tone}`;
 
   const renderColorButton = (color: ThemeColorKey) => {
     const background = resolveColor(color, adminTheme.style, adminTheme.tone);
@@ -116,6 +117,10 @@ export function AdminThemePanel() {
         color: theme.tokens.colors.text.primary,
       }}
     >
+      <div className="text-sm font-semibold text-text-secondary">
+        selected: <span className="font-bold text-admin-admin-admin">{selectedAdminThemeLabel}</span>
+      </div>
+
       <div className=" flex flex-wrap gap-2">
         {colorOptions.map(renderColorButton)}
       </div>

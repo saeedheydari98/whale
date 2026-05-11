@@ -36,6 +36,7 @@ export function UserThemePanel() {
   const { mode, modePreference, setModePreference, userTheme, updateUserTheme, theme } =
     useTheme();
   const accentColor = resolveColor(userTheme.preferredColor, userTheme.style, userTheme.tone);
+  const selectedUserThemeLabel = `${userTheme.preferredColor}-${userTheme.style}-${userTheme.tone}`;
 
   const renderModeButton = (value: "system" | "light" | "dark", label: string) => {
     const selected = modePreference === value;
@@ -138,10 +139,14 @@ export function UserThemePanel() {
         color: theme.tokens.colors.text.primary,
       }}
     >
+      <div className="text-sm font-semibold text-text-secondary">
+        selected: <span className="font-bold text-user-user-user">{selectedUserThemeLabel}</span>
+      </div>
+
       <div className=" flex flex-wrap items-center gap-4">
         <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm font-semibold text-text-secondary">
-            mode: <span className="font-bold text-text-primary">{mode}</span>
+            mode: <span className="font-bold text-user-user-user">{mode}</span>
           </div>
           <div
             className="flex flex-wrap items-center gap-2 rounded-full border px-2 py-2"

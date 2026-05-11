@@ -75,6 +75,7 @@ export function ThemeProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const [isHydrated, setIsHydrated] = useState(false);
   const [modePreference, setModePreference] = useState<ThemeModePreference>(() => {
     if (typeof window === "undefined") return "light";
     const savedPref = localStorage.getItem("theme-mode-pref");
@@ -116,6 +117,10 @@ export function ThemeProvider({
       (media as any).addListener(update);
       return () => (media as any).removeListener(update);
     }
+  }, []);
+
+  useEffect(() => {
+    setIsHydrated(true);
   }, []);
 
   const mode: ThemeMode = modePreference === "system" ? systemMode : modePreference;
@@ -308,7 +313,7 @@ export function ThemeProvider({
 
   return (
     <ThemeContext.Provider value={contextValue}>
-      {children}
+      {isHydrated ? children : null}
     </ThemeContext.Provider>
   );
 }
