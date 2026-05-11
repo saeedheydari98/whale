@@ -10,7 +10,6 @@ const navItems = [
   { href: "/date.converter", label: "date converter", tone: "bg-ui-warning text-white" },
   { href: "/panel/admin", label: "admin panel", tone: "bg-ui-primary text-black" },
   { href: "/panel/user", label: "user panel", tone: "bg-ui-secondary text-white" },
-  { href: "/test", label: "theme test", tone: "bg-ui-success text-black" },
 ];
 
 export function AppHeader() {

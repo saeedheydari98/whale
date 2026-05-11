@@ -8,6 +8,7 @@ import arabic from "react-date-object/calendars/arabic";
 import gregorian_en from "react-date-object/locales/gregorian_en";
 import persian_fa from "react-date-object/locales/persian_fa";
 import arabic_en from "react-date-object/locales/arabic_en";
+import { CustomButton } from "../design-system/components/ui/button";
 
 const calendarMap: any = {
   gregorian: { calendar: gregorian, locale: gregorian_en },
@@ -124,15 +125,15 @@ export default function Home() {
   const currentCalendar = calendarMap[fromType] || calendarMap.gregorian;
 
   return (
-    <div className="flex justify-center items-center h-screen bg-bg-base text-text-primary ">
-      <div className="flex flex-col gap-2 w-1/3 h-[calc(100vh-100px)] bg-white/10 backdrop-blur-md shadow-2xl rounded-2xl p-6 border border-white/30" dir="rtl">
+    <div className="flex justify-center items-center h-screen bg-bg-base text-text-primary">
+      <div className="flex flex-col gap-2 w-1/3 h-[calc(100vh-100px)] bg-bg-surface/40 backdrop-blur-md shadow-2xl rounded-2xl p-6 border border-ui-secondary/40" dir="rtl">
         <div className="flex flex-col h-[30%] justify-center items-center gap-4">
-          <div className="text-2xl font-bold text-center bg-linear-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
+          <div className="text-2xl font-bold text-center bg-user-user-user bg-clip-text text-transparent">
             تبدیل تاریخ
           </div>
 
           <select
-            className="w-full border border-white/30 bg-white/20 backdrop-blur-sm font-bold shadow-2xl p-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 hover:bg-white/30 text-gray-800"
+            className="w-full border border-ui-secondary/40 bg-bg-surface/70 backdrop-blur-sm font-bold shadow-2xl p-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-ui-primary transition-all duration-200 hover:bg-bg-surface/80 text-text-primary"
             value={fromType}
             onChange={(e) => {
               const newFrom = e.target.value;
@@ -151,7 +152,7 @@ export default function Home() {
           </select>
 
           <select
-            className="w-full border border-white/30 bg-white/20 backdrop-blur-sm font-bold p-2 shadow-2xl rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-200 hover:bg-white/30 text-gray-800"
+            className="w-full border border-ui-secondary/40 bg-bg-surface/70 backdrop-blur-sm font-bold p-2 shadow-2xl rounded-xl focus:outline-none focus:ring-2 focus:ring-ui-info transition-all duration-200 hover:bg-bg-surface/80 text-text-primary"
             value={toType}
             onChange={(e) => setToType(e.target.value)}
           >
@@ -168,59 +169,64 @@ export default function Home() {
             calendar={currentCalendar.calendar}
             locale={currentCalendar.locale}
             placeholder="انتخاب تاریخ"
-            className="w-full [&_.react-datepicker-wrapper]:w-full [&_input]:w-full [&_input]:border [&_input]:border-white/30 [&_input]:bg-white/20 [&_input]:backdrop-blur-sm [&_input]:p-2 [&_input]:rounded-xl [&_input]:font-bold [&_input]:text-gray-800 [&_input]:placeholder-gray-500 [&_input]:focus:outline-none [&_input]:focus:ring-2 [&_input]:focus:ring-blue-400 [&_input]:transition-all [&_input]:duration-200 [&_input:hover]:bg-white/30"
+            className="w-full [&_.react-datepicker-wrapper]:w-full [&_input]:w-full [&_input]:border [&_input]:border-ui-secondary/40 [&_input]:bg-bg-surface/70 [&_input]:backdrop-blur-sm
+             [&_input]:p-2 [&_input]:rounded-xl [&_input]:font-bold [&_input]:text-text-primary [&_input]:placeholder-text-secondary [&_input]:focus:outline-none [&_input]:focus:ring-2 
+             [&_input]:focus:ring-ui-info [&_input]:transition-all [&_input]:duration-200 [&_input:hover]:bg-bg-surface/80"
           />
-
-          <button
+          <CustomButton
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full bg-linear-to-r from-blue-400 to-blue-700 text-white text-2xl font-bold py-2.5 rounded-xl hover:from-blue-500 hover:to-blue-800 hover:scale-[1.02] active:scale-[0.98] hover:cursor-pointer transition-all duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            variant="secondary"
+            size="lg"
+            fullWidth
+            hover="lift"
+            rounded="lg"
           >
             {loading ? "در حال تبدیل..." : "تبدیل"}
-          </button>
+          </CustomButton>
         </div>
 
         <div className="flex flex-col h-[10%] justify-center items-center gap-2">
           {error && (
-            <div className="text-red-600 text-sm bg-red-100/90 backdrop-blur-sm px-4 py-2 rounded-full font-medium shadow-md border border-red-300/50">
+            <div className="text-text-primary text-sm bg-ui-danger/30 backdrop-blur-sm px-4 py-2 rounded-full font-medium shadow-md border border-ui-danger/50">
               ⚠️ {error}
             </div>
           )}
 
           {!error && result && (
-            <div className="p-3 bg-linear-to-r from-green-400/30 to-emerald-500/30 backdrop-blur-sm rounded-xl text-center font-bold text-green-900 border border-green-400/50 shadow-md">
+            <div className="p-3 bg-ui-success/25 backdrop-blur-sm rounded-xl text-center font-bold text-text-primary border border-ui-success/50 shadow-md">
               ✓ {result}
             </div>
           )}
         </div>
 
         <div className="flex flex-col h-[60%] justify-center items-center gap-4">
-          <div className="font-bold text-xl bg-linear-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
+          <div className="font-bold text-xl bg-user-user-user bg-clip-text text-transparent">
             تاریخچه
           </div>
 
-          <div className="overflow-y-auto border border-white/30 rounded-xl w-full h-full bg-white/5 backdrop-blur-sm p-2 custom-scrollbar">
+          <div className="overflow-y-auto border border-ui-secondary/40 rounded-xl w-full h-full bg-bg-surface/30 backdrop-blur-sm p-2 custom-scrollbar">
             {history.length === 0 && (
-              <div className="text-sm text-gray-500 text-center py-8">موردی ثبت نشده</div>
+              <div className="text-sm text-text-secondary text-center py-8">موردی ثبت نشده</div>
             )}
 
             {history.map((item) => (
               <div
                 key={item.id}
-                className="flex justify-between items-center bg-white/30 backdrop-blur-sm p-3 rounded-xl hover:bg-white/50 transition-all duration-200 text-sm w-full mb-2 last:mb-0 shadow-sm hover:shadow-md"
+                className="flex justify-between items-center bg-bg-surface/60 backdrop-blur-sm p-3 rounded-xl hover:bg-bg-surface/80 transition-all duration-200 text-sm w-full mb-2 last:mb-0 shadow-sm hover:shadow-md"
               >
                 <div>
-                  <div className="text-xs text-gray-600">
+                  <div className="text-xs text-text-secondary">
                     {item.date}
                   </div>
-                  <div className="text-gray-700 font-medium">
+                  <div className="text-text-primary font-medium">
                     {item.fromType} → {item.toType}
                   </div>
-                  <div className="font-bold bg-linear-to-r from-blue-600 to-sky-600 bg-clip-text text-transparent">
+                  <div className="font-bold text-user-user-user bg-clip-text text-transparent">
                     {item.result}
                   </div>
                 </div>
-                <div className="p-1 min-w-6 flex justify-center rounded-full font-bold bg-linear-to-r from-blue-600 to-sky-600 text-xs text-gray-100">
+                <div className="p-1 min-w-6 flex justify-center rounded-full font-bold bg-user-user-user text-xs text-text-primary">
                   {item.id}
                 </div>
               </div>
@@ -234,15 +240,15 @@ export default function Home() {
           width: 6px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.15);
+          background: color-mix(in srgb, var(--bg-surface) 80%, transparent);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(59, 130, 246, 0.4);
+          background: color-mix(in srgb, var(--ui-info) 40%, transparent);
           border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(59, 130, 246, 0.7);
+          background: color-mix(in srgb, var(--ui-info) 70%, transparent);
         }
       `}</style>
     </div>
