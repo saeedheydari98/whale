@@ -5,12 +5,11 @@ import React from "react";
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
 import { resolveVariantColors, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, interactionStates, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 
+type BaseProps = React.HTMLAttributes<HTMLSpanElement>;
 
-type BaseProps = React.ButtonHTMLAttributes<HTMLButtonElement>;
-
-type CustomButtonProps = BaseProps & {
+type CustomTagProps = BaseProps & {
   children?: React.ReactNode;
 
   variant?: UICommonVariant;
@@ -18,13 +17,10 @@ type CustomButtonProps = BaseProps & {
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
   shadow?: keyof typeof shadowVariants;
+
   fullWidth?: boolean;
   fullwidth?: boolean;
 
-  loading?: boolean;
-  disabled?: boolean;
-
-  hover?: keyof typeof interactionStates.hover;
   icon?: React.ReactNode;
   iconAfter?: React.ReactNode;
   iconafter?: React.ReactNode;
@@ -33,7 +29,7 @@ type CustomButtonProps = BaseProps & {
   className?: string;
 };
 
-export const CustomButton: React.FC<CustomButtonProps> = ({
+export const CustomTag: React.FC<CustomTagProps> = ({
   children,
   variant = "primary",
   size = "md",
@@ -41,20 +37,15 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   border = "none",
   shadow = "none",
   fullWidth = false,
-  loading = false,
-  disabled = false,
-  hover = "scale",
   icon,
   iconAfter,
   token,
-  onClick,
   className,
   style,
   ...rest
 }) => {
   const { theme } = useTheme();
   const variantStyle = resolveVariantColors(variant, theme);
-  const isDisabled = disabled || loading;
 
   const tokenStyle: React.CSSProperties = {};
 
@@ -78,10 +69,8 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   }
 
   return (
-    <button
+    <span
       {...rest}
-      disabled={isDisabled}
-      onClick={onClick}
       style={{
         backgroundColor: variantStyle.backgroundColor,
         color: variantStyle.color,
@@ -98,17 +87,12 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
         radiusVariants[rounded],
         border !== "none" && borderVariants[border],
         shadowVariants[shadow],
-        motionVariants.smooth,
-        !isDisabled && interactionStates.hover[hover],
-        !isDisabled && interactionStates.active.press,
-        isDisabled && interactionStates.disabled.base,
         className
       )}
     >
-      {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}
-      {!loading && icon}
-      <span>{loading ? "Loading..." : children}</span>
-      {!loading && (iconAfter)}
-    </button>
+      {icon}
+      <span>{children}</span>
+      {iconAfter}
+    </span>
   );
 };

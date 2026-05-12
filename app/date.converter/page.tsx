@@ -9,6 +9,8 @@ import gregorian_en from "react-date-object/locales/gregorian_en";
 import persian_fa from "react-date-object/locales/persian_fa";
 import arabic_en from "react-date-object/locales/arabic_en";
 import { CustomButton } from "../design-system/components/ui/button";
+import { CustomSelect } from "../design-system/components/ui/select";
+import { CustomTag } from "../design-system/components/ui/tag";
 
 const calendarMap: any = {
   gregorian: { calendar: gregorian, locale: gregorian_en },
@@ -132,8 +134,10 @@ export default function Home() {
             تبدیل تاریخ
           </div>
 
-          <select
-            className="w-full border border-ui-secondary/40 bg-bg-surface/70 backdrop-blur-sm font-bold shadow-2xl p-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-ui-primary transition-all duration-200 hover:bg-bg-surface/80 text-text-primary"
+          <CustomSelect
+            variant="secondary"
+            size="xxxl"
+            rounded="lg"
             value={fromType}
             onChange={(e) => {
               const newFrom = e.target.value;
@@ -149,10 +153,12 @@ export default function Home() {
             {calendars.map((c) => (
               <option key={c.key} value={c.key}>{c.label}</option>
             ))}
-          </select>
+          </CustomSelect>
 
-          <select
-            className="w-full border border-ui-secondary/40 bg-bg-surface/70 backdrop-blur-sm font-bold p-2 shadow-2xl rounded-xl focus:outline-none focus:ring-2 focus:ring-ui-info transition-all duration-200 hover:bg-bg-surface/80 text-text-primary"
+          <CustomSelect
+            variant="secondary"
+            size="xxxl"
+            rounded="lg"
             value={toType}
             onChange={(e) => setToType(e.target.value)}
           >
@@ -161,7 +167,7 @@ export default function Home() {
               .map((c) => (
                 <option key={c.key} value={c.key}>{c.label}</option>
               ))}
-          </select>
+          </CustomSelect>
 
           <DatePicker
             value={date}
@@ -169,15 +175,15 @@ export default function Home() {
             calendar={currentCalendar.calendar}
             locale={currentCalendar.locale}
             placeholder="انتخاب تاریخ"
-            className="w-full [&_.react-datepicker-wrapper]:w-full [&_input]:w-full [&_input]:border [&_input]:border-ui-secondary/40 [&_input]:bg-bg-surface/70 [&_input]:backdrop-blur-sm
-             [&_input]:p-2 [&_input]:rounded-xl [&_input]:font-bold [&_input]:text-text-primary [&_input]:placeholder-text-secondary [&_input]:focus:outline-none [&_input]:focus:ring-2 
-             [&_input]:focus:ring-ui-info [&_input]:transition-all [&_input]:duration-200 [&_input:hover]:bg-bg-surface/80"
+            className="font-bold bg-bg-base "
+            inputClass="w-full border border-ui-secondary/40 bg-bg-surface/70 backdrop-blur-sm p-1 rounded-xl font-bold 
+            text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-ui-info hover:bg-bg-surface/80"
           />
           <CustomButton
             onClick={handleSubmit}
             disabled={loading}
             variant="secondary"
-            size="lg"
+            size="xxl"
             fullWidth
             hover="lift"
             rounded="lg"
@@ -188,14 +194,14 @@ export default function Home() {
 
         <div className="flex flex-col h-[10%] justify-center items-center gap-2">
           {error && (
-            <div className="text-text-primary text-sm bg-ui-danger/30 backdrop-blur-sm px-4 py-2 rounded-full font-medium shadow-md border border-ui-danger/50">
-              ⚠️ {error}
+            <div className="text-red-admin-600 font-bold text-sm bg-ui-danger/30 backdrop-blur-sm px-4 py-2 rounded-full  shadow-md border border-ui-danger/50">
+               {error}
             </div>
           )}
 
           {!error && result && (
-            <div className="p-3 bg-ui-success/25 backdrop-blur-sm rounded-xl text-center font-bold text-text-primary border border-ui-success/50 shadow-md">
-              ✓ {result}
+            <div className="p-2 bg-admin-admin-100 backdrop-blur-sm rounded-xl text-center font-bold text-admin-admin-600 border border-admin-admin-600 shadow-md">
+               {result}
             </div>
           )}
         </div>
