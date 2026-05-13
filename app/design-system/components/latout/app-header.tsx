@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import Toggle from "./shared/toggle";
-import { useTheme } from "../theme/provider";
+import Toggle from "../shared/toggle";
+import { useTheme } from "../../theme/provider";
 import { useScrollHeaderHide } from "@/hooks/useScrollHeaderHide";
 
 const navItems = [

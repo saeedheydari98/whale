@@ -1,7 +1,7 @@
 import { ThemeProvider } from "./design-system/theme/provider";
-import { AppHeader } from "./design-system/components/app-header";
+import { AppHeader } from "./design-system/components/latout/app-header";
 import "./globals.css";
-import { AppFooter } from "./design-system/components/app-footer";
+import { AppFooter } from "./design-system/components/latout/app-footer";
 
 export default function RootLayout({
   children,
