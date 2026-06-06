@@ -9,6 +9,9 @@ export type ProductPayload = {
   title: string;
   description: string;
   price: string;
+  originalPrice?: string;
+  discountPrice?: string;
+  discountPercent?: number | string;
   imageUrl?: string;
   badge?: string;
   ctaLabel?: string;
@@ -27,6 +30,9 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
     title: String(value.title ?? "").trim(),
     description: String(value.description ?? "").trim(),
     price: String(value.price ?? "").trim(),
+    originalPrice: String(value.originalPrice ?? "").trim(),
+    discountPrice: String(value.discountPrice ?? "").trim(),
+    discountPercent: Number.isFinite(Number(value.discountPercent)) ? Math.max(0, Math.round(Number(value.discountPercent))) : 0,
     imageUrl: String(value.imageUrl ?? "").trim(),
     badge: String(value.badge ?? "").trim(),
     ctaLabel: String(value.ctaLabel ?? "").trim(),
@@ -38,6 +44,30 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
 
 function sortProducts(products: ProductPayload[]) {
   return [...products].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function getProductKey(product: Partial<ProductPayload>) {
+  return [
+    product.title,
+    product.description,
+    product.price,
+    product.originalPrice,
+    product.discountPrice,
+    product.imageUrl,
+  ]
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .join("|");
+}
+
+function dedupeProducts(products: ProductPayload[]) {
+  const seen = new Set<string>();
+
+  return products.filter((product) => {
+    const key = getProductKey(product);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export async function GET(request: Request) {
@@ -54,7 +84,7 @@ export async function GET(request: Request) {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
 
-    return NextResponse.json({ ok: true, data });
+    return NextResponse.json({ ok: true, data: dedupeProducts(data) });
   } catch (error) {
     console.error("Products GET error:", error);
     return NextResponse.json({ ok: true, data: [] });
@@ -64,9 +94,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const products = Array.isArray(body.products) ? body.products : [];
-  const normalized = products
-    .map((item: Partial<ProductPayload>, index: number) => normalizeProduct(item, index))
-    .filter((item: ProductPayload) => item.title && item.description && item.price);
+  const normalized = dedupeProducts(
+    products
+      .map((item: Partial<ProductPayload>, index: number) => normalizeProduct(item, index))
+      .filter((item: ProductPayload) => item.title && item.description && item.price)
+  );
 
   if (!hasProductModel) {
     return NextResponse.json({ ok: true, data: sortProducts(normalized) });
@@ -81,6 +113,9 @@ export async function POST(request: Request) {
             title: item.title,
             description: item.description,
             price: item.price,
+            originalPrice: item.originalPrice || null,
+            discountPrice: item.discountPrice || null,
+            discountPercent: Number(item.discountPercent) || null,
             imageUrl: item.imageUrl || null,
             badge: item.badge || null,
             ctaLabel: item.ctaLabel || null,

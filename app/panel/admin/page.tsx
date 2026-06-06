@@ -15,12 +15,12 @@ export default function AdminPanelPage() {
         color: theme.tokens.colors.text.primary,
       }}
     >
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <div className="mx-auto flex w-full flex-col gap-6">
         <section>
           <h1 className="mb-4 text-admin-admin-admin text-2xl font-bold">Admin Control</h1>
           <AdminThemePanel />
         </section>
-
+        <div className="h-0.5  bg-ui-primary/30"></div>
         <AdminProductsPanel />
       </div>
     </main>

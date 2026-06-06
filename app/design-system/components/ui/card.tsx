@@ -30,7 +30,7 @@ export function CustomCard({
   border = "base",
   shadow = "sm",
   className,
-  hover = "scale",
+  hover = "lift",
   loading = "spinner",
   isLoading = false,
   loadingText,

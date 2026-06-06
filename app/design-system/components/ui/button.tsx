@@ -45,7 +45,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   isLoading = false,
   loadingText,
   disabled = false,
-  hover = "scale",
+  hover = "lift",
   icon,
   iconAfter,
   token,

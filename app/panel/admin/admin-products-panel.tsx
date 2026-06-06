@@ -13,6 +13,9 @@ type ProductForm = {
   title: string;
   description: string;
   price: string;
+  originalPrice: string;
+  discountPrice: string;
+  discountPercent: string;
   imageUrl: string;
   badge: string;
   ctaLabel: string;
@@ -28,6 +31,9 @@ const createProduct = (): ProductForm => ({
   title: "",
   description: "",
   price: "",
+  originalPrice: "",
+  discountPrice: "",
+  discountPercent: "",
   imageUrl: "",
   badge: "",
   ctaLabel: "View product",
@@ -49,26 +55,41 @@ function writeLocalProducts(products: ProductForm[]) {
   localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
 }
 
-function mergeProducts(...lists: ProductForm[][]) {
+function getProductKey(product: Partial<ProductForm>) {
+  return [
+    product.title,
+    product.description,
+    product.price,
+    product.originalPrice,
+    product.discountPrice,
+    product.imageUrl,
+  ]
+    .map((value) => String(value ?? "").trim().toLowerCase())
+    .join("|");
+}
+
+function dedupeProducts(products: ProductForm[]) {
   const seen = new Set<string>();
-  const merged: ProductForm[] = [];
 
-  for (const item of lists.flat()) {
-    const key = String(item.id ?? `${item.title}-${item.description}-${item.price}`);
-    if (seen.has(key)) continue;
+  return products.filter((product) => {
+    const key = getProductKey(product);
+    if (seen.has(key)) return false;
     seen.add(key);
-    merged.push(item);
-  }
-
-  return merged;
+    return true;
+  });
 }
 
 function normalizeProduct(item: Partial<ProductForm>, index: number): ProductForm {
+  const finalPrice = String(item.discountPrice ?? item.price ?? "");
+
   return {
     id: item.id ?? `local-${Date.now()}-${index}`,
     title: String(item.title ?? ""),
     description: String(item.description ?? ""),
-    price: String(item.price ?? ""),
+    price: finalPrice,
+    originalPrice: String(item.originalPrice ?? ""),
+    discountPrice: finalPrice,
+    discountPercent: String(item.discountPercent ?? ""),
     imageUrl: String(item.imageUrl ?? ""),
     badge: String(item.badge ?? ""),
     ctaLabel: String(item.ctaLabel ?? "View product"),
@@ -78,10 +99,29 @@ function normalizeProduct(item: Partial<ProductForm>, index: number): ProductFor
   };
 }
 
+function readPriceNumber(value: string) {
+  const normalized = value.replace(/[^0-9.]/g, "");
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function calculateDiscountPercent(originalPrice: string, discountPrice: string) {
+  const original = readPriceNumber(originalPrice);
+  const discounted = readPriceNumber(discountPrice);
+
+  if (original <= 0 || discounted <= 0 || discounted >= original) {
+    return "";
+  }
+
+  return String(Math.round(((original - discounted) / original) * 100));
+}
+
 export function AdminProductsPanel() {
   const [products, setProducts] = useState<ProductForm[]>([]);
   const [draftProduct, setDraftProduct] = useState<ProductForm>(createProduct);
+  const [editingProduct, setEditingProduct] = useState<ProductForm | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -90,9 +130,13 @@ export function AdminProductsPanel() {
       try {
         const res = await fetch("/api/products?all=1", { cache: "no-store" });
         const data = await res.json();
-        const apiProducts = Array.isArray(data?.data) ? data.data.map(normalizeProduct) : [];
-        const localProducts = readLocalProducts().map(normalizeProduct);
-        setProducts(mergeProducts(apiProducts, localProducts));
+        const apiProducts = Array.isArray(data?.data) ? dedupeProducts(data.data.map(normalizeProduct)) : [];
+        const localProducts = dedupeProducts(readLocalProducts().map(normalizeProduct));
+        const nextProducts = apiProducts.length > 0 ? apiProducts : localProducts;
+        setProducts(nextProducts);
+        if (apiProducts.length > 0) {
+          writeLocalProducts(apiProducts);
+        }
       } catch {
         setProducts(readLocalProducts().map(normalizeProduct));
       }
@@ -106,19 +150,9 @@ export function AdminProductsPanel() {
     [products]
   );
 
-  const updateProduct = (id: ProductForm["id"], patch: Partial<ProductForm>) => {
-    setProducts((current) =>
-      current.map((item) => (item.id === id ? { ...item, ...patch } : item))
-    );
-  };
-
-  const removeProduct = (id: ProductForm["id"]) => {
-    setProducts((current) => current.filter((item) => item.id !== id));
-  };
-
   const persistProducts = async (nextProducts: ProductForm[]) => {
-    const validProducts = nextProducts.filter(
-      (item) => item.title.trim() && item.description.trim() && item.price.trim()
+    const validProducts = dedupeProducts(
+      nextProducts.filter((item) => item.title.trim() && item.description.trim() && item.price.trim())
     );
 
     setSaving(true);
@@ -132,7 +166,7 @@ export function AdminProductsPanel() {
         body: JSON.stringify({ products: validProducts }),
       });
       const data = await res.json();
-      const savedProducts = Array.isArray(data?.data) ? data.data.map(normalizeProduct) : validProducts;
+      const savedProducts = Array.isArray(data?.data) ? dedupeProducts(data.data.map(normalizeProduct)) : validProducts;
       setProducts(savedProducts);
       writeLocalProducts(savedProducts);
       setStatus("Products saved.");
@@ -155,6 +189,46 @@ export function AdminProductsPanel() {
     setDraftProduct((current) => ({ ...current, ...patch }));
   };
 
+  const updateEditingProduct = (patch: Partial<ProductForm>) => {
+    setEditingProduct((current) => (current ? { ...current, ...patch } : current));
+  };
+
+  const updateDraftPricing = (patch: Partial<ProductForm>) => {
+    setDraftProduct((current) => {
+      const next = { ...current, ...patch };
+
+      if (patch.originalPrice !== undefined || patch.discountPrice !== undefined) {
+        const discountPercent = calculateDiscountPercent(next.originalPrice, next.discountPrice);
+        return {
+          ...next,
+          discountPercent,
+          price: next.discountPrice,
+        };
+      }
+
+      return next;
+    });
+  };
+
+  const updateEditingPricing = (patch: Partial<ProductForm>) => {
+    setEditingProduct((current) => {
+      if (!current) return current;
+
+      const next = { ...current, ...patch };
+
+      if (patch.originalPrice !== undefined || patch.discountPrice !== undefined) {
+        const discountPercent = calculateDiscountPercent(next.originalPrice, next.discountPrice);
+        return {
+          ...next,
+          discountPercent,
+          price: next.discountPrice,
+        };
+      }
+
+      return next;
+    });
+  };
+
   const handleImageUpload = (file: File | null) => {
     if (!file) return;
 
@@ -165,9 +239,26 @@ export function AdminProductsPanel() {
     reader.readAsDataURL(file);
   };
 
+  const handleEditImageUpload = (file: File | null) => {
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateEditingProduct({ imageUrl: String(reader.result ?? "") });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const openEditModal = (product: ProductForm) => {
+    setEditingProduct(product);
+    setIsEditOpen(true);
+  };
+
   const submitDraftProduct = async () => {
-    if (!draftProduct.title.trim() || !draftProduct.description.trim() || !draftProduct.price.trim()) {
-      setStatus("Title, description, and price are required.");
+    if (saving) return;
+
+    if (!draftProduct.title.trim() || !draftProduct.description.trim() || !draftProduct.discountPrice.trim()) {
+      setStatus("Title, description, and new price are required.");
       return;
     }
 
@@ -177,108 +268,54 @@ export function AdminProductsPanel() {
     await persistProducts(nextProducts);
   };
 
+  const submitEditingProduct = async () => {
+    if (saving) return;
+    if (!editingProduct) return;
+
+    if (!editingProduct.title.trim() || !editingProduct.description.trim() || !editingProduct.discountPrice.trim()) {
+      setStatus("Title, description, and new price are required.");
+      return;
+    }
+
+    const nextProducts = products.map((item) =>
+      item.id === editingProduct.id ? editingProduct : item
+    );
+    setProducts(nextProducts);
+    setIsEditOpen(false);
+    setEditingProduct(null);
+    await persistProducts(nextProducts);
+  };
+
+  const deleteEditingProduct = async () => {
+    if (saving) return;
+    if (!editingProduct) return;
+
+    const editingKey = getProductKey(editingProduct);
+    const nextProducts = products.filter(
+      (item) => item.id !== editingProduct.id && getProductKey(item) !== editingKey
+    );
+    setProducts(nextProducts);
+    setIsEditOpen(false);
+    setEditingProduct(null);
+    await persistProducts(nextProducts);
+  };
+
   return (
-    <section className="flex w-full max-w-5xl flex-col gap-4 rounded-lg border border-ui-primary/30 bg-bg-surface p-4 pb-24">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">Products</h2>
-          <p className="text-sm text-text-secondary">Manage the product showcase cards.</p>
-        </div>
-        <div className="flex gap-2">
+    <section className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-ui-primary/30 bg-bg-surface p-4">
+      <div className="grid gap-4">
+        {sortedProducts.map((product, index) => (
           <CustomButton
-            size="sm"
+            key={product.id}
+            fullWidth
             border="base"
-            isLoading={saving}
-            loading="dots"
-            loadingText="Saving..."
-            icon={<IoSaveOutline />}
-            onClick={saveProducts}
+            rounded="md"
+            variant={product.active ? "primary" : "neutral"}
+            onClick={() => openEditModal(product)}
           >
-            Save
+            {product.title || `Product ${index + 1}`}
           </CustomButton>
-        </div>
+        ))}
       </div>
-
-      {status && <div className="text-sm font-semibold text-ui-primary">{status}</div>}
-
-      {sortedProducts.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-ui-primary/30 bg-bg-base p-6 text-sm text-text-secondary">
-          No products registered yet.
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {sortedProducts.map((product, index) => (
-            <div key={product.id} className="grid gap-3 rounded-lg border border-ui-primary/20 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-bold">Product {index + 1}</div>
-              <div className="flex items-center gap-3">
-                <CustomSwitch
-                  checked={product.active}
-                  onChange={(active) => updateProduct(product.id, { active })}
-                  label={product.active ? "Active" : "Hidden"}
-                  size="sm"
-                />
-                <CustomButton
-                  size="sm"
-                  variant="danger"
-                  border="base"
-                  icon={<IoTrashOutline />}
-                  onClick={() => removeProduct(product.id)}
-                >
-                  Delete
-                </CustomButton>
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <CustomInput
-                value={product.title}
-                placeholder="Title"
-                onChange={(event) => updateProduct(product.id, { title: event.target.value })}
-              />
-              <CustomInput
-                value={product.price}
-                placeholder="Price"
-                onChange={(event) => updateProduct(product.id, { price: event.target.value })}
-              />
-              <CustomInput
-                value={product.imageUrl}
-                placeholder="Image URL"
-                onChange={(event) => updateProduct(product.id, { imageUrl: event.target.value })}
-              />
-              <CustomInput
-                value={product.badge}
-                placeholder="Badge"
-                onChange={(event) => updateProduct(product.id, { badge: event.target.value })}
-              />
-              <CustomInput
-                value={product.ctaLabel}
-                placeholder="CTA label"
-                onChange={(event) => updateProduct(product.id, { ctaLabel: event.target.value })}
-              />
-              <CustomInput
-                value={product.ctaHref}
-                placeholder="CTA href"
-                onChange={(event) => updateProduct(product.id, { ctaHref: event.target.value })}
-              />
-              <CustomInput
-                type="number"
-                value={product.sortOrder}
-                placeholder="Sort order"
-                onChange={(event) => updateProduct(product.id, { sortOrder: Number(event.target.value) })}
-              />
-            </div>
-
-            <textarea
-              value={product.description}
-              placeholder="Description"
-              onChange={(event) => updateProduct(product.id, { description: event.target.value })}
-              className="min-h-24 rounded-md border border-ui-primary/30 bg-bg-base p-3 text-sm text-text-primary outline-none focus:ring-2 focus:ring-ui-primary/30"
-            />
-            </div>
-          ))}
-        </div>
-      )}
 
       <FloatButton
         label="New product"
@@ -298,7 +335,7 @@ export function AdminProductsPanel() {
         border="base"
         shadow="lg"
       >
-        <div className="grid max-h-[70vh] gap-3 overflow-y-auto pr-1">
+        <div className="grid max-h-[80vh] gap-3 overflow-y-auto pr-1">
           <div className="grid gap-3 md:grid-cols-2">
             <CustomInput
               value={draftProduct.title}
@@ -306,9 +343,14 @@ export function AdminProductsPanel() {
               onChange={(event) => updateDraftProduct({ title: event.target.value })}
             />
             <CustomInput
-              value={draftProduct.price}
-              placeholder="Price"
-              onChange={(event) => updateDraftProduct({ price: event.target.value })}
+              value={draftProduct.originalPrice}
+              placeholder="Price before discount"
+              onChange={(event) => updateDraftPricing({ originalPrice: event.target.value })}
+            />
+            <CustomInput
+              value={draftProduct.discountPrice}
+              placeholder="Discounted price"
+              onChange={(event) => updateDraftPricing({ discountPrice: event.target.value })}
             />
             <CustomInput
               value={draftProduct.badge}
@@ -331,6 +373,10 @@ export function AdminProductsPanel() {
               placeholder="CTA href"
               onChange={(event) => updateDraftProduct({ ctaHref: event.target.value })}
             />
+          </div>
+
+          <div className="rounded-md border border-ui-primary/20 bg-bg-base p-3 text-xs text-text-secondary">
+            Discount formula: ((price before discount - discounted price) / price before discount) x 100
           </div>
 
           <textarea
@@ -389,6 +435,131 @@ export function AdminProductsPanel() {
             Register product
           </CustomButton>
         </div>
+      </CustomModal>
+
+      <CustomModal
+        open={isEditOpen}
+        onClose={() => {
+          setIsEditOpen(false);
+          setEditingProduct(null);
+        }}
+        title={editingProduct?.title || "Edit product"}
+        closeText="Close"
+        rounded="lg"
+        border="base"
+        shadow="lg"
+      >
+        {editingProduct && (
+          <div className="grid max-h-[80vh] gap-3 overflow-y-auto pr-1">
+            <div className="grid gap-3 md:grid-cols-2">
+              <CustomInput
+                value={editingProduct.title}
+                placeholder="Title"
+                onChange={(event) => updateEditingProduct({ title: event.target.value })}
+              />
+              <CustomInput
+                value={editingProduct.originalPrice}
+                placeholder="Price before discount"
+                onChange={(event) => updateEditingPricing({ originalPrice: event.target.value })}
+              />
+              <CustomInput
+                value={editingProduct.discountPrice}
+                placeholder="Discounted price"
+                onChange={(event) => updateEditingPricing({ discountPrice: event.target.value })}
+              />
+              <CustomInput
+                value={editingProduct.badge}
+                placeholder="Badge"
+                onChange={(event) => updateEditingProduct({ badge: event.target.value })}
+              />
+              <CustomInput
+                type="number"
+                value={editingProduct.sortOrder}
+                placeholder="Sort order"
+                onChange={(event) => updateEditingProduct({ sortOrder: Number(event.target.value) })}
+              />
+              <CustomInput
+                value={editingProduct.ctaLabel}
+                placeholder="CTA label"
+                onChange={(event) => updateEditingProduct({ ctaLabel: event.target.value })}
+              />
+              <CustomInput
+                value={editingProduct.ctaHref}
+                placeholder="CTA href"
+                onChange={(event) => updateEditingProduct({ ctaHref: event.target.value })}
+              />
+            </div>
+
+            <div className="rounded-md border border-ui-primary/20 bg-bg-base p-3 text-xs text-text-secondary">
+              Discount formula: ((price before discount - discounted price) / price before discount) x 100
+            </div>
+
+            <textarea
+              value={editingProduct.description}
+              placeholder="Description"
+              onChange={(event) => updateEditingProduct({ description: event.target.value })}
+              className="min-h-24 rounded-md border border-ui-primary/30 bg-bg-base p-3 text-sm text-text-primary outline-none focus:ring-2 focus:ring-ui-primary/30"
+            />
+
+            <div className="grid gap-3 rounded-lg border border-ui-primary/20 p-3">
+              <div className="text-sm font-bold">Product image</div>
+              <CustomInput
+                value={editingProduct.imageUrl}
+                placeholder="Image URL or uploaded image data"
+                onChange={(event) => updateEditingProduct({ imageUrl: event.target.value })}
+              />
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ui-primary/40 bg-bg-base p-4 text-sm font-semibold text-text-secondary transition hover:bg-ui-primary/10">
+                <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
+                Upload image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => handleEditImageUpload(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <div className="flex h-40 items-center justify-center overflow-hidden rounded-md border border-ui-primary/20 bg-bg-base">
+                {editingProduct.imageUrl ? (
+                  <img
+                    src={editingProduct.imageUrl}
+                    alt="Product preview"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-sm text-text-secondary">Image preview</span>
+                )}
+              </div>
+            </div>
+
+            <CustomSwitch
+              checked={editingProduct.active}
+              onChange={(active) => updateEditingProduct({ active })}
+              label={editingProduct.active ? "Active" : "Hidden"}
+              size="sm"
+            />
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <CustomButton
+                variant="danger"
+                border="base"
+                icon={<IoTrashOutline />}
+                onClick={deleteEditingProduct}
+              >
+                Delete
+              </CustomButton>
+              <CustomButton
+                border="base"
+                isLoading={saving}
+                loading="dots"
+                loadingText="Saving..."
+                icon={<IoSaveOutline />}
+                onClick={submitEditingProduct}
+              >
+                Save changes
+              </CustomButton>
+            </div>
+          </div>
+        )}
       </CustomModal>
     </section>
   );

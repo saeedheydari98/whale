@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { IoArrowBack, IoClose, IoMenu } from "react-icons/io5";
 import Toggle from "../shared/toggle";
 import { useTheme } from "../../theme/provider";
@@ -17,12 +17,74 @@ const navItems = [
   { href: "/panel/user", label: "user panel", tone: "bg-ui-primary text-white" },
 ];
 
+const CART_STORAGE_KEY = "product-cart";
+const CART_UPDATED_EVENT = "product-cart-updated";
+
+function readCartCount() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
+    if (!Array.isArray(parsed)) return 0;
+
+    return parsed.reduce((sum, item) => {
+      const quantity = Number(item?.quantity);
+      return sum + (Number.isFinite(quantity) ? quantity : 0);
+    }, 0);
+  } catch {
+    return 0;
+  }
+}
+
+function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
+  return (
+    <Link
+      href="/cart"
+      onClick={onClick}
+      className="relative inline-flex items-center justify-center p-1 text-ui-secondary transition-all hover:scale-110"
+      aria-label="cart"
+    >
+      <svg
+        aria-hidden="true"
+        className="h-6 w-6"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+      >
+        <path d="M6 6h15l-1.5 8.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.6L5 3H2" />
+        <circle cx="9" cy="20" r="1" />
+        <circle cx="18" cy="20" r="1" />
+      </svg>
+      {count > 0 && (
+        <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 export function AppHeader() {
   const { mode, setMode } = useTheme();
   const hideHeader = useScrollHeaderHide(10);
   const isMobile = useIsMobile();
   const { goBack, showBackButton } = useBackNavigation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+
+  useEffect(() => {
+    const syncCartCount = () => setCartCount(readCartCount());
+
+    syncCartCount();
+    window.addEventListener("storage", syncCartCount);
+    window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
+
+    return () => {
+      window.removeEventListener("storage", syncCartCount);
+      window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
+    };
+  }, []);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
@@ -49,13 +111,14 @@ export function AppHeader() {
               <IoArrowBack aria-hidden="true" />
             </button>
           )}
-          <div className="text-sm font-bold text-text-primary border-b-2 border-red-600">
+          <div className="text-sm font-bold text-text-primary border-b-2 border-ui-secondary">
             LiveUiBook
           </div>
           <Toggle
             checked={mode === "dark"}
             onChange={(isDark: boolean) => setMode(isDark ? "dark" : "light")}
           />
+          <CartLink count={cartCount} />
         </div>
 
 

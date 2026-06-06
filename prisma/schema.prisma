@@ -49,6 +49,9 @@ model Product {
   title       String
   description String
   price       String
+  originalPrice   String?
+  discountPrice   String?
+  discountPercent Int?
   imageUrl    String?
   badge       String?
   ctaLabel    String?
