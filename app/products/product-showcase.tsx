@@ -145,10 +145,10 @@ export function ProductShowcase() {
     <main className="min-h-screen bg-bg-base text-text-primary">
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
         <div className="flex flex-col gap-2 border-b border-ui-primary/30 pb-4">
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="max-w-2xl text-sm text-text-secondary">
+          <div className="text-3xl font-bold">Products</div>
+          <div className="max-w-2xl text-sm text-text-secondary">
             A dynamic product showcase managed from the admin panel.
-          </p>
+          </div>
         </div>
 
         {loading && <div className="text-sm text-text-secondary">Loading products...</div>}
@@ -192,7 +192,7 @@ export function ProductShowcase() {
 
               <div className="flex min-h-56 flex-col gap-3 p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-lg font-bold">{product.title}</h2>
+                  <div className="text-lg font-bold">{product.title}</div>
                   <div className="shrink-0 text-right">
                     {product.originalPrice && getDiscountPercent(product) > 0 && (
                       <div className="text-xs text-text-secondary line-through">
@@ -207,7 +207,7 @@ export function ProductShowcase() {
                     {getDiscountPercent(product)}% off
                   </CustomTag>
                 )}
-                <p className="flex-1 text-sm leading-6 text-text-secondary">{product.description}</p>
+                <div className="flex-1 text-sm leading-6 text-text-secondary">{product.description}</div>
                 <div className="flex flex-wrap gap-2">
                   <CustomButton
                     type="button"

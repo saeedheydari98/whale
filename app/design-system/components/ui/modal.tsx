@@ -60,13 +60,15 @@ export function CustomModal({
         loading={loading}
         loadingText={loadingText}
       >
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-xl font-bold">{title}</h2>
-          <CustomButton variant={variant} size="sm" onClick={onClose} disabled={isLoading}>
-            {closeText}
-          </CustomButton>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xl font-bold">{title}</div>
+            <CustomButton variant={variant} size="sm" onClick={onClose} disabled={isLoading}>
+              {closeText}
+            </CustomButton>
+          </div>
+          <div>{children}</div>
         </div>
-        <div>{children}</div>
       </CustomCard>
     </div>
   );

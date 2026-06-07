@@ -1,0 +1,18 @@
+---
+description: Project rules for the Next.js admin/product app
+globs:
+  - "**/*"
+alwaysApply: true
+---
+
+Follow `AGENTS.md` and `.agents/skills/next-project-guidelines/SKILL.md`.
+
+- This project uses Next.js 16. Read relevant docs in `node_modules/next/dist/docs/` before writing Next.js-specific code.
+- Keep every visible UI text node in `div` or `span` only. Do not use `p` or `h1`-`h6`.
+- Set typography with explicit `text-*` and `font-*` classes.
+- Preserve the existing visual appearance when refactoring existing UI.
+- Use flexbox and `gap-*` where it does not alter appearance. Avoid grid and left/right margin or padding in new code, but keep them when required for current spacing, alignment, or responsive layout.
+- Avoid positioning in new code, but keep it when required for overlays, badges, modal layers, input icons, or current visual behavior.
+- Style with Tailwind classes and existing custom components from `app/design-system`; prefer repository patterns.
+- Do not revert user changes or refactor unrelated code.
+- Run `npx tsc --noEmit` after code changes and `npm run build` for broader Next.js changes.

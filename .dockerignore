@@ -4,3 +4,15 @@
 README.md
 Dockerfile
 .dockerignore
+node_modules
+.next/*
+!.next/standalone/
+!.next/standalone/**
+!.next/static/
+!.next/static/**
+.storybook
+.offline
+storybook-static
+stories
+debug-storybook.log
+tsconfig.tsbuildinfo

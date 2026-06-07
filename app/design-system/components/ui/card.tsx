@@ -52,15 +52,17 @@ export function CustomCard({
       )}
       style={{ borderColor: colorStyle.borderColor }}
     >
-      {title && <h3 className="mb-2 text-lg font-semibold">{title}</h3>}
       <div>
-        {isLoading && (
-          <div className="flex items-center gap-2 text-text-secondary">
-            <Loading loading={loading} size={size} />
-            {loadingText && <span>{loadingText}</span>}
-          </div>
-        )}
-        {!isLoading && children}
+        {title && <div className="mb-2 text-lg font-semibold">{title}</div>}
+        <div>
+          {isLoading && (
+            <div className="flex items-center gap-2 text-text-secondary">
+              <Loading loading={loading} size={size} />
+              {loadingText && <span>{loadingText}</span>}
+            </div>
+          )}
+          {!isLoading && children}
+        </div>
       </div>
     </article>
   );

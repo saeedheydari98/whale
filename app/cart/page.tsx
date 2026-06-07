@@ -111,12 +111,12 @@ export default function CartPage() {
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
         <div className="flex items-center justify-between gap-3 border-b border-ui-primary/30 pb-4">
           <div>
-            <h1 className="text-3xl font-bold">Cart</h1>
-            <p className="text-sm text-text-secondary">{totalItems} item(s) in cart</p>
+            <div className="text-3xl font-bold">Cart</div>
+            <div className="text-sm text-text-secondary">{totalItems} item(s) in cart</div>
             {items.length > 0 && (
-              <p className="mt-1 text-base font-bold text-ui-primary">
+              <div className="mt-1 text-base font-bold text-ui-primary">
                 Total: {formatPrice(cartTotal)}
-              </p>
+              </div>
             )}
           </div>
           {items.length > 0 && (
@@ -145,8 +145,8 @@ export default function CartPage() {
                   )}
                 </div>
                 <div className="grid gap-2">
-                  <h2 className="text-lg font-bold">{item.title}</h2>
-                  <p className="text-sm text-text-secondary">{item.description}</p>
+                  <div className="text-lg font-bold">{item.title}</div>
+                  <div className="text-sm text-text-secondary">{item.description}</div>
                   <div className="text-sm font-semibold text-ui-primary">
                     {item.originalPrice && getDiscountPercent(item) > 0 && (
                       <span className="mr-2 text-text-secondary line-through">

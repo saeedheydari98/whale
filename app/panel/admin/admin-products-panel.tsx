@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { IoAdd, IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../../design-system/components/ui/button";
-import { FloatButton } from "../../design-system/components/ui/float-button";
 import { CustomInput } from "../../design-system/components/ui/input";
 import { CustomModal } from "../../design-system/components/ui/modal";
 import { CustomSwitch } from "../../design-system/components/ui/switch";
+import { FloatButton } from "@/app/design-system/components/ui/float-button";
 
 type ProductForm = {
   id: number | string;
@@ -302,7 +302,8 @@ export function AdminProductsPanel() {
 
   return (
     <section className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-ui-primary/30 bg-bg-surface p-4">
-      <div className="grid gap-4">
+      <div className="text-base font-bold">products</div>
+      <div className="flex flex-col gap-4">
         {sortedProducts.map((product, index) => (
           <CustomButton
             key={product.id}
@@ -335,8 +336,8 @@ export function AdminProductsPanel() {
         border="base"
         shadow="lg"
       >
-        <div className="grid max-h-[80vh] gap-3 overflow-y-auto pr-1">
-          <div className="grid gap-3 md:grid-cols-2">
+        <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
+          <div className="flex flex-col gap-3">
             <CustomInput
               value={draftProduct.title}
               placeholder="Title"
@@ -375,8 +376,10 @@ export function AdminProductsPanel() {
             />
           </div>
 
-          <div className="rounded-md border border-ui-primary/20 bg-bg-base p-3 text-xs text-text-secondary">
-            Discount formula: ((price before discount - discounted price) / price before discount) x 100
+          <div className="flex min-h-10 items-center rounded-md border border-ui-primary/20 bg-bg-base">
+            <span className="text-xs text-text-secondary">
+              Discount formula: ((price before discount - discounted price) / price before discount) x 100
+            </span>
           </div>
 
           <textarea
@@ -386,16 +389,16 @@ export function AdminProductsPanel() {
             className="min-h-24 rounded-md border border-ui-primary/30 bg-bg-base p-3 text-sm text-text-primary outline-none focus:ring-2 focus:ring-ui-primary/30"
           />
 
-          <div className="grid gap-3 rounded-lg border border-ui-primary/20 p-3">
+          <div className="flex flex-col gap-3 rounded-lg border border-ui-primary/20">
             <div className="text-sm font-bold">Product image</div>
             <CustomInput
               value={draftProduct.imageUrl}
               placeholder="Image URL or uploaded image data"
               onChange={(event) => updateDraftProduct({ imageUrl: event.target.value })}
             />
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ui-primary/40 bg-bg-base p-4 text-sm font-semibold text-text-secondary transition hover:bg-ui-primary/10">
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ui-primary/40 bg-bg-base py-4 text-sm font-semibold text-text-secondary transition hover:bg-ui-primary/10">
               <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-              Upload image
+              <span className="text-sm font-semibold">Upload image</span>
               <input
                 type="file"
                 accept="image/*"
@@ -450,8 +453,8 @@ export function AdminProductsPanel() {
         shadow="lg"
       >
         {editingProduct && (
-          <div className="grid max-h-[80vh] gap-3 overflow-y-auto pr-1">
-            <div className="grid gap-3 md:grid-cols-2">
+          <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
+            <div className="flex flex-col gap-3">
               <CustomInput
                 value={editingProduct.title}
                 placeholder="Title"
@@ -490,8 +493,10 @@ export function AdminProductsPanel() {
               />
             </div>
 
-            <div className="rounded-md border border-ui-primary/20 bg-bg-base p-3 text-xs text-text-secondary">
-              Discount formula: ((price before discount - discounted price) / price before discount) x 100
+            <div className="flex min-h-10 items-center rounded-md border border-ui-primary/20 bg-bg-base">
+              <span className="text-xs text-text-secondary">
+                Discount formula: ((price before discount - discounted price) / price before discount) x 100
+              </span>
             </div>
 
             <textarea
@@ -501,16 +506,16 @@ export function AdminProductsPanel() {
               className="min-h-24 rounded-md border border-ui-primary/30 bg-bg-base p-3 text-sm text-text-primary outline-none focus:ring-2 focus:ring-ui-primary/30"
             />
 
-            <div className="grid gap-3 rounded-lg border border-ui-primary/20 p-3">
+            <div className="flex flex-col gap-3 rounded-lg border border-ui-primary/20">
               <div className="text-sm font-bold">Product image</div>
               <CustomInput
                 value={editingProduct.imageUrl}
                 placeholder="Image URL or uploaded image data"
                 onChange={(event) => updateEditingProduct({ imageUrl: event.target.value })}
               />
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ui-primary/40 bg-bg-base p-4 text-sm font-semibold text-text-secondary transition hover:bg-ui-primary/10">
+              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-ui-primary/40 bg-bg-base py-4 text-sm font-semibold text-text-secondary transition hover:bg-ui-primary/10">
                 <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-                Upload image
+                <span className="text-sm font-semibold">Upload image</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -538,10 +543,11 @@ export function AdminProductsPanel() {
               size="sm"
             />
 
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <CustomButton
                 variant="danger"
                 border="base"
+                fullWidth
                 icon={<IoTrashOutline />}
                 onClick={deleteEditingProduct}
               >
@@ -552,6 +558,7 @@ export function AdminProductsPanel() {
                 isLoading={saving}
                 loading="dots"
                 loadingText="Saving..."
+                fullWidth
                 icon={<IoSaveOutline />}
                 onClick={submitEditingProduct}
               >
