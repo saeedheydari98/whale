@@ -1,20 +1,26 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import React from "react";
 import { CustomSwitch } from "../../app/design-system/components/ui/switch";
+import { borderOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 const meta = {
   title: "Design System/CustomSwitch",
   component: CustomSwitch,
   tags: ["autodocs"],
   argTypes: {
-    variant: { control: "select", options: ["primary", "secondary", "success", "danger", "warning", "info", "neutral"] },
-    size: { control: "select", options: ["xs", "sm", "md", "lg", "xl", "xxl", "xxxl"] },
-    rounded: { control: "select", options: ["none", "sm", "md", "lg", "xl", "full"] },
-    border: { control: "select", options: ["none", "base", "border-b", "subtle", "strong", "heavy", "dashed", "dotted"] },
-    shadow: { control: "select", options: ["none", "sm", "md", "lg", "xl"] },
-    loading: { control: "select", options: ["spinner", "ring", "dots", "pulse", "bars", "skeleton", "skeleton-block"] },
+    label: { control: "text" },
+    disabled: { control: "boolean" },
+    customColor: { control: "color" },
+    variant: { control: "select", options: variantOptions },
+    size: { control: "select", options: sizeOptions },
+    rounded: { control: "select", options: roundedOptions },
+    border: { control: "select", options: borderOptions },
+    shadow: { control: "select", options: shadowOptions },
+    loading: { control: "select", options: loadingOptions },
     isLoading: { control: "boolean" },
     loadingText: { control: "text" },
+    checked: { table: { disable: true } },
+    onChange: { table: { disable: true } },
   },
   args: {
     label: "Enable feature",
@@ -23,6 +29,8 @@ const meta = {
     rounded: "full",
     border: "base",
     shadow: "none",
+    disabled: false,
+    customColor: "",
     isLoading: false,
     loading: "spinner",
     loadingText: "Saving...",

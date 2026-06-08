@@ -1,7 +1,5 @@
-// app/api/save/route.ts
-
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server"; 
 
 export const runtime = "nodejs";
 
@@ -9,7 +7,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // Basic validation
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
@@ -33,8 +30,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json({ ok: true, saved });
-  } catch (error) {
-    console.error("Save error:", error);
-    return NextResponse.json({ error: "خطا در ذخیره" }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, saved: null });
   }
 }

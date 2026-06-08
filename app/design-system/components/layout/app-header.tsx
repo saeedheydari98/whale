@@ -8,13 +8,14 @@ import { useTheme } from "../../theme/provider";
 import { useScrollHeaderHide } from "@/hooks/useScrollHeaderHide";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useBackNavigation } from "@/hooks/useBackNavigation";
+import { RiShoppingCartFill } from "react-icons/ri";
 
 const navItems = [
-  { href: "/", label: "home", tone: "bg-ui-primary text-white" },
-  { href: "/products", label: "products", tone: "bg-ui-primary text-white" },
-  { href: "/date.converter", label: "date converter", tone: "bg-ui-primary text-white" },
-  { href: "/panel/admin", label: "admin panel", tone: "bg-ui-primary text-white" },
-  { href: "/panel/user", label: "user panel", tone: "bg-ui-primary text-white" },
+  { href: "/", label: "home", tone: "bg-admin-admin-800 text-admin-admin-100" },
+  { href: "/products", label: "products", tone: "bg-admin-admin-800 text-admin-admin-100" },
+  { href: "/date.converter", label: "date converter", tone: "bg-admin-admin-800 text-admin-admin-100" },
+  { href: "/panel/admin", label: "admin panel", tone: "bg-admin-admin-800 text-admin-admin-100" },
+  { href: "/panel/user", label: "user panel", tone: "bg-admin-admin-800 text-admin-admin-100" },
 ];
 
 const CART_STORAGE_KEY = "product-cart";
@@ -42,20 +43,7 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
       className="relative inline-flex items-center justify-center p-1 text-ui-secondary transition-all hover:scale-110"
       aria-label="cart"
     >
-      <svg
-        aria-hidden="true"
-        className="h-6 w-6"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="2"
-        viewBox="0 0 24 24"
-      >
-        <path d="M6 6h15l-1.5 8.5a2 2 0 0 1-2 1.5H9a2 2 0 0 1-2-1.6L5 3H2" />
-        <circle cx="9" cy="20" r="1" />
-        <circle cx="18" cy="20" r="1" />
-      </svg>
+      <RiShoppingCartFill size={24}/>
       {count > 0 && (
         <span className="absolute -right-1 -top-1 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white">
           {count > 99 ? "99+" : count}
@@ -93,7 +81,7 @@ export function AppHeader() {
     <header
       className={`
         sticky top-0 z-30 border-b border-ui-primary/20 
-        bg-bg-base/90 backdrop-blur flex justify-center items-center 
+        bg-user-user-50 backdrop-blur flex justify-center items-center 
         w-full h-20 transition-transform duration-300
         ${hideHeader ? '-translate-y-full' : 'translate-y-0'}
       `}
@@ -134,14 +122,6 @@ export function AppHeader() {
                 {item.label}
               </Link>
             ))}
-            <a
-              className="rounded-md px-4 py-2 text-sm font-semibold text-white bg-ui-primary transition-all hover:scale-105"
-              href="http://localhost:6006"
-              target="_blank"
-              rel="noreferrer"
-            >
-              storybook
-            </a>
           </nav>
         )}
 
@@ -162,8 +142,8 @@ export function AppHeader() {
 
       {/* Mobile Menu Dropdown - Glassmorphic Background */}
       {isMobile && isMenuOpen && (
-        <div className="absolute top-20 left-0 right-0 z-20 ">
-          <div className="flex flex-col p-4 gap-2 max-w-5xl mx-auto">
+        <div className="absolute top-20 w-1/2  right-0 z-20 bg-admin-admin-50 border-b border-ui-primary/20 backdrop-blur-md shadow-lg">
+          <div className="flex flex-col p-4 gap-2  mx-auto">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -174,15 +154,6 @@ export function AppHeader() {
                 {item.label}
               </Link>
             ))}
-            <a
-              className="rounded-md px-4 py-3 text-sm font-semibold text-white transition-all hover:scale-105 text-center backdrop-blur-md bg-ui-primary border border-ui-primary/20 "
-              href="http://localhost:6006"
-              target="_blank"
-              rel="noreferrer"
-              onClick={closeMenu}
-            >
-              storybook
-            </a>
           </div>
         </div>
       )}

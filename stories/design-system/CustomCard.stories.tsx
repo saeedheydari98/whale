@@ -1,18 +1,21 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { CustomCard } from "../../app/design-system/components/ui/card";
+import { borderOptions, hoverOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 const meta = {
   title: "Design System/CustomCard",
   component: CustomCard,
   tags: ["autodocs"],
   argTypes: {
-    variant: { control: "select", options: ["primary", "secondary", "success", "danger", "warning", "info", "neutral"] },
-    size: { control: "select", options: ["xs", "sm", "md", "lg", "xl", "xxl", "xxxl"] },
-    rounded: { control: "select", options: ["none", "sm", "md", "lg", "xl", "full"] },
-    border: { control: "select", options: ["none", "base", "border-b", "subtle", "strong", "heavy", "dashed", "dotted"] },
-    shadow: { control: "select", options: ["none", "sm", "md", "lg", "xl"] },
-    hover: { control: "select", options: ["none", "scale", "lift", "darken", "drken"] },
-    loading: { control: "select", options: ["spinner", "ring", "dots", "pulse", "bars", "skeleton", "skeleton-block"] },
+    title: { control: "text" },
+    children: { control: "text" },
+    variant: { control: "select", options: variantOptions },
+    size: { control: "select", options: sizeOptions },
+    rounded: { control: "select", options: roundedOptions },
+    border: { control: "select", options: borderOptions },
+    shadow: { control: "select", options: shadowOptions },
+    hover: { control: "select", options: hoverOptions },
+    loading: { control: "select", options: loadingOptions },
     isLoading: { control: "boolean" },
     loadingText: { control: "text" },
   },

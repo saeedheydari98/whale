@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { FaArrowRight, FaPlus } from "react-icons/fa";
 import { fn } from "storybook/test";
 import { FloatButton } from "../../app/design-system/components/ui/float-button";
+import { borderOptions, cursorOptions, hoverOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 type StoryArgs = ComponentProps<typeof FloatButton> & {
   icon?: boolean;
@@ -14,15 +15,18 @@ const meta = {
   component: FloatButton,
   tags: ["autodocs"],
   argTypes: {
-    variant: { control: "select", options: ["primary", "secondary", "success", "danger", "warning", "info", "neutral"] },
-    size: { control: "select", options: ["xs", "sm", "md", "lg", "xl", "xxl", "xxxl"] },
-    rounded: { control: "select", options: ["none", "sm", "md", "lg", "xl", "full"] },
-    border: { control: "select", options: ["none", "base", "border-b", "subtle", "strong", "heavy", "dashed", "dotted"] },
-    shadow: { control: "select", options: ["none", "sm", "md", "lg", "xl"] },
-    hover: { control: "select", options: ["none", "scale", "lift", "darken", "drken"] },
-    cursor: { control: "select", options: ["none", "pointer", "notAllowed"] },
+    label: { control: "text" },
+    variant: { control: "select", options: variantOptions },
+    size: { control: "select", options: sizeOptions },
+    rounded: { control: "select", options: roundedOptions },
+    border: { control: "select", options: borderOptions },
+    shadow: { control: "select", options: shadowOptions },
+    hover: { control: "select", options: hoverOptions },
+    cursor: { control: "select", options: cursorOptions },
+    fullWidth: { control: "boolean" },
+    disabled: { control: "boolean" },
     position: { control: "select", options: ["bottom-right", "bottom-left"] },
-    loading: { control: "select", options: ["spinner", "ring", "dots", "pulse", "bars", "skeleton", "skeleton-block"] },
+    loading: { control: "select", options: loadingOptions },
     isLoading: { control: "boolean" },
     loadingText: { control: "text" },
     icon: { control: "boolean" },
@@ -37,6 +41,8 @@ const meta = {
     shadow: "lg",
     hover: "lift",
     cursor: "pointer",
+    fullWidth: false,
+    disabled: false,
     position: "bottom-right",
     isLoading: false,
     loading: "spinner",

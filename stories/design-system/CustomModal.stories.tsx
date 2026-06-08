@@ -2,20 +2,25 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import React from "react";
 import { CustomButton } from "../../app/design-system/components/ui/button";
 import { CustomModal } from "../../app/design-system/components/ui/modal";
+import { borderOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 const meta = {
   title: "Design System/CustomModal",
   component: CustomModal,
   tags: ["autodocs"],
   argTypes: {
-    variant: { control: "select", options: ["primary", "secondary", "success", "danger", "warning", "info", "neutral"] },
-    size: { control: "select", options: ["xs", "sm", "md", "lg", "xl", "xxl", "xxxl"] },
-    rounded: { control: "select", options: ["none", "sm", "md", "lg", "xl", "full"] },
-    border: { control: "select", options: ["none", "base", "border-b", "subtle", "strong", "heavy", "dashed", "dotted"] },
-    shadow: { control: "select", options: ["none", "sm", "md", "lg", "xl"] },
-    loading: { control: "select", options: ["spinner", "ring", "dots", "pulse", "bars", "skeleton", "skeleton-block"] },
+    title: { control: "text" },
+    closeText: { control: "text" },
+    variant: { control: "select", options: variantOptions },
+    size: { control: "select", options: sizeOptions },
+    rounded: { control: "select", options: roundedOptions },
+    border: { control: "select", options: borderOptions },
+    shadow: { control: "select", options: shadowOptions },
+    loading: { control: "select", options: loadingOptions },
     isLoading: { control: "boolean" },
     loadingText: { control: "text" },
+    open: { table: { disable: true } },
+    onClose: { table: { disable: true } },
   },
   args: {
     title: "Confirm Action",

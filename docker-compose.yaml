@@ -27,5 +27,13 @@ services:
       postgres:
         condition: service_healthy
 
+  storybook:
+    build:
+      context: .
+      dockerfile: Dockerfile.storybook
+    container_name: my-storybook
+    ports:
+      - "6006:6006"
+
 volumes:
   postgres_data:

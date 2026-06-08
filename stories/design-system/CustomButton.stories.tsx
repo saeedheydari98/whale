@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { FaRegStar } from "react-icons/fa";
 import { fn } from "storybook/test";
 import { CustomButton } from "../../app/design-system/components/ui/button";
+import { borderOptions, cursorOptions, hoverOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 type StoryArgs = ComponentProps<typeof CustomButton> & {
   icon?: boolean;
@@ -14,13 +15,17 @@ const meta = {
   component: CustomButton,
   tags: ["autodocs"],
   argTypes: {
-    variant: { control: "select", options: ["primary", "secondary", "success", "danger", "warning", "info", "neutral"] },
-    size: { control: "select", options: ["xs", "sm", "md", "lg", "xl", "xxl", "xxxl"] },
-    hover: { control: "select", options: ["none", "scale", "lift", "darken", "drken"] },
-    rounded: { control: "select", options: ["none", "sm", "md", "lg", "xl", "full"] },
-    border: { control: "select", options: ["none", "base", "border-b", "subtle", "strong", "heavy", "dashed", "dotted"] },
-    shadow: { control: "select", options: ["none", "sm", "md", "lg", "xl"] },
-    loading: { control: "select", options: ["spinner", "ring", "dots", "pulse", "bars", "skeleton", "skeleton-block"] },
+    variant: { control: "select", options: variantOptions },
+    size: { control: "select", options: sizeOptions },
+    hover: { control: "select", options: hoverOptions },
+    rounded: { control: "select", options: roundedOptions },
+    border: { control: "select", options: borderOptions },
+    shadow: { control: "select", options: shadowOptions },
+    cursor: { control: "select", options: cursorOptions },
+    fullWidth: { control: "boolean" },
+    disabled: { control: "boolean" },
+    token: { control: "text" },
+    loading: { control: "select", options: loadingOptions },
     isLoading: { control: "boolean" },
     loadingText: { control: "text" },
     icon: { control: "boolean" },
@@ -34,6 +39,10 @@ const meta = {
     rounded: "md",
     border: "none",
     shadow: "none",
+    cursor: "pointer",
+    fullWidth: false,
+    disabled: false,
+    token: "",
     isLoading: false,
     loading: "spinner",
     loadingText: "Loading...",

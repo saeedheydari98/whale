@@ -18,7 +18,6 @@ export const interactionStates = {
     liftLg: "hover:-translate-y-2",
 
     darken: "hover:brightness-90",
-    drken: "hover:brightness-90",
     darker: "hover:brightness-75",
 
     lighten: "hover:brightness-110",
@@ -51,7 +50,7 @@ export const interactionStates = {
 export const borderVariants = {
   none: "border-0",
   base: "border",
-  "border-b": "border-b",
+  borderB: "border-b-2",
   subtle: "border border-opacity-30",
   strong: "border-2",
   heavy: "border-4",
@@ -83,7 +82,7 @@ export const radiusVariants = {
 export const sizeVariants = {
   xs: "h-6 px-2 text-xs",
   sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-base",
+  md: "h-10 px-4 text-lg",
   lg: "h-12 px-6 text-lg",
   xl: "h-14 px-6 text-xl",
   xxl: "h-16 px-6 text-xl",

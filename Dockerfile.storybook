@@ -1,0 +1,10 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY storybook-static ./storybook-static
+COPY scripts/storybook-static-server.mjs ./storybook-static-server.mjs
+
+EXPOSE 6006
+
+CMD ["node", "storybook-static-server.mjs"]

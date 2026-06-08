@@ -93,13 +93,13 @@ export default function Home() {
     try {
       const res = await fetch("/api/history?limit=20", { cache: "no-store" });
       if (!res.ok) {
-        throw new Error("History request failed");
+        setHistory((current) => mergeHistory(current, readLocalHistory()));
+        return;
       }
 
       const data = await res.json();
       setHistory(mergeHistory(normalizeHistory(data), readLocalHistory()));
-    } catch (error) {
-      console.error("Error fetching history:", error);
+    } catch {
       setHistory((current) => mergeHistory(current, readLocalHistory()));
     }
   };
@@ -178,13 +178,13 @@ export default function Home() {
         });
 
         const saveData = await saveRes.json().catch(() => ({}));
-        if (!saveRes.ok) {
-          throw new Error(saveData.error || "Save request failed");
+        if (saveRes.ok && saveData.saved) {
+          savedHistoryItem = saveData.saved;
+        } else {
+          const localHistory = mergeHistory([newHistoryItem], readLocalHistory());
+          writeLocalHistory(localHistory);
         }
-
-        savedHistoryItem = saveData.saved || newHistoryItem;
-      } catch (saveError) {
-        console.error("Save failed, keeping local history:", saveError);
+      } catch {
         const localHistory = mergeHistory([newHistoryItem], readLocalHistory());
         writeLocalHistory(localHistory);
       }
@@ -202,18 +202,19 @@ export default function Home() {
   const currentCalendar = calendarMap[fromType] || calendarMap.gregorian;
 
   return (
-    <div className="flex justify-center items-center h-screen bg-bg-base text-text-primary p-4">
-      <div className="flex flex-col gap-2 w-full md:w-1/2 h-full bg-bg-surface/40 backdrop-blur-md shadow-2xl rounded-2xl p-6 border border-ui-secondary/40" dir="rtl">
-        <div className="flex flex-col h-[30%] justify-center items-center gap-4">
+    <div className="flex min-h-screen justify-center bg-bg-base text-text-primary p-4">
+      <div className="flex min-h-[calc(100vh-2rem)] w-full flex-col items-center gap-4 overflow-hidden rounded-2xl border border-ui-secondary/40 bg-bg-surface/40 p-6 shadow-2xl backdrop-blur-md md:w-1/2" dir="rtl">
+        <div className="flex w-full shrink-0 flex-col items-center justify-center gap-4">
           <div className="text-2xl font-bold text-center bg-user-user-user bg-clip-text text-transparent">
             تبدیل تاریخ
           </div>
 
           <CustomSelect
             variant="secondary"
-            size="xxxl"
+            size="xxl"
             rounded="lg"
             value={fromType}
+            className="text-user-user-800"
             onChange={(e) => {
               const newFrom = e.target.value;
               setFromType(newFrom);
@@ -232,9 +233,10 @@ export default function Home() {
 
           <CustomSelect
             variant="secondary"
-            size="xxxl"
+            size="xxl"
             rounded="lg"
             value={toType}
+            className="text-user-user-800"
             onChange={(e) => setToType(e.target.value)}
           >
             {calendars
@@ -243,55 +245,57 @@ export default function Home() {
                 <option key={c.key} value={c.key}>{c.label}</option>
               ))}
           </CustomSelect>
+          
+        </div>
 
-          <DatePicker
-            value={date}
-            onChange={setDate}
-            calendar={currentCalendar.calendar}
-            locale={currentCalendar.locale}
-            placeholder="انتخاب تاریخ"
-            className="font-bold bg-bg-base "
-            inputClass="w-full border border-ui-secondary/40 bg-bg-surface/70 backdrop-blur-sm p-1 rounded-xl font-bold 
+        <div className="flex w-full max-w-sm shrink-0 flex-col items-stretch justify-center gap-2">
+            <DatePicker
+              value={date}
+              onChange={setDate}
+              calendar={currentCalendar.calendar}
+              locale={currentCalendar.locale}
+              placeholder="انتخاب تاریخ"
+              className="font-bold bg-bg-base"
+              inputClass="w-full border border-ui-secondary/40 bg-bg-surface/70 backdrop-blur-sm p-1 rounded-xl font-bold 
             text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-ui-info hover:bg-bg-surface/80"
-          />
-          <CustomButton
-            onClick={handleSubmit}
-            disabled={loading}
-            variant="secondary"
-            size="xxl"
-            fullWidth
-            hover="lift"
-            rounded="lg"
-            isLoading={loading}
-            loading="dots"
-            loadingText="در حال تبدیل..."
-          >
-            تبدیل
-          </CustomButton>
-        </div>
+            />
+            <CustomButton
+              onClick={handleSubmit}
+              disabled={loading}
+              variant="secondary"
+              fullWidth
+              hover="lift"
+              rounded="lg"
+              isLoading={loading}
+              loading="dots"
+              loadingText="در حال تبدیل..."
+              className="text-user-user-100"
+            >
+              تبدیل
+            </CustomButton>
+            <div className="flex min-h-10 flex-col items-center justify-center gap-2">
+              {error && (
+                <div className="text-red-admin-600 font-bold text-sm bg-ui-danger/30 backdrop-blur-sm px-4 py-2 rounded-full  shadow-md border border-ui-danger/50">
+                  {error}
+                </div>
+              )}
 
-        <div className="flex flex-col h-[10%] justify-center items-center gap-2">
-          {error && (
-            <div className="text-red-admin-600 font-bold text-sm bg-ui-danger/30 backdrop-blur-sm px-4 py-2 rounded-full  shadow-md border border-ui-danger/50">
-               {error}
+              {!error && result && (
+                <div className="p-2 bg-admin-admin-100 backdrop-blur-sm rounded-xl text-center font-bold text-admin-admin-600 border border-admin-admin-600 shadow-md">
+                  {result}
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
-          {!error && result && (
-            <div className="p-2 bg-admin-admin-100 backdrop-blur-sm rounded-xl text-center font-bold text-admin-admin-600 border border-admin-admin-600 shadow-md">
-               {result}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col h-[50%] justify-center items-center gap-4">
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-4">
           <div className="font-bold text-xl bg-user-user-user bg-clip-text text-transparent">
             تاریخچه
           </div>
 
-          <div className="overflow-y-auto border border-ui-secondary/40 rounded-xl w-full h-full bg-bg-surface/30 backdrop-blur-sm p-2 custom-scrollbar">
+          <div className="custom-scrollbar min-h-40 w-full flex-1 overflow-y-auto rounded-xl border border-ui-secondary/40 bg-bg-surface/30 p-2 backdrop-blur-sm">
             {history.length === 0 && (
-              <div className="text-sm text-text-secondary text-center py-8">موردی ثبت نشده</div>
+              <div className="text-sm text-user-user-800 text-center py-8">موردی ثبت نشده</div>
             )}
 
             {history.map((item) => (
