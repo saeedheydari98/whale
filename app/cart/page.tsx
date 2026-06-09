@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IoBagHandleOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../design-system/components/ui/button";
+import { CustomModal } from "../design-system/components/ui/modal";
 
 type CartItem = {
   id?: number | string;
@@ -45,7 +46,7 @@ function formatPrice(value?: string | number) {
     return String(value || "");
   }
 
-  return parsed.toLocaleString("en-US");
+  return `$${parsed.toLocaleString("en-US")}`;
 }
 
 function readPriceNumber(value?: string) {
@@ -61,6 +62,7 @@ function getDiscountPercent(item: CartItem) {
 
 export default function CartPage() {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [previewImage, setPreviewImage] = useState("");
 
   useEffect(() => {
     setItems(readCart());
@@ -106,6 +108,11 @@ export default function CartPage() {
     writeCart([]);
   };
 
+  const openImagePreview = (imageUrl?: string) => {
+    if (!imageUrl) return;
+    setPreviewImage(imageUrl);
+  };
+
   return (
     <main className="min-h-screen bg-bg-base text-text-primary">
       <section className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
@@ -137,13 +144,19 @@ export default function CartPage() {
                 key={String(item.id ?? `${item.title}-${index}`)}
                 className="grid gap-4 rounded-lg border border-ui-primary/30 bg-bg-surface p-4 sm:grid-cols-[120px_1fr_auto]"
               >
-                <div className="flex h-28 items-center justify-center overflow-hidden rounded-md bg-ui-primary/10">
+                <button
+                  type="button"
+                  className="flex h-28 items-center justify-center overflow-hidden rounded-md bg-ui-primary/10"
+                  onClick={() => openImagePreview(item.imageUrl)}
+                  disabled={!item.imageUrl}
+                  aria-label="Open product image"
+                >
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
                   ) : (
                     <IoBagHandleOutline className="text-4xl text-ui-primary" aria-hidden="true" />
                   )}
-                </div>
+                </button>
                 <div className="grid gap-2">
                   <div className="text-lg font-bold">{item.title}</div>
                   <div className="text-sm text-text-secondary">{item.description}</div>
@@ -190,6 +203,26 @@ export default function CartPage() {
             ))}
           </div>
         )}
+
+        <CustomModal
+          open={Boolean(previewImage)}
+          onClose={() => setPreviewImage("")}
+          title="Product image"
+          closeText="Close"
+          rounded="lg"
+          border="base"
+          shadow="lg"
+        >
+          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-bg-base">
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt="Product image preview"
+                className="max-h-[75vh] w-full object-contain"
+              />
+            )}
+          </div>
+        </CustomModal>
       </section>
     </main>
   );

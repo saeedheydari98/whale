@@ -190,6 +190,72 @@ type ResolveDynamicColorInput = {
     user?: Theme["user"];
 };
 
+function resolveDynamicColorKey(
+    value: string | undefined,
+    state: ThemeState,
+    admin?: AdminThemeOverride,
+    user?: Theme["user"]
+): ThemeColorKey {
+    if (value === "admin") {
+        return admin?.primary ?? semanticThemeMap.primary;
+    }
+
+    if (value === "user") {
+        return user?.preferredColor ?? semanticThemeMap.primary;
+    }
+
+    if (value === "mode") {
+        return state.mode === "dark" ? "gray" : "blue";
+    }
+
+    if (value && isThemeColorKey(value)) {
+        return value;
+    }
+
+    return semanticThemeMap.primary;
+}
+
+function resolveDynamicStyle(
+    value: string | undefined,
+    state: ThemeState,
+    admin?: AdminThemeOverride,
+    user?: Theme["user"]
+): ThemeStyle {
+    if (value === "admin") {
+        return admin?.style ?? state.style;
+    }
+
+    if (value === "user") {
+        return user?.style ?? state.style;
+    }
+
+    if (value === "mode") {
+        return state.mode === "dark" ? "dark" : "light";
+    }
+
+    if (value && isThemeStyle(value)) {
+        return value;
+    }
+
+    return state.style || styleFallback;
+}
+
+function resolveDynamicTone(
+    value: string | undefined,
+    admin?: AdminThemeOverride,
+    user?: Theme["user"]
+): ThemeTone {
+    if (value === "admin") {
+        return admin?.tone ?? toneFallback;
+    }
+
+    if (value === "user") {
+        return user?.tone ?? toneFallback;
+    }
+
+    return toTone(value);
+}
+
 export function resolveDynamicColor({
     token,
     state,
@@ -202,67 +268,11 @@ export function resolveDynamicColor({
         return resolveColor("gray", state.style, toneFallback);
     }
 
-    const resolvedStyle =
-        part2 === "admin"
-            ? admin?.style ?? state.style
-            : part2 === "user"
-                ? user?.style ?? state.style
-            : isThemeStyle(part2)
-                ? part2
-                : state.style || styleFallback;
-    const tone =
-        part3 === "admin"
-            ? admin?.tone ?? toneFallback
-            : part3 === "user"
-                ? user?.tone ?? toneFallback
-                : toTone(part3);
+    const color = resolveDynamicColorKey(part1, state, admin, user);
+    const style = resolveDynamicStyle(part2, state, admin, user);
+    const tone = resolveDynamicTone(part3, admin, user);
 
-    // 1) Developer-controlled: bg-red-light-500
-    if (isThemeColorKey(part1)) {
-        if (part2 === "admin") {
-            const adminColor = admin?.primary ?? part1;
-            return resolveColor(adminColor, admin?.style ?? state.style, tone);
-        }
-
-        if (part2 === "user") {
-            const userColor = user?.preferredColor ?? part1;
-            return resolveColor(userColor, resolvedStyle, tone);
-        }
-
-        if (part2 === "mode") {
-            const styleFromMode: ThemeStyle =
-                state.mode === "dark" ? "dark" : "light";
-            return resolveColor(part1, styleFromMode, tone);
-        }
-
-        return resolveColor(part1, resolvedStyle, tone);
-    }
-
-    // 2) User-controlled: bg-user-dark-300
-    if (part1 === "user") {
-        const userColor = user?.preferredColor ?? semanticThemeMap.primary;
-        return resolveColor(userColor, resolvedStyle, tone);
-    }
-
-    // 3) Admin-controlled: bg-blue-admin-600 | bg-admin-dark-600 | text-admin-admin-admin
-    if (part1 === "admin" || part2 === "admin") {
-        const adminColor =
-            admin?.primary ??
-            (isThemeColorKey(part1) ? part1 : semanticThemeMap.primary);
-        const adminStyle =
-            admin?.style ??
-            (isThemeStyle(part2) ? part2 : state.style);
-        return resolveColor(adminColor, adminStyle, tone);
-    }
-
-    // 4) Mode-controlled: bg-mode-fantasy-300
-    if (part1 === "mode") {
-        const modeColor: ThemeColorKey =
-            state.mode === "dark" ? "gray" : "blue";
-        return resolveColor(modeColor, resolvedStyle, tone);
-    }
-
-    return resolveColor(semanticThemeMap.primary, state.style, tone);
+    return resolveColor(color, style, tone);
 }
 
 /**

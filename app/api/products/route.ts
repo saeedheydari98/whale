@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 export type ProductPayload = {
   id?: number | string;
+  showcaseId?: string;
   title: string;
   description: string;
   price: string;
@@ -27,6 +28,7 @@ const hasProductModel =
 function normalizeProduct(value: Partial<ProductPayload>, index: number): ProductPayload {
   return {
     id: value.id,
+    showcaseId: String(value.showcaseId ?? "default-showcase").trim(),
     title: String(value.title ?? "").trim(),
     description: String(value.description ?? "").trim(),
     price: String(value.price ?? "").trim(),
@@ -111,6 +113,7 @@ export async function POST(request: Request) {
         (prisma as any).product.create({
           data: {
             title: item.title,
+            showcaseId: item.showcaseId || "default-showcase",
             description: item.description,
             price: item.price,
             originalPrice: item.originalPrice || null,

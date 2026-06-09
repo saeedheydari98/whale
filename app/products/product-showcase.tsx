@@ -1,27 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { IoBagAddOutline, IoBagHandleOutline, IoOpenOutline } from "react-icons/io5";
-import { CustomButton } from "../design-system/components/ui/button";
-import { CustomTag } from "../design-system/components/ui/tag";
-
-type Product = {
-  id?: number | string;
-  title: string;
-  description: string;
-  price: string;
-  originalPrice?: string;
-  discountPrice?: string;
-  discountPercent?: number | string;
-  imageUrl?: string;
-  badge?: string;
-  ctaLabel?: string;
-  ctaHref?: string;
-  active: boolean;
-  sortOrder: number;
-};
+import { useEffect, useMemo, useRef, useState } from "react";
+import { CustomModal } from "../design-system/components/ui/modal";
+import { BannerCarousel } from "./product-showcase/banner-carousel";
+import { ShowcaseSection } from "./product-showcase/showcase-section";
+import type { Banner, Product, Showcase } from "./product-showcase/types";
 
 const PRODUCTS_STORAGE_KEY = "admin-products";
+const SHOWCASES_STORAGE_KEY = "admin-product-showcases";
+const BANNERS_STORAGE_KEY = "admin-product-banners";
+const DEFAULT_SHOWCASE_ID = "default-showcase";
 const CART_STORAGE_KEY = "product-cart";
 const CART_UPDATED_EVENT = "product-cart-updated";
 
@@ -41,7 +29,7 @@ function formatPrice(value?: string) {
     return value || "";
   }
 
-  return parsed.toLocaleString("en-US");
+  return `$${parsed.toLocaleString("en-US")}`;
 }
 
 function getDiscountPercent(product: Product) {
@@ -52,6 +40,24 @@ function getDiscountPercent(product: Product) {
 function readLocalProducts(): Product[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(PRODUCTS_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function readLocalShowcases(): Showcase[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SHOWCASES_STORAGE_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function readLocalBanners(): Banner[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BANNERS_STORAGE_KEY) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -96,10 +102,76 @@ function dedupeProducts(products: Product[]) {
   });
 }
 
+function mergeLocalShowcaseIds(apiProducts: Product[], localProducts: Product[]) {
+  const localByKey = new Map(localProducts.map((product) => [getProductKey(product), product.showcaseId ?? DEFAULT_SHOWCASE_ID]));
+
+  return apiProducts.map((product) => ({
+    ...product,
+    showcaseId: localByKey.get(getProductKey(product)) ?? product.showcaseId ?? DEFAULT_SHOWCASE_ID,
+  }));
+}
+
+function normalizeShowcase(item: Partial<Showcase>, index: number): Showcase {
+  return {
+    id: String(item.id ?? `showcase-${index + 1}`),
+    title: String(item.title ?? `Showcase ${index + 1}`),
+    active: item.active !== false,
+    sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+  };
+}
+
+function normalizeBanner(item: Partial<Banner> & { bannerUrl?: string }, index: number): Banner {
+  const legacyImage = typeof item.bannerUrl === "string" && item.bannerUrl ? [item.bannerUrl] : [];
+  const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls.map((value) => String(value)).filter(Boolean) : legacyImage;
+
+  return {
+    id: String(item.id ?? `banner-${index + 1}`),
+    title: String(item.title ?? `Banner ${index + 1}`),
+    imageUrls,
+    active: item.active !== false,
+    sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+  };
+}
+
+function ensureShowcases(products: Product[], savedShowcases: Showcase[]) {
+  const byId = new Map(savedShowcases.map(normalizeShowcase).map((showcase) => [showcase.id, showcase]));
+
+  if (!byId.has(DEFAULT_SHOWCASE_ID)) {
+    byId.set(DEFAULT_SHOWCASE_ID, {
+      id: DEFAULT_SHOWCASE_ID,
+      title: "Main showcase",
+      active: true,
+      sortOrder: 1,
+    });
+  }
+
+  for (const product of products) {
+    const showcaseId = product.showcaseId ?? DEFAULT_SHOWCASE_ID;
+    if (!byId.has(showcaseId)) {
+      byId.set(showcaseId, {
+        id: showcaseId,
+        title: "Untitled showcase",
+        active: true,
+        sortOrder: byId.size + 1,
+      });
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
 export function ProductShowcase() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [showcases, setShowcases] = useState<Showcase[]>([]);
+  const [banners, setBanners] = useState<Banner[]>([]);
   const [loading, setLoading] = useState(true);
   const [cartMessage, setCartMessage] = useState("");
+  const [previewImage, setPreviewImage] = useState("");
+  const dragRef = useRef({
+    active: false,
+    startX: 0,
+    scrollLeft: 0,
+  });
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -108,9 +180,15 @@ export function ProductShowcase() {
         const data = await res.json();
         const apiProducts = Array.isArray(data?.data) ? dedupeProducts(data.data) : [];
         const localProducts = dedupeProducts(readLocalProducts().filter((item) => item.active));
-        setProducts(apiProducts.length > 0 ? apiProducts : localProducts);
+        const nextProducts = apiProducts.length > 0 ? mergeLocalShowcaseIds(apiProducts, localProducts) : localProducts;
+        setProducts(nextProducts);
+        setShowcases(ensureShowcases(nextProducts, readLocalShowcases()));
+        setBanners(readLocalBanners().map(normalizeBanner));
       } catch {
-        setProducts(readLocalProducts().filter((item) => item.active));
+        const localProducts = readLocalProducts().filter((item) => item.active);
+        setProducts(localProducts);
+        setShowcases(ensureShowcases(localProducts, readLocalShowcases()));
+        setBanners(readLocalBanners().map(normalizeBanner));
       } finally {
         setLoading(false);
       }
@@ -123,6 +201,57 @@ export function ProductShowcase() {
     () => products.filter((item) => item.active).sort((a, b) => a.sortOrder - b.sortOrder),
     [products]
   );
+
+  const sortedShowcases = useMemo(
+    () => ensureShowcases(sortedProducts, showcases).filter((showcase) => showcase.active),
+    [sortedProducts, showcases]
+  );
+
+  const displaySections = useMemo(() => {
+    const bannerSections = banners
+      .filter((banner) => banner.active && banner.imageUrls.length > 0)
+      .map((banner) => ({ type: "banner" as const, item: banner, sortOrder: banner.sortOrder }));
+
+    const showcaseSections = sortedShowcases
+      .map((showcase) => ({
+        type: "showcase" as const,
+        item: showcase,
+        products: sortedProducts.filter((product) => (product.showcaseId ?? DEFAULT_SHOWCASE_ID) === showcase.id),
+        sortOrder: showcase.sortOrder,
+      }))
+      .filter((section) => section.products.length > 0);
+
+    return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [banners, sortedProducts, sortedShowcases]);
+
+  const startProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button, a")) {
+      return;
+    }
+
+    dragRef.current = {
+      active: true,
+      startX: event.pageX,
+      scrollLeft: event.currentTarget.scrollLeft,
+    };
+  };
+
+  const moveProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragRef.current.active) return;
+
+    event.preventDefault();
+    const dragDistance = event.pageX - dragRef.current.startX;
+    event.currentTarget.scrollLeft = dragRef.current.scrollLeft - dragDistance;
+  };
+
+  const stopProductRailDrag = () => {
+    dragRef.current.active = false;
+  };
+
+  const openImagePreview = (imageUrl?: string) => {
+    if (!imageUrl) return;
+    setPreviewImage(imageUrl);
+  };
 
   const addToCart = (product: Product) => {
     const key = String(product.id ?? `${product.title}-${product.description}-${product.price}`);
@@ -143,12 +272,9 @@ export function ProductShowcase() {
 
   return (
     <main className="min-h-screen bg-bg-base text-text-primary">
-      <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8">
+      <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex flex-col gap-2 border-b border-ui-primary/30 pb-4">
           <div className="text-3xl font-bold">Products</div>
-          <div className="max-w-2xl text-sm text-text-secondary">
-            A dynamic product showcase managed from the admin panel.
-          </div>
         </div>
 
         {loading && <div className="text-sm text-text-secondary">Loading products...</div>}
@@ -165,78 +291,51 @@ export function ProductShowcase() {
           </div>
         )}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedProducts.map((product, index) => (
-            <article
-              key={product.id ?? `${product.title}-${index}`}
-              className="overflow-hidden rounded-lg border border-ui-primary/30 bg-bg-surface shadow-sm"
-            >
-              <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-ui-primary/10">
-                {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.title}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <IoBagHandleOutline className="text-6xl text-ui-primary" aria-hidden="true" />
-                )}
-                {product.badge && (
-                  <div className="absolute left-3 top-3">
-                    <CustomTag size="sm" rounded="full" border="base">
-                      {product.badge}
-                    </CustomTag>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex min-h-56 flex-col gap-3 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-lg font-bold">{product.title}</div>
-                  <div className="shrink-0 text-right">
-                    {product.originalPrice && getDiscountPercent(product) > 0 && (
-                      <div className="text-xs text-text-secondary line-through">
-                        {formatPrice(product.originalPrice)}
-                      </div>
-                    )}
-                    <div className="font-semibold text-ui-primary">{formatPrice(getFinalPrice(product))}</div>
-                  </div>
-                </div>
-                {getDiscountPercent(product) > 0 && (
-                  <CustomTag size="sm" rounded="full" border="base">
-                    {getDiscountPercent(product)}% off
-                  </CustomTag>
-                )}
-                <div className="flex-1 text-sm leading-6 text-text-secondary">{product.description}</div>
-                <div className="flex flex-wrap gap-2">
-                  <CustomButton
-                    type="button"
-                    variant="success"
-                    border="base"
-                    rounded="md"
-                    size="sm"
-                    icon={<IoBagAddOutline />}
-                    onClick={() => addToCart(product)}
-                  >
-                    Add to cart
-                  </CustomButton>
-                  <a href={product.ctaHref || "#"} className="inline-flex">
-                    <CustomButton
-                      type="button"
-                      variant="primary"
-                      border="base"
-                      rounded="md"
-                      size="sm"
-                      iconAfter={<IoOpenOutline />}
-                    >
-                      {product.ctaLabel || "View product"}
-                    </CustomButton>
-                  </a>
-                </div>
-              </div>
-            </article>
-          ))}
+        <div className="flex flex-col gap-8">
+          {displaySections.map((section) =>
+            section.type === "banner" ? (
+              <BannerCarousel
+                key={`banner-${section.item.id}`}
+                banner={section.item}
+                onPreview={openImagePreview}
+              />
+            ) : (
+              <ShowcaseSection
+                key={`showcase-${section.item.id}`}
+                showcase={section.item}
+                products={section.products}
+                onAddToCart={addToCart}
+                onPreview={openImagePreview}
+                onDragStart={startProductRailDrag}
+                onDragMove={moveProductRailDrag}
+                onDragStop={stopProductRailDrag}
+                formatPrice={formatPrice}
+                getFinalPrice={getFinalPrice}
+                getDiscountPercent={getDiscountPercent}
+              />
+            )
+          )}
         </div>
+
+        <CustomModal
+          open={Boolean(previewImage)}
+          onClose={() => setPreviewImage("")}
+          title="Product image"
+          closeText="Close"
+          rounded="lg"
+          border="base"
+          shadow="lg"
+        >
+          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-bg-base">
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt="Product image preview"
+                className="max-h-[75vh] w-full object-contain"
+              />
+            )}
+          </div>
+        </CustomModal>
       </section>
     </main>
   );

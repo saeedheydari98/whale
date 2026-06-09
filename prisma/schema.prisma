@@ -46,6 +46,7 @@ model UserTheme {
 
 model Product {
   id          Int      @id @default(autoincrement())
+  showcaseId  String   @default("default-showcase")
   title       String
   description String
   price       String
