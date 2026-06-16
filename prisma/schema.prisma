@@ -16,15 +16,6 @@ model User {
   updatedAt DateTime @updatedAt
 }
 
-model Conversion {
-  id        Int      @id @default(autoincrement())
-  date      String
-  fromType  String
-  toType    String
-  result    String
-  createdAt DateTime @default(now())
-}
-
 model AdminTheme {
   id        Int      @id @default(autoincrement())
   primary   String

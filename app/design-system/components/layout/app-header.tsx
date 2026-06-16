@@ -19,7 +19,6 @@ import { GiSpermWhale } from "react-icons/gi";
 const navItems = [
   { href: "/", label: "home", tone: "bg-primary text-primary-text" },
   { href: "/products", label: "products", tone: "bg-primary text-primary-text" },
-  { href: "/date.converter", label: "date converter", tone: "bg-primary text-primary-text" },
   { href: "/panel/admin", label: "admin panel", tone: "bg-primary text-primary-text", adminOnly: true },
   { href: "/panel/user", label: "user panel", tone: "bg-primary text-primary-text" },
 ];

@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import React from "react";
 import { CustomButton } from "./button";
-import Icon from "react-multi-date-picker/components/icon";
 
 type Props = {
   productId: string | number;
