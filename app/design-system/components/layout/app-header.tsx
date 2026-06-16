@@ -138,8 +138,15 @@ export function AppHeader() {
       </div>
 
       {/* Mobile Menu Dropdown - Glassmorphic Background */}
-      {isMobile && isMenuOpen && (
-        <div className="absolute top-20 inset-x-0 z-20 w-full bg-primary-bg border-b border-primary-border backdrop-blur-md shadow-lg">
+      {isMobile && (
+        <div
+          className={`absolute right-0 top-20 z-20 w-1/2 origin-top border border-primary-border/70 bg-primary-card/70 shadow-lg backdrop-blur-xl transition-all duration-300 ease-out ${
+            isMenuOpen
+              ? "translate-y-0 scale-y-100 opacity-100"
+              : "pointer-events-none -translate-y-2 scale-y-0 opacity-0"
+          }`}
+          aria-hidden={!isMenuOpen}
+        >
           <div className="flex flex-col p-4 gap-2 w-full">
             {visibleNavItems.map((item) => (
               <Link

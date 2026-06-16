@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { getProducts } from "@/lib/products-client";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { matchesSearchQuery } from "@/lib/product-search";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -24,11 +25,7 @@ export default function SearchPage() {
       try {
         const data = await getProducts({ all: true });
         const list = data.products || [];
-        const filtered = list.filter((p) => {
-          const anyP = p as any;
-          const txt = `${p.title} ${p.description} ${p.price} ${anyP.category || ""} ${anyP.type || anyP.productType || ""}`.toLowerCase();
-          return txt.includes(q.toLowerCase());
-        });
+        const filtered = list.filter((product) => matchesSearchQuery(product, q));
         if (!cancelled) setResults(filtered);
       } catch {
         if (!cancelled) setResults([]);

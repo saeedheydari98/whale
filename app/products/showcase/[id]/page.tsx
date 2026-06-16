@@ -3,9 +3,12 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
-import { FiExternalLink } from "react-icons/fi";
+import { FiExternalLink, FiSearch, FiSliders, FiX } from "react-icons/fi";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomInput } from "@/app/design-system/components/ui/input";
+import { getProducts } from "@/lib/products-client";
+import { matchesSearchQuery } from "@/lib/product-search";
 
 const LOADING_PRODUCTS = [
   {
@@ -48,6 +51,55 @@ export default function ShowcasePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("");
 
+  const parsePrice = (value: any) => {
+    try {
+      const normalized = String(value || "").replace(/[^\d.]/g, "");
+      return normalized ? Number(normalized) : NaN;
+    } catch {
+      return NaN;
+    }
+  };
+
+  const priceBounds = useMemo(() => {
+    const prices = (products || [])
+      .map((product: any) => {
+        const discounted = parsePrice(product.discountPrice);
+        return Number.isFinite(discounted) ? discounted : parsePrice(product.price);
+      })
+      .filter((price) => Number.isFinite(price));
+
+    if (prices.length === 0) {
+      return { min: 0, max: 1000 };
+    }
+
+    return {
+      min: Math.floor(Math.min(...prices)),
+      max: Math.ceil(Math.max(...prices)),
+    };
+  }, [products]);
+
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set((products || []).map((p: any) => String(p.category || p.typeCategory || "")).filter(Boolean))
+      ),
+    [products]
+  );
+
+  const typeOptions = useMemo(
+    () =>
+      Array.from(
+        new Set((products || []).map((p: any) => String(p.type || p.productType || "")).filter(Boolean))
+      ),
+    [products]
+  );
+
+  const selectedPriceMin = priceMin ? Number(priceMin) : priceBounds.min;
+  const selectedPriceMax = priceMax ? Number(priceMax) : priceBounds.max;
+  const rangeSpan = Math.max(priceBounds.max - priceBounds.min, 1);
+  const minPercent = ((selectedPriceMin - priceBounds.min) / rangeSpan) * 100;
+  const maxPercent = ((selectedPriceMax - priceBounds.min) / rangeSpan) * 100;
+
   // When a global search query is entered, fetch all products and filter across showcases
   useEffect(() => {
     let cancelled = false;
@@ -59,13 +111,9 @@ export default function ShowcasePage() {
 
     (async () => {
       try {
-        const res = await fetch(`/api/products`);
-        const json = await res.json();
-        const list = Array.isArray(json?.data?.products) ? json.data.products : [];
-        const filtered = list.filter((p: any) => {
-          const txt = `${p.title} ${p.description} ${p.price}`.toLowerCase();
-          return txt.includes(q.toLowerCase());
-        });
+        const data = await getProducts({ all: true });
+        const list = data.products || [];
+        const filtered = list.filter((product) => matchesSearchQuery(product, q));
         if (!cancelled) setGlobalSearchResults(filtered);
       } catch {
         if (!cancelled) setGlobalSearchResults([]);
@@ -84,16 +132,6 @@ export default function ShowcasePage() {
       const percent = Number(p.discountPercent || 0);
       if (!(percent > 0 || (p.discountPrice && String(p.discountPrice).trim()))) return false;
     }
-    // Price range filter (parse numeric values)
-    const parsePrice = (v: any) => {
-      try {
-        const s = String(v || "").replace(/[^\d.]/g, "");
-        return s ? Number(s) : NaN;
-      } catch {
-        return NaN;
-      }
-    };
-
     const pPrice = Number.isFinite(parsePrice(p.discountPrice)) ? parsePrice(p.discountPrice) : parsePrice(p.price);
     const min = Number.isFinite(Number(parsePrice(priceMin))) ? Number(parsePrice(priceMin)) : NaN;
     const max = Number.isFinite(Number(parsePrice(priceMax))) ? Number(parsePrice(priceMax)) : NaN;
@@ -182,35 +220,45 @@ export default function ShowcasePage() {
 
   return (
     <div className="p-4 w-full">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-2xl font-bold">{showcase?.title || `Showcase: ${showcaseId}`}</div>
 
-        <div className="flex-1">
+        <div className="w-full sm:w-auto">
           {/* Desktop: show input; Mobile: toggleable */}
-          <div className="hidden sm:flex items-center gap-2">
-            <input
+          <div className="hidden w-80 max-w-full items-center gap-2 sm:flex">
+            <CustomInput
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search across all products..."
-              className="w-full rounded-md border p-2 text-sm"
+              size="sm"
+              rounded="full"
+              border="base"
+              icon={<FiSearch />}
+              className="bg-primary-media text-sm"
+              style={{ backgroundColor: "var(--primary-media)" }}
             />
           </div>
           <div className="flex sm:hidden items-center gap-2">
             {showMobileSearch ? (
-              <input
+              <CustomInput
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search..."
-                className="w-full rounded-md border p-2 text-sm"
+                size="sm"
+                rounded="full"
+                border="base"
+                icon={<FiSearch />}
+                className="bg-primary-media text-sm"
+                style={{ backgroundColor: "var(--primary-media)" }}
               />
             ) : (
-              <CustomButton size="sm" variant="neutral" onClick={() => setShowMobileSearch(true)}>Search</CustomButton>
+              <CustomButton size="sm" variant="neutral" icon={<FiSearch />} onClick={() => setShowMobileSearch(true)}>Search</CustomButton>
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <CustomButton size="sm" variant="secondary" onClick={() => setShowFilterModal(true)}>Filter</CustomButton>
+          <CustomButton size="sm" variant="secondary" icon={<FiSliders />} onClick={() => setShowFilterModal(true)}>Filter</CustomButton>
         </div>
       </div>
 
@@ -265,56 +313,152 @@ export default function ShowcasePage() {
         {/* Filters are only available via the Filter button (modal). Desktop panel removed per design. */}
       </div>
 
-      {/* Mobile filter modal */}
+      {/* Filter drawer */}
       {showFilterModal ? (
-        <div className="fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowFilterModal(false)} />
-          <div className="relative bg-white w-3/4 max-w-sm h-full p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="text-lg font-bold">Filters</div>
-              <CustomButton size="sm" variant="neutral" onClick={() => setShowFilterModal(false)}>Close</CustomButton>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:items-stretch sm:justify-end sm:p-0">
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={() => setShowFilterModal(false)} />
+          <div className="relative flex max-h-[85vh] w-full max-w-sm flex-col gap-4 overflow-y-auto rounded-lg border border-primary-border bg-primary-card p-4 text-primary-text shadow-xl sm:h-full sm:max-h-none sm:w-11/12 sm:max-w-md sm:rounded-none sm:border-y-0 sm:border-r-0">
+            <div className="flex items-center justify-between gap-3 border-b border-primary-border pb-4">
+              <div className="flex flex-col gap-1">
+                <div className="text-lg font-bold">Filters</div>
+                <div className="text-xs font-semibold text-secondary-text">Refine this showcase</div>
+              </div>
+              <CustomButton size="sm" variant="neutral" icon={<FiX />} onClick={() => setShowFilterModal(false)}>Close</CustomButton>
             </div>
-            <div className="flex flex-col gap-3">
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} /> Active only</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyDiscounted} onChange={(e) => setOnlyDiscounted(e.target.checked)} /> Only discounted</label>
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setOnlyActive((current) => !current)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                    onlyActive
+                      ? "border-primary bg-primary text-primary-text"
+                      : "border-primary-border bg-primary-soft text-secondary-text"
+                  }`}
+                >
+                  <span>Active only</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnlyDiscounted((current) => !current)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
+                    onlyDiscounted
+                      ? "border-danger-border-nomode bg-danger-bg-nomode text-danger-text-nomode"
+                      : "border-primary-border bg-primary-soft text-secondary-text"
+                  }`}
+                >
+                  <span>Deals</span>
+                </button>
+              </div>
 
-              <div>
-                <div className="text-xs text-secondary-text mb-1">Price range</div>
+              <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-soft p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-bold">Price range</div>
+                  <div className="text-xs font-semibold text-primary">
+                    ${selectedPriceMin.toLocaleString("en-US")} - ${selectedPriceMax.toLocaleString("en-US")}
+                  </div>
+                </div>
+                <div className="relative h-10">
+                  <div
+                    className="absolute top-4 h-2 w-full rounded-full bg-primary-bg"
+                    style={{
+                      background: `linear-gradient(to right, var(--primary-bg) 0%, var(--primary-bg) ${minPercent}%, var(--primary) ${minPercent}%, var(--primary) ${maxPercent}%, var(--primary-bg) ${maxPercent}%, var(--primary-bg) 100%)`,
+                    }}
+                  />
+                  <input
+                    type="range"
+                    min={priceBounds.min}
+                    max={priceBounds.max}
+                    value={selectedPriceMin}
+                    onChange={(event) => {
+                      const next = Math.min(Number(event.target.value), selectedPriceMax);
+                      setPriceMin(String(next));
+                    }}
+                    className="absolute top-1 h-8 w-full cursor-pointer appearance-none bg-transparent accent-primary"
+                    aria-label="Minimum price"
+                  />
+                  <input
+                    type="range"
+                    min={priceBounds.min}
+                    max={priceBounds.max}
+                    value={selectedPriceMax}
+                    onChange={(event) => {
+                      const next = Math.max(Number(event.target.value), selectedPriceMin);
+                      setPriceMax(String(next));
+                    }}
+                    className="absolute top-1 h-8 w-full cursor-pointer appearance-none bg-transparent accent-primary"
+                    aria-label="Maximum price"
+                  />
+                </div>
                 <div className="flex gap-2">
-                  <input value={priceMin} onChange={(e) => setPriceMin(e.target.value)} placeholder="Min" className="w-1/2 rounded-md border px-2 py-1 text-sm" />
-                  <input value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="Max" className="w-1/2 rounded-md border px-2 py-1 text-sm" />
+                  <CustomInput value={priceMin} onChange={(e) => setPriceMin(e.target.value)} placeholder="Min" size="sm" />
+                  <CustomInput value={priceMax} onChange={(e) => setPriceMax(e.target.value)} placeholder="Max" size="sm" />
                 </div>
               </div>
 
-              <div>
-                <div className="text-xs text-secondary-text mb-1">Year range</div>
+              <div className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-soft p-3">
+                <div className="text-sm font-bold">Year range</div>
                 <div className="flex gap-2">
-                  <input value={yearMin} onChange={(e) => setYearMin(e.target.value)} placeholder="From" className="w-1/2 rounded-md border px-2 py-1 text-sm" />
-                  <input value={yearMax} onChange={(e) => setYearMax(e.target.value)} placeholder="To" className="w-1/2 rounded-md border px-2 py-1 text-sm" />
+                  <CustomInput value={yearMin} onChange={(e) => setYearMin(e.target.value)} placeholder="From" size="sm" />
+                  <CustomInput value={yearMax} onChange={(e) => setYearMax(e.target.value)} placeholder="To" size="sm" />
                 </div>
               </div>
 
-              <div>
-                <div className="text-xs text-secondary-text mb-1">Category</div>
-                <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full rounded-md border px-2 py-1 text-sm">
-                  <option value="">All categories</option>
-                  {(Array.from(new Set((products || []).map((p: any) => String(p.category || p.typeCategory || "")).filter(Boolean)))).map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+              <div className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-soft p-3">
+                <div className="text-sm font-bold">Category</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory("")}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      !selectedCategory ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                    }`}
+                  >
+                    <span>All</span>
+                  </button>
+                  {categoryOptions.map((cat) => (
+                    <button
+                      type="button"
+                      key={cat}
+                      onClick={() => setSelectedCategory(String(cat))}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                        selectedCategory === cat ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                      }`}
+                    >
+                      <span>{cat}</span>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
-              <div>
-                <div className="text-xs text-secondary-text mb-1">Type</div>
-                <select value={selectedType} onChange={(e) => setSelectedType(e.target.value)} className="w-full rounded-md border px-2 py-1 text-sm">
-                  <option value="">All types</option>
-                  {(Array.from(new Set((products || []).map((p: any) => String(p.type || p.productType || "")).filter(Boolean)))).map((t) => (
-                    <option key={t} value={t}>{t}</option>
+              <div className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-soft p-3">
+                <div className="text-sm font-bold">Type</div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedType("")}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                      !selectedType ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                    }`}
+                  >
+                    <span>All</span>
+                  </button>
+                  {typeOptions.map((type) => (
+                    <button
+                      type="button"
+                      key={type}
+                      onClick={() => setSelectedType(String(type))}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                        selectedType === type ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                      }`}
+                    >
+                      <span>{type}</span>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
 
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 border-t border-primary-border pt-3">
                 <CustomButton size="sm" variant="primary" onClick={() => setShowFilterModal(false)}>Apply</CustomButton>
                 <CustomButton size="sm" variant="neutral" onClick={() => {
                   setPriceMin(""); setPriceMax(""); setYearMin(""); setYearMax(""); setSelectedCategory(""); setSelectedType(""); setOnlyDiscounted(false); setOnlyActive(true); setShowFilterModal(false);
