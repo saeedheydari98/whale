@@ -55,3 +55,43 @@ export function writeUserProfile(profile: UserProfile) {
   localStorage.setItem(USER_PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
   window.dispatchEvent(new Event(USER_PROFILE_UPDATED_EVENT));
 }
+
+export async function fetchUserProfile(nationalId?: string) {
+  const id = String(nationalId ?? readUserProfile()?.nationalId ?? "").trim();
+  if (!id) return null;
+
+  const res = await fetch(`/api/profile?nationalId=${encodeURIComponent(id)}`, {
+    cache: "no-store",
+  });
+  const data = await res.json();
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || "Profile load failed");
+  }
+
+  const profile = data?.data?.profile
+    ? normalizeUserProfile(data.data.profile as Partial<UserProfile>)
+    : null;
+  if (profile && isUserProfileComplete(profile)) {
+    writeUserProfile(profile);
+    return profile;
+  }
+
+  return null;
+}
+
+export async function saveUserProfile(profile: UserProfile) {
+  const nextProfile = normalizeUserProfile(profile);
+  const res = await fetch("/api/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ profile: nextProfile }),
+  });
+  const data = await res.json();
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || "Profile save failed");
+  }
+
+  const savedProfile = normalizeUserProfile(data?.data?.profile ?? nextProfile);
+  writeUserProfile(savedProfile);
+  return savedProfile;
+}

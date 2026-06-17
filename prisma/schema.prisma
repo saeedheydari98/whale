@@ -35,10 +35,28 @@ model UserTheme {
   updatedAt      DateTime @updatedAt
 }
 
+model AdminSecurity {
+  id        Int      @id @default(autoincrement())
+  code      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CustomerProfile {
+  id         String   @id @default(cuid())
+  firstName  String
+  lastName   String
+  nationalId String   @unique
+  phone      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  carts      Cart[]
+}
+
 model Product {
   id          Int      @id @default(autoincrement())
-  showcaseId  String
-  showcase    Showcase @relation(fields: [showcaseId], references: [id])
+  showcaseId  String?
+  showcase    Showcase? @relation(fields: [showcaseId], references: [id])
   title       String
   description String
   price       String
@@ -53,6 +71,7 @@ model Product {
   sortOrder   Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  cartItems   CartItem[]
 }
 
 model Showcase {
@@ -60,6 +79,8 @@ model Showcase {
   title     String?
   description String?
   imageUrl  String?
+  active    Boolean   @default(true)
+  sortOrder Int       @default(0)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   products  Product[]
@@ -69,9 +90,43 @@ model Showcase {
 model Banner {
   id         String   @id @default(cuid())
   title      String?
-  showcaseId String
+  showcaseId String?
+  active     Boolean  @default(true)
+  sortOrder  Int      @default(0)
   images     Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-  showcase   Showcase @relation(fields: [showcaseId], references: [id])
+  showcase   Showcase? @relation(fields: [showcaseId], references: [id])
+}
+
+model Cart {
+  id        String          @id @default(cuid())
+  profileId String
+  status    String          @default("active")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  profile   CustomerProfile @relation(fields: [profileId], references: [id])
+  items     CartItem[]
+
+  @@unique([profileId, status])
+}
+
+model CartItem {
+  id              String   @id @default(cuid())
+  cartId          String
+  productId       Int?
+  title           String
+  description     String
+  price           String
+  originalPrice   String?
+  discountPrice   String?
+  discountPercent Int?
+  imageUrl        String?
+  quantity        Int      @default(1)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  cart            Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  product         Product? @relation(fields: [productId], references: [id])
+
+  @@unique([cartId, productId])
 }

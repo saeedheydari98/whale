@@ -1,14 +1,12 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
 import { FiExternalLink, FiSearch, FiSliders, FiX } from "react-icons/fi";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
-import { getProducts } from "@/lib/products-client";
-import { matchesSearchQuery } from "@/lib/product-search";
 
 const LOADING_PRODUCTS = [
   {
@@ -39,11 +37,13 @@ export default function ShowcasePage() {
   const products = showcase?.products ?? [];
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchSubmitCount, setSearchSubmitCount] = useState(0);
+  const lastImmediateSearchRef = useRef(0);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
   const [onlyActive, setOnlyActive] = useState(true);
-  const [globalSearchResults, setGlobalSearchResults] = useState<any[] | null>(null);
+  const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
   const [priceMin, setPriceMin] = useState<string>("");
   const [priceMax, setPriceMax] = useState<string>("");
   const [yearMin, setYearMin] = useState<string>("");
@@ -100,66 +100,49 @@ export default function ShowcasePage() {
   const minPercent = ((selectedPriceMin - priceBounds.min) / rangeSpan) * 100;
   const maxPercent = ((selectedPriceMax - priceBounds.min) / rangeSpan) * 100;
 
-  // When a global search query is entered, fetch all products and filter across showcases
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
     const q = String(searchQuery ?? "").trim();
-    if (!q) {
-      setGlobalSearchResults(null);
-      return;
+
+    const isImmediate = searchSubmitCount !== lastImmediateSearchRef.current;
+    if (isImmediate) {
+      lastImmediateSearchRef.current = searchSubmitCount;
     }
 
-    (async () => {
+    const timer = window.setTimeout(async () => {
       try {
-        const data = await getProducts({ all: true });
-        const list = data.products || [];
-        const filtered = list.filter((product) => matchesSearchQuery(product, q));
-        if (!cancelled) setGlobalSearchResults(filtered);
+        const params = new URLSearchParams({
+          showcaseId: String(showcaseId),
+          all: onlyActive ? "0" : "1",
+        });
+        if (q) params.set("q", q);
+        if (onlyDiscounted) params.set("discounted", "1");
+        if (priceMin) params.set("priceMin", priceMin);
+        if (priceMax) params.set("priceMax", priceMax);
+        if (yearMin) params.set("yearMin", yearMin);
+        if (yearMax) params.set("yearMax", yearMax);
+        if (selectedCategory) params.set("category", selectedCategory);
+        if (selectedType) params.set("type", selectedType);
+
+        const res = await fetch(`/api/products?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        if (!res.ok || data?.ok === false) throw new Error(data?.error || "Search failed");
+        if (!cancelled) setFilteredProducts(Array.isArray(data?.data?.products) ? data.data.products : []);
       } catch {
-        if (!cancelled) setGlobalSearchResults([]);
+        if (!cancelled) setFilteredProducts([]);
       }
-    })();
+    }, q && !isImmediate ? 2000 : 0);
 
     return () => {
       cancelled = true;
+      controller.abort();
+      window.clearTimeout(timer);
     };
-  }, [searchQuery]);
-
-  // Apply local filters on current product list or global search results
-  const filteredProducts = (globalSearchResults ?? products).filter((p: any) => {
-    if (onlyActive && p.active === false) return false;
-    if (onlyDiscounted) {
-      const percent = Number(p.discountPercent || 0);
-      if (!(percent > 0 || (p.discountPrice && String(p.discountPrice).trim()))) return false;
-    }
-    const pPrice = Number.isFinite(parsePrice(p.discountPrice)) ? parsePrice(p.discountPrice) : parsePrice(p.price);
-    const min = Number.isFinite(Number(parsePrice(priceMin))) ? Number(parsePrice(priceMin)) : NaN;
-    const max = Number.isFinite(Number(parsePrice(priceMax))) ? Number(parsePrice(priceMax)) : NaN;
-    if (!Number.isNaN(min) && !Number.isNaN(pPrice) && pPrice < min) return false;
-    if (!Number.isNaN(max) && !Number.isNaN(pPrice) && pPrice > max) return false;
-
-    // Year range filter (support multiple possible field names)
-    const getYear = (prod: any) => {
-      const candidates = [prod.year, prod.manufactureYear, prod.madeYear, prod.releaseYear];
-      for (const c of candidates) {
-        const n = Number(String(c || "").replace(/[^\d-]/g, ""));
-        if (Number.isFinite(n) && n > 0) return n;
-      }
-      return NaN;
-    };
-
-    const py = getYear(p);
-    const yMin = Number(String(yearMin || "").replace(/[^\d]/g, ""));
-    const yMax = Number(String(yearMax || "").replace(/[^\d]/g, ""));
-    if (!Number.isNaN(yMin) && !Number.isNaN(py) && py < yMin) return false;
-    if (!Number.isNaN(yMax) && !Number.isNaN(py) && py > yMax) return false;
-
-    // Category and type filters (optional fields)
-    if (selectedCategory && String(p.category || p.typeCategory || "").toLowerCase() !== selectedCategory.toLowerCase()) return false;
-    if (selectedType && String(p.type || p.productType || "").toLowerCase() !== selectedType.toLowerCase()) return false;
-
-    return true;
-  });
+  }, [onlyActive, onlyDiscounted, priceMax, priceMin, searchQuery, searchSubmitCount, selectedCategory, selectedType, showcaseId, yearMax, yearMin]);
 
   if (loading && !showcase) {
     return (
@@ -229,6 +212,13 @@ export default function ShowcasePage() {
             <CustomInput
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  setSearchQuery(event.currentTarget.value.trim());
+                  setSearchSubmitCount((current) => current + 1);
+                }
+              }}
               placeholder="Search across all products..."
               size="sm"
               rounded="full"
@@ -243,6 +233,13 @@ export default function ShowcasePage() {
               <CustomInput
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    setSearchQuery(event.currentTarget.value.trim());
+                    setSearchSubmitCount((current) => current + 1);
+                  }
+                }}
                 placeholder="Search..."
                 size="sm"
                 rounded="full"

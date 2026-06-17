@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 type ThemeStyle = "light" | "dark" | "fantasy";
 type ThemeColor = "green" | "red" | "blue" | "yellow" | "gray" | "orange" | "purple";
@@ -17,6 +18,9 @@ const defaultUserTheme: UserThemeConfig = {
   tone: 500,
   density: "comfortable",
 };
+
+const hasUserThemeModel =
+  prisma.userTheme && typeof prisma.userTheme.findFirst === "function";
 
 function isThemeStyle(value: string): value is ThemeStyle {
   return value === "light" || value === "dark" || value === "fantasy";
@@ -44,12 +48,33 @@ function isThemeDensity(value: string): value is ThemeDensity {
 }
 
 export async function GET() {
-  // User panel is purely front-end; just return defaults so initial load has a shape.
-  return NextResponse.json(defaultUserTheme);
+  if (!hasUserThemeModel) {
+    return NextResponse.json(defaultUserTheme);
+  }
+
+  try {
+    const record = await prisma.userTheme.findFirst({
+      orderBy: { updatedAt: "desc" },
+    });
+    const theme: UserThemeConfig = record
+      ? {
+          preferredColor: isThemeColor(record.preferredColor)
+            ? record.preferredColor
+            : defaultUserTheme.preferredColor,
+          style: isThemeStyle(record.style) ? record.style : defaultUserTheme.style,
+          tone: isThemeTone(record.tone) ? record.tone : defaultUserTheme.tone,
+          density: isThemeDensity(record.density) ? record.density : defaultUserTheme.density,
+        }
+      : defaultUserTheme;
+
+    return NextResponse.json(theme);
+  } catch (error) {
+    console.error("User theme GET error:", error);
+    return NextResponse.json(defaultUserTheme);
+  }
 }
 
 export async function POST(request: Request) {
-  // Echo back validated theme without touching any database.
   const body = (await request.json()) as Partial<UserThemeConfig>;
 
   const nextTheme: UserThemeConfig = {
@@ -65,5 +90,32 @@ export async function POST(request: Request) {
       : defaultUserTheme.density,
   };
 
-  return NextResponse.json(nextTheme);
+  if (!hasUserThemeModel) {
+    return NextResponse.json(nextTheme);
+  }
+
+  try {
+    const existing = await prisma.userTheme.findFirst({
+      orderBy: { updatedAt: "desc" },
+    });
+
+    const record = existing
+      ? await prisma.userTheme.update({
+          where: { id: existing.id },
+          data: nextTheme,
+        })
+      : await prisma.userTheme.create({
+          data: nextTheme,
+        });
+
+    return NextResponse.json({
+      preferredColor: record.preferredColor,
+      style: record.style,
+      tone: record.tone,
+      density: record.density,
+    } as UserThemeConfig);
+  } catch (error) {
+    console.error("User theme POST error:", error);
+    return NextResponse.json({ ok: false, error: "server error" }, { status: 500 });
+  }
 }

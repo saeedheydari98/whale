@@ -62,16 +62,6 @@ const defaultUserTheme: UserThemeConfig = {
   isColorPanelLocked: false,
 };
 
-function readJsonFromStorage<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
 export function ThemeProvider({
   children,
 }: {
@@ -134,15 +124,11 @@ export function ThemeProvider({
   });
 
   const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(() => {
-    if (typeof window === "undefined") return defaultAdminTheme;
-    const saved = readJsonFromStorage<Partial<AdminThemeConfig>>("theme-admin");
-    return { ...defaultAdminTheme, ...(saved ?? {}) };
+    return defaultAdminTheme;
   });
 
   const [userTheme, setUserTheme] = useState<UserThemeConfig>(() => {
-    if (typeof window === "undefined") return defaultUserTheme;
-    const saved = readJsonFromStorage<Partial<UserThemeConfig>>("theme-user");
-    return { ...defaultUserTheme, ...(saved ?? {}) };
+    return defaultUserTheme;
   });
 
   const adminThemeRef = useRef(adminTheme);
@@ -172,14 +158,6 @@ export function ThemeProvider({
   useEffect(() => {
     localStorage.setItem("theme-style", style);
   }, [style]);
-
-  useEffect(() => {
-    localStorage.setItem("theme-admin", JSON.stringify(adminTheme));
-  }, [adminTheme]);
-
-  useEffect(() => {
-    localStorage.setItem("theme-user", JSON.stringify(userTheme));
-  }, [userTheme]);
 
   useLayoutEffect(() => {
     const vars = generateCSSVariables(theme);
@@ -260,7 +238,30 @@ export function ThemeProvider({
     return () => observer.disconnect();
   }, [theme]);
 
-  const updateUserTheme = useCallback((next: Partial<UserThemeConfig>) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.all([
+      fetch("/api/theme/admin", { cache: "no-store" }).then((res) => res.json()),
+      fetch("/api/theme/user", { cache: "no-store" }).then((res) => res.json()),
+    ])
+      .then(([nextAdminTheme, nextUserTheme]) => {
+        if (cancelled) return;
+        setAdminTheme((current) => ({ ...current, ...nextAdminTheme }));
+        setUserTheme((current) => ({ ...current, ...nextUserTheme }));
+      })
+      .catch((error) => {
+        console.error("Failed to load theme API settings:", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const updateUserTheme = useCallback(async (next: Partial<UserThemeConfig>) => {
+    let optimistic = defaultUserTheme;
+
     setUserTheme((prev) => {
       const lockUpdate =
         typeof next.isColorPanelLocked === "boolean"
@@ -268,14 +269,27 @@ export function ThemeProvider({
           : {};
 
       if (prev.isColorPanelLocked) {
-        return {
+        optimistic = {
           ...prev,
           ...lockUpdate,
         };
+        return optimistic;
       }
 
-      return { ...prev, ...next };
+      optimistic = { ...prev, ...next };
+      return optimistic;
     });
+
+    try {
+      const res = await fetch("/api/theme/user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(optimistic),
+      });
+      if (!res.ok) throw new Error("Request failed");
+    } catch (error) {
+      console.error("Failed to update user theme:", error);
+    }
   }, []);
 
   const updateAdminTheme = useCallback(async (next: Partial<AdminThemeConfig>) => {

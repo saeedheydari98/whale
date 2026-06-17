@@ -1,22 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
+import { addProductToCart } from "@/lib/cart-client";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
 import { ShowcaseSection } from "./product-showcase/showcase-section";
 import type { Banner, Product, Showcase } from "./product-showcase/types";
 
-const BANNERS_STORAGE_KEY = "admin-product-banners";
-const PRODUCTS_STORAGE_KEY = "admin-products";
-const SHOWCASES_STORAGE_KEY = "admin-product-showcases";
 // No default showcase id: only use explicit showcase ids provided by data
-const CART_STORAGE_KEY = "product-cart";
-const CART_UPDATED_EVENT = "product-cart-updated";
-
-type CartItem = Product & {
-  quantity: number;
-};
 
 function getFinalPrice(product: Product) {
   return product.discountPrice || product.price;
@@ -38,50 +30,6 @@ function getDiscountPercent(product: Product) {
   return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
 }
 
-function readLocalBanners(): Banner[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(BANNERS_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function readLocalProducts(): Product[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PRODUCTS_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function readLocalShowcases(): Showcase[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SHOWCASES_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function readCart(): CartItem[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCart(items: CartItem[]) {
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-  window.dispatchEvent(new Event(CART_UPDATED_EVENT));
-}
-
 function normalizeShowcase(item: Partial<Showcase>, index: number): Showcase {
   return {
     id: String(item.id ?? `showcase-${index + 1}`),
@@ -91,9 +39,14 @@ function normalizeShowcase(item: Partial<Showcase>, index: number): Showcase {
   };
 }
 
-function normalizeBanner(item: Partial<Banner> & { bannerUrl?: string }, index: number): Banner {
+function normalizeBanner(item: Partial<Banner> & { bannerUrl?: string; images?: unknown }, index: number): Banner {
   const legacyImage = typeof item.bannerUrl === "string" && item.bannerUrl ? [item.bannerUrl] : [];
-  const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls.map((value) => String(value)).filter(Boolean) : legacyImage;
+  const dbImages = Array.isArray(item.images) ? item.images.map((value) => String(value)).filter(Boolean) : [];
+  const imageUrls = Array.isArray(item.imageUrls)
+    ? item.imageUrls.map((value) => String(value)).filter(Boolean)
+    : dbImages.length > 0
+      ? dbImages
+      : legacyImage;
 
   return {
     id: String(item.id ?? `banner-${index + 1}`),
@@ -127,10 +80,7 @@ function ensureShowcases(products: Product[], savedShowcases: Showcase[]) {
 
 export function ProductShowcase() {
   // header search is handled on the separate `/search` route
-  const { products: catalogProducts, showcases: catalogShowcases, loading } = useProductsCatalog();
-  const [banners, setBanners] = useState<Banner[]>(() => readLocalBanners().map(normalizeBanner));
-  const [localProducts, setLocalProducts] = useState<Product[]>(() => readLocalProducts());
-  const [localShowcases, setLocalShowcases] = useState<Showcase[]>(() => readLocalShowcases());
+  const { products: catalogProducts, showcases: catalogShowcases, tree, loading } = useProductsCatalog();
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
   const dragRef = useRef({
@@ -138,12 +88,6 @@ export function ProductShowcase() {
     startX: 0,
     scrollLeft: 0,
   });
-
-  useEffect(() => {
-    setBanners(readLocalBanners().map(normalizeBanner));
-    setLocalProducts(readLocalProducts());
-    setLocalShowcases(readLocalShowcases());
-  }, []);
 
   const sortedProducts = useMemo(
     () => catalogProducts.filter((item) => item.active).sort((a, b) => a.sortOrder - b.sortOrder),
@@ -159,9 +103,24 @@ export function ProductShowcase() {
   );
 
   const displaySections = useMemo(() => {
-    const bannerSections = banners
-      .filter((banner) => banner.active && banner.imageUrls.length > 0)
-      .map((banner) => ({ type: "banner" as const, item: banner, sortOrder: banner.sortOrder }));
+    if (tree.sections.length > 0) {
+      return tree.sections
+        .map((section) =>
+          section.type === "banner"
+            ? {
+                type: "banner" as const,
+                item: normalizeBanner(section.item, section.sortOrder),
+                sortOrder: section.sortOrder,
+              }
+            : {
+                type: "showcase" as const,
+                item: normalizeShowcase(section.item as Showcase, section.sortOrder),
+                products: section.products as Product[],
+                sortOrder: section.sortOrder,
+              }
+        )
+        .filter((section) => section.type === "banner" || section.products.length > 0);
+    }
 
     const showcaseSections = sortedShowcases
       .map((showcase) => {
@@ -176,26 +135,19 @@ export function ProductShowcase() {
       })
       .filter((section) => section.products.length > 0);
 
-    return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [banners, sortedProducts, sortedShowcases]);
+    return showcaseSections.sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [sortedProducts, sortedShowcases, tree]);
 
   
 
   const loadingSections = useMemo(() => {
-    const sourceProducts = sortedProducts.length > 0 ? sortedProducts : localProducts;
-    const sourceShowcases =
-      sortedShowcases.length > 0 ? (sortedShowcases as Showcase[]) : localShowcases;
-    const activeProducts = sourceProducts
+    const activeProducts = sortedProducts
       .filter((item) => item.active !== false)
       .sort((a, b) => a.sortOrder - b.sortOrder);
     const localSortedShowcases = ensureShowcases(
       activeProducts,
-      sourceShowcases as Showcase[]
+      sortedShowcases as Showcase[]
     ).filter((showcase) => showcase.active !== false);
-
-    const bannerSections = banners
-      .filter((banner) => banner.active && banner.imageUrls.length > 0)
-      .map((banner) => ({ type: "banner" as const, item: banner, sortOrder: banner.sortOrder }));
 
     const showcaseSections = localSortedShowcases
       .map((showcase) => ({
@@ -206,8 +158,8 @@ export function ProductShowcase() {
       }))
       .filter((section) => section.products.length > 0);
 
-    return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [banners, localProducts, localShowcases, sortedProducts, sortedShowcases]);
+    return showcaseSections.sort((a, b) => a.sortOrder - b.sortOrder);
+  }, [sortedProducts, sortedShowcases]);
 
   const startProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button, a")) {
@@ -238,19 +190,8 @@ export function ProductShowcase() {
     setPreviewImage(imageUrl);
   };
 
-  const addToCart = (product: Product) => {
-    const key = String(product.id ?? `${product.title}-${product.description}-${product.price}`);
-    const currentCart = readCart();
-    const existing = currentCart.find((item) => String(item.id ?? `${item.title}-${item.description}-${item.price}`) === key);
-    const nextCart = existing
-      ? currentCart.map((item) =>
-          String(item.id ?? `${item.title}-${item.description}-${item.price}`) === key
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        )
-      : [...currentCart, { ...product, quantity: 1 }];
-
-    writeCart(nextCart);
+  const addToCart = async (product: Product) => {
+    await addProductToCart(product);
     setCartMessage(`${product.title} added to cart.`);
     window.setTimeout(() => setCartMessage(""), 1800);
   };
@@ -264,15 +205,7 @@ export function ProductShowcase() {
 
         {loading ? (
           <div className="flex flex-col gap-8">
-            {loadingSections.map((section) =>
-              section.type === "banner" ? (
-                <BannerCarousel
-                  key={`loading-banner-${section.item.id}`}
-                  banner={section.item}
-                  onPreview={() => undefined}
-                  isLoading
-                />
-              ) : (
+            {loadingSections.map((section) => (
                 <ShowcaseSection
                   key={`loading-showcase-${section.item.id}`}
                   showcase={section.item}
@@ -287,8 +220,7 @@ export function ProductShowcase() {
                   getDiscountPercent={(product) => Number(product.discountPercent) || 0}
                   isLoading
                 />
-              )
-            )}
+            ))}
           </div>
         ) : null}
 

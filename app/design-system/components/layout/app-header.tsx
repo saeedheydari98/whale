@@ -12,33 +12,23 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { RiShoppingCartFill } from "react-icons/ri";
 import {
   ADMIN_ACCESS_UPDATED_EVENT,
+  fetchAdminSecurityCode,
   isAdminAccessUnlocked,
 } from "@/lib/admin-access";
+import {
+  CART_UPDATED_EVENT,
+  getCart,
+  getCartCount,
+  readLocalCart,
+} from "@/lib/cart-client";
 import { GiSpermWhale } from "react-icons/gi";
 
 const navItems = [
-  { href: "/", label: "home", tone: "bg-primary text-primary-text" },
-  { href: "/products", label: "products", tone: "bg-primary text-primary-text" },
-  { href: "/panel/admin", label: "admin panel", tone: "bg-primary text-primary-text", adminOnly: true },
-  { href: "/panel/user", label: "user panel", tone: "bg-primary text-primary-text" },
+  { href: "/", label: "home", tone: "bg-primary-contrast text-primary-text-nomode" },
+  { href: "/products", label: "products", tone: "bg-primary-contrast text-primary-text-nomode" },
+  { href: "/panel/admin", label: "admin panel", tone: "bg-primary-contrast text-primary-text-nomode", adminOnly: true },
+  { href: "/panel/user", label: "user panel", tone: "bg-primary-contrast text-primary-text-nomode" },
 ];
-
-const CART_STORAGE_KEY = "product-cart";
-const CART_UPDATED_EVENT = "product-cart-updated";
-
-function readCartCount() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
-    if (!Array.isArray(parsed)) return 0;
-
-    return parsed.reduce((sum, item) => {
-      const quantity = Number(item?.quantity);
-      return sum + (Number.isFinite(quantity) ? quantity : 0);
-    }, 0);
-  } catch {
-    return 0;
-  }
-}
 
 function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
   return (
@@ -68,11 +58,21 @@ export function AppHeader() {
   const router = useRouter();
 
   useEffect(() => {
-    const syncCartCount = () => setCartCount(readCartCount());
+    const syncCartCount = () => setCartCount(getCartCount(readLocalCart()));
+    const syncCartFromApi = async () => {
+      const snapshot = await getCart();
+      setCartCount(getCartCount(snapshot.items));
+    };
     const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
+    const syncAdminAccessFromApi = async () => {
+      await fetchAdminSecurityCode();
+      setHasAdminAccess(isAdminAccessUnlocked());
+    };
 
     syncCartCount();
+    void syncCartFromApi();
     syncAdminAccess();
+    void syncAdminAccessFromApi();
     window.addEventListener("storage", syncCartCount);
     window.addEventListener("storage", syncAdminAccess);
     window.addEventListener(CART_UPDATED_EVENT, syncCartCount);

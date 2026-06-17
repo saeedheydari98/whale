@@ -5,14 +5,13 @@ import { useParams } from "next/navigation";
 import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
 import type { ProductRecord } from "@/lib/products-client";
+import { addProductToCart } from "@/lib/cart-client";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomTag } from "@/app/design-system/components/ui/tag";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import Loading from "@/app/design-system/components/loading/loading";
 
-const CART_STORAGE_KEY = "product-cart";
-const CART_UPDATED_EVENT = "product-cart-updated";
 const LOADING_PRODUCT: ProductRecord = {
   id: "loading-product",
   title: "Product title placeholder text",
@@ -43,20 +42,6 @@ function formatPrice(value?: string) {
 function getDiscountPercent(product: ProductRecord) {
   const percent = Number(product.discountPercent);
   return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
-}
-
-function readCart() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCart(items: unknown[]) {
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-  window.dispatchEvent(new Event(CART_UPDATED_EVENT));
 }
 
 export default function ProductPage() {
@@ -119,21 +104,8 @@ export default function ProductPage() {
     setIsPurchased(true);
   };
 
-  const addToCart = (item: ProductRecord) => {
-    const key = String(item.id ?? `${item.title}-${item.description}-${item.price}`);
-    const currentCart = readCart();
-    const existing = currentCart.find(
-      (cartItem: { id?: string | number }) => String(cartItem.id ?? "") === key
-    );
-    const nextCart = existing
-      ? currentCart.map((cartItem: { id?: string | number; quantity?: number }) =>
-          String(cartItem.id ?? "") === key
-            ? { ...cartItem, quantity: Number(cartItem.quantity ?? 0) + 1 }
-            : cartItem
-        )
-      : [...currentCart, { ...item, quantity: 1 }];
-
-    writeCart(nextCart);
+  const addToCart = async (item: ProductRecord) => {
+    await addProductToCart(item);
     setCartMessage(`${item.title} added to cart.`);
     window.setTimeout(() => setCartMessage(""), 2000);
   };

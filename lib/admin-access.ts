@@ -12,6 +12,19 @@ export function readAdminSecurityCode() {
   return localStorage.getItem(ADMIN_SECURITY_CODE_STORAGE_KEY) ?? "";
 }
 
+export async function fetchAdminSecurityCode() {
+  const res = await fetch("/api/admin/security", { cache: "no-store" });
+  const data = await res.json();
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || "Admin security load failed");
+  }
+  const code = String(data?.data?.code ?? "");
+  if (typeof window !== "undefined") {
+    localStorage.setItem(ADMIN_SECURITY_CODE_STORAGE_KEY, code);
+  }
+  return code;
+}
+
 export function writeAdminSecurityCode(code: string) {
   if (typeof window === "undefined") return;
 
@@ -19,6 +32,21 @@ export function writeAdminSecurityCode(code: string) {
   localStorage.setItem(ADMIN_SECURITY_CODE_STORAGE_KEY, normalizedCode);
   localStorage.setItem(ADMIN_ACCESS_UNLOCKED_STORAGE_KEY, normalizedCode ? "1" : "0");
   emitAdminAccessUpdated();
+}
+
+export async function saveAdminSecurityCode(code: string) {
+  const normalizedCode = code.trim();
+  const res = await fetch("/api/admin/security", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: normalizedCode }),
+  });
+  const data = await res.json();
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || "Admin security save failed");
+  }
+  writeAdminSecurityCode(String(data?.data?.code ?? normalizedCode));
+  return String(data?.data?.code ?? normalizedCode);
 }
 
 export function isAdminAccessUnlocked() {

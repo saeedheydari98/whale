@@ -13,6 +13,8 @@ import {
   findProductById,
   findShowcaseById,
   getProducts,
+  type BannerRecord,
+  type CatalogTree,
   type ProductRecord,
   type ShowcaseRecord,
 } from "@/lib/products-client";
@@ -20,6 +22,8 @@ import {
 type ProductsCatalogContextValue = {
   products: ProductRecord[];
   showcases: ShowcaseRecord[];
+  banners: BannerRecord[];
+  tree: CatalogTree;
   loading: boolean;
   getProductById: (id: string | number) => ProductRecord | null;
   getShowcaseById: (id: string | number) => ShowcaseRecord | null;
@@ -31,6 +35,8 @@ const ProductsCatalogContext = createContext<ProductsCatalogContextValue | null>
 export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseRecord[]>([]);
+  const [banners, setBanners] = useState<BannerRecord[]>([]);
+  const [tree, setTree] = useState<CatalogTree>({ sections: [] });
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (force = false) => {
@@ -39,6 +45,8 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
       const data = await getProducts({ force });
       setProducts(data.products);
       setShowcases(data.showcases);
+      setBanners(data.banners);
+      setTree(data.tree);
     } finally {
       setLoading(false);
     }
@@ -52,6 +60,8 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       setProducts(data.products);
       setShowcases(data.showcases);
+      setBanners(data.banners);
+      setTree(data.tree);
       setLoading(false);
     })();
 
@@ -74,12 +84,14 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
     () => ({
       products,
       showcases,
+      banners,
+      tree,
       loading,
       getProductById,
       getShowcaseById,
       refresh: () => load(true),
     }),
-    [products, showcases, loading, getProductById, getShowcaseById, load]
+    [products, showcases, banners, tree, loading, getProductById, getShowcaseById, load]
   );
 
   return (

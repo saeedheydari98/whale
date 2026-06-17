@@ -12,9 +12,6 @@ import { AdminBannerList } from "./products-panel/admin-banner-list";
 import { AdminShowcaseList } from "./products-panel/admin-showcase-list";
 import type { BannerForm, ProductForm, ShowcaseForm } from "./products-panel/types";
 
-const PRODUCTS_STORAGE_KEY = "admin-products";
-const SHOWCASES_STORAGE_KEY = "admin-product-showcases";
-const BANNERS_STORAGE_KEY = "admin-product-banners";
 // No default showcase id
 
 const createShowcase = (): ShowcaseForm => ({
@@ -50,48 +47,6 @@ const createProduct = (): ProductForm => ({
 });
 
 
-function readLocalProducts(): ProductForm[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PRODUCTS_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeLocalProducts(products: ProductForm[]) {
-  localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
-}
-
-function readLocalShowcases(): ShowcaseForm[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SHOWCASES_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeLocalShowcases(showcases: ShowcaseForm[]) {
-  localStorage.setItem(SHOWCASES_STORAGE_KEY, JSON.stringify(showcases));
-}
-
-function readLocalBanners(): BannerForm[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(BANNERS_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeLocalBanners(banners: BannerForm[]) {
-  localStorage.setItem(BANNERS_STORAGE_KEY, JSON.stringify(banners));
-}
-
 function getProductKey(product: Partial<ProductForm>) {
   return [
     product.title,
@@ -114,15 +69,6 @@ function dedupeProducts(products: ProductForm[]) {
     seen.add(key);
     return true;
   });
-}
-
-function mergeLocalShowcaseIds(apiProducts: ProductForm[], localProducts: ProductForm[]) {
-  const localByKey = new Map(localProducts.map((product) => [getProductKey(product), product.showcaseId]));
-
-  return apiProducts.map((product) => ({
-    ...product,
-    showcaseId: localByKey.get(getProductKey(product)) ?? product.showcaseId,
-  }));
 }
 
 function normalizeProduct(item: Partial<ProductForm>, index: number): ProductForm {
@@ -155,9 +101,14 @@ function normalizeShowcase(item: Partial<ShowcaseForm>, index: number): Showcase
   };
 }
 
-function normalizeBanner(item: Partial<BannerForm> & { bannerUrl?: string }, index: number): BannerForm {
+function normalizeBanner(item: Partial<BannerForm> & { bannerUrl?: string; images?: unknown }, index: number): BannerForm {
   const legacyImage = typeof item.bannerUrl === "string" && item.bannerUrl ? [item.bannerUrl] : [];
-  const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls.map((value) => String(value)).filter(Boolean) : legacyImage;
+  const dbImages = Array.isArray(item.images) ? item.images.map((value) => String(value)).filter(Boolean) : [];
+  const imageUrls = Array.isArray(item.imageUrls)
+    ? item.imageUrls.map((value) => String(value)).filter(Boolean)
+    : dbImages.length > 0
+      ? dbImages
+      : legacyImage;
 
   return {
     id: String(item.id ?? `banner-${Date.now()}-${index}`),
@@ -217,15 +168,9 @@ function formatPrice(value?: string) {
 }
 
 export function AdminProductsPanel() {
-  const [products, setProducts] = useState<ProductForm[]>(() =>
-    readLocalProducts().map(normalizeProduct)
-  );
-  const [showcases, setShowcases] = useState<ShowcaseForm[]>(() =>
-    ensureShowcases(readLocalProducts().map(normalizeProduct), readLocalShowcases())
-  );
-  const [banners, setBanners] = useState<BannerForm[]>(() =>
-    readLocalBanners().map(normalizeBanner)
-  );
+  const [products, setProducts] = useState<ProductForm[]>([]);
+  const [showcases, setShowcases] = useState<ShowcaseForm[]>([]);
+  const [banners, setBanners] = useState<BannerForm[]>([]);
   const [draftProduct, setDraftProduct] = useState<ProductForm>(createProduct);
   const [draftShowcase, setDraftShowcase] = useState<ShowcaseForm>(createShowcase);
   const [draftBanner, setDraftBanner] = useState<BannerForm>(createBanner);
@@ -263,37 +208,25 @@ export function AdminProductsPanel() {
             normalizeProduct(item as Partial<ProductForm>, index)
           )
         );
-        const localProducts = dedupeProducts(readLocalProducts().map(normalizeProduct));
-        const nextProducts =
-          apiProducts.length > 0 ? mergeLocalShowcaseIds(apiProducts, localProducts) : localProducts;
         const nextShowcases = ensureShowcases(
-          nextProducts,
-          catalog.showcases.length > 0
-            ? catalog.showcases.map((item, index) => ({
-                id: String(item.id),
-                title: String(item.title ?? `Showcase ${index + 1}`),
-                active: item.active !== false,
-                sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
-              }))
-            : readLocalShowcases()
+          apiProducts,
+          catalog.showcases.map((item, index) => ({
+            id: String(item.id),
+            title: String(item.title ?? `Showcase ${index + 1}`),
+            active: item.active !== false,
+            sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+          }))
         );
-        const nextBanners = readLocalBanners().map(normalizeBanner);
-        setProducts(nextProducts);
+        const nextBanners = catalog.banners.map((item, index) => normalizeBanner(item, index));
+        setProducts(apiProducts);
         setShowcases(nextShowcases);
         setBanners(nextBanners);
-        writeLocalShowcases(nextShowcases);
-        writeLocalBanners(nextBanners);
-        if (apiProducts.length > 0) {
-          writeLocalProducts(apiProducts);
-        }
       } catch {
         if (cancelled) return;
-        const localProducts = readLocalProducts().map(normalizeProduct);
-        const nextShowcases = ensureShowcases(localProducts, readLocalShowcases());
-        const nextBanners = readLocalBanners().map(normalizeBanner);
-        setProducts(localProducts);
-        setShowcases(nextShowcases);
-        setBanners(nextBanners);
+        setProducts([]);
+        setShowcases([]);
+        setBanners([]);
+        setStatus("Catalog API was not available.");
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -344,7 +277,12 @@ export function AdminProductsPanel() {
     return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [sortedBanners, sortedShowcases]);
 
-  const persistProducts = async (nextProducts: ProductForm[]) => {
+  const persistProducts = async (
+    nextProducts: ProductForm[],
+    nextShowcases = sortedShowcases,
+    nextBanners = sortedBanners,
+    showSavedStatus = true
+  ) => {
     const validProducts = dedupeProducts(
       nextProducts.filter((item) => item.title.trim() && item.description.trim() && item.price.trim())
     );
@@ -353,27 +291,47 @@ export function AdminProductsPanel() {
     setStatus("");
 
     try {
-      writeLocalProducts(validProducts);
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           products: validProducts,
-          showcases: sortedShowcases.map((showcase) => ({
+          showcases: nextShowcases.map((showcase) => ({
             id: showcase.id,
             title: showcase.title,
+            active: showcase.active,
+            sortOrder: showcase.sortOrder,
+          })),
+          banners: nextBanners.map((banner) => ({
+            id: banner.id,
+            title: banner.title,
+            imageUrls: banner.imageUrls,
+            active: banner.active,
+            sortOrder: banner.sortOrder,
           })),
         }),
       });
       const data = await res.json();
-      const savedProducts = Array.isArray(data?.data) ? dedupeProducts(data.data.map(normalizeProduct)) : validProducts;
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || "API save failed");
+      }
+      const savedProducts = Array.isArray(data?.data?.products)
+        ? dedupeProducts(data.data.products.map(normalizeProduct))
+        : validProducts;
+      const savedShowcases = Array.isArray(data?.data?.showcases)
+        ? ensureShowcases(savedProducts, data.data.showcases.map(normalizeShowcase))
+        : nextShowcases;
+      const savedBanners = Array.isArray(data?.data?.banners)
+        ? data.data.banners.map(normalizeBanner)
+        : nextBanners;
       setProducts(savedProducts);
-      writeLocalProducts(savedProducts);
+      setShowcases(savedShowcases);
+      setBanners(savedBanners);
       clearProductsCache();
-      setStatus("Products saved.");
-    } catch {
-      writeLocalProducts(validProducts);
-      setStatus("Saved locally. API was not available.");
+      if (showSavedStatus) setStatus("Catalog saved to database.");
+    } catch (error) {
+      console.error("Catalog save error:", error);
+      setStatus("Database save failed.");
     } finally {
       setSaving(false);
     }
@@ -589,7 +547,7 @@ export function AdminProductsPanel() {
     await persistProducts(nextProducts);
   };
 
-  const submitDraftShowcase = () => {
+  const submitDraftShowcase = async () => {
     if (!draftShowcase.title.trim()) {
       setStatus("Showcase title is required.");
       return;
@@ -597,12 +555,11 @@ export function AdminProductsPanel() {
 
     const nextShowcases = [...sortedShowcases, draftShowcase];
     setShowcases(nextShowcases);
-    writeLocalShowcases(nextShowcases);
     setIsShowcaseOpen(false);
-    setStatus("Showcase saved.");
+    await persistProducts(products, nextShowcases, sortedBanners);
   };
 
-  const submitDraftBanner = () => {
+  const submitDraftBanner = async () => {
     if (draftBanner.imageUrls.length === 0) {
       setStatus("Banner needs at least one image.");
       return;
@@ -610,12 +567,11 @@ export function AdminProductsPanel() {
 
     const nextBanners = [...sortedBanners, draftBanner];
     setBanners(nextBanners);
-    writeLocalBanners(nextBanners);
     setIsBannerOpen(false);
-    setStatus("Banner saved.");
+    await persistProducts(products, sortedShowcases, nextBanners);
   };
 
-  const submitEditingShowcase = () => {
+  const submitEditingShowcase = async () => {
     if (!editingShowcase) return;
 
     if (!editingShowcase.title.trim()) {
@@ -627,13 +583,12 @@ export function AdminProductsPanel() {
       showcase.id === editingShowcase.id ? editingShowcase : showcase
     );
     setShowcases(nextShowcases);
-    writeLocalShowcases(nextShowcases);
     setIsEditShowcaseOpen(false);
     setEditingShowcase(null);
-    setStatus("Showcase saved.");
+    await persistProducts(products, nextShowcases, sortedBanners);
   };
 
-  const submitEditingBanner = () => {
+  const submitEditingBanner = async () => {
     if (!editingBanner) return;
 
     if (editingBanner.imageUrls.length === 0) {
@@ -645,21 +600,19 @@ export function AdminProductsPanel() {
       banner.id === editingBanner.id ? editingBanner : banner
     );
     setBanners(nextBanners);
-    writeLocalBanners(nextBanners);
     setIsEditBannerOpen(false);
     setEditingBanner(null);
-    setStatus("Banner saved.");
+    await persistProducts(products, sortedShowcases, nextBanners);
   };
 
-  const deleteEditingBanner = () => {
+  const deleteEditingBanner = async () => {
     if (!editingBanner) return;
 
     const nextBanners = sortedBanners.filter((banner) => banner.id !== editingBanner.id);
     setBanners(nextBanners);
-    writeLocalBanners(nextBanners);
     setIsEditBannerOpen(false);
     setEditingBanner(null);
-    setStatus("Banner deleted.");
+    await persistProducts(products, sortedShowcases, nextBanners);
   };
 
   const deleteEditingShowcase = async () => {
@@ -674,7 +627,6 @@ export function AdminProductsPanel() {
     const nextProducts = products.filter((product) => product.showcaseId !== showcaseToDelete.id);
 
     setShowcases(nextShowcases);
-    writeLocalShowcases(nextShowcases);
     setIsEditShowcaseOpen(false);
     setEditingShowcase(null);
     await persistProducts(nextProducts);

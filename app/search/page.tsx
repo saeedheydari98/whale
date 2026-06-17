@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { getProducts } from "@/lib/products-client";
 import { CustomButton } from "@/app/design-system/components/ui/button";
-import { matchesSearchQuery } from "@/lib/product-search";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -23,10 +21,14 @@ export default function SearchPage() {
     (async () => {
       setLoading(true);
       try {
-        const data = await getProducts({ all: true });
-        const list = data.products || [];
-        const filtered = list.filter((product) => matchesSearchQuery(product, q));
-        if (!cancelled) setResults(filtered);
+        const res = await fetch(`/api/products?search=${encodeURIComponent(q)}&all=1`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (!res.ok || data?.ok === false) {
+          throw new Error(data?.error || "Search request failed");
+        }
+        if (!cancelled) setResults(Array.isArray(data?.data?.products) ? data.data.products : []);
       } catch {
         if (!cancelled) setResults([]);
       } finally {

@@ -3,19 +3,19 @@ export default function Home() {
     <main className=" bg-bg-base p-10 text-primary-text">
       <section className="mx-auto w-full max-w-3xl rounded-xl border border-primary-border bg-bg-surface p-8">
         <div className="mb-6 text-4xl font-bold md:text-5xl">
-          Building a Dynamic UI Playground
+          Dynamic & Scalable E-Commerce Platform
         </div>
 
         <div className="mb-8 max-w-2xl text-lg text-primary-text md:text-xl">
           This project is an experimental space focused on designing and developing
-          a scalable, dynamic UI infrastructure. It’s a place to explore ideas,
-          refine patterns, and push the boundaries of modern frontend architecture.
+          a dynamic, scalable e-commerce infrastructure. It's a place to explore ideas,
+          refine patterns, and push the boundaries of modern online store architecture.
         </div>
 
         <div className="mb-10 max-w-xl text-base text-secondary-text">
           Contributions, ideas, and feedback are always welcome. If you're
-          interested in UI systems, design architecture, or just enjoy building
-          things — we'd love to have you involved.
+          interested in e-commerce systems, design architecture, or just enjoy building
+          digital products — we'd love to have you involved.
         </div>
 
         <div className="flex gap-4">

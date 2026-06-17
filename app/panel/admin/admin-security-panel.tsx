@@ -6,8 +6,9 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import {
   lockAdminAccess,
+  fetchAdminSecurityCode,
   readAdminSecurityCode,
-  writeAdminSecurityCode,
+  saveAdminSecurityCode,
 } from "@/lib/admin-access";
 
 export function AdminSecurityPanel() {
@@ -16,11 +17,20 @@ export function AdminSecurityPanel() {
 
   useEffect(() => {
     setSecurityCode(readAdminSecurityCode());
+    void fetchAdminSecurityCode()
+      .then(setSecurityCode)
+      .catch((error) => {
+        console.error("Admin security API load error:", error);
+      });
   }, []);
 
-  const saveSecurityCode = () => {
-    writeAdminSecurityCode(securityCode);
-    setStatus(securityCode.trim() ? "Security code saved." : "Security code cleared.");
+  const saveSecurityCode = async () => {
+    try {
+      await saveAdminSecurityCode(securityCode);
+      setStatus(securityCode.trim() ? "Security code saved to database." : "Security code cleared.");
+    } catch {
+      setStatus("Security code database save failed.");
+    }
   };
 
   const lockPanel = () => {

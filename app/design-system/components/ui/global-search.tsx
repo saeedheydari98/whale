@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FiSearch } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import { CustomInput } from "./input";
@@ -9,17 +9,52 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 
 export function GlobalSearch() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isMobile = useIsMobile();
   const [value, setValue] = useState("");
   const [expanded, setExpanded] = useState(false);
+  const returnPathRef = useRef("/");
   const INPUT_ID = "global-search-input";
   const isOpen = !isMobile || expanded;
 
   const submit = (q?: string) => {
     const v = (q ?? value).trim();
-    if (!v) return; // do not submit empty
+    if (!v) {
+      router.push(returnPathRef.current);
+      return;
+    }
     router.push(`/search?q=${encodeURIComponent(v)}`);
   };
+
+  useEffect(() => {
+    if (pathname !== "/search") {
+      const params = searchParams.toString();
+      returnPathRef.current = params ? `${pathname}?${params}` : pathname;
+    }
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    const nextValue = searchParams.get("q") ?? "";
+    if (pathname === "/search") {
+      setValue(nextValue);
+    }
+  }, [pathname, searchParams]);
+
+  useEffect(() => {
+    const trimmed = value.trim();
+    const timer = window.setTimeout(() => {
+      if (!trimmed && pathname === "/search") {
+        router.push(returnPathRef.current);
+        return;
+      }
+      if (trimmed) {
+        router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+      }
+    }, 2000);
+
+    return () => window.clearTimeout(timer);
+  }, [pathname, router, value]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

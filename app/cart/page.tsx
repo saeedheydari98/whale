@@ -6,43 +6,24 @@ import { CustomButton } from "../design-system/components/ui/button";
 import { CustomInput } from "../design-system/components/ui/input";
 import { CustomModal } from "../design-system/components/ui/modal";
 import {
+  clearCart as clearCartData,
+  getCart,
+  persistCart,
+  removeCartItem,
+  updateCartQuantity,
+  type CartItemRecord,
+} from "@/lib/cart-client";
+import {
   EMPTY_USER_PROFILE,
+  fetchUserProfile,
   isUserProfileComplete,
   readUserProfile,
+  saveUserProfile,
   writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
 
-type CartItem = {
-  id?: number | string;
-  title: string;
-  description: string;
-  price: string;
-  originalPrice?: string;
-  discountPrice?: string;
-  discountPercent?: number | string;
-  imageUrl?: string;
-  quantity: number;
-};
-
-const CART_STORAGE_KEY = "product-cart";
-const CART_UPDATED_EVENT = "product-cart-updated";
-
-function readCart(): CartItem[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeCart(items: CartItem[]) {
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-  window.dispatchEvent(new Event(CART_UPDATED_EVENT));
-}
-
-function getFinalPrice(item: CartItem) {
+function getFinalPrice(item: CartItemRecord) {
   return item.discountPrice || item.price;
 }
 
@@ -63,13 +44,13 @@ function readPriceNumber(value?: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function getDiscountPercent(item: CartItem) {
+function getDiscountPercent(item: CartItemRecord) {
   const percent = Number(item.discountPercent);
   return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
 }
 
 export default function CartPage() {
-  const [items, setItems] = useState<CartItem[]>([]);
+  const [items, setItems] = useState<CartItemRecord[]>([]);
   const [previewImage, setPreviewImage] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileDraft, setProfileDraft] = useState<UserProfile>(EMPTY_USER_PROFILE);
@@ -78,10 +59,20 @@ export default function CartPage() {
   const [checkoutMessage, setCheckoutMessage] = useState("");
 
   useEffect(() => {
-    setItems(readCart());
-    const savedProfile = readUserProfile();
-    setProfile(savedProfile);
-    setProfileDraft(savedProfile ?? EMPTY_USER_PROFILE);
+    let cancelled = false;
+
+    void (async () => {
+      const snapshot = await getCart();
+      const savedProfile = await fetchUserProfile().catch(() => snapshot.profile);
+      if (cancelled) return;
+      setItems(snapshot.items);
+      setProfile(savedProfile);
+      setProfileDraft(savedProfile ?? snapshot.profile ?? EMPTY_USER_PROFILE);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const totalItems = useMemo(
@@ -93,35 +84,19 @@ export default function CartPage() {
     [items]
   );
 
-  const removeItem = (target: CartItem) => {
-    const targetKey = String(target.id ?? `${target.title}-${target.description}-${target.price}`);
-    const nextItems = items.filter(
-      (item) => String(item.id ?? `${item.title}-${item.description}-${item.price}`) !== targetKey
-    );
+  const removeItem = async (target: CartItemRecord) => {
+    const nextItems = await removeCartItem(target);
     setItems(nextItems);
-    writeCart(nextItems);
   };
 
-  const updateQuantity = (target: CartItem, nextQuantity: number) => {
-    const targetKey = String(target.id ?? `${target.title}-${target.description}-${target.price}`);
-
-    if (nextQuantity <= 0) {
-      removeItem(target);
-      return;
-    }
-
-    const nextItems = items.map((item) =>
-      String(item.id ?? `${item.title}-${item.description}-${item.price}`) === targetKey
-        ? { ...item, quantity: nextQuantity }
-        : item
-    );
+  const updateQuantity = async (target: CartItemRecord, nextQuantity: number) => {
+    const nextItems = await updateCartQuantity(target, nextQuantity);
     setItems(nextItems);
-    writeCart(nextItems);
   };
 
-  const clearCart = () => {
-    setItems([]);
-    writeCart([]);
+  const clearCart = async () => {
+    const nextItems = await clearCartData();
+    setItems(nextItems);
   };
 
   const openImagePreview = (imageUrl?: string) => {
@@ -147,11 +122,16 @@ export default function CartPage() {
       phone: profileDraft.phone.trim(),
     };
 
-    writeUserProfile(nextProfile);
-    setProfile(nextProfile);
-    setProfileDraft(nextProfile);
-    setIsProfileModalOpen(false);
-    setCheckoutMessage("Profile saved. You can continue checkout.");
+    void saveUserProfile(nextProfile)
+      .then((savedProfile) => {
+        writeUserProfile(savedProfile);
+        void persistCart(items, savedProfile).then(setItems);
+        setProfile(savedProfile);
+        setProfileDraft(savedProfile);
+        setIsProfileModalOpen(false);
+        setCheckoutMessage("Profile saved. Your cart is synced.");
+      })
+      .catch(() => setProfileError("Profile database save failed."));
   };
 
   const continueCheckout = () => {
@@ -165,7 +145,8 @@ export default function CartPage() {
     }
 
     setProfile(savedProfile);
-    setCheckoutMessage("Profile found. You can continue checkout.");
+    void persistCart(items, savedProfile).then(setItems);
+    setCheckoutMessage("Profile found. Your cart is synced.");
   };
 
   return (
@@ -218,7 +199,7 @@ export default function CartPage() {
                 <button
                   type="button"
                   className="flex h-28 items-center justify-center overflow-hidden rounded-md bg-primary-media"
-                  onClick={() => openImagePreview(item.imageUrl)}
+                  onClick={() => openImagePreview(item.imageUrl || undefined)}
                   disabled={!item.imageUrl}
                   aria-label="Open product image"
                 >

@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { IoSaveOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { persistCart, readLocalCart } from "@/lib/cart-client";
 import {
   EMPTY_USER_PROFILE,
+  fetchUserProfile,
   isUserProfileComplete,
   readUserProfile,
+  saveUserProfile,
   USER_PROFILE_UPDATED_EVENT,
-  writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
 
@@ -23,6 +25,11 @@ export function UserProfilePanel() {
     };
 
     syncProfile();
+    void fetchUserProfile().then((profile) => {
+      if (profile) setProfileDraft(profile);
+    }).catch((error) => {
+      console.error("Profile API load error:", error);
+    });
     window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
 
     return () => {
@@ -35,19 +42,27 @@ export function UserProfilePanel() {
     setStatus("");
   };
 
-  const saveProfile = () => {
+  const saveProfile = async () => {
     if (!isUserProfileComplete(profileDraft)) {
       setStatus("All profile fields are required.");
       return;
     }
 
-    writeUserProfile({
+    const nextProfile = {
       firstName: profileDraft.firstName.trim(),
       lastName: profileDraft.lastName.trim(),
       nationalId: profileDraft.nationalId.trim(),
       phone: profileDraft.phone.trim(),
-    });
-    setStatus("Profile saved.");
+    };
+
+    try {
+      const savedProfile = await saveUserProfile(nextProfile);
+      setProfileDraft(savedProfile);
+      void persistCart(readLocalCart(), savedProfile);
+      setStatus("Profile saved to database.");
+    } catch {
+      setStatus("Profile database save failed.");
+    }
   };
 
   return (

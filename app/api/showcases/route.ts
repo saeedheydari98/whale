@@ -68,13 +68,13 @@ export async function GET(request: Request) {
         },
         banners: true,
       },
-      orderBy: [{ createdAt: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
     return NextResponse.json({ ok: true, data: { showcases } });
   } catch (error) {
     console.error("Showcases GET error:", error);
-    return NextResponse.json({ ok: true, data: { showcases: [] } });
+    return NextResponse.json({ ok: false, error: "server error", data: { showcases: [] } }, { status: 500 });
   }
 }
 
@@ -92,8 +92,33 @@ export async function POST(request: Request) {
 
     const result = await (prisma as any).$transaction(async (tx: any) => {
       const sc = showcaseId
-        ? await tx.showcase.upsert({ where: { id: showcaseId }, update: { title: incoming.title, description: incoming.description ?? null, imageUrl: incoming.imageUrl ?? null }, create: { id: showcaseId, title: incoming.title, description: incoming.description ?? null, imageUrl: incoming.imageUrl ?? null } })
-        : await tx.showcase.create({ data: { title: incoming.title, description: incoming.description ?? null, imageUrl: incoming.imageUrl ?? null } });
+        ? await tx.showcase.upsert({
+            where: { id: showcaseId },
+            update: {
+              title: incoming.title,
+              description: incoming.description ?? null,
+              imageUrl: incoming.imageUrl ?? null,
+              active: incoming.active ?? true,
+              sortOrder: Number.isFinite(Number(incoming.sortOrder)) ? Number(incoming.sortOrder) : 0,
+            },
+            create: {
+              id: showcaseId,
+              title: incoming.title,
+              description: incoming.description ?? null,
+              imageUrl: incoming.imageUrl ?? null,
+              active: incoming.active ?? true,
+              sortOrder: Number.isFinite(Number(incoming.sortOrder)) ? Number(incoming.sortOrder) : 0,
+            },
+          })
+        : await tx.showcase.create({
+            data: {
+              title: incoming.title,
+              description: incoming.description ?? null,
+              imageUrl: incoming.imageUrl ?? null,
+              active: incoming.active ?? true,
+              sortOrder: Number.isFinite(Number(incoming.sortOrder)) ? Number(incoming.sortOrder) : 0,
+            },
+          });
 
       // replace products for this showcase (delete then create)
       if (Array.isArray(incoming.products)) {
@@ -107,7 +132,16 @@ export async function POST(request: Request) {
       if (Array.isArray(incoming.banners)) {
         await tx.banner.deleteMany({ where: { showcaseId: sc.id } });
         for (const b of incoming.banners) {
-          await tx.banner.create({ data: { title: b.title ?? null, showcaseId: sc.id, images: b.images ?? null } });
+          await tx.banner.create({
+            data: {
+              id: b.id ? String(b.id) : undefined,
+              title: b.title ?? null,
+              showcaseId: sc.id,
+              images: b.imageUrls ?? b.images ?? undefined,
+              active: b.active ?? true,
+              sortOrder: Number.isFinite(Number(b.sortOrder)) ? Number(b.sortOrder) : 0,
+            },
+          });
         }
       }
 

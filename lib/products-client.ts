@@ -2,9 +2,6 @@
 
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
-const PRODUCTS_STORAGE_KEY = "admin-products";
-const SHOWCASES_STORAGE_KEY = "admin-product-showcases";
-
 const CATALOG_URL_ACTIVE = "/api/products";
 const CATALOG_URL_ALL = "/api/products?all=1";
 
@@ -35,9 +32,38 @@ export type ShowcaseRecord = {
   products?: ProductRecord[];
 };
 
+export type BannerRecord = {
+  id: string;
+  title?: string;
+  showcaseId?: string | null;
+  imageUrls?: string[];
+  images?: unknown;
+  active?: boolean;
+  sortOrder?: number;
+};
+
+export type CatalogTreeSection =
+  | {
+      type: "banner";
+      sortOrder: number;
+      item: BannerRecord;
+    }
+  | {
+      type: "showcase";
+      sortOrder: number;
+      item: ShowcaseRecord;
+      products: ProductRecord[];
+    };
+
+export type CatalogTree = {
+  sections: CatalogTreeSection[];
+};
+
 export type ProductsCache = {
   products: ProductRecord[];
   showcases: ShowcaseRecord[];
+  banners: BannerRecord[];
+  tree: CatalogTree;
 };
 
 export type GetProductsOptions = {
@@ -46,27 +72,6 @@ export type GetProductsOptions = {
   /** Bypass session cache and refetch. */
   force?: boolean;
 };
-
-function readLocalProducts(includeInactive: boolean): ProductRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(PRODUCTS_STORAGE_KEY) || "[]");
-    const list = Array.isArray(parsed) ? parsed : [];
-    return includeInactive ? list : list.filter((item) => item.active !== false);
-  } catch {
-    return [];
-  }
-}
-
-function readLocalShowcases(): ShowcaseRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SHOWCASES_STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 function getProductKey(product: Partial<ProductRecord>) {
   return [
@@ -91,65 +96,59 @@ function dedupeProducts(products: ProductRecord[]) {
   });
 }
 
-function mergeLocalShowcaseIds(apiProducts: ProductRecord[], localProducts: ProductRecord[]) {
-  const localByKey = new Map(
-    localProducts.map((product) => [getProductKey(product), product.showcaseId ?? ""])
-  );
-
-  return apiProducts.map((product) => ({
-    ...product,
-    showcaseId: localByKey.get(getProductKey(product)) ?? product.showcaseId ?? "",
-  }));
-}
-
-function buildShowcasesFromProducts(products: ProductRecord[], savedShowcases: ShowcaseRecord[]) {
-  const byId = new Map(savedShowcases.map((showcase) => [String(showcase.id), showcase]));
-
-  for (const product of products) {
-    const showcaseId = String(product.showcaseId ?? "").trim();
-    if (!showcaseId || byId.has(showcaseId)) continue;
-    byId.set(showcaseId, {
-      id: showcaseId,
-      title: "Untitled showcase",
-      active: true,
-      sortOrder: byId.size + 1,
-    });
-  }
-
-  return Array.from(byId.values());
-}
-
 function parseApiPayload(payload: unknown): ProductsCache {
   if (Array.isArray(payload)) {
-    return { products: dedupeProducts(payload as ProductRecord[]), showcases: [] };
+    return { products: dedupeProducts(payload as ProductRecord[]), showcases: [], banners: [], tree: { sections: [] } };
   }
 
   if (!payload || typeof payload !== "object") {
-    return { products: [], showcases: [] };
+    return { products: [], showcases: [], banners: [], tree: { sections: [] } };
   }
 
-  const record = payload as { products?: ProductRecord[]; showcases?: ShowcaseRecord[] };
+  const record = payload as {
+    products?: ProductRecord[];
+    showcases?: ShowcaseRecord[];
+    banners?: BannerRecord[];
+    tree?: CatalogTree;
+  };
   return {
     products: Array.isArray(record.products) ? dedupeProducts(record.products) : [],
     showcases: Array.isArray(record.showcases) ? record.showcases : [],
+    banners: Array.isArray(record.banners) ? record.banners : [],
+    tree:
+      record.tree && Array.isArray(record.tree.sections)
+        ? record.tree
+        : { sections: [] },
   };
 }
 
-function withLocalFallback(apiData: ProductsCache, includeInactive: boolean): ProductsCache {
-  const localProducts = dedupeProducts(readLocalProducts(includeInactive));
-  const localShowcases = readLocalShowcases();
+function resolveTree(apiData: ProductsCache): CatalogTree {
+  const tree =
+    apiData.tree.sections.length > 0
+      ? apiData.tree
+      : {
+          sections: [
+            ...apiData.banners.map((banner) => ({
+              type: "banner" as const,
+              sortOrder: Number(banner.sortOrder ?? 0),
+              item: banner,
+            })),
+            ...apiData.showcases.map((showcase) => ({
+              type: "showcase" as const,
+              sortOrder: Number(showcase.sortOrder ?? 0),
+              item: showcase,
+              products: apiData.products.filter(
+                (product) => String(product.showcaseId ?? "") === String(showcase.id)
+              ),
+            })),
+          ].sort((a, b) => a.sortOrder - b.sortOrder),
+        };
 
-  const products =
-    apiData.products.length > 0
-      ? mergeLocalShowcaseIds(apiData.products, localProducts)
-      : localProducts;
+  return tree;
+}
 
-  const showcases =
-    apiData.showcases.length > 0
-      ? apiData.showcases
-      : buildShowcasesFromProducts(products, localShowcases);
-
-  return { products, showcases };
+function withResolvedTree(apiData: ProductsCache): ProductsCache {
+  return { ...apiData, tree: resolveTree(apiData) };
 }
 
 function resolveOptions(options?: boolean | GetProductsOptions): GetProductsOptions {
@@ -164,9 +163,9 @@ export async function getProducts(options?: boolean | GetProductsOptions): Promi
 
   try {
     const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force });
-    return withLocalFallback(parseApiPayload(json?.data), all);
+    return withResolvedTree(parseApiPayload(json?.data));
   } catch {
-    return withLocalFallback({ products: [], showcases: [] }, all);
+    return { products: [], showcases: [], banners: [], tree: { sections: [] } };
   }
 }
 
