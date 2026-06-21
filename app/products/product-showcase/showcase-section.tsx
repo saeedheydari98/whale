@@ -54,7 +54,7 @@ export function ShowcaseSection({
             <span className="text-xs font-semibold text-secondary-text">{products.length} items</span>
           </Loading>
           <Loading loading="skeleton-item" isLoading={isLoading}>
-            <ShowcaseLink showcaseId={showcase.id}>See all</ShowcaseLink>
+            <ShowcaseLink showcaseId={showcase.id} showcaseTitle={showcase.title}>See all</ShowcaseLink>
           </Loading>
         </div>
       </div>
@@ -153,7 +153,7 @@ export function ShowcaseSection({
               </Loading>
               <Loading loading="skeleton-item" isLoading={isLoading} className="flex-1">
                 <div className="flex flex-1 gap-2 w-full">
-                  <ProductLink iconAfter={<FiExternalLink />} className="w-full flex justify-center items-center gap-1" productId={product.id ?? String(product.id)}>
+                  <ProductLink iconAfter={<FiExternalLink />} className="w-full flex justify-center items-center gap-1" productId={product.id ?? String(product.id)} productTitle={product.title}>
                     {product.ctaLabel || "View"}  
                   </ProductLink>
                 </div>

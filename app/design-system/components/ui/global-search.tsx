@@ -20,10 +20,12 @@ export function GlobalSearch() {
 
   const submit = (q?: string) => {
     const v = (q ?? value).trim();
+    const currentQuery = searchParams.get("q") ?? "";
     if (!v) {
       router.push(returnPathRef.current);
       return;
     }
+    if (pathname === "/search" && currentQuery === v) return;
     router.push(`/search?q=${encodeURIComponent(v)}`);
   };
 
@@ -44,17 +46,18 @@ export function GlobalSearch() {
   useEffect(() => {
     const trimmed = value.trim();
     const timer = window.setTimeout(() => {
+      const currentQuery = searchParams.get("q") ?? "";
       if (!trimmed && pathname === "/search") {
         router.push(returnPathRef.current);
         return;
       }
-      if (trimmed) {
+      if (trimmed && (pathname !== "/search" || currentQuery !== trimmed)) {
         router.push(`/search?q=${encodeURIComponent(trimmed)}`);
       }
     }, 2000);
 
     return () => window.clearTimeout(timer);
-  }, [pathname, router, value]);
+  }, [pathname, router, searchParams, value]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

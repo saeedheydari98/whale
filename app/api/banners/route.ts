@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { rateLimit } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -61,6 +62,9 @@ function toClientBanner(banner: {
 }
 
 export async function GET(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const url = new URL(request.url);
   const includeInactive = url.searchParams.get("all") === "1";
 
@@ -84,6 +88,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+
   const body = await request.json().catch(() => ({}));
   const incoming: BannerPayload[] = Array.isArray(body.banners) ? body.banners : [];
   const banners = incoming

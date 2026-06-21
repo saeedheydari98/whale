@@ -19,21 +19,26 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
 
   useEffect(() => {
     if (banner.imageUrls.length <= 1) return;
+    const seconds = Number.isFinite(Number(banner.intervalSeconds)) ? Math.max(1, Number(banner.intervalSeconds)) : 5;
 
     const timer = window.setInterval(() => {
       setActiveIndex((current) => (current + 1) % banner.imageUrls.length);
-    }, 5000);
+    }, seconds * 1000);
 
     return () => window.clearInterval(timer);
-  }, [banner.imageUrls.length]);
+  }, [banner.imageUrls.length, banner.intervalSeconds]);
 
   const activeImage = banner.imageUrls[activeIndex] ?? banner.imageUrls[0];
+  const heightPercent = Number.isFinite(Number(banner.heightPercent))
+    ? Math.max(10, Math.min(100, Number(banner.heightPercent)))
+    : 28;
+  const bannerHeight = `${heightPercent}vh`;
 
   if (isLoading) {
     return (
       <section className="flex flex-col gap-2">
         <Loading loading="skeleton-item" isLoading>
-          <div className="flex h-56 w-full items-center justify-center overflow-hidden rounded-xl border border-border-default bg-primary-media" />
+          <div className="flex w-full items-center justify-center overflow-hidden rounded-xl border border-border-default bg-primary-media" style={{ height: bannerHeight }} />
         </Loading>
         <div className="flex justify-center gap-2">
           {banner.imageUrls.map((imageUrl, index) => (
@@ -52,7 +57,8 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
     <section className="flex flex-col gap-2">
       <button
         type="button"
-        className="flex h-56 w-full items-center justify-center overflow-hidden rounded-xl border border-primary-border bg-primary-media"
+        className="flex w-full items-center justify-center overflow-hidden rounded-xl border border-primary-border bg-primary-media"
+        style={{ height: bannerHeight }}
         onClick={() => onPreview(activeImage)}
         aria-label="Open banner image"
       >

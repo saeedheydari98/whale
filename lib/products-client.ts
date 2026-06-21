@@ -10,19 +10,50 @@ export type ProductRecord = {
   showcaseId?: string;
   title: string;
   description: string;
+  slug?: string;
   price: string;
   originalPrice?: string;
   discountPrice?: string;
   discountPercent?: number | string;
   imageUrl?: string;
+  images?: string[] | unknown;
+  videoUrl?: string;
   badge?: string;
   ctaLabel?: string;
   ctaHref?: string;
   active: boolean;
+  isActive?: boolean;
+  isFeatured?: boolean;
+  isAvailable?: boolean;
   stockQuantity?: number | string;
+  stockStatus?: string;
+  minOrder?: number | string;
+  maxOrder?: number | string | null;
+  weight?: number | string | null;
+  length?: number | string | null;
+  width?: number | string | null;
+  height?: number | string | null;
+  salesCount?: number | string;
+  views?: number | string;
+  wishlistCount?: number | string;
+  ratingAverage?: number | string;
+  ratingCount?: number | string;
+  discountStartAt?: string | null;
+  discountEndAt?: string | null;
+  categoryId?: string;
+  manufactureYear?: number | string | null;
+  brand?: string;
+  vendor?: string;
+  sku?: string;
+  barcode?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+  placement?: number | string;
+  publishedAt?: string | null;
+  deletedAt?: string | null;
   colorStock?: unknown;
   sortOrder: number;
-  placement?: number | string;
 };
 
 export type ShowcaseRecord = {
@@ -31,9 +62,22 @@ export type ShowcaseRecord = {
   description?: string;
   imageUrl?: string;
   active?: boolean;
+  mode?: "manual" | "auto" | string;
+  autoSort?: string;
+  limit?: number | string;
+  categoryId?: string | null;
+  manualProductIds?: Array<number | string> | unknown;
   sortOrder?: number;
   placement?: number | string;
   products?: ProductRecord[];
+};
+
+export type CategoryRecord = {
+  id: string;
+  title: string;
+  slug?: string;
+  active?: boolean;
+  sortOrder?: number | string;
 };
 
 export type BannerRecord = {
@@ -43,6 +87,8 @@ export type BannerRecord = {
   imageUrls?: string[];
   images?: unknown;
   active?: boolean;
+  intervalSeconds?: number | string;
+  heightPercent?: number | string;
   sortOrder?: number;
   placement?: number | string;
 };
@@ -67,12 +113,14 @@ export type CatalogTree = {
 export type CatalogObject = {
   placement?: number;
   showcases: Array<ShowcaseRecord & { products: ProductRecord[] }>;
+  categories: CategoryRecord[];
   banners: BannerRecord[];
 };
 
 type CatalogApiTree = {
   type?: "root";
   placement?: number | string;
+  categories?: CategoryRecord[];
   children?: Array<
     | (BannerRecord & { type: "banner" })
     | (ShowcaseRecord & { type: "showcase"; products?: ProductRecord[] })
@@ -82,10 +130,29 @@ type CatalogApiTree = {
 export type ProductsCache = {
   products: ProductRecord[];
   showcases: ShowcaseRecord[];
+  categories: CategoryRecord[];
   banners: BannerRecord[];
   tree: CatalogTree;
   catalog: CatalogObject;
 };
+
+export function slugifyCatalogValue(value: string | number | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^\p{L}\p{N}-]+/gu, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function productSlug(product: Partial<ProductRecord>) {
+  return slugifyCatalogValue(product.slug || product.title || product.id || "");
+}
+
+export function showcaseSlug(showcase: Partial<ShowcaseRecord>) {
+  return slugifyCatalogValue(showcase.title || showcase.id || "");
+}
 
 export type GetProductsOptions = {
   /** Include inactive products (admin). */
@@ -121,9 +188,10 @@ function emptyProductsCache(): ProductsCache {
   return {
     products: [],
     showcases: [],
+    categories: [],
     banners: [],
     tree: { sections: [] },
-    catalog: { placement: 0, showcases: [], banners: [] },
+    catalog: { placement: 0, showcases: [], categories: [], banners: [] },
   };
 }
 
@@ -166,11 +234,30 @@ export function normalizeColorStock(value: unknown) {
 
 function normalizeProductRecord(product: ProductRecord, fallbackOrder: number): ProductRecord {
   const placement = getPlacement(product, fallbackOrder);
+  const stockQuantity = Number.isFinite(Number(product.stockQuantity)) ? Math.max(0, Math.round(Number(product.stockQuantity))) : 0;
+  const imageList = Array.isArray(product.images)
+    ? product.images.map((item) => String(item)).filter(Boolean)
+    : [];
 
   return {
     ...product,
-    active: product.active !== false,
-    stockQuantity: Number.isFinite(Number(product.stockQuantity)) ? Math.max(0, Math.round(Number(product.stockQuantity))) : 0,
+    slug: String(product.slug ?? productSlug(product)),
+    images: imageList,
+    active: product.active !== false && product.isActive !== false,
+    isActive: product.isActive !== false && product.active !== false,
+    isFeatured: product.isFeatured === true,
+    isAvailable: product.isAvailable !== false && stockQuantity > 0,
+    stockQuantity,
+    stockStatus: String(product.stockStatus ?? (stockQuantity > 0 ? "in_stock" : "out_of_stock")),
+    minOrder: Number.isFinite(Number(product.minOrder)) ? Math.max(1, Math.round(Number(product.minOrder))) : 1,
+    maxOrder: Number.isFinite(Number(product.maxOrder)) ? Math.max(1, Math.round(Number(product.maxOrder))) : null,
+    salesCount: Number.isFinite(Number(product.salesCount)) ? Math.max(0, Math.round(Number(product.salesCount))) : 0,
+    views: Number.isFinite(Number(product.views)) ? Math.max(0, Math.round(Number(product.views))) : 0,
+    wishlistCount: Number.isFinite(Number(product.wishlistCount)) ? Math.max(0, Math.round(Number(product.wishlistCount))) : 0,
+    ratingAverage: Number.isFinite(Number(product.ratingAverage)) ? Math.max(0, Math.min(5, Number(product.ratingAverage))) : 0,
+    ratingCount: Number.isFinite(Number(product.ratingCount)) ? Math.max(0, Math.round(Number(product.ratingCount))) : 0,
+    categoryId: String(product.categoryId ?? "general").trim() || "general",
+    manufactureYear: Number.isFinite(Number(product.manufactureYear)) ? Math.round(Number(product.manufactureYear)) : null,
     colorStock: normalizeColorStock(product.colorStock),
     sortOrder: placement,
     placement,
@@ -179,12 +266,34 @@ function normalizeProductRecord(product: ProductRecord, fallbackOrder: number): 
 
 function normalizeShowcaseRecord(showcase: ShowcaseRecord, fallbackOrder: number): ShowcaseRecord {
   const placement = getPlacement(showcase, fallbackOrder);
+  const manualProductIds = Array.isArray(showcase.manualProductIds)
+    ? showcase.manualProductIds.map((item) => String(item)).filter(Boolean)
+    : [];
 
   return {
     ...showcase,
     active: showcase.active !== false,
+    mode: showcase.mode === "auto" ? "auto" : "manual",
+    autoSort: String(showcase.autoSort ?? "newest"),
+    limit: Number.isFinite(Number(showcase.limit)) ? Math.max(1, Math.round(Number(showcase.limit))) : 8,
+    categoryId: String(showcase.categoryId ?? ""),
+    manualProductIds,
     sortOrder: placement,
     placement,
+  };
+}
+
+function normalizeCategoryRecord(category: CategoryRecord, fallbackOrder: number): CategoryRecord {
+  const placement = getPlacement(category, fallbackOrder);
+  const title = String(category.title ?? category.id ?? "").trim();
+  const slug = slugifyCatalogValue((category.slug || title || category.id) ?? "");
+
+  return {
+    id: String(category.id ?? (slug || `category-${fallbackOrder}`)),
+    title: title || `Category ${fallbackOrder}`,
+    slug,
+    active: category.active !== false,
+    sortOrder: placement,
   };
 }
 
@@ -196,6 +305,8 @@ function normalizeBannerRecord(banner: BannerRecord, fallbackOrder: number): Ban
     ...banner,
     imageUrls,
     active: banner.active !== false,
+    intervalSeconds: Number.isFinite(Number(banner.intervalSeconds)) ? Math.max(1, Math.round(Number(banner.intervalSeconds))) : 5,
+    heightPercent: Number.isFinite(Number(banner.heightPercent)) ? Math.max(10, Math.min(100, Math.round(Number(banner.heightPercent)))) : 28,
     sortOrder: placement,
     placement,
   };
@@ -231,6 +342,7 @@ function readTreePayload(payload: unknown): CatalogObject | null {
   return {
     placement: getPlacement(tree, 0),
     showcases,
+    categories: Array.isArray(tree.categories) ? tree.categories.map(normalizeCategoryRecord) : [],
     banners,
   };
 }
@@ -250,6 +362,7 @@ function parseApiPayload(payload: unknown): ProductsCache {
   const record = payload as {
     products?: ProductRecord[];
     showcases?: ShowcaseRecord[];
+    categories?: CategoryRecord[];
     banners?: BannerRecord[];
     tree?: CatalogTree;
     catalog?: Partial<CatalogObject>;
@@ -282,9 +395,9 @@ function parseApiPayload(payload: unknown): ProductsCache {
   const fallbackProducts = Array.isArray(record.products)
     ? record.products.map(normalizeProductRecord)
     : [];
-  const products = catalogShowcases.length > 0
-    ? catalogShowcases.flatMap((showcase) => showcase.products)
-    : fallbackProducts;
+  const products = fallbackProducts.length > 0
+    ? fallbackProducts
+    : catalogShowcases.flatMap((showcase) => showcase.products);
   const showcases = catalogShowcases.length > 0
     ? catalogShowcases.map(({ products: _products, ...showcase }) => showcase)
     : Array.isArray(record.showcases)
@@ -295,10 +408,18 @@ function parseApiPayload(payload: unknown): ProductsCache {
     : Array.isArray(record.banners)
       ? record.banners.map(normalizeBannerRecord)
       : [];
+  const categories = treeCatalog?.categories && treeCatalog.categories.length > 0
+    ? treeCatalog.categories
+    : Array.isArray(record.categories)
+      ? record.categories.map(normalizeCategoryRecord)
+      : Array.isArray(record.catalog?.categories)
+      ? record.catalog.categories.map(normalizeCategoryRecord)
+      : [];
 
   return {
     products: dedupeProducts(products),
     showcases,
+    categories,
     banners,
     tree:
       record.tree && Array.isArray(record.tree.sections)
@@ -307,6 +428,7 @@ function parseApiPayload(payload: unknown): ProductsCache {
     catalog: {
       placement: Number(treeCatalog?.placement ?? record.catalog?.placement ?? 0),
       showcases: catalogShowcases,
+      categories,
       banners: catalogBanners,
     },
   };
@@ -327,14 +449,70 @@ function resolveTree(apiData: ProductsCache): CatalogTree {
               type: "showcase" as const,
               sortOrder: getPlacement(showcase, index + 1),
               item: showcase,
-              products: apiData.products.filter(
-                (product) => String(product.showcaseId ?? "") === String(showcase.id)
-              ),
+              products: resolveShowcaseProducts(apiData.products, showcase, true),
             })),
           ].sort((a, b) => a.sortOrder - b.sortOrder),
         };
 
   return tree;
+}
+
+export function sortProductsBy(products: ProductRecord[], sort: string) {
+  const price = (product: ProductRecord) => {
+    const parsed = Number(String(product.discountPrice || product.price || "").replace(/[^\d.]/g, ""));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  const time = (value: unknown) => {
+    const parsed = new Date(String(value ?? "")).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  return [...products].sort((a, b) => {
+    switch (sort) {
+      case "cheapest":
+        return price(a) - price(b);
+      case "expensive":
+        return price(b) - price(a);
+      case "oldest":
+        return time((a as { createdAt?: unknown }).createdAt) - time((b as { createdAt?: unknown }).createdAt);
+      case "bestseller":
+        return Number(b.salesCount ?? 0) - Number(a.salesCount ?? 0);
+      case "mostDiscounted":
+      case "biggestDiscount":
+        return Number(b.discountPercent ?? 0) - Number(a.discountPercent ?? 0);
+      case "newest":
+      default:
+        return time((b as { createdAt?: unknown }).createdAt) - time((a as { createdAt?: unknown }).createdAt);
+    }
+  });
+}
+
+export function resolveShowcaseProducts(
+  products: ProductRecord[],
+  showcase: ShowcaseRecord,
+  applyLimit: boolean
+) {
+  const activeProducts = products.filter((product) => product.active !== false && product.isActive !== false);
+  const mode = showcase.mode === "auto" ? "auto" : "manual";
+  const limit = Number.isFinite(Number(showcase.limit)) ? Math.max(1, Math.round(Number(showcase.limit))) : 8;
+  const categoryId = String(showcase.categoryId ?? "").trim();
+
+  if (mode === "auto") {
+    const filtered = activeProducts.filter((product) => !categoryId || product.categoryId === categoryId);
+    const sorted = sortProductsBy(filtered, String(showcase.autoSort ?? "newest"));
+    return applyLimit ? sorted.slice(0, limit) : sorted;
+  }
+
+  const manualIds = Array.isArray(showcase.manualProductIds)
+    ? showcase.manualProductIds.map((item) => String(item))
+    : [];
+
+  if (manualIds.length > 0) {
+    const byId = new Map(activeProducts.map((product) => [String(product.id), product]));
+    return manualIds.map((id) => byId.get(id)).filter(Boolean) as ProductRecord[];
+  }
+
+  return activeProducts.filter((product) => String(product.showcaseId ?? "") === String(showcase.id));
 }
 
 function withResolvedTree(apiData: ProductsCache): ProductsCache {
@@ -363,7 +541,11 @@ export function findProductById(
   products: ProductRecord[],
   id: string | number
 ): ProductRecord | null {
-  return products.find((product) => String(product.id) === String(id)) ?? null;
+  const target = String(id);
+  const targetSlug = slugifyCatalogValue(id);
+  return products.find((product) =>
+    String(product.id) === target || productSlug(product) === targetSlug
+  ) ?? null;
 }
 
 export function findShowcaseById(
@@ -371,12 +553,14 @@ export function findShowcaseById(
   showcases: ShowcaseRecord[],
   id: string | number
 ): ShowcaseRecord | null {
-  const showcase = showcases.find((item) => String(item.id) === String(id));
+  const target = String(id);
+  const targetSlug = slugifyCatalogValue(id);
+  const showcase = showcases.find((item) =>
+    String(item.id) === target || showcaseSlug(item) === targetSlug
+  );
   if (!showcase) return null;
 
-  const showcaseProducts = products.filter(
-    (product) => String(product.showcaseId ?? "") === String(id) && product.active !== false
-  );
+  const showcaseProducts = resolveShowcaseProducts(products, showcase, false);
 
   return {
     ...showcase,

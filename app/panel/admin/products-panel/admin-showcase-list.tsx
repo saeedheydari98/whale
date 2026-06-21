@@ -20,6 +20,48 @@ type AdminShowcaseListProps = {
   isLoading?: boolean;
 };
 
+function priceValue(value?: string) {
+  const parsed = Number(String(value || "").replace(/[^\d.]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sortedByRule(products: ProductForm[], sort: string) {
+  return [...products].sort((a, b) => {
+    switch (sort) {
+      case "cheapest":
+        return priceValue(a.discountPrice || a.price) - priceValue(b.discountPrice || b.price);
+      case "expensive":
+        return priceValue(b.discountPrice || b.price) - priceValue(a.discountPrice || a.price);
+      case "oldest":
+        return Number(a.id) - Number(b.id);
+      case "bestseller":
+        return b.salesCount - a.salesCount;
+      case "mostDiscounted":
+        return Number(b.discountPercent || 0) - Number(a.discountPercent || 0);
+      case "newest":
+      default:
+        return Number(b.id) - Number(a.id);
+    }
+  });
+}
+
+function getShowcaseProducts(products: ProductForm[], showcase: ShowcaseForm) {
+  const activeProducts = products.filter((product) => product.isActive !== false);
+  if (showcase.mode === "auto") {
+    const filtered = activeProducts.filter((product) => !showcase.categoryId || product.categoryId === showcase.categoryId);
+    return sortedByRule(filtered, showcase.autoSort).slice(0, Math.max(1, showcase.limit));
+  }
+
+  const manualIds = showcase.manualProductIds.map((item) => String(item));
+  if (manualIds.length > 0) {
+    return manualIds
+      .map((id) => activeProducts.find((product) => String(product.id) === id))
+      .filter(Boolean) as ProductForm[];
+  }
+
+  return activeProducts.filter((product) => product.showcaseId === showcase.id);
+}
+
 export function AdminShowcaseList({
   products,
   showcases,
@@ -36,7 +78,7 @@ export function AdminShowcaseList({
   return (
     <div className="flex flex-col gap-5">
       {showcases.map((showcase) => {
-        const showcaseProducts = products.filter((product) => product.showcaseId === showcase.id);
+        const showcaseProducts = getShowcaseProducts(products, showcase);
 
         return (
           <div
@@ -151,12 +193,17 @@ export function AdminShowcaseList({
                       </Loading>
                       <Loading loading="skeleton-item" isLoading={isLoading}>
                         <span className="text-xs font-semibold text-secondary-text">
-                          {product.active ? "Active" : "Hidden"}
+                          {product.isActive ? "Active" : "Hidden"}{product.isFeatured ? " / Featured" : ""}
                         </span>
                       </Loading>
                       <Loading loading="skeleton-item" isLoading={isLoading}>
                         <span className="text-xs font-semibold text-secondary-text">
-                          Stock: {product.stockQuantity}
+                          Stock: {product.stockQuantity} / {product.stockStatus}
+                        </span>
+                      </Loading>
+                      <Loading loading="skeleton-item" isLoading={isLoading}>
+                        <span className="text-xs font-semibold text-secondary-text">
+                          Category: {product.categoryId}
                         </span>
                       </Loading>
                     </div>
@@ -172,7 +219,7 @@ export function AdminShowcaseList({
                         border="base"
                         rounded="md"
                         size="sm"
-                        variant={product.active ? "primary" : "neutral"}
+                        variant={product.isActive ? "primary" : "neutral"}
                         icon={<IoCreateOutline />}
                         onClick={() => onEditProduct(product)}
                       >

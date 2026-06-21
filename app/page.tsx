@@ -1,41 +1,65 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { CustomButton } from "./design-system/components/ui/button";
+import { getProducts, slugifyCatalogValue, type CategoryRecord } from "@/lib/products-client";
+
 export default function Home() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<CategoryRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const catalog = await getProducts();
+      if (cancelled) return;
+      setCategories(catalog.categories.filter((category) => category.active !== false));
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
-    <main className=" bg-bg-base p-10 text-primary-text">
-      <section className="mx-auto w-full max-w-3xl rounded-xl border border-primary-border bg-bg-surface p-8">
-        <div className="mb-6 text-4xl font-bold md:text-5xl">
-          Dynamic & Scalable E-Commerce Platform
+    <main className="min-h-screen bg-bg-base text-primary-text">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8">
+        <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
+          <div className="text-3xl font-bold">Categories</div>
+          <span className="text-sm text-secondary-text">Choose a category to see all products in that group.</span>
         </div>
 
-        <div className="mb-8 max-w-2xl text-lg text-primary-text md:text-xl">
-          This project is an experimental space focused on designing and developing
-          a dynamic, scalable e-commerce infrastructure. It's a place to explore ideas,
-          refine patterns, and push the boundaries of modern online store architecture.
-        </div>
+        {loading ? (
+          <div className="text-sm text-secondary-text">Loading categories...</div>
+        ) : null}
 
-        <div className="mb-10 max-w-xl text-base text-secondary-text">
-          Contributions, ideas, and feedback are always welcome. If you're
-          interested in e-commerce systems, design architecture, or just enjoy building
-          digital products — we'd love to have you involved.
-        </div>
+        {!loading && categories.length === 0 ? (
+          <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
+            No active categories are available.
+          </div>
+        ) : null}
 
-        <div className="flex gap-4">
-          <a
-            href="https://github.com/saeedheydari98/NEXT-UI"
-            target="_blank"
-            rel="noreferrer"
-            className="rounded-2xl bg-primary px-6 py-3 text-primary-contrast shadow transition hover:opacity-90"
-          >
-            Contribute on GitHub
-          </a>
-
-          <a
-            href="#"
-            className="rounded-2xl border px-6 py-3 transition hover:bg-primary-bg"
-          >
-            Learn More
-          </a>
+        <div className="flex flex-wrap gap-3">
+          {categories.map((category) => {
+            const slug = slugifyCatalogValue(category.slug || category.title || category.id);
+            return (
+              <CustomButton
+                key={category.id}
+                variant="primary"
+                border="base"
+                rounded="full"
+                onClick={() => router.push(`/products/category/${slug || category.id}`)}
+              >
+                {category.title}
+              </CustomButton>
+            );
+          })}
         </div>
-      </section>
+      </div>
     </main>
   );
 }

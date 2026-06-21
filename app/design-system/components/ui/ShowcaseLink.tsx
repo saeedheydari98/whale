@@ -3,9 +3,11 @@
 import { useRouter } from "next/navigation";
 import React from "react";
 import { CustomButton } from "./button";
+import { slugifyCatalogValue } from "@/lib/products-client";
 
 type Props = {
   showcaseId: string | number;
+  showcaseTitle?: string;
   children?: React.ReactNode;
   variant?: Parameters<typeof CustomButton>[0]["variant"];
   size?: Parameters<typeof CustomButton>[0]["size"];
@@ -14,13 +16,15 @@ type Props = {
 
 export default function ShowcaseLink({
   showcaseId,
+  showcaseTitle,
   children,
   variant = "neutral",
   size = "sm",
   className,
 }: Props) {
   const router = useRouter();
-  const href = `/products/showcase/${showcaseId}`;
+  const slug = slugifyCatalogValue(showcaseTitle || showcaseId);
+  const href = `/products/showcase/${slug || showcaseId}`;
 
   return (
     <CustomButton

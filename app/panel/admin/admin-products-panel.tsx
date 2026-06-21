@@ -13,13 +13,28 @@ import { clearProductsCache, getProducts } from "@/lib/products-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { AdminBannerList } from "./products-panel/admin-banner-list";
 import { AdminShowcaseList } from "./products-panel/admin-showcase-list";
-import type { BannerForm, ProductForm, ShowcaseForm } from "./products-panel/types";
+import type { BannerForm, CategoryForm, ProductForm, ShowcaseForm } from "./products-panel/types";
+
+export type AdminCatalogSection = "products" | "banners" | "showcases" | "categories" | "storefront";
 
 // No default showcase id
 
 const createShowcase = (): ShowcaseForm => ({
   id: `showcase-${Date.now()}`,
   title: "",
+  active: true,
+  mode: "manual",
+  autoSort: "newest",
+  limit: 8,
+  categoryId: "",
+  manualProductIds: [],
+  sortOrder: 1,
+});
+
+const createCategory = (): CategoryForm => ({
+  id: `category-${Date.now()}`,
+  title: "",
+  slug: "",
   active: true,
   sortOrder: 1,
 });
@@ -29,6 +44,8 @@ const createBanner = (): BannerForm => ({
   title: "",
   imageUrls: [],
   active: true,
+  intervalSeconds: 5,
+  heightPercent: 28,
   sortOrder: 1,
 });
 
@@ -37,19 +54,60 @@ const createProduct = (): ProductForm => ({
   showcaseId: "",
   title: "",
   description: "",
+  slug: "",
   price: "",
   originalPrice: "",
   discountPrice: "",
   discountPercent: "",
   imageUrl: "",
+  images: [],
+  videoUrl: "",
   badge: "",
   ctaLabel: "View product",
   ctaHref: "#",
   active: true,
+  isActive: true,
+  isFeatured: false,
+  isAvailable: true,
   stockQuantity: 0,
+  stockStatus: "in_stock",
+  minOrder: 1,
+  maxOrder: 0,
+  weight: "",
+  length: "",
+  width: "",
+  height: "",
+  salesCount: 0,
+  views: 0,
+  wishlistCount: 0,
+  ratingAverage: "",
+  ratingCount: 0,
+  discountStartAt: "",
+  discountEndAt: "",
+  categoryId: "general",
+  manufactureYear: "",
+  brand: "",
+  vendor: "",
+  sku: "",
+  barcode: "",
+  metaTitle: "",
+  metaDescription: "",
+  metaKeywords: "",
+  placement: "",
+  publishedAt: "",
+  deletedAt: "",
   colorStock: {},
   sortOrder: 1,
 });
+
+const MIN_LOADING_MS = 350;
+
+function waitForMinimumLoading(startedAt: number) {
+  const remaining = MIN_LOADING_MS - (Date.now() - startedAt);
+  return remaining > 0
+    ? new Promise((resolve) => window.setTimeout(resolve, remaining))
+    : Promise.resolve();
+}
 
 const STOCK_OPTIONS = [
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100,
@@ -66,6 +124,15 @@ const PRODUCT_COLOR_OPTIONS = [
   "orange",
   "purple",
   "pink",
+];
+
+const SHOWCASE_SORT_OPTIONS = [
+  { value: "cheapest", label: "Cheapest" },
+  { value: "expensive", label: "Most expensive" },
+  { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
+  { value: "bestseller", label: "Bestseller" },
+  { value: "mostDiscounted", label: "Most discounted" },
 ];
 
 type InventoryControlsProps = {
@@ -175,6 +242,64 @@ function InventoryControls({ product, onChange }: InventoryControlsProps) {
   );
 }
 
+type ProductAdvancedFieldsProps = {
+  product: ProductForm;
+  categories: CategoryForm[];
+  onChange: (patch: Partial<ProductForm>) => void;
+  hasRequiredError: (key: string) => boolean;
+  categoryErrorKey: string;
+};
+
+function imageListToText(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean).join(", ") : "";
+}
+
+function textToImageList(value: string) {
+  return value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+}
+
+function ProductAdvancedFields({ product, categories, onChange, hasRequiredError, categoryErrorKey }: ProductAdvancedFieldsProps) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+      <div className="text-sm font-bold text-primary-text">Product details</div>
+      <RequiredLabel required className="text-primary-text">Category</RequiredLabel>
+      <CustomSelect
+        value={product.categoryId}
+        onChange={(event) => onChange({ categoryId: event.target.value })}
+        aria-invalid={hasRequiredError(categoryErrorKey) && !product.categoryId.trim()}
+      >
+        <option value="">Select category</option>
+        {categories.map((category) => (
+          <option key={category.id} value={category.id}>
+            {category.title}
+          </option>
+        ))}
+      </CustomSelect>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <CustomInput value={product.slug} placeholder="Slug" onChange={(event) => onChange({ slug: event.target.value })} />
+        <CustomInput value={product.manufactureYear} placeholder="Manufacture year" onChange={(event) => onChange({ manufactureYear: event.target.value })} />
+      </div>
+      <CustomInput value={imageListToText(product.images)} placeholder="Gallery image URLs" onChange={(event) => onChange({ images: textToImageList(event.target.value) })} />
+      <CustomInput value={product.videoUrl} placeholder="Video URL" onChange={(event) => onChange({ videoUrl: event.target.value })} />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <CustomInput value={product.brand} placeholder="Brand" onChange={(event) => onChange({ brand: event.target.value })} />
+        <CustomInput value={product.sku} placeholder="SKU" onChange={(event) => onChange({ sku: event.target.value })} />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <CustomSwitch checked={product.isActive} onChange={(isActive) => onChange({ isActive, active: isActive })} label={product.isActive ? "Active" : "Hidden"} size="sm" />
+        <CustomSwitch checked={product.isFeatured} onChange={(isFeatured) => onChange({ isFeatured })} label={product.isFeatured ? "Featured" : "Normal"} size="sm" />
+        <CustomSwitch checked={product.isAvailable} onChange={(isAvailable) => onChange({ isAvailable })} label={product.isAvailable ? "Available" : "Unavailable"} size="sm" />
+      </div>
+    </div>
+  );
+}
+
+function toggleProductId(list: Array<number | string>, productId: number | string) {
+  const id = String(productId);
+  const ids = list.map((item) => String(item));
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+}
+
 
 function getProductKey(product: Partial<ProductForm>) {
   return [
@@ -202,22 +327,55 @@ function dedupeProducts(products: ProductForm[]) {
 
 function normalizeProduct(item: Partial<ProductForm>, index: number): ProductForm {
   const finalPrice = String(item.discountPrice ?? item.price ?? "");
+  const stockQuantity = Number.isFinite(Number(item.stockQuantity)) ? Math.max(0, Math.round(Number(item.stockQuantity))) : 0;
 
   return {
     id: item.id ?? `local-${Date.now()}-${index}`,
     showcaseId: String(item.showcaseId ?? ""),
     title: String(item.title ?? ""),
     description: String(item.description ?? ""),
+    slug: String(item.slug ?? ""),
     price: finalPrice,
     originalPrice: String(item.originalPrice ?? ""),
     discountPrice: finalPrice,
     discountPercent: String(item.discountPercent ?? ""),
     imageUrl: String(item.imageUrl ?? ""),
+    images: Array.isArray(item.images) ? item.images.map((value) => String(value)).filter(Boolean) : [],
+    videoUrl: String(item.videoUrl ?? ""),
     badge: String(item.badge ?? ""),
     ctaLabel: String(item.ctaLabel ?? "View product"),
     ctaHref: String(item.ctaHref ?? "#"),
-    active: Boolean(item.active),
-    stockQuantity: Number.isFinite(Number(item.stockQuantity)) ? Math.max(0, Math.round(Number(item.stockQuantity))) : 0,
+    active: item.active !== false && item.isActive !== false,
+    isActive: item.isActive !== false && item.active !== false,
+    isFeatured: item.isFeatured === true,
+    isAvailable: item.isAvailable !== false,
+    stockQuantity,
+    stockStatus: String(item.stockStatus ?? (stockQuantity > 0 ? "in_stock" : "out_of_stock")),
+    minOrder: Number.isFinite(Number(item.minOrder)) ? Math.max(1, Math.round(Number(item.minOrder))) : 1,
+    maxOrder: Number.isFinite(Number(item.maxOrder)) ? Math.max(0, Math.round(Number(item.maxOrder))) : 0,
+    weight: String(item.weight ?? ""),
+    length: String(item.length ?? ""),
+    width: String(item.width ?? ""),
+    height: String(item.height ?? ""),
+    salesCount: Number.isFinite(Number(item.salesCount)) ? Math.max(0, Math.round(Number(item.salesCount))) : 0,
+    views: Number.isFinite(Number(item.views)) ? Math.max(0, Math.round(Number(item.views))) : 0,
+    wishlistCount: Number.isFinite(Number(item.wishlistCount)) ? Math.max(0, Math.round(Number(item.wishlistCount))) : 0,
+    ratingAverage: String(item.ratingAverage ?? ""),
+    ratingCount: Number.isFinite(Number(item.ratingCount)) ? Math.max(0, Math.round(Number(item.ratingCount))) : 0,
+    discountStartAt: String(item.discountStartAt ?? ""),
+    discountEndAt: String(item.discountEndAt ?? ""),
+    categoryId: String(item.categoryId ?? "general").trim() || "general",
+    manufactureYear: String(item.manufactureYear ?? ""),
+    brand: String(item.brand ?? ""),
+    vendor: String(item.vendor ?? ""),
+    sku: String(item.sku ?? ""),
+    barcode: String(item.barcode ?? ""),
+    metaTitle: String(item.metaTitle ?? ""),
+    metaDescription: String(item.metaDescription ?? ""),
+    metaKeywords: String(item.metaKeywords ?? ""),
+    placement: String(item.placement ?? ""),
+    publishedAt: String(item.publishedAt ?? ""),
+    deletedAt: String(item.deletedAt ?? ""),
     colorStock: normalizeColorStock(item.colorStock),
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
@@ -261,6 +419,34 @@ function normalizeShowcase(item: Partial<ShowcaseForm>, index: number): Showcase
     id: String(item.id ?? `showcase-${Date.now()}-${index}`),
     title: String(item.title ?? `Showcase ${index + 1}`),
     active: item.active !== false,
+    mode: item.mode === "auto" ? "auto" : "manual",
+    autoSort: String(item.autoSort ?? "newest"),
+    limit: Number.isFinite(Number(item.limit)) ? Math.max(1, Math.round(Number(item.limit))) : 8,
+    categoryId: String(item.categoryId ?? ""),
+    manualProductIds: Array.isArray(item.manualProductIds) ? item.manualProductIds.map((value) => String(value)) : [],
+    sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+  };
+}
+
+function slugifyValue(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^\p{L}\p{N}-]+/gu, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function normalizeCategory(item: Partial<CategoryForm>, index: number): CategoryForm {
+  const title = String(item.title ?? `Category ${index + 1}`).trim();
+  const slug = String(item.slug ?? slugifyValue(title)).trim() || slugifyValue(title);
+
+  return {
+    id: String(item.id ?? (slug || `category-${Date.now()}-${index}`)),
+    title,
+    slug,
+    active: item.active !== false,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
 }
@@ -279,6 +465,8 @@ function normalizeBanner(item: Partial<BannerForm> & { bannerUrl?: string; image
     title: String(item.title ?? `Banner ${index + 1}`),
     imageUrls,
     active: item.active !== false,
+    intervalSeconds: Number.isFinite(Number(item.intervalSeconds)) ? Math.max(1, Math.round(Number(item.intervalSeconds))) : 5,
+    heightPercent: Number.isFinite(Number(item.heightPercent)) ? Math.max(10, Math.min(100, Math.round(Number(item.heightPercent)))) : 28,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
 }
@@ -295,6 +483,11 @@ function ensureShowcases(products: ProductForm[], savedShowcases: ShowcaseForm[]
         id: showcaseId,
         title: "Untitled showcase",
         active: true,
+        mode: "manual",
+        autoSort: "newest",
+        limit: 8,
+        categoryId: "",
+        manualProductIds: [],
         sortOrder: byId.size + 1,
       });
     }
@@ -331,19 +524,30 @@ function formatPrice(value?: string) {
   return `$${parsed.toLocaleString("en-US")}`;
 }
 
-export function AdminProductsPanel() {
+type AdminProductsPanelProps = {
+  section?: AdminCatalogSection;
+};
+
+export function AdminProductsPanel({ section = "storefront" }: AdminProductsPanelProps) {
   const [products, setProducts] = useState<ProductForm[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseForm[]>([]);
+  const [categories, setCategories] = useState<CategoryForm[]>([
+    normalizeCategory({ id: "general", title: "General", slug: "general", active: true, sortOrder: 1 }, 0),
+  ]);
   const [banners, setBanners] = useState<BannerForm[]>([]);
   const [draftProduct, setDraftProduct] = useState<ProductForm>(createProduct);
   const [draftShowcase, setDraftShowcase] = useState<ShowcaseForm>(createShowcase);
+  const [draftCategory, setDraftCategory] = useState<CategoryForm>(createCategory);
   const [draftBanner, setDraftBanner] = useState<BannerForm>(createBanner);
   const [editingShowcase, setEditingShowcase] = useState<ShowcaseForm | null>(null);
+  const [editingCategory, setEditingCategory] = useState<CategoryForm | null>(null);
   const [editingBanner, setEditingBanner] = useState<BannerForm | null>(null);
   const [editingProduct, setEditingProduct] = useState<ProductForm | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isShowcaseOpen, setIsShowcaseOpen] = useState(false);
   const [isEditShowcaseOpen, setIsEditShowcaseOpen] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+  const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
   const [isBannerOpen, setIsBannerOpen] = useState(false);
   const [isEditBannerOpen, setIsEditBannerOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -372,6 +576,7 @@ export function AdminProductsPanel() {
     let cancelled = false;
 
     const loadProducts = async () => {
+      const startedAt = Date.now();
       try {
         const catalog = await getProducts({ all: true });
         if (cancelled) return;
@@ -387,19 +592,59 @@ export function AdminProductsPanel() {
             id: String(item.id),
             title: String(item.title ?? `Showcase ${index + 1}`),
             active: item.active !== false,
+            mode: item.mode === "auto" ? "auto" : "manual",
+            autoSort: String(item.autoSort ?? "newest"),
+            limit: Number.isFinite(Number(item.limit)) ? Math.max(1, Math.round(Number(item.limit))) : 8,
+            categoryId: String(item.categoryId ?? ""),
+            manualProductIds: Array.isArray(item.manualProductIds) ? item.manualProductIds.map((value) => String(value)) : [],
             sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
           }))
         );
-        const nextBanners = catalog.banners.map((item, index) => normalizeBanner(item, index));
+        const nextBanners = catalog.banners.map((item, index) =>
+          normalizeBanner(
+            {
+              ...item,
+              intervalSeconds: Number(item.intervalSeconds),
+              heightPercent: Number(item.heightPercent),
+            },
+            index
+          )
+        );
+        const nextCategories = catalog.categories.length > 0
+          ? catalog.categories.map((item, index) =>
+              normalizeCategory(
+                {
+                  id: item.id,
+                  title: item.title,
+                  slug: item.slug,
+                  active: item.active,
+                  sortOrder: Number(item.sortOrder),
+                },
+                index
+              )
+            )
+          : [
+              normalizeCategory({
+                id: "general",
+                title: "General",
+                slug: "general",
+                active: true,
+                sortOrder: 1,
+              }, 0),
+            ];
         setProducts(apiProducts);
         setShowcases(nextShowcases);
+        setCategories(nextCategories);
         setBanners(nextBanners);
+        await waitForMinimumLoading(startedAt);
       } catch {
         if (cancelled) return;
         setProducts([]);
         setShowcases([]);
+        setCategories([]);
         setBanners([]);
         setStatus("Catalog API was not available.");
+        await waitForMinimumLoading(startedAt);
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -424,6 +669,11 @@ export function AdminProductsPanel() {
     [products, showcases]
   );
 
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.sortOrder - b.sortOrder),
+    [categories]
+  );
+
   const sortedBanners = useMemo(
     () => [...banners].sort((a, b) => a.sortOrder - b.sortOrder),
     [banners]
@@ -433,6 +683,11 @@ export function AdminProductsPanel() {
     const orders = [...sortedShowcases, ...sortedBanners].map((item) => item.sortOrder);
     return (Math.max(0, ...orders) || 0) + 1;
   }, [sortedBanners, sortedShowcases]);
+
+  const nextCategoryOrder = useMemo(
+    () => (Math.max(0, ...sortedCategories.map((item) => item.sortOrder)) || 0) + 1,
+    [sortedCategories]
+  );
 
   const displaySections = useMemo(() => {
     const bannerSections = sortedBanners.map((banner) => ({
@@ -454,6 +709,7 @@ export function AdminProductsPanel() {
     nextProducts: ProductForm[],
     nextShowcases = sortedShowcases,
     nextBanners = sortedBanners,
+    nextCategories = sortedCategories,
     showSavedStatus = true
   ) => {
     const validProducts = dedupeProducts(
@@ -473,13 +729,27 @@ export function AdminProductsPanel() {
             id: showcase.id,
             title: showcase.title,
             active: showcase.active,
+            mode: showcase.mode,
+            autoSort: showcase.autoSort,
+            limit: showcase.limit,
+            categoryId: showcase.categoryId,
+            manualProductIds: showcase.manualProductIds,
             sortOrder: showcase.sortOrder,
+          })),
+          categories: nextCategories.map((category) => ({
+            id: category.id,
+            title: category.title,
+            slug: category.slug,
+            active: category.active,
+            sortOrder: category.sortOrder,
           })),
           banners: nextBanners.map((banner) => ({
             id: banner.id,
             title: banner.title,
             imageUrls: banner.imageUrls,
             active: banner.active,
+            intervalSeconds: banner.intervalSeconds,
+            heightPercent: banner.heightPercent,
             sortOrder: banner.sortOrder,
           })),
         }),
@@ -497,8 +767,12 @@ export function AdminProductsPanel() {
       const savedBanners = Array.isArray(data?.data?.banners)
         ? data.data.banners.map(normalizeBanner)
         : nextBanners;
+      const savedCategories = Array.isArray(data?.data?.categories)
+        ? data.data.categories.map(normalizeCategory)
+        : nextCategories;
       setProducts(savedProducts);
       setShowcases(savedShowcases);
+      setCategories(savedCategories);
       setBanners(savedBanners);
       clearProductsCache();
       if (showSavedStatus) setStatus("Catalog saved to database.");
@@ -543,8 +817,9 @@ export function AdminProductsPanel() {
 
   const openCreateModal = () => {
     const firstShowcase = sortedShowcases[0]?.id ?? "";
+    const firstCategory = sortedCategories[0]?.id ?? "general";
     setRequiredErrors([]);
-    setDraftProduct({ ...createProduct(), showcaseId: firstShowcase, sortOrder: products.length + 1 });
+    setDraftProduct({ ...createProduct(), showcaseId: firstShowcase, categoryId: firstCategory, sortOrder: products.length + 1 });
     setIsCreateOpen(true);
   };
 
@@ -552,6 +827,12 @@ export function AdminProductsPanel() {
     setRequiredErrors([]);
     setDraftShowcase({ ...createShowcase(), sortOrder: nextDisplayOrder });
     setIsShowcaseOpen(true);
+  };
+
+  const openCategoryModal = () => {
+    setRequiredErrors([]);
+    setDraftCategory({ ...createCategory(), sortOrder: nextCategoryOrder });
+    setIsCategoryOpen(true);
   };
 
   const openBannerModal = () => {
@@ -565,6 +846,12 @@ export function AdminProductsPanel() {
     setRequiredErrors([]);
     setEditingShowcase(showcase);
     setIsEditShowcaseOpen(true);
+  };
+
+  const openEditCategoryModal = (category: CategoryForm) => {
+    setRequiredErrors([]);
+    setEditingCategory(category);
+    setIsEditCategoryOpen(true);
   };
 
   const openEditBannerModal = (banner: BannerForm) => {
@@ -582,8 +869,35 @@ export function AdminProductsPanel() {
     setDraftShowcase((current) => ({ ...current, ...patch }));
   };
 
+  const updateDraftCategory = (patch: Partial<CategoryForm>) => {
+    setDraftCategory((current) => {
+      const next = { ...current, ...patch };
+      if (patch.title !== undefined && !patch.slug) {
+        return { ...next, slug: slugifyValue(next.title), id: slugifyValue(next.title) || next.id };
+      }
+      if (patch.slug !== undefined) {
+        return { ...next, slug: slugifyValue(patch.slug), id: slugifyValue(patch.slug) || next.id };
+      }
+      return next;
+    });
+  };
+
   const updateEditingShowcase = (patch: Partial<ShowcaseForm>) => {
     setEditingShowcase((current) => (current ? { ...current, ...patch } : current));
+  };
+
+  const updateEditingCategory = (patch: Partial<CategoryForm>) => {
+    setEditingCategory((current) => {
+      if (!current) return current;
+      const next = { ...current, ...patch };
+      if (patch.title !== undefined && !patch.slug) {
+        return { ...next, slug: slugifyValue(next.title) };
+      }
+      if (patch.slug !== undefined) {
+        return { ...next, slug: slugifyValue(patch.slug) };
+      }
+      return next;
+    });
   };
 
   const updateDraftBanner = (patch: Partial<BannerForm>) => {
@@ -719,10 +1033,11 @@ export function AdminProductsPanel() {
       !draftProduct.title.trim() && "draftProduct.title",
       !draftProduct.description.trim() && "draftProduct.description",
       !draftProduct.discountPrice.trim() && "draftProduct.discountPrice",
+      !draftProduct.categoryId.trim() && "draftProduct.categoryId",
     ].filter(Boolean) as string[];
 
     if (errors.length > 0) {
-      showRequiredErrors(errors, "Title, description, and new price are required.");
+      showRequiredErrors(errors, "Title, description, new price, and category are required.");
       return;
     }
 
@@ -744,6 +1059,20 @@ export function AdminProductsPanel() {
     setShowcases(nextShowcases);
     setIsShowcaseOpen(false);
     await persistProducts(products, nextShowcases, sortedBanners);
+  };
+
+  const submitDraftCategory = async () => {
+    if (!draftCategory.title.trim()) {
+      showRequiredErrors(["draftCategory.title"], "Category title is required.");
+      return;
+    }
+
+    const normalized = normalizeCategory(draftCategory, sortedCategories.length);
+    setRequiredErrors([]);
+    const nextCategories = [...sortedCategories, normalized];
+    setCategories(nextCategories);
+    setIsCategoryOpen(false);
+    await persistProducts(products, sortedShowcases, sortedBanners, nextCategories);
   };
 
   const submitDraftBanner = async () => {
@@ -775,6 +1104,24 @@ export function AdminProductsPanel() {
     setIsEditShowcaseOpen(false);
     setEditingShowcase(null);
     await persistProducts(products, nextShowcases, sortedBanners);
+  };
+
+  const submitEditingCategory = async () => {
+    if (!editingCategory) return;
+
+    if (!editingCategory.title.trim()) {
+      showRequiredErrors(["editingCategory.title"], "Category title is required.");
+      return;
+    }
+
+    const nextCategories = sortedCategories.map((category) =>
+      category.id === editingCategory.id ? normalizeCategory(editingCategory, category.sortOrder) : category
+    );
+    setRequiredErrors([]);
+    setCategories(nextCategories);
+    setIsEditCategoryOpen(false);
+    setEditingCategory(null);
+    await persistProducts(products, sortedShowcases, sortedBanners, nextCategories);
   };
 
   const submitEditingBanner = async () => {
@@ -811,15 +1158,31 @@ export function AdminProductsPanel() {
     await deleteShowcase(editingShowcase);
   };
 
+  const deleteEditingCategory = async () => {
+    if (!editingCategory) return;
+    const fallbackCategory = sortedCategories.find((category) => category.id !== editingCategory.id)?.id ?? "general";
+    const nextCategories = sortedCategories.filter((category) => category.id !== editingCategory.id);
+    const nextProducts = products.map((product) =>
+      product.categoryId === editingCategory.id ? { ...product, categoryId: fallbackCategory } : product
+    );
+    setProducts(nextProducts);
+    setCategories(nextCategories);
+    setIsEditCategoryOpen(false);
+    setEditingCategory(null);
+    await persistProducts(nextProducts, sortedShowcases, sortedBanners, nextCategories);
+  };
+
   const deleteShowcase = async (showcaseToDelete: ShowcaseForm) => {
-    // Remove the showcase and its products
     const nextShowcases = sortedShowcases.filter((showcase) => showcase.id !== showcaseToDelete.id);
-    const nextProducts = products.filter((product) => product.showcaseId !== showcaseToDelete.id);
+    const nextProducts = products.map((product) =>
+      product.showcaseId === showcaseToDelete.id ? { ...product, showcaseId: "" } : product
+    );
 
     setShowcases(nextShowcases);
+    setProducts(nextProducts);
     setIsEditShowcaseOpen(false);
     setEditingShowcase(null);
-    await persistProducts(nextProducts);
+    await persistProducts(nextProducts, nextShowcases, sortedBanners);
     setStatus("Showcase deleted.");
   };
 
@@ -831,10 +1194,11 @@ export function AdminProductsPanel() {
       !editingProduct.title.trim() && "editingProduct.title",
       !editingProduct.description.trim() && "editingProduct.description",
       !editingProduct.discountPrice.trim() && "editingProduct.discountPrice",
+      !editingProduct.categoryId.trim() && "editingProduct.categoryId",
     ].filter(Boolean) as string[];
 
     if (errors.length > 0) {
-      showRequiredErrors(errors, "Title, description, and new price are required.");
+      showRequiredErrors(errors, "Title, description, new price, and category are required.");
       return;
     }
 
@@ -862,28 +1226,120 @@ export function AdminProductsPanel() {
     await persistProducts(nextProducts);
   };
 
+  const updateProductAssignment = async (
+    product: ProductForm,
+    patch: Pick<Partial<ProductForm>, "categoryId" | "showcaseId">
+  ) => {
+    const nextProducts = products.map((item) =>
+      item.id === product.id ? { ...item, ...patch } : item
+    );
+    setProducts(nextProducts);
+    await persistProducts(nextProducts, sortedShowcases, sortedBanners, sortedCategories, false);
+  };
+
+  const toggleCategoryProduct = async (category: CategoryForm, product: ProductForm) => {
+    const fallbackCategory = sortedCategories.find((item) => item.id !== category.id)?.id ?? category.id;
+    const nextCategoryId = product.categoryId === category.id ? fallbackCategory : category.id;
+    await updateProductAssignment(product, { categoryId: nextCategoryId });
+  };
+
+  const updateBannerPlacement = (banner: BannerForm, sortOrder: number) => {
+    setBanners((current) =>
+      current.map((item) => (item.id === banner.id ? { ...item, sortOrder } : item))
+    );
+  };
+
+  const updateShowcasePlacement = (showcase: ShowcaseForm, sortOrder: number) => {
+    setShowcases((current) =>
+      current.map((item) => (item.id === showcase.id ? { ...item, sortOrder } : item))
+    );
+  };
+
+  const saveStorefrontPlacement = () => persistProducts(products, sortedShowcases, sortedBanners, sortedCategories);
+
   return (
     <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-base font-bold text-primary-text">products display</div>
-        <span className="text-xs font-semibold text-primary-text">{sortedProducts.length} products</span>
+        <div className="text-base font-bold text-primary-text">
+          {section === "products" && "Products"}
+          {section === "banners" && "Banners"}
+          {section === "showcases" && "Showcases"}
+          {section === "categories" && "Categories"}
+          {section === "storefront" && "Storefront management"}
+        </div>
+        <span className="text-xs font-semibold text-primary-text">
+          {section === "products" && `${sortedProducts.length} products`}
+          {section === "banners" && `${sortedBanners.length} banners`}
+          {section === "showcases" && `${sortedShowcases.length} showcases`}
+          {section === "categories" && `${sortedCategories.length} categories`}
+          {section === "storefront" && `${displaySections.length} sections`}
+        </span>
       </div>
 
-      <div className="flex flex-col gap-5">
-        {displaySections.map((section) =>
-          section.type === "banner" ? (
+      {section === "products" ? (
+        <div className="flex flex-col gap-3">
+          {sortedProducts.map((product) => (
+            <div key={product.id} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="line-clamp-1 text-sm font-bold text-primary-text">{product.title || "Untitled product"}</div>
+                  <span className="text-xs text-secondary-text">{formatPrice(product.discountPrice || product.price) || "No price"}</span>
+                </div>
+                <CustomButton size="sm" variant="neutral" border="base" onClick={() => openEditModal(product)}>
+                  Edit
+                </CustomButton>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <CustomSelect
+                  value={product.categoryId}
+                  aria-label="Product category"
+                  onChange={(event) => void updateProductAssignment(product, { categoryId: event.target.value })}
+                >
+                  {sortedCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.title}
+                    </option>
+                  ))}
+                </CustomSelect>
+                <CustomSelect
+                  value={product.showcaseId}
+                  aria-label="Product showcase"
+                  onChange={(event) => void updateProductAssignment(product, { showcaseId: event.target.value })}
+                >
+                  <option value="">No showcase</option>
+                  {sortedShowcases.map((showcase) => (
+                    <option key={showcase.id} value={showcase.id}>
+                      {showcase.title || showcase.id}
+                    </option>
+                  ))}
+                </CustomSelect>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {section === "banners" ? (
+        <div className="flex flex-col gap-5">
+          {sortedBanners.map((banner) => (
             <AdminBannerList
-              key={`banner-${section.item.id}`}
-              banner={section.item}
+              key={`banner-${banner.id}`}
+              banner={banner}
               onEdit={openEditBannerModal}
               onPreview={openImagePreview}
               isLoading={loading}
             />
-          ) : (
+          ))}
+        </div>
+      ) : null}
+
+      {section === "showcases" ? (
+        <div className="flex flex-col gap-5">
+          {sortedShowcases.map((showcase) => (
             <AdminShowcaseList
-              key={`showcase-${section.item.id}`}
+              key={`showcase-${showcase.id}`}
               products={sortedProducts}
-              showcases={[section.item]}
+              showcases={[showcase]}
               onEditShowcase={openEditShowcaseModal}
               onDeleteShowcase={deleteShowcase}
               onEditProduct={openEditModal}
@@ -894,38 +1350,162 @@ export function AdminProductsPanel() {
               formatPrice={formatPrice}
               isLoading={loading}
             />
-          )
+          ))}
+        </div>
+      ) : null}
+
+      {section === "categories" ? (
+        <div className="flex flex-col gap-4">
+          {sortedCategories.map((category) => (
+            <div key={category.id} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-1">
+                  <div className="text-sm font-bold text-primary-text">{category.title}</div>
+                  <span className="text-xs text-secondary-text">{sortedProducts.filter((product) => product.categoryId === category.id).length} products</span>
+                </div>
+                <CustomButton size="sm" variant="neutral" border="base" onClick={() => openEditCategoryModal(category)}>
+                  Edit
+                </CustomButton>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sortedProducts.map((product) => (
+                  <CustomButton
+                    key={product.id}
+                    size="sm"
+                    border="base"
+                    rounded="full"
+                    variant={product.categoryId === category.id ? "primary" : "neutral"}
+                    onClick={() => void toggleCategoryProduct(category, product)}
+                  >
+                    {product.title || "Untitled"}
+                  </CustomButton>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {section === "storefront" ? (
+        <div className="flex flex-col gap-4">
+          {[...sortedBanners.map((banner) => ({ type: "banner" as const, item: banner, sortOrder: banner.sortOrder })), ...sortedShowcases.map((showcase) => ({ type: "showcase" as const, item: showcase, sortOrder: showcase.sortOrder }))].sort((a, b) => a.sortOrder - b.sortOrder).map((entry) => (
+            <div key={`${entry.type}-${entry.item.id}`} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-1">
+                <div className="text-sm font-bold text-primary-text">{entry.item.title || `Untitled ${entry.type}`}</div>
+                <span className="text-xs text-secondary-text">{entry.type === "banner" ? "Banner" : "Showcase"}</span>
+              </div>
+              <CustomInput
+                type="number"
+                value={entry.item.sortOrder}
+                placeholder="Placement"
+                onChange={(event) => {
+                  const sortOrder = Number(event.target.value);
+                  if (entry.type === "banner") updateBannerPlacement(entry.item, sortOrder);
+                  else updateShowcasePlacement(entry.item, sortOrder);
+                }}
+              />
+            </div>
+          ))}
+          <CustomButton border="base" icon={<IoSaveOutline />} onClick={() => void saveStorefrontPlacement()}>
+            Save placement
+          </CustomButton>
+        </div>
+      ) : null}
+
+      {section === "products" ? <FloatButton label="New product" icon={<IoAdd />} position="bottom-right" border="base" shadow="lg" onClick={openCreateModal} /> : null}
+      {section === "showcases" ? <FloatButton label="New showcase" icon={<IoAdd />} position="bottom-right" border="base" shadow="lg" onClick={openShowcaseModal} /> : null}
+      {section === "categories" ? <FloatButton label="New category" icon={<IoAdd />} position="bottom-right" border="base" shadow="lg" onClick={openCategoryModal} /> : null}
+      {section === "banners" ? <FloatButton label="New banner" icon={<IoAdd />} position="bottom-right" border="base" shadow="lg" onClick={openBannerModal} /> : null}
+
+      <CustomModal
+        open={isCategoryOpen}
+        onClose={() => setIsCategoryOpen(false)}
+        title="Register category"
+        closeText="Close"
+        rounded="lg"
+        border="base"
+        shadow="lg"
+      >
+        <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <RequiredLabel required className="text-primary-text">Category title</RequiredLabel>
+          <CustomInput
+            value={draftCategory.title}
+            placeholder="Category title"
+            invalid={hasRequiredError("draftCategory.title") && !draftCategory.title.trim()}
+            onChange={(event) => updateDraftCategory({ title: event.target.value })}
+          />
+          <CustomInput
+            value={draftCategory.slug}
+            placeholder="Slug"
+            onChange={(event) => updateDraftCategory({ slug: event.target.value })}
+          />
+          <CustomInput
+            type="number"
+            value={draftCategory.sortOrder}
+            placeholder="Sort order"
+            onChange={(event) => updateDraftCategory({ sortOrder: Number(event.target.value) })}
+          />
+          <CustomSwitch
+            checked={draftCategory.active}
+            onChange={(active) => updateDraftCategory({ active })}
+            label={draftCategory.active ? "Active" : "Hidden"}
+            size="sm"
+          />
+          <CustomButton border="base" fullWidth icon={<IoSaveOutline />} onClick={submitDraftCategory}>
+            Register category
+          </CustomButton>
+        </div>
+      </CustomModal>
+
+      <CustomModal
+        open={isEditCategoryOpen}
+        onClose={() => {
+          setIsEditCategoryOpen(false);
+          setEditingCategory(null);
+        }}
+        title={editingCategory?.title || "Edit category"}
+        closeText="Close"
+        rounded="lg"
+        border="base"
+        shadow="lg"
+      >
+        {editingCategory && (
+          <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+            <RequiredLabel required className="text-primary-text">Category title</RequiredLabel>
+            <CustomInput
+              value={editingCategory.title}
+              placeholder="Category title"
+              invalid={hasRequiredError("editingCategory.title") && !editingCategory.title.trim()}
+              onChange={(event) => updateEditingCategory({ title: event.target.value })}
+            />
+            <CustomInput
+              value={editingCategory.slug}
+              placeholder="Slug"
+              onChange={(event) => updateEditingCategory({ slug: event.target.value })}
+            />
+            <CustomInput
+              type="number"
+              value={editingCategory.sortOrder}
+              placeholder="Sort order"
+              onChange={(event) => updateEditingCategory({ sortOrder: Number(event.target.value) })}
+            />
+            <CustomSwitch
+              checked={editingCategory.active}
+              onChange={(active) => updateEditingCategory({ active })}
+              label={editingCategory.active ? "Active" : "Hidden"}
+              size="sm"
+            />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <CustomButton variant="danger" border="base" fullWidth icon={<IoTrashOutline />} onClick={deleteEditingCategory}>
+                Delete
+              </CustomButton>
+              <CustomButton border="base" fullWidth icon={<IoSaveOutline />} onClick={submitEditingCategory}>
+                Save category
+              </CustomButton>
+            </div>
+          </div>
         )}
-      </div>
-
-      <FloatButton
-        label="New product"
-        icon={<IoAdd />}
-        position="bottom-right"
-        className="bottom-30"
-        border="base"
-        shadow="lg"
-        onClick={openCreateModal}
-      />
-
-      <FloatButton
-        label="New showcase"
-        icon={<IoAdd />}
-        position="bottom-right"
-        border="base"
-        shadow="lg"
-        onClick={openShowcaseModal}
-      />
-
-      <FloatButton
-        label="New banner"
-        icon={<IoAdd />}
-        position="bottom-right"
-        className="bottom-18"
-        border="base"
-        shadow="lg"
-        onClick={openBannerModal}
-      />
+      </CustomModal>
 
       <CustomModal
         open={isBannerOpen}
@@ -948,6 +1528,20 @@ export function AdminProductsPanel() {
             placeholder="Sort order"
             onChange={(event) => updateDraftBanner({ sortOrder: Number(event.target.value) })}
           />
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <CustomInput
+              type="number"
+              value={draftBanner.intervalSeconds}
+              placeholder="Auto advance seconds"
+              onChange={(event) => updateDraftBanner({ intervalSeconds: Number(event.target.value) })}
+            />
+            <CustomInput
+              type="number"
+              value={draftBanner.heightPercent}
+              placeholder="Height percent"
+              onChange={(event) => updateDraftBanner({ heightPercent: Number(event.target.value) })}
+            />
+          </div>
           <div
             data-invalid={hasRequiredError("draftBanner.images") && draftBanner.imageUrls.length === 0 ? "true" : undefined}
             tabIndex={-1}
@@ -1044,6 +1638,20 @@ export function AdminProductsPanel() {
               placeholder="Sort order"
               onChange={(event) => updateEditingBanner({ sortOrder: Number(event.target.value) })}
             />
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <CustomInput
+                type="number"
+                value={editingBanner.intervalSeconds}
+                placeholder="Auto advance seconds"
+                onChange={(event) => updateEditingBanner({ intervalSeconds: Number(event.target.value) })}
+              />
+              <CustomInput
+                type="number"
+                value={editingBanner.heightPercent}
+                placeholder="Height percent"
+                onChange={(event) => updateEditingBanner({ heightPercent: Number(event.target.value) })}
+              />
+            </div>
             <div
               data-invalid={hasRequiredError("editingBanner.images") && editingBanner.imageUrls.length === 0 ? "true" : undefined}
               tabIndex={-1}
@@ -1147,6 +1755,64 @@ export function AdminProductsPanel() {
             placeholder="Sort order"
             onChange={(event) => updateDraftShowcase({ sortOrder: Number(event.target.value) })}
           />
+          <CustomSelect
+            value={draftShowcase.mode}
+            aria-label="Showcase mode"
+            onChange={(event) => updateDraftShowcase({ mode: event.target.value === "auto" ? "auto" : "manual" })}
+          >
+            <option value="manual">Manual product selection</option>
+            <option value="auto">Automatic by rule</option>
+          </CustomSelect>
+          {draftShowcase.mode === "auto" ? (
+            <div className="flex flex-col gap-3">
+              <CustomSelect
+                value={draftShowcase.autoSort}
+                aria-label="Automatic showcase sort"
+                onChange={(event) => updateDraftShowcase({ autoSort: event.target.value })}
+              >
+                {SHOWCASE_SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </CustomSelect>
+              <CustomSelect
+                value={draftShowcase.categoryId}
+                aria-label="Automatic showcase category"
+                onChange={(event) => updateDraftShowcase({ categoryId: event.target.value })}
+              >
+                <option value="">All categories</option>
+                {sortedCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.title}
+                  </option>
+                ))}
+              </CustomSelect>
+              <CustomInput
+                type="number"
+                value={draftShowcase.limit}
+                placeholder="Product count"
+                onChange={(event) => updateDraftShowcase({ limit: Number(event.target.value) })}
+              />
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <div className="text-xs font-bold text-secondary-text">Manual products</div>
+              <div className="flex max-h-48 flex-col gap-2 overflow-y-auto">
+                {sortedProducts.map((product) => (
+                  <CustomButton
+                    key={product.id}
+                    variant={draftShowcase.manualProductIds.map(String).includes(String(product.id)) ? "primary" : "neutral"}
+                    size="sm"
+                    border="base"
+                    onClick={() => updateDraftShowcase({ manualProductIds: toggleProductId(draftShowcase.manualProductIds, product.id) })}
+                  >
+                    {product.title}
+                  </CustomButton>
+                ))}
+              </div>
+            </div>
+          )}
           <CustomSwitch
             checked={draftShowcase.active}
             onChange={(active) => updateDraftShowcase({ active })}
@@ -1191,6 +1857,64 @@ export function AdminProductsPanel() {
               placeholder="Sort order"
               onChange={(event) => updateEditingShowcase({ sortOrder: Number(event.target.value) })}
             />
+            <CustomSelect
+              value={editingShowcase.mode}
+              aria-label="Showcase mode"
+              onChange={(event) => updateEditingShowcase({ mode: event.target.value === "auto" ? "auto" : "manual" })}
+            >
+              <option value="manual">Manual product selection</option>
+              <option value="auto">Automatic by rule</option>
+            </CustomSelect>
+            {editingShowcase.mode === "auto" ? (
+              <div className="flex flex-col gap-3">
+                <CustomSelect
+                  value={editingShowcase.autoSort}
+                  aria-label="Automatic showcase sort"
+                  onChange={(event) => updateEditingShowcase({ autoSort: event.target.value })}
+                >
+                  {SHOWCASE_SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </CustomSelect>
+                <CustomSelect
+                  value={editingShowcase.categoryId}
+                  aria-label="Automatic showcase category"
+                  onChange={(event) => updateEditingShowcase({ categoryId: event.target.value })}
+                >
+                  <option value="">All categories</option>
+                  {sortedCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.title}
+                    </option>
+                  ))}
+                </CustomSelect>
+                <CustomInput
+                  type="number"
+                  value={editingShowcase.limit}
+                  placeholder="Product count"
+                  onChange={(event) => updateEditingShowcase({ limit: Number(event.target.value) })}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-bold text-secondary-text">Manual products</div>
+                <div className="flex max-h-48 flex-col gap-2 overflow-y-auto">
+                  {sortedProducts.map((product) => (
+                    <CustomButton
+                      key={product.id}
+                      variant={editingShowcase.manualProductIds.map(String).includes(String(product.id)) ? "primary" : "neutral"}
+                      size="sm"
+                      border="base"
+                      onClick={() => updateEditingShowcase({ manualProductIds: toggleProductId(editingShowcase.manualProductIds, product.id) })}
+                    >
+                      {product.title}
+                    </CustomButton>
+                  ))}
+                </div>
+              </div>
+            )}
             <CustomSwitch
               checked={editingShowcase.active}
               onChange={(active) => updateEditingShowcase({ active })}
@@ -1273,6 +1997,13 @@ export function AdminProductsPanel() {
               onChange={(event) => updateDraftProduct({ badge: event.target.value })}
             />
             <InventoryControls product={draftProduct} onChange={updateDraftProduct} />
+            <ProductAdvancedFields
+              product={draftProduct}
+              categories={sortedCategories}
+              onChange={updateDraftProduct}
+              hasRequiredError={hasRequiredError}
+              categoryErrorKey="draftProduct.categoryId"
+            />
             <CustomInput
               type="number"
               value={draftProduct.sortOrder}
@@ -1345,9 +2076,9 @@ export function AdminProductsPanel() {
           </div>
 
           <CustomSwitch
-            checked={draftProduct.active}
-            onChange={(active) => updateDraftProduct({ active })}
-            label={draftProduct.active ? "Active" : "Hidden"}
+            checked={draftProduct.isActive}
+            onChange={(isActive) => updateDraftProduct({ isActive, active: isActive })}
+            label={draftProduct.isActive ? "Active" : "Hidden"}
             size="sm"
           />
 
@@ -1420,8 +2151,15 @@ export function AdminProductsPanel() {
                 value={editingProduct.badge}
                 placeholder="Badge"
                 onChange={(event) => updateEditingProduct({ badge: event.target.value })}
-              />
+            />
               <InventoryControls product={editingProduct} onChange={updateEditingProduct} />
+              <ProductAdvancedFields
+                product={editingProduct}
+                categories={sortedCategories}
+                onChange={updateEditingProduct}
+                hasRequiredError={hasRequiredError}
+                categoryErrorKey="editingProduct.categoryId"
+              />
               <CustomInput
                 type="number"
                 value={editingProduct.sortOrder}
@@ -1494,9 +2232,9 @@ export function AdminProductsPanel() {
             </div>
 
             <CustomSwitch
-              checked={editingProduct.active}
-              onChange={(active) => updateEditingProduct({ active })}
-              label={editingProduct.active ? "Active" : "Hidden"}
+              checked={editingProduct.isActive}
+              onChange={(isActive) => updateEditingProduct({ isActive, active: isActive })}
+              label={editingProduct.isActive ? "Active" : "Hidden"}
               size="sm"
             />
 

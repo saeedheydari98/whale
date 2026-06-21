@@ -9,11 +9,19 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                 Int               @id @default(autoincrement())
+  email              String            @unique
+  name               String?
+  passwordHash       String?
+  role               String            @default("user")
+  refreshTokenHash   String?
+  resetTokenHash     String?
+  resetTokenExpiresAt DateTime?
+  avatarUrl          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  profiles           CustomerProfile[]
+  comments           Comment[]
 }
 
 model AdminTheme {
@@ -46,13 +54,16 @@ model UserTheme {
 
 model CustomerProfile {
   id              String   @id @default(cuid())
+  userId          Int?
   firstName       String
   lastName        String
   nationalId      String   @unique
   phone           String
+  avatarUrl       String?
   isAdminUnlocked Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  user            User?    @relation(fields: [userId], references: [id])
   carts           Cart[]
 }
 
@@ -62,21 +73,68 @@ model Product {
   showcase        Showcase?  @relation(fields: [showcaseId], references: [id])
   title           String
   description     String
+  slug            String?    @unique
   price           String
   originalPrice   String?
   discountPrice   String?
   discountPercent Int?
   imageUrl        String?
+  images          Json?
+  videoUrl        String?
   badge           String?
   ctaLabel        String?
   ctaHref         String?
   active          Boolean    @default(true)
+  isActive        Boolean    @default(true)
+  isFeatured      Boolean    @default(false)
+  isAvailable     Boolean    @default(true)
   stockQuantity   Int        @default(0)
+  stockStatus     String     @default("in_stock")
+  minOrder        Int        @default(1)
+  maxOrder        Int?
+  weight          Float?
+  length          Float?
+  width           Float?
+  height          Float?
+  salesCount      Int        @default(0)
+  views           Int        @default(0)
+  wishlistCount   Int        @default(0)
+  ratingAverage   Float      @default(0)
+  ratingCount     Int        @default(0)
+  discountStartAt DateTime?
+  discountEndAt   DateTime?
+  categoryId      String     @default("general")
+  manufactureYear Int?
+  brand           String?
+  vendor          String?
+  sku             String?    @unique
+  barcode         String?    @unique
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  placement       String?
+  publishedAt     DateTime?
+  deletedAt       DateTime?
   colorStock      Json?
   sortOrder       Int        @default(0)
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
   cartItems       CartItem[]
+  comments        Comment[]
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  productId Int
+  userId    Int?
+  author    String
+  content   String
+  rating    Int?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
 }
 
 model Showcase {
@@ -85,11 +143,26 @@ model Showcase {
   description String?
   imageUrl    String?
   active      Boolean   @default(true)
+  mode        String    @default("manual")
+  autoSort    String    @default("newest")
+  limit       Int       @default(8)
+  categoryId  String?
+  manualProductIds Json?
   sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   products    Product[]
   banners     Banner[]
+}
+
+model Category {
+  id        String   @id
+  title     String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Banner {
@@ -98,6 +171,8 @@ model Banner {
   showcaseId String?
   active     Boolean   @default(true)
   sortOrder  Int       @default(0)
+  intervalSeconds Int   @default(5)
+  heightPercent Int     @default(28)
   images     Json?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt

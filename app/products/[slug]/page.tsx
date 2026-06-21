@@ -59,7 +59,8 @@ function normalizeColorStock(value: unknown) {
 
 export default function ProductPage() {
   const params = useParams();
-  const productId = Array.isArray(params?.id) ? params.id[0] : (params?.id ?? "");
+  const rawSlug = params?.slug ?? params?.id ?? "";
+  const productId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const { getProductById, loading: catalogLoading } = useProductsCatalog();
   const product = useMemo(() => getProductById(productId), [getProductById, productId]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -283,30 +284,31 @@ export default function ProductPage() {
           </div>
         ) : null}
 
-        <section className="flex w-full flex-col gap-8 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:flex-row lg:items-start">
-          <div className="flex w-full flex-col gap-4 lg:max-w-md lg:shrink-0">
-            <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-primary-border bg-primary-media">
-              {product.imageUrl ? (
-                <img
-                  src={product.imageUrl}
-                  alt={product.title}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <IoBagHandleOutline className="text-6xl text-primary" aria-hidden="true" />
-              )}
+        <Loading loading="skeleton-card" isLoading={catalogLoading}>
+          <section className="flex w-full flex-col gap-8 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:flex-row lg:items-start">
+            <div className="flex w-full flex-col gap-4 lg:max-w-md lg:shrink-0">
+              <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-primary-border bg-primary-media">
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <IoBagHandleOutline className="text-6xl text-primary" aria-hidden="true" />
+                )}
+              </div>
             </div>
-          </div>
 
-          <div className="flex min-w-0 flex-1 flex-col gap-5">
-            <div className="flex flex-col gap-3">
-              {product.badge ? (
-                <div>
-                  <CustomTag size="xs" rounded="full" border="base">
-                    {product.badge}
-                  </CustomTag>
-                </div>
-              ) : null}
+            <div className="flex min-w-0 flex-1 flex-col gap-5">
+              <div className="flex flex-col gap-3">
+                {product.badge ? (
+                  <div>
+                    <CustomTag size="xs" rounded="full" border="base">
+                      {product.badge}
+                    </CustomTag>
+                  </div>
+                ) : null}
 
               <div className="text-3xl font-bold leading-tight text-primary-text">{product.title}</div>
 
@@ -385,19 +387,22 @@ export default function ProductPage() {
                 See reviews
               </CustomButton>
             </div>
-          </div>
-        </section>
+            </div>
+          </section>
+        </Loading>
 
-        <ProductReviewsSection
-          reviews={reviews}
-          text={text}
-          rating={rating}
-          isPurchased={isPurchased}
-          onTextChange={setText}
-          onRatingChange={setRating}
-          onSubmit={submitReview}
-          onMarkPurchased={markPurchased}
-        />
+        <Loading loading="skeleton-card" isLoading={catalogLoading}>
+          <ProductReviewsSection
+            reviews={reviews}
+            text={text}
+            rating={rating}
+            isPurchased={isPurchased}
+            onTextChange={setText}
+            onRatingChange={setRating}
+            onSubmit={submitReview}
+            onMarkPurchased={markPurchased}
+          />
+        </Loading>
       </div>
     </main>
   );

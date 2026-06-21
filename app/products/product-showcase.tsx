@@ -9,7 +9,6 @@ import { ShowcaseSection } from "./product-showcase/showcase-section";
 import type { Banner, Product, Showcase } from "./product-showcase/types";
 
 // No default showcase id: only use explicit showcase ids provided by data
-
 function getFinalPrice(product: Product) {
   return product.discountPrice || product.price;
 }
@@ -53,6 +52,11 @@ function normalizeShowcase(item: Partial<Showcase>, index: number): Showcase {
     id: String(item.id ?? `showcase-${index + 1}`),
     title: String(item.title ?? `Showcase ${index + 1}`),
     active: item.active !== false,
+    mode: item.mode === "auto" ? "auto" : "manual",
+    autoSort: String(item.autoSort ?? "newest"),
+    limit: Number.isFinite(Number(item.limit)) ? Math.max(1, Math.round(Number(item.limit))) : 8,
+    categoryId: String(item.categoryId ?? ""),
+    manualProductIds: Array.isArray(item.manualProductIds) ? item.manualProductIds.map((value) => String(value)) : [],
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
 }
@@ -108,7 +112,7 @@ export function ProductShowcase() {
   });
 
   const sortedProducts = useMemo(
-    () => catalogProducts.filter((item) => item.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    () => catalogProducts.filter((item) => item.active !== false && item.isActive !== false).sort((a, b) => a.sortOrder - b.sortOrder),
     [catalogProducts]
   );
 

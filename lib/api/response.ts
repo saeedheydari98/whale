@@ -16,12 +16,13 @@ export function apiOk<T>(data: T, init: ApiInit = {}) {
   );
 }
 
-export function apiFail(message: string, status = 400, data: unknown = null) {
+export function apiFail(message: string, status = 400, errors: unknown[] = [], data: unknown = null) {
   return NextResponse.json(
     {
       ok: false,
-      data,
       message,
+      errors,
+      ...(data === null ? {} : { data }),
     },
     { status }
   );

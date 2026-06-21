@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { slugifyCatalogValue } from "@/lib/products-client";
+import { fetchJsonDeduped } from "@/lib/fetch-json";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const q = (searchParams?.get("q") || "").trim();
-  const router = useRouter();
   const [results, setResults] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -21,14 +22,10 @@ export default function SearchPage() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/products?search=${encodeURIComponent(q)}&all=1`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (!res.ok || data?.ok === false) {
-          throw new Error(data?.error || "Search request failed");
-        }
-        if (!cancelled) setResults(Array.isArray(data?.data?.products) ? data.data.products : []);
+        const data = await fetchJsonDeduped<any>(`/api/products/search?q=${encodeURIComponent(q)}&limit=24`);
+        if (data?.ok === false) throw new Error(data?.error || "Search request failed");
+        const items = data?.data?.products?.items;
+        if (!cancelled) setResults(Array.isArray(items) ? items : []);
       } catch {
         if (!cancelled) setResults([]);
       } finally {
@@ -65,7 +62,7 @@ export default function SearchPage() {
                     <div className="text-primary text-sm font-bold">{product.price}$</div>
                     <div className="text-xs text-secondary-text line-clamp-2">{product.description}</div>
                     <div className="mt-2">
-                      <CustomButton size="sm" variant="primary" onClick={() => (window.location.href = `/products/${product.id}`)}>View</CustomButton>
+                      <CustomButton size="sm" variant="primary" onClick={() => (window.location.href = `/products/${slugifyCatalogValue(product.title || product.id) || product.id}`)}>View</CustomButton>
                     </div>
                   </div>
                 </div>

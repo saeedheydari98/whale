@@ -23,7 +23,7 @@ export function rateLimit(request: Request, limit = DEFAULT_LIMIT) {
   }
 
   if (bucket.count >= limit) {
-    return apiFail("rate limit exceeded", 429);
+    return apiFail("rate limit exceeded", 403);
   }
 
   bucket.count += 1;

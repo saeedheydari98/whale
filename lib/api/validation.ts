@@ -19,10 +19,12 @@ export async function parseJsonBody<T>(request: Request, schema: ZodType<T>) {
 }
 
 export function validationError(error: ZodError) {
-  return apiFail("validation failed", 422, {
-    issues: error.issues.map((issue) => ({
+  return apiFail(
+    "validation failed",
+    422,
+    error.issues.map((issue) => ({
       path: issue.path.join("."),
       message: issue.message,
-    })),
-  });
+    }))
+  );
 }

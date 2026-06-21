@@ -1,12 +1,23 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
+import { slugifyCatalogValue, sortProductsBy } from "@/lib/products-client";
 import { FiExternalLink, FiSearch, FiSliders, FiX } from "react-icons/fi";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { CustomSelect } from "@/app/design-system/components/ui/select";
+
+const SORT_OPTIONS = [
+  { value: "newest", label: "Newest" },
+  { value: "oldest", label: "Oldest" },
+  { value: "cheapest", label: "Cheapest" },
+  { value: "expensive", label: "Most expensive" },
+  { value: "bestseller", label: "Bestseller" },
+  { value: "mostDiscounted", label: "Most discounted" },
+];
 
 const LOADING_PRODUCTS = [
   {
@@ -29,53 +40,26 @@ const LOADING_PRODUCTS = [
   },
 ];
 
-function extractShowcaseProductsFromTree(payload: unknown, showcaseId: string) {
-  if (!payload || typeof payload !== "object") return null;
-
-  const directNode = payload as { id?: unknown; type?: unknown; products?: unknown };
-  if (
-    directNode.type === "showcase" &&
-    String(directNode.id ?? "") === String(showcaseId)
-  ) {
-    return Array.isArray(directNode.products) ? directNode.products : [];
-  }
-
-  const children = (payload as { children?: unknown }).children;
-  if (!Array.isArray(children)) return null;
-
-  const showcaseNode = children.find((item) => {
-    if (!item || typeof item !== "object") return false;
-    const record = item as { id?: unknown; type?: unknown };
-    return record.type === "showcase" && String(record.id ?? "") === String(showcaseId);
-  });
-
-  if (!showcaseNode || typeof showcaseNode !== "object") return null;
-
-  const products = (showcaseNode as { products?: unknown }).products;
-  return Array.isArray(products) ? products : [];
-}
-
 export default function ShowcasePage() {
   const params = useParams();
-  const showcaseId = Array.isArray(params?.id) ? params.id[0] : (params?.id ?? "");
+  const rawSlug = params?.slug ?? params?.id ?? "";
+  const showcaseId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const { getShowcaseById, loading } = useProductsCatalog();
   const showcase = useMemo(() => getShowcaseById(showcaseId), [getShowcaseById, showcaseId]);
   const products = showcase?.products ?? [];
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchSubmitCount, setSearchSubmitCount] = useState(0);
-  const lastImmediateSearchRef = useRef(0);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [onlyDiscounted, setOnlyDiscounted] = useState(false);
   const [onlyActive, setOnlyActive] = useState(true);
-  const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
   const [priceMin, setPriceMin] = useState<string>("");
   const [priceMax, setPriceMax] = useState<string>("");
   const [yearMin, setYearMin] = useState<string>("");
   const [yearMax, setYearMax] = useState<string>("");
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("");
+  const [sort, setSort] = useState("newest");
 
   const parsePrice = (value: any) => {
     try {
@@ -107,7 +91,7 @@ export default function ShowcasePage() {
   const categoryOptions = useMemo(
     () =>
       Array.from(
-        new Set((products || []).map((p: any) => String(p.category || p.typeCategory || "")).filter(Boolean))
+        new Set((products || []).map((p: any) => String(p.categoryId || "")).filter(Boolean))
       ),
     [products]
   );
@@ -126,50 +110,41 @@ export default function ShowcasePage() {
   const minPercent = ((selectedPriceMin - priceBounds.min) / rangeSpan) * 100;
   const maxPercent = ((selectedPriceMax - priceBounds.min) / rangeSpan) * 100;
 
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
+  const filteredProducts = useMemo(() => {
     const q = String(searchQuery ?? "").trim();
-
-    const isImmediate = searchSubmitCount !== lastImmediateSearchRef.current;
-    if (isImmediate) {
-      lastImmediateSearchRef.current = searchSubmitCount;
-    }
-
-    const timer = window.setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({
-          showcaseId: String(showcaseId),
-          all: onlyActive ? "0" : "1",
-        });
-        if (q) params.set("q", q);
-        if (onlyDiscounted) params.set("discounted", "1");
-        if (priceMin) params.set("priceMin", priceMin);
-        if (priceMax) params.set("priceMax", priceMax);
-        if (yearMin) params.set("yearMin", yearMin);
-        if (yearMax) params.set("yearMax", yearMax);
-        if (selectedCategory) params.set("category", selectedCategory);
-        if (selectedType) params.set("type", selectedType);
-
-        const res = await fetch(`/api/products?${params.toString()}`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        const data = await res.json();
-        if (!res.ok || data?.ok === false) throw new Error(data?.error || "Search failed");
-        const nextProducts = extractShowcaseProductsFromTree(data?.data, String(showcaseId));
-        if (!cancelled) setFilteredProducts(nextProducts ?? products);
-      } catch {
-        if (!cancelled) setFilteredProducts(products);
+    return (products || []).filter((product: any) => {
+      if (onlyActive && product.active === false) return false;
+      if (onlyDiscounted) {
+        const discountPercent = Number(product.discountPercent || 0);
+        if (!(discountPercent > 0 || String(product.discountPrice || "").trim())) return false;
       }
-    }, q && !isImmediate ? 2000 : 0);
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-      window.clearTimeout(timer);
-    };
-  }, [onlyActive, onlyDiscounted, priceMax, priceMin, products, searchQuery, searchSubmitCount, selectedCategory, selectedType, showcaseId, yearMax, yearMin]);
+      if (q) {
+        const searchable = [
+          product.title,
+          product.description,
+          product.badge,
+          product.categoryId,
+          product.type,
+          product.productType,
+        ].join(" ").toLowerCase();
+        if (!searchable.includes(q.toLowerCase())) return false;
+      }
+      const price = Number.isFinite(parsePrice(product.discountPrice))
+        ? parsePrice(product.discountPrice)
+        : parsePrice(product.price);
+      if (priceMin && Number.isFinite(price) && price < Number(priceMin)) return false;
+      if (priceMax && Number.isFinite(price) && price > Number(priceMax)) return false;
+      if (yearMin && Number(product.manufactureYear) < Number(yearMin)) return false;
+      if (yearMax && Number(product.manufactureYear) > Number(yearMax)) return false;
+      if (selectedCategory && String(product.categoryId || "") !== selectedCategory) return false;
+      if (selectedType && String(product.type || product.productType || "") !== selectedType) return false;
+      return true;
+    });
+  }, [onlyActive, onlyDiscounted, priceMax, priceMin, products, searchQuery, selectedCategory, selectedType, yearMax, yearMin]);
+  const sortedFilteredProducts = useMemo(
+    () => sortProductsBy(filteredProducts, sort),
+    [filteredProducts, sort]
+  );
 
   if (loading && !showcase) {
     return (
@@ -205,10 +180,9 @@ export default function ShowcasePage() {
                       <div className=" flex gap-2">
                         <Loading loading="skeleton-item" isLoading className="w-full">
                           {(() => {
-                            const viewHref = `/products/${product.id}`;
+                            const viewHref = `/products/${slugifyCatalogValue(product.title || product.id) || product.id}`;
                             const handleClick = async (e: React.MouseEvent) => {
                               e.preventDefault();
-                              try { await fetch(`/api/products?id=${encodeURIComponent(String(product.id))}`, { method: "GET" }); } catch {}
                               router.push(viewHref);
                             };
                             return (
@@ -231,7 +205,9 @@ export default function ShowcasePage() {
   return (
     <div className="p-4 w-full">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-2xl font-bold">{showcase?.title || `Showcase: ${showcaseId}`}</div>
+        <Loading loading="skeleton-item" isLoading={loading}>
+          <div className="text-2xl font-bold">{showcase?.title || `Showcase: ${showcaseId}`}</div>
+        </Loading>
 
         <div className="w-full sm:w-auto">
           {/* Desktop: show input; Mobile: toggleable */}
@@ -243,7 +219,6 @@ export default function ShowcasePage() {
                 if (event.key === "Enter") {
                   event.preventDefault();
                   setSearchQuery(event.currentTarget.value.trim());
-                  setSearchSubmitCount((current) => current + 1);
                 }
               }}
               placeholder="Search across all products..."
@@ -264,7 +239,6 @@ export default function ShowcasePage() {
                   if (event.key === "Enter") {
                     event.preventDefault();
                     setSearchQuery(event.currentTarget.value.trim());
-                    setSearchSubmitCount((current) => current + 1);
                   }
                 }}
                 placeholder="Search..."
@@ -282,47 +256,65 @@ export default function ShowcasePage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <CustomSelect value={sort} aria-label="Sort showcase products" onChange={(event) => setSort(event.target.value)}>
+            {SORT_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </CustomSelect>
           <CustomButton size="sm" variant="secondary" icon={<FiSliders />} onClick={() => setShowFilterModal(true)}>Filter</CustomButton>
         </div>
       </div>
 
       {showcase?.description ? (
-        <div className="mt-2 text-sm text-secondary-text">{showcase.description}</div>
+        <Loading loading="skeleton-item" isLoading={loading}>
+          <div className="mt-2 text-sm text-secondary-text">{showcase.description}</div>
+        </Loading>
       ) : null}
 
       <div className="mt-4 flex gap-4">
         <main className="flex-1">
-          {filteredProducts.length === 0 ? (
+          {sortedFilteredProducts.length === 0 ? (
             <div className="text-sm text-secondary-text">No products found for this showcase.</div>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,220px))] gap-3">
-              {filteredProducts.map((product) => (
+              {sortedFilteredProducts.map((product) => (
                 <div key={product.id} className="max-w-55 rounded-md border border-primary-border bg-primary-card p-2">
                   <div className="flex gap-2">
                     <div className="h-18 w-18 shrink-0 overflow-hidden rounded bg-primary-media">
-                      {product.imageUrl ? (
-                        <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="p-2 text-sm">No image</div>
-                      )}
+                      <Loading loading="skeleton-item" isLoading={loading} className="h-full w-full">
+                        {product.imageUrl ? (
+                          <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="p-2 text-sm">No image</div>
+                        )}
+                      </Loading>
                     </div>
                     <div className="flex-1 flex flex-col justify-between">
                       <div className="flex flex-col h-full">
-                        <div className="line-clamp-1 text-xs font-bold">{product.title}</div>
-                        <div className="text-primary text-xs font-bold">{product.price}$</div>
-                        <div className="text-xs text-secondary-text line-clamp-2">{product.description}</div>
+                        <Loading loading="skeleton-item" isLoading={loading}>
+                          <div className="line-clamp-1 text-xs font-bold">{product.title}</div>
+                        </Loading>
+                        <Loading loading="skeleton-item" isLoading={loading}>
+                          <div className="text-primary text-xs font-bold">{product.price}$</div>
+                        </Loading>
+                        <Loading loading="skeleton-item" isLoading={loading}>
+                          <div className="text-xs text-secondary-text line-clamp-2">{product.description}</div>
+                        </Loading>
                       </div>
                       <div className=" flex gap-2">
                         {(() => {
-                          const viewHref = `/products/${product.id}`;
+                          const viewHref = `/products/${slugifyCatalogValue(product.title || product.id) || product.id}`;
                           const handleClick = async (e: React.MouseEvent) => {
                             e.preventDefault();
-                            try { await fetch(`/api/products?id=${encodeURIComponent(String(product.id))}`, { method: "GET" }); } catch {}
                             router.push(viewHref);
                           };
 
                           return (
-                            <CustomButton href={viewHref} onClick={handleClick} className="w-full" variant="primary" size="sm" rounded="md" iconAfter={<FiExternalLink />}>View</CustomButton>
+                            <Loading loading="skeleton-item" isLoading={loading} className="w-full">
+                              <CustomButton href={viewHref} onClick={handleClick} className="w-full" variant="primary" size="sm" rounded="md" iconAfter={<FiExternalLink />}>View</CustomButton>
+                            </Loading>
                           );
                         })()}
                       </div>
@@ -495,3 +487,4 @@ export default function ShowcasePage() {
     </div>
   );
 }
+

@@ -3,9 +3,11 @@
 import { useRouter } from "next/navigation";
 import React from "react";
 import { CustomButton } from "./button";
+import { slugifyCatalogValue } from "@/lib/products-client";
 
 type Props = {
   productId: string | number;
+  productTitle?: string;
   children?: React.ReactNode;
   variant?: Parameters<typeof CustomButton>[0]["variant"];
   size?: Parameters<typeof CustomButton>[0]["size"];
@@ -17,6 +19,7 @@ type Props = {
 
 export default function ProductLink({
   productId,
+  productTitle,
   children,
   variant = "primary",
   size = "sm",
@@ -26,7 +29,8 @@ export default function ProductLink({
   externalHref,
 }: Props) {
   const router = useRouter();
-  const internalHref = `/products/${productId}`;
+  const slug = slugifyCatalogValue(productTitle || productId);
+  const internalHref = `/products/${slug || productId}`;
 
   if (externalHref && externalHref !== "#") {
     return (
