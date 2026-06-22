@@ -25,9 +25,20 @@ export function pageResult<T>(items: T[], page: number, limit: number, total: nu
 export function normalizeProductData(data: any) {
   const stockQuantity = Number.isFinite(Number(data.stockQuantity)) ? Math.max(0, Math.round(Number(data.stockQuantity))) : 0;
   const categoryId = String(data.categoryId ?? "").trim();
+  const categoryIds = Array.isArray(data.categoryIds)
+    ? data.categoryIds.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : categoryId
+      ? [categoryId]
+      : ["general"];
+  const showcaseIds = Array.isArray(data.showcaseIds)
+    ? data.showcaseIds.map((item: unknown) => String(item).trim()).filter(Boolean)
+    : data.showcaseId
+      ? [String(data.showcaseId).trim()]
+      : [];
 
   return {
     showcaseId: data.showcaseId || null,
+    showcaseIds: showcaseIds.length > 0 ? showcaseIds : Prisma.JsonNull,
     title: data.title,
     description: data.description,
     slug: data.slug || null,
@@ -60,7 +71,8 @@ export function normalizeProductData(data: any) {
     ratingCount: data.ratingCount ?? 0,
     discountStartAt: data.discountStartAt ? new Date(data.discountStartAt) : null,
     discountEndAt: data.discountEndAt ? new Date(data.discountEndAt) : null,
-    categoryId: categoryId || "general",
+    categoryId: categoryIds[0] || "general",
+    categoryIds: categoryIds.length > 0 ? categoryIds : Prisma.JsonNull,
     manufactureYear: Number.isFinite(Number(data.manufactureYear)) ? Math.round(Number(data.manufactureYear)) : null,
     brand: data.brand || null,
     vendor: data.vendor || null,
@@ -144,7 +156,7 @@ export function productWhere(searchParams: URLSearchParams, extra: Record<string
     ...(inStock === "true" ? { stockQuantity: { gt: 0 } } : {}),
     ...(Number.isFinite(minRating) ? { ratingAverage: { gte: minRating } } : {}),
     ...(badge ? { badge } : {}),
-    ...(categoryId ? { categoryId } : {}),
+    ...(categoryId ? { OR: [{ categoryId }, { categoryIds: { array_contains: categoryId } }] } : {}),
     ...(isFeaturedParam !== null ? { isFeatured: isFeaturedParam === "true" } : {}),
     ...dateRange("createdAt", searchParams),
     ...dateRange("updatedAt", searchParams),

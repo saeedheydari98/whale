@@ -8,6 +8,7 @@ const CATALOG_URL_ALL = "/api/products?all=1";
 export type ProductRecord = {
   id?: number | string;
   showcaseId?: string;
+  showcaseIds?: string[] | unknown;
   title: string;
   description: string;
   slug?: string;
@@ -41,6 +42,7 @@ export type ProductRecord = {
   discountStartAt?: string | null;
   discountEndAt?: string | null;
   categoryId?: string;
+  categoryIds?: string[] | unknown;
   manufactureYear?: number | string | null;
   brand?: string;
   vendor?: string;
@@ -232,6 +234,12 @@ export function normalizeColorStock(value: unknown) {
   );
 }
 
+export function normalizeStringList(value: unknown, fallback: string[] = []) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : fallback;
+}
+
 function normalizeProductRecord(product: ProductRecord, fallbackOrder: number): ProductRecord {
   const placement = getPlacement(product, fallbackOrder);
   const stockQuantity = Number.isFinite(Number(product.stockQuantity)) ? Math.max(0, Math.round(Number(product.stockQuantity))) : 0;
@@ -256,7 +264,9 @@ function normalizeProductRecord(product: ProductRecord, fallbackOrder: number): 
     wishlistCount: Number.isFinite(Number(product.wishlistCount)) ? Math.max(0, Math.round(Number(product.wishlistCount))) : 0,
     ratingAverage: Number.isFinite(Number(product.ratingAverage)) ? Math.max(0, Math.min(5, Number(product.ratingAverage))) : 0,
     ratingCount: Number.isFinite(Number(product.ratingCount)) ? Math.max(0, Math.round(Number(product.ratingCount))) : 0,
-    categoryId: String(product.categoryId ?? "general").trim() || "general",
+    categoryId: normalizeStringList(product.categoryIds, [String(product.categoryId ?? "general").trim() || "general"])[0] || "general",
+    categoryIds: normalizeStringList(product.categoryIds, [String(product.categoryId ?? "general").trim() || "general"]),
+    showcaseIds: normalizeStringList(product.showcaseIds, product.showcaseId ? [String(product.showcaseId)] : []),
     manufactureYear: Number.isFinite(Number(product.manufactureYear)) ? Math.round(Number(product.manufactureYear)) : null,
     colorStock: normalizeColorStock(product.colorStock),
     sortOrder: placement,
@@ -498,7 +508,10 @@ export function resolveShowcaseProducts(
   const categoryId = String(showcase.categoryId ?? "").trim();
 
   if (mode === "auto") {
-    const filtered = activeProducts.filter((product) => !categoryId || product.categoryId === categoryId);
+    const filtered = activeProducts.filter((product) => {
+      const categoryIds = normalizeStringList(product.categoryIds, [String(product.categoryId ?? "")]);
+      return !categoryId || categoryIds.includes(categoryId);
+    });
     const sorted = sortProductsBy(filtered, String(showcase.autoSort ?? "newest"));
     return applyLimit ? sorted.slice(0, limit) : sorted;
   }
@@ -512,7 +525,10 @@ export function resolveShowcaseProducts(
     return manualIds.map((id) => byId.get(id)).filter(Boolean) as ProductRecord[];
   }
 
-  return activeProducts.filter((product) => String(product.showcaseId ?? "") === String(showcase.id));
+  return activeProducts.filter((product) => {
+    const showcaseIds = normalizeStringList(product.showcaseIds, product.showcaseId ? [String(product.showcaseId)] : []);
+    return showcaseIds.includes(String(showcase.id));
+  });
 }
 
 function withResolvedTree(apiData: ProductsCache): ProductsCache {

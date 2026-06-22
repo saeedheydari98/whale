@@ -5,14 +5,23 @@ export const idParamSchema = z.object({
 });
 
 export const authRegisterSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: z.email().trim().toLowerCase().optional(),
+  username: z.string().trim().toLowerCase().min(3).regex(/^[a-z0-9._-]+$/).optional(),
   password: z.string().min(8),
   name: z.string().trim().min(1).optional(),
+}).refine((value) => Boolean(value.email || value.username), {
+  message: "email or username is required",
+  path: ["username"],
 });
 
 export const authLoginSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: z.email().trim().toLowerCase().optional(),
+  username: z.string().trim().toLowerCase().optional(),
+  identifier: z.string().trim().toLowerCase().optional(),
   password: z.string().min(1),
+}).refine((value) => Boolean(value.email || value.username || value.identifier), {
+  message: "username or email is required",
+  path: ["username"],
 });
 
 export const resetRequestSchema = z.object({
@@ -70,6 +79,7 @@ export const showcaseSchema = z.object({
 
 export const productSchema = z.object({
   showcaseId: z.string().trim().optional().nullable(),
+  showcaseIds: z.array(z.string().trim()).optional(),
   title: z.string().trim().min(1),
   description: z.string().trim().min(1),
   slug: z.string().trim().optional().nullable(),
@@ -103,6 +113,7 @@ export const productSchema = z.object({
   discountStartAt: z.string().trim().optional().nullable(),
   discountEndAt: z.string().trim().optional().nullable(),
   categoryId: z.string().trim().min(1),
+  categoryIds: z.array(z.string().trim()).optional(),
   manufactureYear: z.coerce.number().int().min(0).optional().nullable(),
   brand: z.string().trim().optional().nullable(),
   vendor: z.string().trim().optional().nullable(),
@@ -163,4 +174,5 @@ export const adminCodeSchema = z.object({
   code: z.string().min(4),
   confirmCode: z.string().optional(),
   currentCode: z.string().optional(),
+  username: z.string().trim().toLowerCase().optional(),
 });

@@ -72,6 +72,11 @@ function normalizeColorStock(value: unknown) {
   );
 }
 
+function readPriceNumber(value?: string | null) {
+  const parsed = Number(String(value || "").replace(/[^\d.]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 async function findLegacyProfile(request: Request, bodyProfile?: ProfilePayload) {
   const authUser = await getAuthUser(request);
   if (authUser) return prisma.customerProfile.findFirst({ where: { userId: authUser.id } });
@@ -192,7 +197,38 @@ export async function PATCH(request: Request) {
   try {
     const cart = await activeCartForProfile(profile.id);
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const authUser = await getAuthUser(request);
+      let total = 0;
+      const order = authUser
+        ? await tx.order.create({
+            data: {
+              userId: authUser.id,
+              profileId: profile.id,
+              status: "paid",
+              total: "0",
+            },
+          })
+        : null;
+
       for (const item of cart.items) {
+        total += readPriceNumber(item.discountPrice || item.price) * item.quantity;
+        if (order) {
+          await tx.orderItem.create({
+            data: {
+              orderId: order.id,
+              productId: item.productId,
+              title: item.title,
+              description: item.description,
+              price: item.price,
+              originalPrice: item.originalPrice,
+              discountPrice: item.discountPrice,
+              discountPercent: item.discountPercent,
+              imageUrl: item.imageUrl,
+              selectedColor: item.selectedColor,
+              quantity: item.quantity,
+            },
+          });
+        }
         if (!item.productId) continue;
         const product = await tx.product.findUnique({ where: { id: item.productId } });
         if (!product || product.stockQuantity < item.quantity) {
@@ -209,10 +245,12 @@ export async function PATCH(request: Request) {
           where: { id: product.id },
           data: {
             stockQuantity: product.stockQuantity - item.quantity,
+            salesCount: { increment: item.quantity },
             colorStock: Object.keys(colorStock).length > 0 ? colorStock : Prisma.JsonNull,
           },
         });
       }
+      if (order) await tx.order.update({ where: { id: order.id }, data: { total: String(total) } });
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
     });
 

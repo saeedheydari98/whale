@@ -27,6 +27,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ path?: string[] }> };
+const SUPERADMIN_USERNAME = "saeedheydari98";
 
 async function authTokens(user: { id: number; email: string; role: string }) {
   const accessToken = createAccessToken(user);
@@ -62,18 +63,22 @@ export async function POST(request: Request, context: Context) {
       const parsed = await parseJsonBody(request, authRegisterSchema);
       if (!parsed.ok) return parsed.response;
 
-      const existing = await prisma.user.findUnique({ where: { email: parsed.data.email } });
-      if (existing) return apiFail("email already exists", 400);
+      const username = parsed.data.username?.trim().toLowerCase() || null;
+      const email = parsed.data.email || (username ? `${username}@local.user` : "");
+      const existing = await prisma.user.findFirst({
+        where: { OR: [{ email }, ...(username ? [{ username }] : [])] },
+      });
+      if (existing) return apiFail("account already exists", 400);
 
-      const adminCount = await prisma.user.count({ where: { role: "admin" } });
       const user = await prisma.user.create({
         data: {
-          email: parsed.data.email,
+          email,
+          username,
           name: parsed.data.name ?? null,
           passwordHash: hashPassword(parsed.data.password),
-          role: adminCount === 0 ? "admin" : "user",
+          role: username === SUPERADMIN_USERNAME ? "superadmin" : "user",
         },
-        select: { id: true, email: true, name: true, role: true, avatarUrl: true },
+        select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
       });
       const tokens = await authTokens(user);
       return apiOk({ user: publicUser(user), ...tokens }, { status: 201 });
@@ -83,12 +88,17 @@ export async function POST(request: Request, context: Context) {
       const parsed = await parseJsonBody(request, authLoginSchema);
       if (!parsed.ok) return parsed.response;
 
-      const user = await prisma.user.findUnique({
-        where: { email: parsed.data.email },
-        select: { id: true, email: true, name: true, role: true, passwordHash: true, avatarUrl: true },
+      const identifier = (parsed.data.identifier || parsed.data.username || parsed.data.email || "").trim().toLowerCase();
+      const user = await prisma.user.findFirst({
+        where: { OR: [{ email: identifier }, { username: identifier }] },
+        select: { id: true, email: true, username: true, name: true, role: true, passwordHash: true, avatarUrl: true },
       });
       if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
         return apiFail("invalid credentials", 401);
+      }
+      if (user.username === SUPERADMIN_USERNAME && user.role !== "superadmin") {
+        user.role = "superadmin";
+        await prisma.user.update({ where: { id: user.id }, data: { role: "superadmin" } });
       }
       const tokens = await authTokens(user);
       return apiOk({ user: publicUser(user), ...tokens });
@@ -112,7 +122,7 @@ export async function POST(request: Request, context: Context) {
       }
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, email: true, name: true, role: true, refreshTokenHash: true, avatarUrl: true },
+        select: { id: true, email: true, username: true, name: true, role: true, refreshTokenHash: true, avatarUrl: true },
       });
       if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return apiFail("unauthorized", 401);
       const tokens = await authTokens(user);

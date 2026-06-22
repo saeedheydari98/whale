@@ -61,6 +61,14 @@ export default function CartPage() {
   const [profileError, setProfileError] = useState("");
   const [showProfileRequiredErrors, setShowProfileRequiredErrors] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState("");
+  const [authUser, setAuthUser] = useState<any>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("register");
+  const [authUsername, setAuthUsername] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authName, setAuthName] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authStatus, setAuthStatus] = useState("");
   const profileFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,10 +77,14 @@ export default function CartPage() {
     void (async () => {
       const snapshot = await getCart();
       const savedProfile = await fetchUserProfile().catch(() => snapshot.profile);
+      const me = await fetch("/api/auth/me", { cache: "no-store" })
+        .then((res) => res.ok ? res.json() : null)
+        .catch(() => null);
       if (cancelled) return;
       setItems(snapshot.items);
       setProfile(savedProfile);
       setProfileDraft(savedProfile ?? snapshot.profile ?? EMPTY_USER_PROFILE);
+      setAuthUser(me?.data?.user ?? null);
     })();
 
     return () => {
@@ -144,6 +156,11 @@ export default function CartPage() {
   };
 
   const continueCheckout = () => {
+    if (!authUser) {
+      setAuthModalOpen(true);
+      return;
+    }
+
     const savedProfile = readUserProfile();
 
     if (!savedProfile) {
@@ -163,6 +180,39 @@ export default function CartPage() {
       .catch((error) => {
         setCheckoutMessage(error instanceof Error ? error.message : "Checkout failed.");
       });
+  };
+
+  const submitAuth = async () => {
+    if (!authUsername.trim() || !authPassword.trim()) {
+      setAuthStatus("Username and password are required.");
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthStatus("");
+    try {
+      const res = await fetch(`/api/auth/${authMode === "register" ? "register" : "login"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          authMode === "register"
+            ? { username: authUsername.trim().toLowerCase(), password: authPassword, name: authName.trim() || undefined }
+            : { username: authUsername.trim().toLowerCase(), password: authPassword }
+        ),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "Account request failed.");
+      setAuthUser(data?.data?.user ?? null);
+      setAuthModalOpen(false);
+      setAuthPassword("");
+      const snapshot = await getCart();
+      setItems(snapshot.items.length > 0 ? snapshot.items : await persistCart(items, profile ?? undefined));
+      setCheckoutMessage("Account ready. Continue to payment.");
+    } catch (error) {
+      setAuthStatus(error instanceof Error ? error.message : "Account request failed.");
+    } finally {
+      setAuthLoading(false);
+    }
   };
 
   return (
@@ -186,7 +236,7 @@ export default function CartPage() {
                 icon={<IoCardOutline />}
                 onClick={continueCheckout}
               >
-                Continue checkout
+                {authUser ? "Pay" : "Continue checkout"}
               </CustomButton>
               <CustomButton variant="danger" border="base" size="sm" onClick={clearCart}>
                 Clear cart
@@ -365,6 +415,49 @@ export default function CartPage() {
             ) : null}
             <CustomButton border="base" fullWidth icon={<IoCardOutline />} onClick={saveProfileDraft}>
               Save and continue
+            </CustomButton>
+          </div>
+        </CustomModal>
+
+        <CustomModal
+          open={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          title={authMode === "register" ? "Create account" : "Sign in"}
+          closeText="Close"
+          rounded="lg"
+          border="base"
+          shadow="lg"
+        >
+          <div className="flex flex-col gap-3">
+            <div className="flex gap-2">
+              <CustomButton size="sm" variant={authMode === "login" ? "primary" : "neutral"} border="base" onClick={() => setAuthMode("login")}>
+                Sign in
+              </CustomButton>
+              <CustomButton size="sm" variant={authMode === "register" ? "primary" : "neutral"} border="base" onClick={() => setAuthMode("register")}>
+                Sign up
+              </CustomButton>
+            </div>
+            {authMode === "register" ? (
+              <CustomInput value={authName} placeholder="Name" aria-label="Name" onChange={(event) => setAuthName(event.target.value)} />
+            ) : null}
+            <CustomInput value={authUsername} placeholder="Username" aria-label="Username" onChange={(event) => setAuthUsername(event.target.value)} />
+            <CustomInput
+              value={authPassword}
+              type="password"
+              placeholder="Password"
+              aria-label="Password"
+              onChange={(event) => setAuthPassword(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") void submitAuth();
+              }}
+            />
+            {authStatus ? (
+              <div className="rounded-md border border-primary-border bg-bg-base px-3 py-2 text-sm font-semibold text-primary-text">
+                {authStatus}
+              </div>
+            ) : null}
+            <CustomButton border="base" fullWidth isLoading={authLoading} icon={<IoCardOutline />} onClick={submitAuth}>
+              {authMode === "register" ? "Create account" : "Sign in"}
             </CustomButton>
           </div>
         </CustomModal>

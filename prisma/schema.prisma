@@ -11,6 +11,7 @@ datasource db {
 model User {
   id                 Int               @id @default(autoincrement())
   email              String            @unique
+  username           String?           @unique
   name               String?
   passwordHash       String?
   role               String            @default("user")
@@ -22,6 +23,8 @@ model User {
   updatedAt          DateTime          @updatedAt
   profiles           CustomerProfile[]
   comments           Comment[]
+  orders             Order[]
+  adminRequests      AdminAccessRequest[]
 }
 
 model AdminTheme {
@@ -71,6 +74,7 @@ model Product {
   id              Int        @id @default(autoincrement())
   showcaseId      String?
   showcase        Showcase?  @relation(fields: [showcaseId], references: [id])
+  showcaseIds     Json?
   title           String
   description     String
   slug            String?    @unique
@@ -104,6 +108,7 @@ model Product {
   discountStartAt DateTime?
   discountEndAt   DateTime?
   categoryId      String     @default("general")
+  categoryIds     Json?
   manufactureYear Int?
   brand           String?
   vendor          String?
@@ -121,6 +126,7 @@ model Product {
   updatedAt       DateTime   @updatedAt
   cartItems       CartItem[]
   comments        Comment[]
+  orderItems      OrderItem[]
 }
 
 model Comment {
@@ -210,4 +216,44 @@ model CartItem {
   product         Product? @relation(fields: [productId], references: [id])
 
   @@unique([cartId, productId])
+}
+
+model Order {
+  id        String      @id @default(cuid())
+  userId    Int
+  profileId String?
+  status    String      @default("paid")
+  total     String      @default("0")
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     OrderItem[]
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  productId       Int?
+  title           String
+  description     String
+  price           String
+  originalPrice   String?
+  discountPrice   String?
+  discountPercent Int?
+  imageUrl        String?
+  selectedColor   String?
+  quantity        Int      @default(1)
+  createdAt       DateTime @default(now())
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product? @relation(fields: [productId], references: [id])
+}
+
+model AdminAccessRequest {
+  id        String   @id @default(cuid())
+  userId    Int
+  username  String
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

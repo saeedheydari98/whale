@@ -13,6 +13,13 @@ import {
   saveAdminAccessCode,
 } from "@/lib/admin-access";
 
+type AdminRequest = {
+  id: string;
+  username: string;
+  status: string;
+  user?: { name?: string | null; email?: string | null; role?: string | null };
+};
+
 export function AdminSecurityPanel() {
   const [hasAdminCode, setHasAdminCode] = useState(false);
   const [isPanelLocked, setIsPanelLocked] = useState(false);
@@ -25,8 +32,17 @@ export function AdminSecurityPanel() {
   const [savingLock, setSavingLock] = useState(false);
   const [savingCode, setSavingCode] = useState(false);
   const [status, setStatus] = useState("");
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
+  const [adminRequests, setAdminRequests] = useState<AdminRequest[]>([]);
   const [showCodeRequiredErrors, setShowCodeRequiredErrors] = useState(false);
   const codeFormRef = useRef<HTMLDivElement>(null);
+
+  const loadAdminRequests = async () => {
+    const res = await fetch("/api/admin/security/requests", { cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok || data?.ok === false) throw new Error(data?.error || "Admin requests load failed.");
+    setAdminRequests(Array.isArray(data?.data?.requests) ? data.data.requests : []);
+  };
 
   useEffect(() => {
     void fetchAdminSecurity()
@@ -37,7 +53,33 @@ export function AdminSecurityPanel() {
       .catch((error) => {
         console.error("Admin security load error:", error);
       });
+    void fetch("/api/auth/me", { cache: "no-store" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        const user = data?.data?.user;
+        const superadmin = user?.username === "saeedheydari98" && user?.role === "superadmin";
+        setIsSuperadmin(superadmin);
+        if (superadmin) void loadAdminRequests();
+      })
+      .catch(() => undefined);
   }, []);
+
+  const reviewAdminRequest = async (id: string, approved: boolean) => {
+    setStatus("");
+    try {
+      const res = await fetch("/api/admin/security/requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, approved }),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) throw new Error(data?.error || "Admin request update failed.");
+      await loadAdminRequests();
+      setStatus(approved ? "Admin request approved." : "Admin request rejected.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Admin request update failed.");
+    }
+  };
 
   const togglePanelLock = async (nextLocked: boolean) => {
     const previousLocked = isPanelLocked;
@@ -207,6 +249,37 @@ export function AdminSecurityPanel() {
       {status ? (
         <div className="rounded-md border border-primary-border bg-primary-bg px-3 py-2 text-sm font-semibold text-primary-text">
           {status}
+        </div>
+      ) : null}
+
+      {isSuperadmin ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <div className="flex flex-col gap-1">
+            <div className="text-sm font-bold text-primary-text">Admin requests</div>
+            <span className="text-xs text-secondary-text">Approve users who entered the admin code.</span>
+          </div>
+          {adminRequests.length === 0 ? (
+            <span className="text-xs text-secondary-text">No requests yet.</span>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {adminRequests.map((request) => (
+                <div key={request.id} className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-bg p-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-bold text-primary-text">{request.username}</span>
+                    <span className="text-xs text-secondary-text">{request.status}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <CustomButton size="sm" border="base" onClick={() => void reviewAdminRequest(request.id, true)}>
+                      Approve
+                    </CustomButton>
+                    <CustomButton size="sm" variant="danger" border="base" onClick={() => void reviewAdminRequest(request.id, false)}>
+                      Reject
+                    </CustomButton>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : null}
     </section>

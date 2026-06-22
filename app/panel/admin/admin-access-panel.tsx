@@ -13,14 +13,15 @@ type AdminAccessPanelProps = {
 
 export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
   const [code, setCode] = useState("");
+  const [username, setUsername] = useState("");
   const [status, setStatus] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showRequiredError, setShowRequiredError] = useState(false);
 
   const submitCode = async () => {
-    if (!code.trim()) {
+    if (!username.trim() || !code.trim()) {
       setShowRequiredError(true);
-      setStatus("Security code is required.");
+      setStatus("Username and security code are required.");
       return;
     }
 
@@ -28,15 +29,16 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
     setStatus("");
 
     try {
-      const unlocked = await unlockAdminAccessWithCode(code);
+      const unlocked = await unlockAdminAccessWithCode(code, username.trim().toLowerCase());
       if (unlocked) {
         setCode("");
+        setUsername("");
         setShowRequiredError(false);
         onUnlock();
         return;
       }
 
-      setStatus("Security code was not accepted.");
+      setStatus("Request sent. Superadmin must approve admin access.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Security code was not accepted.");
     } finally {
@@ -54,6 +56,18 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
       </div>
 
       <div className="flex flex-col gap-2">
+        <RequiredLabel required className="text-primary-text">Username</RequiredLabel>
+        <CustomInput
+          value={username}
+          placeholder="Enter your username"
+          aria-label="Admin username"
+          invalid={showRequiredError && !username.trim()}
+          onChange={(event) => {
+            setUsername(event.target.value);
+            setShowRequiredError(false);
+            setStatus("");
+          }}
+        />
         <RequiredLabel required className="text-primary-text">Security code</RequiredLabel>
         <CustomInput
           value={code}

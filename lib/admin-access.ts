@@ -47,6 +47,12 @@ export function isAdminAccessUnlocked(profile = readUserProfile()) {
 }
 
 export async function fetchAdminAccess() {
+  const me = await fetch("/api/auth/me", { cache: "no-store" })
+    .then((res) => res.ok ? res.json() : null)
+    .catch(() => null);
+  const role = me?.data?.user?.role;
+  if (role === "admin" || role === "superadmin") return true;
+
   const security = await fetchAdminSecurity();
   if (!security.isPanelLocked) return true;
 
@@ -54,15 +60,12 @@ export async function fetchAdminAccess() {
   return isAdminAccessUnlocked(profile);
 }
 
-export async function unlockAdminAccessWithCode(code: string, profile = readUserProfile()) {
-  if (!profile || !isUserProfileComplete(profile)) {
-    throw new Error("Complete profile is required before changing admin access.");
-  }
+export async function unlockAdminAccessWithCode(code: string, username: string, profile = readUserProfile()) {
 
   const res = await fetch("/api/admin/security/unlock", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, profile }),
+    body: JSON.stringify({ code, username, profile }),
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
@@ -70,12 +73,12 @@ export async function unlockAdminAccessWithCode(code: string, profile = readUser
   }
 
   const savedProfile = normalizeUserProfile(data?.data?.user?.profile ?? data?.data?.profile ?? {
-    ...profile,
+    ...(profile ?? {}),
     isAdminUnlocked: true,
   });
-  writeUserProfile(savedProfile);
+  if (isUserProfileComplete(savedProfile)) writeUserProfile(savedProfile);
   emitAdminAccessUpdated();
-  return savedProfile.isAdminUnlocked;
+  return data?.data?.access?.isAdminUnlocked === true || savedProfile.isAdminUnlocked;
 }
 
 export async function fetchAdminSecurity(options?: { force?: boolean }) {

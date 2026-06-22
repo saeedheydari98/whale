@@ -52,6 +52,7 @@ const createBanner = (): BannerForm => ({
 const createProduct = (): ProductForm => ({
   id: `local-${Date.now()}`,
   showcaseId: "",
+  showcaseIds: [],
   title: "",
   description: "",
   slug: "",
@@ -85,6 +86,7 @@ const createProduct = (): ProductForm => ({
   discountStartAt: "",
   discountEndAt: "",
   categoryId: "general",
+  categoryIds: ["general"],
   manufactureYear: "",
   brand: "",
   vendor: "",
@@ -328,10 +330,13 @@ function dedupeProducts(products: ProductForm[]) {
 function normalizeProduct(item: Partial<ProductForm>, index: number): ProductForm {
   const finalPrice = String(item.discountPrice ?? item.price ?? "");
   const stockQuantity = Number.isFinite(Number(item.stockQuantity)) ? Math.max(0, Math.round(Number(item.stockQuantity))) : 0;
+  const categoryIds = normalizeStringList(item.categoryIds, [String(item.categoryId ?? "general").trim() || "general"]);
+  const showcaseIds = normalizeStringList(item.showcaseIds, item.showcaseId ? [String(item.showcaseId)] : []);
 
   return {
     id: item.id ?? `local-${Date.now()}-${index}`,
-    showcaseId: String(item.showcaseId ?? ""),
+    showcaseId: showcaseIds[0] ?? "",
+    showcaseIds,
     title: String(item.title ?? ""),
     description: String(item.description ?? ""),
     slug: String(item.slug ?? ""),
@@ -364,7 +369,8 @@ function normalizeProduct(item: Partial<ProductForm>, index: number): ProductFor
     ratingCount: Number.isFinite(Number(item.ratingCount)) ? Math.max(0, Math.round(Number(item.ratingCount))) : 0,
     discountStartAt: String(item.discountStartAt ?? ""),
     discountEndAt: String(item.discountEndAt ?? ""),
-    categoryId: String(item.categoryId ?? "general").trim() || "general",
+    categoryId: categoryIds[0] || "general",
+    categoryIds,
     manufactureYear: String(item.manufactureYear ?? ""),
     brand: String(item.brand ?? ""),
     vendor: String(item.vendor ?? ""),
@@ -392,6 +398,12 @@ function normalizeColorStock(value: unknown) {
       ] as const)
       .filter(([color, count]) => color && Number.isFinite(count))
   );
+}
+
+function normalizeStringList(value: unknown, fallback: string[] = []) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : fallback;
 }
 
 function colorStockToText(value: unknown) {
@@ -819,7 +831,14 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     const firstShowcase = sortedShowcases[0]?.id ?? "";
     const firstCategory = sortedCategories[0]?.id ?? "general";
     setRequiredErrors([]);
-    setDraftProduct({ ...createProduct(), showcaseId: firstShowcase, categoryId: firstCategory, sortOrder: products.length + 1 });
+    setDraftProduct({
+      ...createProduct(),
+      showcaseId: firstShowcase,
+      showcaseIds: firstShowcase ? [firstShowcase] : [],
+      categoryId: firstCategory,
+      categoryIds: [firstCategory],
+      sortOrder: products.length + 1,
+    });
     setIsCreateOpen(true);
   };
 
@@ -1033,7 +1052,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       !draftProduct.title.trim() && "draftProduct.title",
       !draftProduct.description.trim() && "draftProduct.description",
       !draftProduct.discountPrice.trim() && "draftProduct.discountPrice",
-      !draftProduct.categoryId.trim() && "draftProduct.categoryId",
+      draftProduct.categoryIds.length === 0 && "draftProduct.categoryId",
     ].filter(Boolean) as string[];
 
     if (errors.length > 0) {
@@ -1162,9 +1181,12 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     if (!editingCategory) return;
     const fallbackCategory = sortedCategories.find((category) => category.id !== editingCategory.id)?.id ?? "general";
     const nextCategories = sortedCategories.filter((category) => category.id !== editingCategory.id);
-    const nextProducts = products.map((product) =>
-      product.categoryId === editingCategory.id ? { ...product, categoryId: fallbackCategory } : product
-    );
+    const nextProducts = products.map((product) => {
+      if (!product.categoryIds.includes(editingCategory.id)) return product;
+      const categoryIds = product.categoryIds.filter((id) => id !== editingCategory.id);
+      const normalized = categoryIds.length > 0 ? categoryIds : [fallbackCategory];
+      return { ...product, categoryId: normalized[0], categoryIds: normalized };
+    });
     setProducts(nextProducts);
     setCategories(nextCategories);
     setIsEditCategoryOpen(false);
@@ -1174,9 +1196,11 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
   const deleteShowcase = async (showcaseToDelete: ShowcaseForm) => {
     const nextShowcases = sortedShowcases.filter((showcase) => showcase.id !== showcaseToDelete.id);
-    const nextProducts = products.map((product) =>
-      product.showcaseId === showcaseToDelete.id ? { ...product, showcaseId: "" } : product
-    );
+    const nextProducts = products.map((product) => {
+      if (!product.showcaseIds.includes(showcaseToDelete.id)) return product;
+      const showcaseIds = product.showcaseIds.filter((id) => id !== showcaseToDelete.id);
+      return { ...product, showcaseId: showcaseIds[0] ?? "", showcaseIds };
+    });
 
     setShowcases(nextShowcases);
     setProducts(nextProducts);
@@ -1194,7 +1218,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       !editingProduct.title.trim() && "editingProduct.title",
       !editingProduct.description.trim() && "editingProduct.description",
       !editingProduct.discountPrice.trim() && "editingProduct.discountPrice",
-      !editingProduct.categoryId.trim() && "editingProduct.categoryId",
+      editingProduct.categoryIds.length === 0 && "editingProduct.categoryId",
     ].filter(Boolean) as string[];
 
     if (errors.length > 0) {
@@ -1228,7 +1252,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
   const updateProductAssignment = async (
     product: ProductForm,
-    patch: Pick<Partial<ProductForm>, "categoryId" | "showcaseId">
+    patch: Pick<Partial<ProductForm>, "categoryId" | "showcaseId" | "categoryIds" | "showcaseIds">
   ) => {
     const nextProducts = products.map((item) =>
       item.id === product.id ? { ...item, ...patch } : item
@@ -1238,9 +1262,20 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
   };
 
   const toggleCategoryProduct = async (category: CategoryForm, product: ProductForm) => {
-    const fallbackCategory = sortedCategories.find((item) => item.id !== category.id)?.id ?? category.id;
-    const nextCategoryId = product.categoryId === category.id ? fallbackCategory : category.id;
-    await updateProductAssignment(product, { categoryId: nextCategoryId });
+    const current = product.categoryIds.length > 0 ? product.categoryIds : [product.categoryId];
+    const next = current.includes(category.id)
+      ? current.filter((id) => id !== category.id)
+      : [...current, category.id];
+    const normalized = next.length > 0 ? next : [sortedCategories[0]?.id ?? "general"];
+    await updateProductAssignment(product, { categoryId: normalized[0], categoryIds: normalized });
+  };
+
+  const toggleShowcaseProduct = async (showcase: ShowcaseForm, product: ProductForm) => {
+    const current = product.showcaseIds.length > 0 ? product.showcaseIds : product.showcaseId ? [product.showcaseId] : [];
+    const next = current.includes(showcase.id)
+      ? current.filter((id) => id !== showcase.id)
+      : [...current, showcase.id];
+    await updateProductAssignment(product, { showcaseId: next[0] ?? "", showcaseIds: next });
   };
 
   const updateBannerPlacement = (banner: BannerForm, sortOrder: number) => {
@@ -1277,42 +1312,50 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       </div>
 
       {section === "products" ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-3">
           {sortedProducts.map((product) => (
-            <div key={product.id} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <div key={product.id} className="flex w-full max-w-80 flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+              <button type="button" className="flex gap-3 text-left" onClick={() => openEditModal(product)}>
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs text-secondary-text">No image</span>
+                  )}
+                </div>
                 <div className="flex min-w-0 flex-col gap-1">
                   <div className="line-clamp-1 text-sm font-bold text-primary-text">{product.title || "Untitled product"}</div>
                   <span className="text-xs text-secondary-text">{formatPrice(product.discountPrice || product.price) || "No price"}</span>
+                  <span className="text-xs text-secondary-text">{product.categoryIds.length} categories / {product.showcaseIds.length} showcases</span>
                 </div>
-                <CustomButton size="sm" variant="neutral" border="base" onClick={() => openEditModal(product)}>
-                  Edit
-                </CustomButton>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <CustomSelect
-                  value={product.categoryId}
-                  aria-label="Product category"
-                  onChange={(event) => void updateProductAssignment(product, { categoryId: event.target.value })}
-                >
+              </button>
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-1">
                   {sortedCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
+                    <CustomButton
+                      key={category.id}
+                      size="sm"
+                      variant={product.categoryIds.includes(category.id) ? "primary" : "neutral"}
+                      border="base"
+                      onClick={() => void toggleCategoryProduct(category, product)}
+                    >
                       {category.title}
-                    </option>
+                    </CustomButton>
                   ))}
-                </CustomSelect>
-                <CustomSelect
-                  value={product.showcaseId}
-                  aria-label="Product showcase"
-                  onChange={(event) => void updateProductAssignment(product, { showcaseId: event.target.value })}
-                >
-                  <option value="">No showcase</option>
+                </div>
+                <div className="flex flex-wrap gap-1">
                   {sortedShowcases.map((showcase) => (
-                    <option key={showcase.id} value={showcase.id}>
+                    <CustomButton
+                      key={showcase.id}
+                      size="sm"
+                      variant={product.showcaseIds.includes(showcase.id) ? "primary" : "neutral"}
+                      border="base"
+                      onClick={() => void toggleShowcaseProduct(showcase, product)}
+                    >
                       {showcase.title || showcase.id}
-                    </option>
+                    </CustomButton>
                   ))}
-                </CustomSelect>
+                </div>
               </div>
             </div>
           ))}

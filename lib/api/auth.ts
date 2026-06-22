@@ -6,6 +6,7 @@ import { apiFail } from "@/lib/api/response";
 export type AuthUser = {
   id: number;
   email: string;
+  username: string | null;
   name: string | null;
   role: string;
   avatarUrl: string | null;
@@ -89,6 +90,7 @@ export function publicUser(user: AuthUser) {
   return {
     id: user.id,
     email: user.email,
+    username: user.username,
     name: user.name,
     role: user.role,
     avatarUrl: user.avatarUrl,
@@ -110,7 +112,7 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
 
   const user = await prisma.user.findUnique({
     where: { id },
-    select: { id: true, email: true, name: true, role: true, avatarUrl: true },
+    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
   });
   return user ?? null;
 }
@@ -124,7 +126,7 @@ export async function requireUser(request: Request) {
 export async function requireAdmin(request: Request) {
   const auth = await requireUser(request);
   if (!auth.ok) return auth;
-  if (auth.user.role !== "admin") {
+  if (auth.user.role !== "admin" && auth.user.role !== "superadmin") {
     return { ok: false as const, response: apiFail("forbidden", 403) };
   }
   return auth;

@@ -41,6 +41,19 @@ export async function POST(request: Request, context: Context) {
     const product = await prisma.product.findUnique({ where: { id: Number(id) } });
     if (!product) return apiFail("not found", 404);
 
+    if (parsed.data.rating) {
+      const purchased = await prisma.orderItem.findFirst({
+        where: {
+          productId: product.id,
+          order: {
+            userId: auth.user.id,
+            status: "paid",
+          },
+        },
+      });
+      if (!purchased) return apiFail("purchase required before rating", 403);
+    }
+
     const comment = await prisma.comment.create({
       data: {
         productId: product.id,
@@ -51,6 +64,20 @@ export async function POST(request: Request, context: Context) {
         active: parsed.data.active ?? true,
       },
     });
+    if (parsed.data.rating) {
+      const stats = await prisma.comment.aggregate({
+        where: { productId: product.id, active: true, rating: { not: null } },
+        _avg: { rating: true },
+        _count: { rating: true },
+      });
+      await prisma.product.update({
+        where: { id: product.id },
+        data: {
+          ratingAverage: stats._avg.rating ?? 0,
+          ratingCount: stats._count.rating,
+        },
+      });
+    }
     return apiOk({ comment }, { status: 201 });
   } catch (error) {
     console.error("Comment POST error:", error);

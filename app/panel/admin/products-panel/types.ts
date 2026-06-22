@@ -1,6 +1,7 @@
 export type ProductForm = {
   id: number | string;
   showcaseId: string;
+  showcaseIds: string[];
   title: string;
   description: string;
   slug: string;
@@ -34,6 +35,7 @@ export type ProductForm = {
   discountStartAt: string;
   discountEndAt: string;
   categoryId: string;
+  categoryIds: string[];
   manufactureYear: string;
   brand: string;
   vendor: string;

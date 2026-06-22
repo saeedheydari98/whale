@@ -12,6 +12,7 @@ export const runtime = "nodejs";
 export type ProductPayload = {
   id?: number | string;
   showcaseId?: string;
+  showcaseIds?: string[];
   title: string;
   description: string;
   slug?: string;
@@ -45,6 +46,7 @@ export type ProductPayload = {
   discountStartAt?: string | null;
   discountEndAt?: string | null;
   categoryId?: string;
+  categoryIds?: string[];
   manufactureYear?: number | string | null;
   brand?: string;
   vendor?: string;
@@ -134,9 +136,19 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
       ? Number(value.sortOrder)
       : index + 1;
 
+  const categoryIds = Array.isArray(value.categoryIds)
+    ? value.categoryIds.map((item) => String(item).trim()).filter(Boolean)
+    : [String(value.categoryId ?? "general").trim() || "general"];
+  const showcaseIds = Array.isArray(value.showcaseIds)
+    ? value.showcaseIds.map((item) => String(item).trim()).filter(Boolean)
+    : String(value.showcaseId ?? "").trim()
+      ? [String(value.showcaseId ?? "").trim()]
+      : [];
+
   return {
     id: value.id,
-    showcaseId: String(value.showcaseId ?? "").trim(),
+    showcaseId: showcaseIds[0] ?? "",
+    showcaseIds,
     title: String(value.title ?? "").trim(),
     description: String(value.description ?? "").trim(),
     slug: String(value.slug ?? "").trim(),
@@ -169,7 +181,8 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
     ratingCount: Number.isFinite(Number(value.ratingCount)) ? Math.max(0, Math.round(Number(value.ratingCount))) : 0,
     discountStartAt: String(value.discountStartAt ?? "").trim() || null,
     discountEndAt: String(value.discountEndAt ?? "").trim() || null,
-    categoryId: String(value.categoryId ?? "general").trim() || "general",
+    categoryId: categoryIds[0] || "general",
+    categoryIds,
     manufactureYear: Number.isFinite(Number(value.manufactureYear)) ? Math.round(Number(value.manufactureYear)) : null,
     brand: String(value.brand ?? "").trim(),
     vendor: String(value.vendor ?? "").trim(),
@@ -296,6 +309,7 @@ function toClientProduct(product: ProductPayload) {
   return {
     id: product.id,
     showcaseId: product.showcaseId,
+    showcaseIds: Array.isArray(product.showcaseIds) ? product.showcaseIds : product.showcaseId ? [product.showcaseId] : [],
     title: product.title,
     description: product.description,
     slug: product.slug,
@@ -329,6 +343,7 @@ function toClientProduct(product: ProductPayload) {
     discountStartAt: product.discountStartAt,
     discountEndAt: product.discountEndAt,
     categoryId: product.categoryId,
+    categoryIds: Array.isArray(product.categoryIds) ? product.categoryIds : [product.categoryId],
     manufactureYear: product.manufactureYear,
     brand: product.brand,
     vendor: product.vendor,
@@ -455,14 +470,20 @@ function buildCatalogTree(
       const limit = Number.isFinite(Number(showcase.limit)) ? Math.max(1, Number(showcase.limit)) : 8;
       const matchedProducts = mode === "auto"
         ? visibleProducts
-            .filter((product) => !categoryId || product.categoryId === categoryId)
+            .filter((product) => {
+              const productCategoryIds = Array.isArray(product.categoryIds) ? product.categoryIds : [product.categoryId];
+              return !categoryId || productCategoryIds.includes(categoryId);
+            })
             .sort(getSortComparer(showcase.autoSort ?? "newest"))
             .slice(0, limit)
         : manualIds.length > 0
           ? manualIds
               .map((id) => visibleProducts.find((product) => String(product.id) === id))
               .filter(Boolean) as ProductPayload[]
-          : visibleProducts.filter((product) => String(product.showcaseId ?? "") === showcase.id);
+          : visibleProducts.filter((product) => {
+              const productShowcaseIds = Array.isArray(product.showcaseIds) ? product.showcaseIds : product.showcaseId ? [product.showcaseId] : [];
+              return productShowcaseIds.includes(showcase.id);
+            });
 
       return {
         ...toClientShowcase(showcase),
@@ -605,7 +626,10 @@ export async function GET(request: Request) {
     });
     const products = dedupeProducts(productsData as ProductPayload[]).filter((product) => {
       if (query && !matchesSearchQuery(product, query)) return false;
-      if (categoryId && String(product.categoryId ?? "") !== categoryId) return false;
+      if (categoryId) {
+        const productCategoryIds = Array.isArray(product.categoryIds) ? product.categoryIds : [String(product.categoryId ?? "")];
+        if (!productCategoryIds.includes(categoryId)) return false;
+      }
       if (badge && String(product.badge ?? "") !== badge) return false;
       if (inStock && Number(product.stockQuantity ?? 0) <= 0) return false;
       if (Number.isFinite(minRating) && Number(product.ratingAverage ?? 0) < minRating) return false;
@@ -735,7 +759,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const productCategoryIds = normalized.map((item) => String(item.categoryId ?? "").trim()).filter(Boolean);
+    const productCategoryIds = normalized.flatMap((item) =>
+      (Array.isArray(item.categoryIds) ? item.categoryIds : [item.categoryId]).map((value) => String(value ?? "").trim()).filter(Boolean)
+    );
     const normalizedCategories = categories.length > 0
       ? categories
       : [...new Set(productCategoryIds)].map((categoryId, index) =>
@@ -840,7 +866,9 @@ export async function POST(request: Request) {
                 : Prisma.JsonNull,
               stockStatus: item.stockStatus || (Number(item.stockQuantity) > 0 ? "in_stock" : "out_of_stock"),
             }),
-            showcaseId: String(item.showcaseId ?? "").trim(),
+              showcaseId: String(item.showcaseId ?? "").trim(),
+              showcaseIds: item.showcaseIds,
+              categoryIds: item.categoryIds,
           },
         });
       }

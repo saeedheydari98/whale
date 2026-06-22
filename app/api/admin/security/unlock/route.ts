@@ -4,6 +4,9 @@ import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { parseJsonBody } from "@/lib/api/validation";
 import {
+  getAuthUser,
+} from "@/lib/api/auth";
+import {
   readAdminSecurity,
   readFallbackAdminCode,
   toAdminSecurityData,
@@ -15,6 +18,7 @@ export const runtime = "nodejs";
 
 const unlockSchema = z.object({
   code: z.string().trim().optional().default(""),
+  username: z.string().trim().toLowerCase().optional(),
   profile: z.object({
     firstName: z.string().trim().min(1),
     lastName: z.string().trim().min(1),
@@ -53,27 +57,38 @@ export async function POST(request: Request) {
       return apiFail("invalid admin code", 401);
     }
 
-    if (!parsed.data.profile) {
-      return apiFail("complete profile is required", 400);
+    const authUser = await getAuthUser(request);
+    if (!authUser) return apiFail("sign in is required", 401);
+
+    if (authUser.role === "superadmin" || authUser.role === "admin") {
+      return apiOk({
+        ...toAdminSecurityData(security),
+        access: { isAdminUnlocked: true },
+      });
     }
 
-    const saved = await prisma.customerProfile.upsert({
-      where: { nationalId: parsed.data.profile.nationalId },
+    const username = String(parsed.data.username || authUser.username || "").trim().toLowerCase();
+    if (!username || username !== authUser.username) {
+      return apiFail("signed-in username is required", 400);
+    }
+
+    const requestRecord = await prisma.adminAccessRequest.upsert({
+      where: { id: `${authUser.id}-pending-admin-access` },
       update: {
-        firstName: parsed.data.profile.firstName,
-        lastName: parsed.data.profile.lastName,
-        phone: parsed.data.profile.phone,
-        isAdminUnlocked: true,
+        username,
+        status: "pending",
       },
       create: {
-        ...parsed.data.profile,
-        isAdminUnlocked: true,
+        id: `${authUser.id}-pending-admin-access`,
+        userId: authUser.id,
+        username,
+        status: "pending",
       },
     });
 
     return apiOk({
       ...toAdminSecurityData(security),
-      user: { profile: saved },
+      access: { isAdminUnlocked: false, status: requestRecord.status },
     });
   } catch (error) {
     console.error("Admin security unlock error:", error);
