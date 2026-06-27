@@ -98,6 +98,26 @@ export function publicUser(user: AuthUser) {
   };
 }
 
+async function normalizeRole(user: AuthUser) {
+  if (user.username === SUPERADMIN_USERNAME && user.role !== "superadmin") {
+    user.role = "superadmin";
+    await prisma.user.update({ where: { id: user.id }, data: { role: "superadmin" } });
+  }
+  if (user.username !== SUPERADMIN_USERNAME && user.role === "superadmin") {
+    user.role = "user";
+    await prisma.user.update({ where: { id: user.id }, data: { role: "user" } });
+  }
+  return user;
+}
+
+async function findPublicUser(id: number) {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
+  });
+  return user ? normalizeRole(user) : null;
+}
+
 function bearerToken(request: Request) {
   const authorization = request.headers.get("authorization") || "";
   return authorization.toLowerCase().startsWith("bearer ")
@@ -106,24 +126,45 @@ function bearerToken(request: Request) {
 }
 
 export async function getAuthUser(request: Request): Promise<AuthUser | null> {
-  const token = bearerToken(request) || (await cookies()).get(ACCESS_COOKIE)?.value;
+  const store = await cookies();
+  const token = bearerToken(request) || store.get(ACCESS_COOKIE)?.value;
   const payload = verifyToken(token);
   const id = Number(payload?.sub);
-  if (!Number.isInteger(id) || id <= 0) return null;
+
+  if (Number.isInteger(id) && id > 0) {
+    return findPublicUser(id);
+  }
+
+  const refreshToken = store.get(REFRESH_COOKIE)?.value;
+  const refreshPayload = verifyToken(refreshToken);
+  const refreshUserId = Number(refreshPayload?.sub);
+  if (!refreshToken || refreshPayload?.type !== "refresh" || !Number.isInteger(refreshUserId) || refreshUserId <= 0) {
+    return null;
+  }
 
   const user = await prisma.user.findUnique({
-    where: { id },
-    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
+    where: { id: refreshUserId },
+    select: { id: true, email: true, username: true, name: true, role: true, refreshTokenHash: true, avatarUrl: true },
   });
-  if (user?.username === SUPERADMIN_USERNAME && user.role !== "superadmin") {
-    user.role = "superadmin";
-    await prisma.user.update({ where: { id: user.id }, data: { role: "superadmin" } });
-  }
-  if (user?.username !== SUPERADMIN_USERNAME && user?.role === "superadmin") {
-    user.role = "user";
-    await prisma.user.update({ where: { id: user.id }, data: { role: "user" } });
-  }
-  return user ?? null;
+  if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return null;
+
+  const normalizedUser = await normalizeRole(user);
+  const accessToken = createAccessToken(normalizedUser);
+  const nextRefreshToken = createRefreshToken(normalizedUser);
+  await prisma.user.update({
+    where: { id: normalizedUser.id },
+    data: { refreshTokenHash: hashToken(nextRefreshToken) },
+  });
+  await setAuthCookies(accessToken, nextRefreshToken);
+
+  return {
+    id: normalizedUser.id,
+    email: normalizedUser.email,
+    username: normalizedUser.username,
+    name: normalizedUser.name,
+    role: normalizedUser.role,
+    avatarUrl: normalizedUser.avatarUrl,
+  };
 }
 
 export async function requireUser(request: Request) {

@@ -16,7 +16,7 @@ export function GlobalSearch() {
   const [expanded, setExpanded] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const returnPathRef = useRef("/");
-  const INPUT_ID = "site-global-search-input";
+  const INPUT_ID = "global-search-input";
   const isOpen = !isMobile || expanded;
 
   const submit = (q?: string) => {
@@ -30,6 +30,13 @@ export function GlobalSearch() {
     router.push(`/search?q=${encodeURIComponent(v)}`);
   };
 
+  const updateSearchValue = (nextValue: string) => {
+    setValue(nextValue);
+    if (!nextValue.trim() && pathname === "/search") {
+      router.push(returnPathRef.current);
+    }
+  };
+
   useEffect(() => {
     if (pathname !== "/search") {
       const params = searchParams.toString();
@@ -41,7 +48,9 @@ export function GlobalSearch() {
     const nextValue = searchParams.get("q") ?? "";
     if (pathname === "/search") {
       setValue(nextValue);
+      return;
     }
+    setValue("");
   }, [pathname, searchParams]);
 
   useEffect(() => {
@@ -101,9 +110,9 @@ export function GlobalSearch() {
           <CustomInput
             id={INPUT_ID}
             name="site-global-search"
-            type="search"
+            type="text"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => updateSearchValue(e.target.value)}
             placeholder=" search products ..."
             autoComplete="new-password"
             autoCorrect="off"
@@ -121,7 +130,6 @@ export function GlobalSearch() {
                 ? "h-10 px-7 text-sm"
                 : "h-6 w-10 min-w-10 p-0 text-center text-transparent caret-transparent placeholder:text-transparent md:h-10 md:w-full md:px-7 md:text-sm md:text-primary-text md:caret-auto md:placeholder:text-secondary-text"
             }
-            style={{ backgroundColor: "color-mix(in srgb, var(--primary) 58%, var(--bg-base))" }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();

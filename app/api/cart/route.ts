@@ -32,6 +32,26 @@ type CartItemPayload = {
   quantity?: number | string;
 };
 
+type CheckoutCartItem = {
+  productId: number | null;
+  title: string;
+  description: string;
+  price: string;
+  originalPrice: string | null;
+  discountPrice: string | null;
+  discountPercent: number | null;
+  imageUrl: string | null;
+  selectedColor: string | null;
+  quantity: number;
+};
+
+type ProductUpdatePlan = {
+  productId: number;
+  stockQuantity: number;
+  quantity: number;
+  colorStock: Record<string, number>;
+};
+
 function normalizeProfile(value: ProfilePayload) {
   return {
     firstName: String(value.firstName ?? "").trim(),
@@ -64,6 +84,33 @@ function normalizeCartItem(value: CartItemPayload) {
     selectedColor: value.selectedColor ? String(value.selectedColor).trim() : null,
     quantity: Math.max(1, Math.round(Number(value.quantity ?? 1))),
   };
+}
+
+function serverCartItemKey(item: ReturnType<typeof normalizeCartItem>) {
+  return item.productId
+    ? String(item.productId)
+    : `${item.title}|${item.description}|${item.price}|${item.selectedColor ?? ""}`;
+}
+
+function mergeCartItems(items: ReturnType<typeof normalizeCartItem>[]) {
+  const byKey = new Map<string, ReturnType<typeof normalizeCartItem>>();
+
+  for (const item of items) {
+    if (!item.title || !item.price) continue;
+    const key = serverCartItemKey(item);
+    const existing = byKey.get(key);
+    if (existing) {
+      byKey.set(key, {
+        ...existing,
+        selectedColor: existing.selectedColor ?? item.selectedColor,
+        quantity: existing.quantity + item.quantity,
+      });
+      continue;
+    }
+    byKey.set(key, item);
+  }
+
+  return Array.from(byKey.values());
 }
 
 function normalizeColorStock(value: unknown) {
@@ -164,17 +211,34 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const profile = normalizeProfile(body.profile ?? {});
-  const items = Array.isArray(body.items) ? body.items.map(normalizeCartItem) : [];
+  const items: ReturnType<typeof normalizeCartItem>[] = Array.isArray(body.items)
+    ? body.items.map(normalizeCartItem)
+    : [];
   if (!isProfileComplete(profile)) return apiFail("complete profile is required", 400);
 
   try {
     const savedProfile = await upsertLegacyProfile(request, profile);
     const cart = await activeCartForProfile(savedProfile.id);
+    const requestedProductIds = items
+      .map((item) => item.productId)
+      .filter((id): id is number => typeof id === "number");
+    const products = requestedProductIds.length
+      ? await prisma.product.findMany({
+          where: { id: { in: Array.from(new Set(requestedProductIds)) } },
+          select: { id: true },
+        })
+      : [];
+    const validProductIds = new Set(products.map((product: { id: number }) => product.id));
+    const safeItems = mergeCartItems(
+      items.map((item) => ({
+        ...item,
+        productId: item.productId && validProductIds.has(item.productId) ? item.productId : null,
+      }))
+    );
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-      for (const item of items) {
-        if (!item.title || !item.price) continue;
+      for (const item of safeItems) {
         await tx.cartItem.create({
           data: {
             cartId: cart.id,
@@ -214,9 +278,49 @@ export async function PATCH(request: Request) {
 
   try {
     const cart = await activeCartForProfile(profile.id);
+    const authUser = await getAuthUser(request);
+    const cartItems = cart.items as CheckoutCartItem[];
+    const productIds = cartItems
+      .map((item) => item.productId)
+      .filter((id): id is number => typeof id === "number");
+    const products = productIds.length
+      ? await prisma.product.findMany({ where: { id: { in: Array.from(new Set(productIds)) } } })
+      : [];
+    const productsById = new Map(products.map((product: { id: number }) => [product.id, product]));
+    let total = 0;
+    const productUpdates: ProductUpdatePlan[] = [];
+
+    for (const item of cartItems) {
+      total += readPriceNumber(item.discountPrice || item.price) * item.quantity;
+      if (!item.productId) continue;
+
+      const product = productsById.get(item.productId) as
+        | { id: number; stockQuantity: number; colorStock: unknown }
+        | undefined;
+      if (!product || product.stockQuantity < item.quantity) {
+        throw new Error(`${item.title} is out of stock`);
+      }
+
+      const colorStock = normalizeColorStock(product.colorStock);
+      if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
+        throw new Error(`Select a color for ${item.title}`);
+      }
+      if (item.selectedColor) {
+        if ((colorStock[item.selectedColor] ?? 0) < item.quantity) {
+          throw new Error(`${item.title} ${item.selectedColor} is out of stock`);
+        }
+        colorStock[item.selectedColor] -= item.quantity;
+      }
+
+      productUpdates.push({
+        productId: product.id,
+        stockQuantity: product.stockQuantity - item.quantity,
+        quantity: item.quantity,
+        colorStock,
+      });
+    }
+
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const authUser = await getAuthUser(request);
-      let total = 0;
       const order = authUser
         ? await tx.order.create({
             data: {
@@ -228,51 +332,38 @@ export async function PATCH(request: Request) {
           })
         : null;
 
-      for (const item of cart.items) {
-        total += readPriceNumber(item.discountPrice || item.price) * item.quantity;
-        if (order) {
-          await tx.orderItem.create({
-            data: {
-              orderId: order.id,
-              productId: item.productId,
-              title: item.title,
-              description: item.description,
-              price: item.price,
-              originalPrice: item.originalPrice,
-              discountPrice: item.discountPrice,
-              discountPercent: item.discountPercent,
-              imageUrl: item.imageUrl,
-              selectedColor: item.selectedColor,
-              quantity: item.quantity,
-            },
-          });
-        }
-        if (!item.productId) continue;
-        const product = await tx.product.findUnique({ where: { id: item.productId } });
-        if (!product || product.stockQuantity < item.quantity) {
-          throw new Error(`${item.title} is out of stock`);
-        }
-        const colorStock = normalizeColorStock(product.colorStock);
-        if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
-          throw new Error(`Select a color for ${item.title}`);
-        }
-        if (item.selectedColor) {
-          if ((colorStock[item.selectedColor] ?? 0) < item.quantity) {
-            throw new Error(`${item.title} ${item.selectedColor} is out of stock`);
-          }
-          colorStock[item.selectedColor] -= item.quantity;
-        }
+      if (order) {
+        await tx.orderItem.createMany({
+          data: cartItems.map((item) => ({
+            orderId: order.id,
+            productId: item.productId,
+            title: item.title,
+            description: item.description,
+            price: item.price,
+            originalPrice: item.originalPrice,
+            discountPrice: item.discountPrice,
+            discountPercent: item.discountPercent,
+            imageUrl: item.imageUrl,
+            selectedColor: item.selectedColor,
+            quantity: item.quantity,
+          })),
+        });
+      }
+
+      for (const update of productUpdates) {
         await tx.product.update({
-          where: { id: product.id },
+          where: { id: update.productId },
           data: {
-            stockQuantity: product.stockQuantity - item.quantity,
-            salesCount: { increment: item.quantity },
-            colorStock: Object.keys(colorStock).length > 0 ? colorStock : Prisma.JsonNull,
+            stockQuantity: update.stockQuantity,
+            salesCount: { increment: update.quantity },
+            colorStock: Object.keys(update.colorStock).length > 0 ? update.colorStock : Prisma.JsonNull,
           },
         });
       }
       if (order) await tx.order.update({ where: { id: order.id }, data: { total: String(total) } });
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+    }, {
+      timeout: 15_000,
     });
 
     return apiOk({ user: { profile }, cart: { items: [] } });

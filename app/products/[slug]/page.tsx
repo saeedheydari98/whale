@@ -120,6 +120,10 @@ export default function ProductPage() {
 
   const colorStock = useMemo(() => normalizeColorStock(product?.colorStock), [product]);
   const colorOptions = useMemo(() => Object.entries(colorStock), [colorStock]);
+  const firstAvailableColor = useMemo(
+    () => colorOptions.find(([, count]) => count > 0)?.[0] ?? "",
+    [colorOptions]
+  );
 
   const ratedReviews = useMemo(
     () => reviews.filter((review) => Number(review.rating) > 0),
@@ -184,13 +188,12 @@ export default function ProductPage() {
       return;
     }
 
-    if (colorOptions.length > 0 && !selectedColor) {
-      setCartMessage("Select an available color in Product details.");
-      window.setTimeout(() => setCartMessage(""), 2000);
-      return;
+    const cartColor = selectedColor || firstAvailableColor;
+    if (cartColor && cartColor !== selectedColor) {
+      setSelectedColor(cartColor);
     }
 
-    await addProductToCart(item, 1, selectedColor);
+    await addProductToCart(item, 1, cartColor);
     setCartMessage(`${item.title} added to cart.`);
     window.setTimeout(() => setCartMessage(""), 2000);
   };
