@@ -9,6 +9,7 @@ import ShowcaseLink from "../../design-system/components/ui/ShowcaseLink";
 import ProductLink from "../../design-system/components/ui/ProductLink";
 import { FiExternalLink } from "react-icons/fi";
 import Loading from "@/app/design-system/components/loading/loading";
+import ProductRatingSummary from "@/app/design-system/components/ui/product-rating-summary";
 
 type ShowcaseSectionProps = {
   showcase: Showcase;
@@ -129,6 +130,10 @@ export function ShowcaseSection({
                     </CustomTag>
                   ) : null}
                 </div>
+                <ProductRatingSummary
+                  average={product.ratingAverage}
+                  count={product.ratingCount}
+                />
               </div>
             </div>
             <div

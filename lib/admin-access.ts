@@ -4,6 +4,7 @@ import {
   USER_PROFILE_UPDATED_EVENT,
   USER_PROFILE_STORAGE_KEY,
 } from "@/lib/user-profile";
+import { fetchCurrentUser, hasAdminRole } from "@/lib/auth-client";
 
 export const ADMIN_ACCESS_UPDATED_EVENT = "admin-access-updated";
 
@@ -43,17 +44,7 @@ export function isAdminAccessUnlocked() {
 }
 
 export async function fetchAdminAccess() {
-  const profileUser = await fetch("/api/user/profile", { cache: "no-store" })
-    .then((res) => res.ok ? res.json() : null)
-    .catch(() => null);
-  const profileRole = profileUser?.data?.user?.role;
-  if (profileRole === "admin" || profileRole === "superadmin") return true;
-
-  const me = await fetch("/api/auth/session", { cache: "no-store" })
-    .then((res) => res.ok ? res.json() : null)
-    .catch(() => null);
-  const role = me?.data?.user?.role;
-  return role === "admin" || role === "superadmin";
+  return hasAdminRole(await fetchCurrentUser());
 }
 
 export async function unlockAdminAccessWithCode(code: string, username: string, profile = readUserProfile()) {

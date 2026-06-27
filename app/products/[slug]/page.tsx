@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
@@ -11,6 +11,7 @@ import { CustomTag } from "@/app/design-system/components/ui/tag";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import Loading from "@/app/design-system/components/loading/loading";
+import ColorStockDots from "@/app/design-system/components/ui/color-stock-dots";
 
 const LOADING_PRODUCT: ProductRecord = {
   id: "loading-product",
@@ -44,6 +45,17 @@ function getDiscountPercent(product: ProductRecord) {
   return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
 }
 
+function formatDate(value?: string | null) {
+  if (!value) return "";
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return String(value);
+  return new Date(time).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function normalizeColorStock(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
 
@@ -61,34 +73,53 @@ export default function ProductPage() {
   const params = useParams();
   const rawSlug = params?.slug ?? params?.id ?? "";
   const productId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
-  const { getProductById, loading: catalogLoading } = useProductsCatalog();
+  const { getProductById, loading: catalogLoading, refresh } = useProductsCatalog();
   const product = useMemo(() => getProductById(productId), [getProductById, productId]);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [text, setText] = useState("");
   const [rating, setRating] = useState<number | undefined>(undefined);
   const [isPurchased, setIsPurchased] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
+  const [reviewError, setReviewError] = useState("");
   const [cartMessage, setCartMessage] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
+  const [activeTab, setActiveTab] = useState<"details" | "reviews" | "price">("details");
 
-  useEffect(() => {
-    const stored = localStorage.getItem(`product-comments:${productId}`) || "[]";
+  const productApiId = product?.id;
+  const productStorageKey = String(productApiId ?? productId);
+
+  const loadReviews = useCallback(async () => {
+    const numericProductId = Number(productApiId);
+    if (!Number.isInteger(numericProductId) || numericProductId <= 0) return;
+
     try {
-      const parsed = JSON.parse(stored);
-      setReviews(Array.isArray(parsed) ? parsed : []);
+      const response = await fetch(`/api/products/${numericProductId}/comments`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || data?.ok === false) {
+        throw new Error(data?.message || "Reviews could not be loaded.");
+      }
+      const comments = Array.isArray(data?.data?.comments) ? data.data.comments : [];
+      setReviews(comments.map((comment: any) => ({
+        id: String(comment.id ?? Date.now()),
+        text: String(comment.content ?? comment.text ?? ""),
+        rating: Number.isFinite(Number(comment.rating)) ? Number(comment.rating) : undefined,
+        createdAt: String(comment.createdAt ?? new Date().toISOString()),
+      })));
+      setIsPurchased(Boolean(data?.data?.isPurchased) || localStorage.getItem(`purchased:${productStorageKey}`) === "1");
+      setHasRated(Boolean(data?.data?.hasRated));
     } catch {
       setReviews([]);
+      setIsPurchased(localStorage.getItem(`purchased:${productStorageKey}`) === "1");
+      setHasRated(false);
     }
+  }, [productApiId, productStorageKey]);
 
-    setIsPurchased(localStorage.getItem(`purchased:${productId}`) === "1");
-  }, [productId]);
+  useEffect(() => {
+    void loadReviews();
+  }, [loadReviews]);
 
   const colorStock = useMemo(() => normalizeColorStock(product?.colorStock), [product]);
   const colorOptions = useMemo(() => Object.entries(colorStock), [colorStock]);
-
-  useEffect(() => {
-    const firstAvailableColor = colorOptions.find(([, count]) => count > 0)?.[0] ?? "";
-    setSelectedColor(firstAvailableColor);
-  }, [colorOptions]);
 
   const ratedReviews = useMemo(
     () => reviews.filter((review) => Number(review.rating) > 0),
@@ -101,30 +132,49 @@ export default function ProductPage() {
     return Math.round((total / ratedReviews.length) * 10) / 10;
   }, [ratedReviews]);
 
-  const submitReview = () => {
+  const submitReview = async () => {
     if (!text.trim()) return;
+    setReviewError("");
 
     if (rating && !isPurchased) {
-      alert("Only customers who purchased this product can submit a rating. You may still leave a comment.");
+      setReviewError("Only customers who purchased this product can submit a rating. You may still leave a comment.");
       return;
     }
 
-    const newReview: ProductReview = {
-      id: String(Date.now()),
-      text: text.trim(),
-      rating,
-      createdAt: new Date().toISOString(),
-    };
-    const next = [newReview, ...reviews];
-    setReviews(next);
-    localStorage.setItem(`product-comments:${productId}`, JSON.stringify(next));
-    setText("");
-    setRating(undefined);
-  };
+    if (rating && hasRated) {
+      setReviewError("You have already submitted a star rating for this product.");
+      return;
+    }
 
-  const markPurchased = () => {
-    localStorage.setItem(`purchased:${productId}`, "1");
-    setIsPurchased(true);
+    const numericProductId = Number(productApiId);
+    if (!Number.isInteger(numericProductId) || numericProductId <= 0) {
+      setReviewError("Product is not ready for reviews yet.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/products/${numericProductId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content: text.trim(),
+          ...(rating ? { rating } : {}),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || data?.ok === false) {
+        throw new Error(data?.message || "Review could not be submitted.");
+      }
+      setText("");
+      setRating(undefined);
+      await loadReviews();
+      if (rating) {
+        setHasRated(true);
+        await refresh();
+      }
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : "Review could not be submitted.");
+    }
   };
 
   const addToCart = async (item: ProductRecord) => {
@@ -135,7 +185,7 @@ export default function ProductPage() {
     }
 
     if (colorOptions.length > 0 && !selectedColor) {
-      setCartMessage("Select an available color.");
+      setCartMessage("Select an available color in Product details.");
       window.setTimeout(() => setCartMessage(""), 2000);
       return;
     }
@@ -146,7 +196,8 @@ export default function ProductPage() {
   };
 
   const scrollToReviews = () => {
-    document.getElementById("product-reviews")?.scrollIntoView({ behavior: "smooth" });
+    setActiveTab("reviews");
+    document.getElementById("product-tabs")?.scrollIntoView({ behavior: "smooth" });
   };
 
   if (catalogLoading && !product) {
@@ -206,17 +257,12 @@ export default function ProductPage() {
                 </Loading>
               </div>
               <div className="flex flex-wrap gap-3">
-                <Loading loading="skeleton-item" isLoading>
-                  <CustomButton type="button" variant="success" border="base" icon={<IoBagAddOutline />}>
-                    Add to cart
-                  </CustomButton>
-                </Loading>
-                <Loading loading="skeleton-item" isLoading>
-                  <CustomButton type="button" variant="primary">
-                    See reviews
-                  </CustomButton>
-                </Loading>
-              </div>
+              <Loading loading="skeleton-item" isLoading>
+                <CustomButton type="button" variant="success" border="base" icon={<IoBagAddOutline />}>
+                  Add to cart
+                </CustomButton>
+              </Loading>
+            </div>
             </div>
           </section>
 
@@ -274,19 +320,37 @@ export default function ProductPage() {
   const discountPercent = getDiscountPercent(product);
   const finalPrice = formatPrice(getFinalPrice(product));
   const originalPrice = formatPrice(product.originalPrice);
+  const detailRows = [
+    ["Brand", product.brand],
+    ["Vendor", product.vendor],
+    ["SKU", product.sku],
+    ["Barcode", product.barcode],
+    ["Manufacture year", product.manufactureYear],
+    ["Category", product.categoryId],
+    ["Stock status", product.stockStatus],
+    ["Minimum order", product.minOrder],
+    ["Maximum order", product.maxOrder],
+    ["Weight", product.weight],
+    ["Length", product.length],
+    ["Width", product.width],
+    ["Height", product.height],
+    ["Published", formatDate(product.publishedAt)],
+  ].filter(([, value]) => String(value ?? "").trim());
+  const finalPriceDate = formatDate(product.updatedAt || product.publishedAt || product.createdAt);
 
   return (
     <main className="min-h-screen bg-bg-base text-primary-text">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 py-8 px-4">
+      <div className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         {cartMessage ? (
           <div className="rounded-lg border border-primary-border bg-primary-card px-4 py-3 text-sm font-semibold text-primary">
             {cartMessage}
           </div>
         ) : null}
 
+        <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
         <Loading loading="skeleton-card" isLoading={catalogLoading}>
-          <section className="flex w-full flex-col gap-8 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:flex-row lg:items-start">
-            <div className="flex w-full flex-col gap-4 lg:max-w-md lg:shrink-0">
+          <section className="flex w-full flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:w-[42rem] lg:max-w-[42rem] lg:shrink-0">
+            <div className="flex w-full flex-col gap-4">
               <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-primary-border bg-primary-media">
                 {product.imageUrl ? (
                   <img
@@ -300,7 +364,7 @@ export default function ProductPage() {
               </div>
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col gap-5">
+            <div className="flex min-w-0 flex-col gap-5">
               <div className="flex flex-col gap-3">
                 {product.badge ? (
                   <div>
@@ -348,31 +412,6 @@ export default function ProductPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 rounded-xl border border-primary-border bg-primary-card p-4">
-              <div className="text-sm font-bold text-primary-text">Inventory</div>
-              <span className="text-sm font-semibold text-secondary-text">
-                Total stock: {Number(product.stockQuantity ?? 0)}
-              </span>
-              {colorOptions.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {colorOptions.map(([color, count]) => (
-                    <CustomButton
-                      key={color}
-                      type="button"
-                      variant={selectedColor === color ? "primary" : "neutral"}
-                      size="sm"
-                      rounded="full"
-                      border="base"
-                      disabled={count <= 0}
-                      onClick={() => setSelectedColor(color)}
-                    >
-                      {color} ({count})
-                    </CustomButton>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-
             <div className="flex flex-wrap gap-3">
               <CustomButton
                 type="button"
@@ -383,26 +422,102 @@ export default function ProductPage() {
               >
                 Add to cart
               </CustomButton>
-              <CustomButton type="button" variant="primary" onClick={scrollToReviews}>
-                See reviews
-              </CustomButton>
             </div>
             </div>
           </section>
         </Loading>
 
-        <Loading loading="skeleton-card" isLoading={catalogLoading}>
-          <ProductReviewsSection
-            reviews={reviews}
-            text={text}
-            rating={rating}
-            isPurchased={isPurchased}
-            onTextChange={setText}
-            onRatingChange={setRating}
-            onSubmit={submitReview}
-            onMarkPurchased={markPurchased}
-          />
-        </Loading>
+        <section id="product-tabs" className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="flex flex-wrap gap-2 border-b border-primary-border">
+            {[
+              { id: "details", label: "Product details" },
+              { id: "reviews", label: "Reviews and rating" },
+              { id: "price", label: "Price changes" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors hover:bg-primary-soft ${
+                  activeTab === tab.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
+                }`}
+              >
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "details" ? (
+            <Loading loading="skeleton-card" isLoading={catalogLoading}>
+              <section className="flex flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6">
+                <div className="flex flex-col gap-2">
+                  <div className="text-2xl font-bold text-primary-text">Full product information</div>
+                  <div className="text-sm leading-7 text-secondary-text whitespace-pre-wrap">{product.description}</div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {detailRows.length > 0 ? detailRows.map(([label, value]) => (
+                    <div key={String(label)} className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
+                      <span className="text-xs font-semibold text-secondary-text">{label}</span>
+                      <span className="text-sm font-bold text-primary-text">{String(value)}</span>
+                    </div>
+                  )) : (
+                    <div className="text-sm text-secondary-text">No additional product fields are available.</div>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-3">
+                  <div className="text-sm font-bold text-primary-text">Color inventory</div>
+                  <span className="text-sm font-semibold text-secondary-text">
+                    Total stock: {Number(product.stockQuantity ?? 0)}
+                  </span>
+                  <ColorStockDots
+                    value={product.colorStock}
+                    selectedColor={selectedColor}
+                    onSelect={setSelectedColor}
+                    disabledUnavailable
+                    size="md"
+                  />
+                </div>
+              </section>
+            </Loading>
+          ) : null}
+
+          {activeTab === "reviews" ? (
+            <Loading loading="skeleton-card" isLoading={catalogLoading}>
+              <ProductReviewsSection
+                reviews={reviews}
+                text={text}
+                rating={rating}
+                isPurchased={isPurchased}
+                hasRated={hasRated}
+                error={reviewError}
+                onTextChange={setText}
+                onRatingChange={setRating}
+                onSubmit={submitReview}
+              />
+            </Loading>
+          ) : null}
+
+          {activeTab === "price" ? (
+            <Loading loading="skeleton-card" isLoading={catalogLoading}>
+              <section className="flex flex-col gap-5 rounded-2xl border border-primary-border bg-primary-soft p-6">
+                <div className="flex flex-col gap-2">
+                  <div className="text-2xl font-bold text-primary-text">Price changes</div>
+                  <div className="text-sm text-secondary-text">Final product price and the date it was recorded.</div>
+                </div>
+                <div className="flex flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-bold text-primary-text">Final price</span>
+                    <span className="text-xs text-secondary-text">
+                      {finalPriceDate ? `Recorded on ${finalPriceDate}` : "Recorded date is not available"}
+                    </span>
+                  </div>
+                  <span className="text-lg font-bold text-primary">{finalPrice || "No price"}</span>
+                </div>
+              </section>
+            </Loading>
+          ) : null}
+        </section>
+        </div>
       </div>
     </main>
   );

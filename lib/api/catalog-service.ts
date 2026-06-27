@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { matchesSearchQuery } from "@/lib/product-search";
 
 export function parseMoney(value: unknown) {
   const parsed = Number(String(value ?? "").replace(/[^\d.]/g, ""));
@@ -118,7 +119,6 @@ function dateRange(field: "createdAt" | "updatedAt", searchParams: URLSearchPara
 }
 
 export function productWhere(searchParams: URLSearchParams, extra: Record<string, unknown> = {}) {
-  const q = String(searchParams.get("q") ?? "").trim();
   const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
   const minPrice = minPriceParam === null || minPriceParam === "" ? NaN : Number(minPriceParam);
@@ -132,15 +132,6 @@ export function productWhere(searchParams: URLSearchParams, extra: Record<string
   const isActiveParam = searchParams.get("isActive");
   const isFeaturedParam = searchParams.get("isFeatured");
   const and: unknown[] = [];
-  if (q) {
-    and.push({
-      OR: [
-        { title: { contains: q, mode: "insensitive" as const } },
-        { description: { contains: q, mode: "insensitive" as const } },
-        { badge: { contains: q, mode: "insensitive" as const } },
-      ],
-    });
-  }
   if (hasDiscount === "true") {
     and.push({ OR: [{ discountPercent: { gt: 0 } }, { discountPrice: { not: null } }] });
   }
@@ -188,30 +179,29 @@ function productOrderBy(searchParams: URLSearchParams): Prisma.ProductOrderByWit
 }
 
 export async function searchProducts(searchParams: URLSearchParams, extra: Record<string, unknown> = {}) {
-  const { page, limit, skip } = pagination(searchParams);
+  const { page, limit } = pagination(searchParams);
   const where = productWhere(searchParams, extra);
-  const [rawItems, rawTotal] = await Promise.all([
-    prisma.product.findMany({
-      where: where as any,
-      orderBy: productOrderBy(searchParams),
-      skip,
-      take: limit,
-    }),
-    prisma.product.count({ where: where as any }),
-  ]);
+  const q = String(searchParams.get("q") ?? "").trim();
+  const rawItems = await prisma.product.findMany({
+    where: where as any,
+    orderBy: productOrderBy(searchParams),
+  });
 
   const minPriceParam = searchParams.get("minPrice");
   const maxPriceParam = searchParams.get("maxPrice");
   const minPrice = minPriceParam === null || minPriceParam === "" ? NaN : Number(minPriceParam);
   const maxPrice = maxPriceParam === null || maxPriceParam === "" ? NaN : Number(maxPriceParam);
   const filtered = rawItems.filter((item: { discountPrice: string | null; price: string }) => {
+    if (q && !matchesSearchQuery(item, q)) return false;
     const price = parseMoney(item.discountPrice || item.price);
     if (Number.isFinite(minPrice) && price < minPrice) return false;
     if (Number.isFinite(maxPrice) && price > maxPrice) return false;
     return true;
   });
+  const start = (page - 1) * limit;
+  const paged = filtered.slice(start, start + limit);
 
-  return pageResult(filtered, page, limit, rawTotal);
+  return pageResult(paged, page, limit, filtered.length);
 }
 
 export async function getOrCreateActiveCart(userId: number) {

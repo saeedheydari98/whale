@@ -101,13 +101,17 @@ export function GlobalSearch() {
           <CustomInput
             id={INPUT_ID}
             name="site-global-search"
+            type="search"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder=" search products ..."
-            autoComplete="off"
+            autoComplete="new-password"
             autoCorrect="off"
+            autoCapitalize="none"
             spellCheck={false}
             data-lpignore="true"
+            data-1p-ignore="true"
+            data-form-type="other"
             showLabel={false}
             fullWidth={isOpen}
             rounded="full"

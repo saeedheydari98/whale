@@ -5,11 +5,15 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { UserProfilePanel } from "./user-profile-panel";
 import { UserThemePanel } from "./user-theme-panel";
+import { readUserProfile } from "@/lib/user-profile";
 
 type OrderItem = {
   id: string;
   productId?: number | null;
   title: string;
+  price?: string | null;
+  discountPrice?: string | null;
+  selectedColor?: string | null;
   imageUrl?: string | null;
   quantity: number;
 };
@@ -21,7 +25,9 @@ function UserOrdersPanel() {
   const [status, setStatus] = useState("");
 
   useEffect(() => {
-    void fetch("/api/user/orders", { cache: "no-store" })
+    const nationalId = readUserProfile()?.nationalId ?? "";
+    const query = nationalId ? `?nationalId=${encodeURIComponent(nationalId)}` : "";
+    void fetch(`/api/user/orders${query}`, { cache: "no-store" })
       .then((res) => res.ok ? res.json() : null)
       .then((data) => setOrders(Array.isArray(data?.data?.orders) ? data.data.orders : []))
       .catch(() => setOrders([]));
@@ -37,7 +43,7 @@ function UserOrdersPanel() {
       body: JSON.stringify({ rating, content }),
     });
     const data = await res.json();
-    setStatus(res.ok && data?.ok !== false ? "Rating saved." : data?.error || "Rating failed.");
+    setStatus(res.ok && data?.ok !== false ? "Rating saved." : data?.message || data?.error || "Rating failed.");
   };
 
   return (
@@ -53,12 +59,17 @@ function UserOrdersPanel() {
           {orders.flatMap((order) => order.items.map((item) => (
             <div key={item.id} className="flex flex-col gap-2 rounded-md border border-secondary-border bg-bg-base p-3">
               <div className="flex items-center gap-3">
-                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
                   {item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" /> : <span className="text-xs text-secondary-text">No image</span>}
                 </div>
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1">
                   <span className="text-sm font-bold text-primary-text">{item.title}</span>
-                  <span className="text-xs text-secondary-text">Quantity: {item.quantity}</span>
+                  <span className="text-xs text-secondary-text">
+                    Quantity: {item.quantity}{item.selectedColor ? ` | Color: ${item.selectedColor}` : ""}
+                  </span>
+                  <span className="text-xs font-semibold text-primary">
+                    {item.discountPrice || item.price || "No price"}
+                  </span>
                 </div>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">

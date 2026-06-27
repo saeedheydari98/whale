@@ -9,6 +9,7 @@ import {
   fetchAdminAccess,
   subscribeAdminAccess,
 } from "@/lib/admin-access";
+import { fetchCurrentUser, subscribeAuthUser } from "@/lib/auth-client";
 
 type AdminPanelUser = {
   username?: string | null;
@@ -22,18 +23,10 @@ export default function AdminPanelPage() {
 
   useEffect(() => {
     const syncAccessFromApi = async () => {
-      const [access, session] = await Promise.all([
-        fetchAdminAccess(),
-        fetch("/api/auth/session", { cache: "no-store" })
-          .then((res) => res.ok ? res.json() : null)
-          .catch(() => null),
-      ]);
-      const user = session?.data?.user ?? null;
+      const user = await fetchCurrentUser();
+      const access = await fetchAdminAccess();
       setAuthUser(user);
       setHasAdminAccess(access);
-      if (user?.role !== "superadmin" && activeTab === "security") {
-        setActiveTab("products");
-      }
     };
 
     void syncAccessFromApi()
@@ -42,10 +35,24 @@ export default function AdminPanelPage() {
         setHasAdminAccess(false);
       });
 
-    return subscribeAdminAccess(() => {
+    const unsubscribeAdminAccess = subscribeAdminAccess(() => {
       void syncAccessFromApi().catch(() => setHasAdminAccess(false));
     });
-  }, [activeTab]);
+    const unsubscribeAuthUser = subscribeAuthUser(() => {
+      void fetchCurrentUser().then(setAuthUser);
+    });
+
+    return () => {
+      unsubscribeAdminAccess();
+      unsubscribeAuthUser();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (authUser?.role !== "superadmin" && activeTab === "security") {
+      setActiveTab("products");
+    }
+  }, [activeTab, authUser?.role]);
 
   const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === "saeedheydari98";
   const tabs = [

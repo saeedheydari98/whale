@@ -271,6 +271,12 @@ function parsePriceValue(value: unknown) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function clampWholeNumber(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(parsed)));
+}
+
 function getProductKey(product: Partial<ProductPayload>) {
   return [
     String(product.showcaseId ?? "").trim().toLowerCase(),
@@ -309,8 +315,8 @@ function toClientBanner(banner: BannerRecord) {
     images: imageUrls.map((url, index) => ({ url, placement: index + 1 })),
     imageUrls,
     active: banner.active,
-    intervalSeconds: banner.intervalSeconds ?? 5,
-    heightPercent: banner.heightPercent ?? 28,
+    intervalSeconds: clampWholeNumber(banner.intervalSeconds, 1, 60, 5),
+    heightPercent: clampWholeNumber(banner.heightPercent, 10, 100, 28),
     sortOrder: banner.sortOrder,
     placement: banner.sortOrder,
   };
@@ -365,6 +371,8 @@ function toClientProduct(product: ProductPayload) {
     metaKeywords: product.metaKeywords,
     publishedAt: product.publishedAt,
     deletedAt: product.deletedAt,
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt,
     colorStock: normalizeColorStock(product.colorStock),
     placement: Number(product.sortOrder ?? product.placement ?? 0),
     sortOrder: Number(product.sortOrder ?? product.placement ?? 0),
@@ -908,8 +916,8 @@ export async function POST(request: Request) {
               showcaseId: item.showcaseId ? String(item.showcaseId) : null,
               images: imageUrls.length > 0 ? imageUrls : Prisma.JsonNull,
               active: item.active ?? true,
-              intervalSeconds: Number.isFinite(Number(item.intervalSeconds)) ? Number(item.intervalSeconds) : 5,
-              heightPercent: Number.isFinite(Number(item.heightPercent)) ? Number(item.heightPercent) : 28,
+              intervalSeconds: clampWholeNumber(item.intervalSeconds, 1, 60, 5),
+              heightPercent: clampWholeNumber(item.heightPercent, 10, 100, 28),
               sortOrder: getPlacement(item, 0),
             },
           });

@@ -12,6 +12,7 @@ import {
   saveAdminPanelLock,
   saveAdminAccessCode,
 } from "@/lib/admin-access";
+import { fetchCurrentUser } from "@/lib/auth-client";
 
 type AdminRequest = {
   id: string;
@@ -54,10 +55,8 @@ export function AdminSecurityPanel() {
       .catch((error) => {
         console.error("Admin security load error:", error);
       });
-    void fetch("/api/auth/session", { cache: "no-store" })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
-        const user = data?.data?.user;
+    void fetchCurrentUser()
+      .then((user) => {
         const superadmin = user?.username === "saeedheydari98" && user?.role === "superadmin";
         setIsSuperadmin(superadmin);
         setCheckedSuperadmin(true);
@@ -162,6 +161,16 @@ export function AdminSecurityPanel() {
       {isSuperadmin ? (
         <>
       <div ref={codeFormRef} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+        <input
+          type="text"
+          name="admin-security-username"
+          autoComplete="username"
+          value="admin"
+          readOnly
+          tabIndex={-1}
+          aria-hidden="true"
+          className="hidden"
+        />
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-1">
             <div className="text-sm font-bold text-primary-text">Panel access</div>
@@ -189,9 +198,11 @@ export function AdminSecurityPanel() {
           <div className="flex flex-col gap-2">
           <RequiredLabel required className="text-primary-text">Current code</RequiredLabel>
           <CustomInput
+            name="admin-security-current-code"
             value={currentAdminCode}
             type={showCurrentCode ? "text" : "password"}
             placeholder="Current code"
+            autoComplete="current-password"
             aria-label="Current admin security code"
             invalid={showCodeRequiredErrors && !currentAdminCode.trim()}
             showLabel={false}
@@ -210,9 +221,11 @@ export function AdminSecurityPanel() {
         <div className="flex flex-col gap-2">
         <RequiredLabel required className="text-primary-text">New code</RequiredLabel>
         <CustomInput
+          name="admin-security-new-code"
           value={adminCode}
           type={showAdminCode ? "text" : "password"}
           placeholder="New code"
+          autoComplete="new-password"
           aria-label="New admin security code"
           invalid={showCodeRequiredErrors && !adminCode.trim()}
           showLabel={false}
@@ -230,9 +243,11 @@ export function AdminSecurityPanel() {
         <div className="flex flex-col gap-2">
         <RequiredLabel required className="text-primary-text">Confirm new code</RequiredLabel>
         <CustomInput
+          name="admin-security-confirm-code"
           value={confirmAdminCode}
           type={showConfirmAdminCode ? "text" : "password"}
           placeholder="Confirm new code"
+          autoComplete="new-password"
           aria-label="Confirm new admin security code"
           invalid={showCodeRequiredErrors && !confirmAdminCode.trim()}
           showLabel={false}

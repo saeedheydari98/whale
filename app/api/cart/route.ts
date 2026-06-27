@@ -83,10 +83,20 @@ function readPriceNumber(value?: string | null) {
 
 async function findLegacyProfile(request: Request, bodyProfile?: ProfilePayload) {
   const authUser = await getAuthUser(request);
-  if (authUser) return prisma.customerProfile.findFirst({ where: { userId: authUser.id } });
-
   const url = new URL(request.url);
   const nationalId = String(bodyProfile?.nationalId ?? url.searchParams.get("nationalId") ?? "").trim();
+
+  if (authUser && nationalId) {
+    const profile = await prisma.customerProfile.findFirst({
+      where: {
+        userId: authUser.id,
+        nationalId,
+      },
+    });
+    return profile ?? prisma.customerProfile.findUnique({ where: { nationalId } });
+  }
+
+  if (authUser) return prisma.customerProfile.findFirst({ where: { userId: authUser.id } });
   if (!nationalId) return null;
   return prisma.customerProfile.findUnique({ where: { nationalId } });
 }
@@ -243,6 +253,9 @@ export async function PATCH(request: Request) {
           throw new Error(`${item.title} is out of stock`);
         }
         const colorStock = normalizeColorStock(product.colorStock);
+        if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
+          throw new Error(`Select a color for ${item.title}`);
+        }
         if (item.selectedColor) {
           if ((colorStock[item.selectedColor] ?? 0) < item.quantity) {
             throw new Error(`${item.title} ${item.selectedColor} is out of stock`);

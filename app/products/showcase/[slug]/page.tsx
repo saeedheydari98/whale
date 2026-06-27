@@ -1,14 +1,18 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
-import { slugifyCatalogValue, sortProductsBy } from "@/lib/products-client";
+import { normalizeColorStock, sortProductsBy, type ProductRecord } from "@/lib/products-client";
+import { addProductToCart } from "@/lib/cart-client";
 import { FiExternalLink, FiSearch, FiSliders, FiX } from "react-icons/fi";
+import { IoBagAddOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
+import ProductLink from "@/app/design-system/components/ui/ProductLink";
+import ProductRatingSummary from "@/app/design-system/components/ui/product-rating-summary";
 
 const SORT_OPTIONS = [
   { value: "newest", label: "Newest" },
@@ -47,7 +51,6 @@ export default function ShowcasePage() {
   const { getShowcaseById, loading } = useProductsCatalog();
   const showcase = useMemo(() => getShowcaseById(showcaseId), [getShowcaseById, showcaseId]);
   const products = showcase?.products ?? [];
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
@@ -60,6 +63,7 @@ export default function ShowcasePage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("");
   const [selectedType, setSelectedType] = useState<string>("");
   const [sort, setSort] = useState("newest");
+  const [cartMessage, setCartMessage] = useState("");
 
   const parsePrice = (value: any) => {
     try {
@@ -146,6 +150,19 @@ export default function ShowcasePage() {
     [filteredProducts, sort]
   );
 
+  const addToCart = async (product: ProductRecord) => {
+    if (Number(product.stockQuantity ?? 0) <= 0) {
+      setCartMessage(`${product.title} is out of stock.`);
+      window.setTimeout(() => setCartMessage(""), 1800);
+      return;
+    }
+    const colorStock = normalizeColorStock(product.colorStock);
+    const selectedColor = Object.entries(colorStock).find(([, count]) => count > 0)?.[0] ?? "";
+    await addProductToCart(product, 1, selectedColor);
+    setCartMessage(`${product.title} added to cart.`);
+    window.setTimeout(() => setCartMessage(""), 1800);
+  };
+
   if (loading && !showcase) {
     return (
       <main className="min-h-screen bg-bg-base text-primary-text">
@@ -179,16 +196,7 @@ export default function ShowcasePage() {
                       </div>
                       <div className=" flex gap-2">
                         <Loading loading="skeleton-item" isLoading className="w-full">
-                          {(() => {
-                            const viewHref = `/products/${slugifyCatalogValue(product.title || product.id) || product.id}`;
-                            const handleClick = async (e: React.MouseEvent) => {
-                              e.preventDefault();
-                              router.push(viewHref);
-                            };
-                            return (
-                              <CustomButton href={viewHref} onClick={handleClick} className="w-full" variant="primary" size="sm" rounded="md" iconAfter={<FiExternalLink />}>View</CustomButton>
-                            );
-                          })()}
+                          <ProductLink productId={product.id ?? product.title} productTitle={product.title} className="w-full" iconAfter={<FiExternalLink />}>View</ProductLink>
                         </Loading>
                       </div>
                     </div>
@@ -273,55 +281,71 @@ export default function ShowcasePage() {
         </Loading>
       ) : null}
 
+      {cartMessage ? (
+        <div className="mt-3 rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary">
+          {cartMessage}
+        </div>
+      ) : null}
+
       <div className="mt-4 flex gap-4">
         <main className="flex-1">
           {sortedFilteredProducts.length === 0 ? (
             <div className="text-sm text-secondary-text">No products found for this showcase.</div>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,220px))] gap-3">
-              {sortedFilteredProducts.map((product) => (
-                <div key={product.id} className="max-w-55 rounded-md border border-primary-border bg-primary-card p-2">
-                  <div className="flex gap-2">
-                    <div className="h-18 w-18 shrink-0 overflow-hidden rounded bg-primary-media">
-                      <Loading loading="skeleton-item" isLoading={loading} className="h-full w-full">
-                        {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="p-2 text-sm">No image</div>
-                        )}
-                      </Loading>
-                    </div>
-                    <div className="flex-1 flex flex-col justify-between">
-                      <div className="flex flex-col h-full">
-                        <Loading loading="skeleton-item" isLoading={loading}>
-                          <div className="line-clamp-1 text-xs font-bold">{product.title}</div>
-                        </Loading>
-                        <Loading loading="skeleton-item" isLoading={loading}>
-                          <div className="text-primary text-xs font-bold">{product.price}$</div>
-                        </Loading>
-                        <Loading loading="skeleton-item" isLoading={loading}>
-                          <div className="text-xs text-secondary-text line-clamp-2">{product.description}</div>
-                        </Loading>
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,220px))] gap-3">
+                {sortedFilteredProducts.map((product) => (
+                  <div key={product.id} className="max-w-55 rounded-md border border-primary-border bg-primary-card p-2">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex gap-2">
+                        <div className="h-18 w-18 shrink-0 overflow-hidden rounded bg-primary-media">
+                          <Loading loading="skeleton-item" isLoading={loading} className="h-full w-full">
+                            {product.imageUrl ? (
+                              <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="p-2 text-sm">No image</div>
+                            )}
+                          </Loading>
+                        </div>
+                        <div className="flex-1 flex flex-col">
+                          <Loading loading="skeleton-item" isLoading={loading}>
+                            <div className="line-clamp-1 text-xs font-bold">{product.title}</div>
+                          </Loading>
+                          <Loading loading="skeleton-item" isLoading={loading}>
+                            <div className="text-primary text-xs font-bold">{product.price}$</div>
+                          </Loading>
+                          <Loading loading="skeleton-item" isLoading={loading}>
+                            <div className="text-xs text-secondary-text line-clamp-2">{product.description}</div>
+                          </Loading>
+                          <ProductRatingSummary
+                            average={product.ratingAverage}
+                            count={product.ratingCount}
+                          />
+                        </div>
                       </div>
-                      <div className=" flex gap-2">
-                        {(() => {
-                          const viewHref = `/products/${slugifyCatalogValue(product.title || product.id) || product.id}`;
-                          const handleClick = async (e: React.MouseEvent) => {
-                            e.preventDefault();
-                            router.push(viewHref);
-                          };
-
-                          return (
-                            <Loading loading="skeleton-item" isLoading={loading} className="w-full">
-                              <CustomButton href={viewHref} onClick={handleClick} className="w-full" variant="primary" size="sm" rounded="md" iconAfter={<FiExternalLink />}>View</CustomButton>
-                            </Loading>
-                          );
-                        })()}
+                      <div className="flex gap-2 border-t border-primary-border pt-2">
+                        <Loading loading="skeleton-item" isLoading={loading} className="w-full">
+                          <CustomButton
+                            type="button"
+                            variant="success"
+                            border="base"
+                            size="sm"
+                            fullWidth
+                            className="flex-1"
+                            icon={<IoBagAddOutline />}
+                            onClick={() => void addToCart(product)}
+                          >
+                            Add
+                          </CustomButton>
+                        </Loading>
+                        <Loading loading="skeleton-item" isLoading={loading} className="w-full">
+                          <ProductLink productId={product.id ?? product.title} productTitle={product.title} className="flex-1" iconAfter={<FiExternalLink />}>View</ProductLink>
+                        </Loading>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </main>
@@ -346,22 +370,20 @@ export default function ShowcasePage() {
                 <button
                   type="button"
                   onClick={() => setOnlyActive((current) => !current)}
-                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
-                    onlyActive
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${onlyActive
                       ? "border-primary bg-primary text-primary-text"
                       : "border-primary-border bg-primary-soft text-secondary-text"
-                  }`}
+                    }`}
                 >
                   <span>Active only</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setOnlyDiscounted((current) => !current)}
-                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${
-                    onlyDiscounted
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition-colors ${onlyDiscounted
                       ? "border-danger-border-nomode bg-danger-bg-nomode text-danger-text-nomode"
                       : "border-primary-border bg-primary-soft text-secondary-text"
-                  }`}
+                    }`}
                 >
                   <span>Deals</span>
                 </button>
@@ -426,9 +448,8 @@ export default function ShowcasePage() {
                   <button
                     type="button"
                     onClick={() => setSelectedCategory("")}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                      !selectedCategory ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
-                    }`}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${!selectedCategory ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                      }`}
                   >
                     <span>All</span>
                   </button>
@@ -437,9 +458,8 @@ export default function ShowcasePage() {
                       type="button"
                       key={cat}
                       onClick={() => setSelectedCategory(String(cat))}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                        selectedCategory === cat ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
-                      }`}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${selectedCategory === cat ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                        }`}
                     >
                       <span>{cat}</span>
                     </button>
@@ -453,9 +473,8 @@ export default function ShowcasePage() {
                   <button
                     type="button"
                     onClick={() => setSelectedType("")}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                      !selectedType ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
-                    }`}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${!selectedType ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                      }`}
                   >
                     <span>All</span>
                   </button>
@@ -464,9 +483,8 @@ export default function ShowcasePage() {
                       type="button"
                       key={type}
                       onClick={() => setSelectedType(String(type))}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                        selectedType === type ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
-                      }`}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${selectedType === type ? "border-primary bg-primary text-primary-text" : "border-primary-border bg-primary-card text-secondary-text"
+                        }`}
                     >
                       <span>{type}</span>
                     </button>

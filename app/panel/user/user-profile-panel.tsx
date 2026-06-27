@@ -16,6 +16,7 @@ import {
   USER_PROFILE_UPDATED_EVENT,
   type UserProfile,
 } from "@/lib/user-profile";
+import { fetchCurrentUser, setCachedAuthUser } from "@/lib/auth-client";
 
 type PanelUser = {
   username?: string | null;
@@ -69,12 +70,10 @@ export function UserProfilePanel() {
     syncProfile();
     void Promise.all([
       fetchUserProfile().catch(() => null),
-      fetch("/api/auth/session", { cache: "no-store" })
-        .then((res) => res.ok ? res.json() : null)
-        .catch(() => null),
-    ]).then(([profile, me]) => {
+      fetchCurrentUser(),
+    ]).then(([profile, user]) => {
       if (profile) setProfileDraft(profile);
-      setAuthUser(me?.data?.user ?? null);
+      setAuthUser(user);
     });
     window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
 
@@ -173,7 +172,9 @@ export function UserProfilePanel() {
       const data = await res.json();
       if (!res.ok || data?.ok === false) throw new Error(data?.error || "Account creation failed.");
       const savedProfile = (await fetchUserProfile(profile.nationalId).catch(() => null)) ?? profile;
-      setAuthUser(data?.data?.user ?? null);
+      const user = data?.data?.user ?? null;
+      setCachedAuthUser(user);
+      setAuthUser(user);
       setProfileDraft(savedProfile);
       setRegisterDraft(EMPTY_REGISTER);
       setShowRequiredErrors(false);

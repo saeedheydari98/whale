@@ -1,7 +1,6 @@
 "use client";
 
 import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5";
-import type { MouseEvent } from "react";
 import { CustomButton } from "../../../design-system/components/ui/button";
 import Loading from "@/app/design-system/components/loading/loading";
 import type { ProductForm, ShowcaseForm } from "./types";
@@ -11,11 +10,8 @@ type AdminShowcaseListProps = {
   showcases: ShowcaseForm[];
   onEditShowcase: (showcase: ShowcaseForm) => void;
   onDeleteShowcase: (showcase: ShowcaseForm) => void;
-  onEditProduct: (product: ProductForm) => void;
+  onReorderProducts: (showcase: ShowcaseForm, sourceProductId: number | string, targetProductId: number | string) => void;
   onPreview: (imageUrl?: string) => void;
-  onDragStart: (event: MouseEvent<HTMLDivElement>) => void;
-  onDragMove: (event: MouseEvent<HTMLDivElement>) => void;
-  onDragStop: () => void;
   formatPrice: (value?: string) => string;
   isLoading?: boolean;
 };
@@ -67,11 +63,8 @@ export function AdminShowcaseList({
   showcases,
   onEditShowcase,
   onDeleteShowcase,
-  onEditProduct,
+  onReorderProducts,
   onPreview,
-  onDragStart,
-  onDragMove,
-  onDragStop,
   formatPrice,
   isLoading = false,
 }: AdminShowcaseListProps) {
@@ -126,10 +119,6 @@ export function AdminShowcaseList({
 
             <div
               className="flex cursor-grab gap-3 overflow-x-auto overscroll-x-contain pb-2 active:cursor-grabbing"
-              onMouseDown={onDragStart}
-              onMouseMove={onDragMove}
-              onMouseUp={onDragStop}
-              onMouseLeave={onDragStop}
             >
               {showcaseProducts.length === 0 && (
                 <div
@@ -149,14 +138,28 @@ export function AdminShowcaseList({
               {showcaseProducts.map((product, index) => (
                 <div
                   key={product.id}
-                  className={`flex min-h-48 min-w-90 max-w-90 shrink-0 flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
+                  draggable={!isLoading}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", String(product.id));
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const sourceId = event.dataTransfer.getData("text/plain");
+                    if (sourceId) onReorderProducts(showcase, sourceId, product.id);
+                  }}
+                  className={`flex min-w-56 max-w-56 shrink-0 cursor-grab flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm active:cursor-grabbing ${
                     isLoading ? "border-border-default" : "border-primary-border"
                   }`}
                 >
-                  <div className="flex min-h-36 flex-1 gap-3 p-3">
+                  <div className="flex gap-2 p-2">
                     <button
                       type="button"
-                      className="flex min-h-28 w-1/3 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+                      className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
                       onClick={() => onPreview(product.imageUrl)}
                       disabled={isLoading || !product.imageUrl}
                       aria-label="Open product image"
@@ -170,62 +173,28 @@ export function AdminShowcaseList({
                               className="h-full w-full object-cover"
                             />
                           ) : (
-                            <IoImageOutline className="text-4xl text-primary" aria-hidden="true" />
+                            <IoImageOutline className="text-3xl text-primary" aria-hidden="true" />
                           )}
                         </div>
                       </Loading>
                     </button>
-                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <div className="line-clamp-1 text-sm font-bold text-primary-text">
+                        <div className="line-clamp-1 text-xs font-bold text-primary-text">
                           {product.title || `Product ${index + 1}`}
                         </div>
                       </Loading>
                       <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <span className="line-clamp-2 text-xs leading-5 text-secondary-text">
+                        <span className="line-clamp-1 text-[11px] leading-4 text-secondary-text">
                           {product.description || "No description"}
                         </span>
                       </Loading>
                       <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <div className="text-sm font-semibold text-primary">
+                        <div className="text-xs font-semibold text-primary">
                           {formatPrice(product.discountPrice || product.price) || "No price"}
                         </div>
                       </Loading>
-                      <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <span className="text-xs font-semibold text-secondary-text">
-                          {product.isActive ? "Active" : "Hidden"}{product.isFeatured ? " / Featured" : ""}
-                        </span>
-                      </Loading>
-                      <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <span className="text-xs font-semibold text-secondary-text">
-                          Stock: {product.stockQuantity} / {product.stockStatus}
-                        </span>
-                      </Loading>
-                      <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <span className="text-xs font-semibold text-secondary-text">
-                          Category: {product.categoryId}
-                        </span>
-                      </Loading>
                     </div>
-                  </div>
-                  <div
-                    className={`flex min-h-12 gap-2 border-t p-3 ${
-                      isLoading ? "border-border-default" : "border-primary-border"
-                    }`}
-                  >
-                    <Loading loading="skeleton-item" isLoading={isLoading} className="flex-1">
-                      <CustomButton
-                        fullWidth
-                        border="base"
-                        rounded="md"
-                        size="sm"
-                        variant={product.isActive ? "primary" : "neutral"}
-                        icon={<IoCreateOutline />}
-                        onClick={() => onEditProduct(product)}
-                      >
-                        Open
-                      </CustomButton>
-                    </Loading>
                   </div>
                 </div>
               ))}

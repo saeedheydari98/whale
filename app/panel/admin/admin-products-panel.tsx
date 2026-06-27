@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { IoAdd, IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
+import { useEffect, useMemo, useState } from "react";
+import { IoAdd, IoCloudUploadOutline, IoCreateOutline, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../../design-system/components/ui/button";
 import { CustomInput } from "../../design-system/components/ui/input";
 import { CustomModal } from "../../design-system/components/ui/modal";
 import { RequiredLabel } from "../../design-system/components/ui/required-label";
 import { CustomSelect } from "../../design-system/components/ui/select";
 import { CustomSwitch } from "../../design-system/components/ui/switch";
+import { getStockColorValue } from "../../design-system/components/ui/color-stock-dots";
 import { FloatButton } from "@/app/design-system/components/ui/float-button";
 import { clearProductsCache, getProducts } from "@/lib/products-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
@@ -145,32 +146,33 @@ type InventoryControlsProps = {
 
 function InventoryControls({ product, onChange }: InventoryControlsProps) {
   const colorStock = normalizeColorStock(product.colorStock);
-  const selectedColors = Object.keys(colorStock);
-  const availableColors = PRODUCT_COLOR_OPTIONS.filter(
-    (color) => !selectedColors.includes(color)
-  );
+  const [selectedColor, setSelectedColor] = useState(PRODUCT_COLOR_OPTIONS[0]);
+  const totalStock = Math.max(0, Math.round(Number(product.stockQuantity ?? 0)));
+  const assignedStock = PRODUCT_COLOR_OPTIONS.reduce((sum, color) => sum + Number(colorStock[color] ?? 0), 0);
+  const stockMatchesTotal = assignedStock === totalStock;
+  const selectedCount = Number(colorStock[selectedColor] ?? 0);
 
   const updateColorStock = (color: string, count: number) => {
+    const normalizedCount = Math.max(0, Math.round(Number(count)));
     onChange({
       colorStock: {
         ...colorStock,
-        [color]: count,
+        [color]: normalizedCount,
       },
     });
   };
 
-  const removeColorStock = (color: string) => {
-    const nextColorStock = { ...colorStock };
-    delete nextColorStock[color];
-    onChange({ colorStock: nextColorStock });
-  };
-
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+    <div
+      data-invalid={!stockMatchesTotal ? "true" : undefined}
+      className={`flex flex-col gap-3 rounded-lg border bg-primary-card p-3 ${
+        stockMatchesTotal ? "border-primary-border" : "border-danger-border-nomode"
+      }`}
+    >
       <div className="flex flex-col gap-1">
         <div className="text-sm font-bold text-primary-text">Inventory</div>
         <span className="text-xs text-secondary-text">
-          Select total stock and stock by color.
+          Set total stock first, then assign the same total across colors.
         </span>
       </div>
 
@@ -190,57 +192,53 @@ function InventoryControls({ product, onChange }: InventoryControlsProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="text-xs font-bold text-secondary-text">Add color stock</div>
+        <div className="text-xs font-bold text-secondary-text">Color stock</div>
+        <div className="flex flex-wrap gap-2">
+          {PRODUCT_COLOR_OPTIONS.map((color) => {
+            const count = Number(colorStock[color] ?? 0);
+            const selected = color === selectedColor;
+            return (
+              <button
+                key={color}
+                type="button"
+                aria-label={`${color} stock`}
+                onClick={() => setSelectedColor(color)}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border text-[10px] font-bold tabular-nums transition hover:scale-105 ${
+                  selected ? "border-primary text-primary-text ring-2 ring-primary-border" : "border-primary-border text-primary-text"
+                }`}
+                style={{ backgroundColor: getStockColorValue(color) }}
+              >
+                <span className="rounded-full bg-bg-base/85 px-1 leading-4">{count > 10 ? "+10" : count}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-bg p-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-bold text-primary-text">{selectedColor}</span>
+          <span className={`text-xs font-semibold ${stockMatchesTotal ? "text-secondary-text" : "text-danger-text-nomode"}`}>
+            {assignedStock}/{totalStock}
+          </span>
+        </div>
         <CustomSelect
-          value=""
-          aria-label="Add color stock"
-          onChange={(event) => {
-            const color = event.target.value;
-            if (!color) return;
-            updateColorStock(color, colorStock[color] ?? 0);
-          }}
+          value={String(selectedCount)}
+          aria-label={`${selectedColor} stock quantity`}
+          onChange={(event) => updateColorStock(selectedColor, Number(event.target.value))}
         >
-          <option value="">Select color</option>
-          {availableColors.map((color) => (
-            <option key={color} value={color}>
-              {color}
+          {STOCK_OPTIONS.map((count) => (
+            <option key={count} value={count}>
+              {count}
             </option>
           ))}
         </CustomSelect>
+        {!stockMatchesTotal ? (
+          <span className="text-xs font-semibold text-danger-text-nomode">
+            Color quantities must equal total stock before saving.
+          </span>
+        ) : null}
       </div>
-
-      {selectedColors.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          {selectedColors.map((color) => (
-            <div
-              key={color}
-              className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-bg p-2 sm:flex-row sm:items-center"
-            >
-              <span className="min-w-20 text-sm font-bold text-primary-text">{color}</span>
-              <CustomSelect
-                value={String(colorStock[color] ?? 0)}
-                aria-label={`${color} stock quantity`}
-                onChange={(event) => updateColorStock(color, Number(event.target.value))}
-              >
-                {STOCK_OPTIONS.map((count) => (
-                  <option key={count} value={count}>
-                    {count}
-                  </option>
-                ))}
-              </CustomSelect>
-              <CustomButton
-                variant="danger"
-                size="sm"
-                border="base"
-                icon={<IoTrashOutline />}
-                onClick={() => removeColorStock(color)}
-              >
-                Remove
-              </CustomButton>
-            </div>
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -401,6 +399,14 @@ function normalizeColorStock(value: unknown) {
   );
 }
 
+function getAssignedColorStock(value: unknown) {
+  return Object.values(normalizeColorStock(value)).reduce((sum, count) => sum + Number(count), 0);
+}
+
+function hasMatchingColorStock(product: Pick<ProductForm, "stockQuantity" | "colorStock">) {
+  return getAssignedColorStock(product.colorStock) === Math.max(0, Math.round(Number(product.stockQuantity ?? 0)));
+}
+
 function normalizeStringList(value: unknown, fallback: string[] = []) {
   return Array.isArray(value)
     ? value.map((item) => String(item).trim()).filter(Boolean)
@@ -537,6 +543,61 @@ function formatPrice(value?: string) {
   return `$${parsed.toLocaleString("en-US")}`;
 }
 
+function getShowcaseProductsForAdmin(products: ProductForm[], showcase: ShowcaseForm) {
+  const activeProducts = products.filter((product) => product.isActive !== false);
+
+  if (showcase.mode === "auto") {
+    const filtered = activeProducts.filter((product) => !showcase.categoryId || product.categoryId === showcase.categoryId);
+    return sortAdminShowcaseProducts(filtered, showcase.autoSort).slice(0, Math.max(1, showcase.limit));
+  }
+
+  const manualIds = showcase.manualProductIds.map((item) => String(item));
+  if (manualIds.length > 0) {
+    return manualIds
+      .map((id) => activeProducts.find((product) => String(product.id) === id))
+      .filter(Boolean) as ProductForm[];
+  }
+
+  return activeProducts.filter((product) => {
+    const showcaseIds = product.showcaseIds.length > 0 ? product.showcaseIds : product.showcaseId ? [product.showcaseId] : [];
+    return showcaseIds.includes(showcase.id);
+  });
+}
+
+function sortAdminShowcaseProducts(products: ProductForm[], sort: string) {
+  return [...products].sort((a, b) => {
+    switch (sort) {
+      case "cheapest":
+        return readPriceNumber(a.discountPrice || a.price) - readPriceNumber(b.discountPrice || b.price);
+      case "expensive":
+        return readPriceNumber(b.discountPrice || b.price) - readPriceNumber(a.discountPrice || a.price);
+      case "oldest":
+        return Number(a.id) - Number(b.id);
+      case "bestseller":
+        return b.salesCount - a.salesCount;
+      case "mostDiscounted":
+        return Number(b.discountPercent || 0) - Number(a.discountPercent || 0);
+      case "newest":
+      default:
+        return Number(b.id) - Number(a.id);
+    }
+  });
+}
+
+function clampWholeNumber(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, Math.round(parsed)));
+}
+
+function normalizeBannerTiming(banner: BannerForm): BannerForm {
+  return {
+    ...banner,
+    intervalSeconds: clampWholeNumber(banner.intervalSeconds, 1, 60, 5),
+    heightPercent: clampWholeNumber(banner.heightPercent, 10, 100, 28),
+  };
+}
+
 type AdminProductsPanelProps = {
   section?: AdminCatalogSection;
 };
@@ -572,13 +633,9 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
   const [relationProduct, setRelationProduct] = useState<ProductForm | null>(null);
   const [relationMode, setRelationMode] = useState<ProductRelationMode>("category");
   const [draggingProductId, setDraggingProductId] = useState<number | string | null>(null);
+  const [draggingStorefrontKey, setDraggingStorefrontKey] = useState<string | null>(null);
   const [draftBannerImageUrl, setDraftBannerImageUrl] = useState("");
   const [editingBannerImageUrl, setEditingBannerImageUrl] = useState("");
-  const dragRef = useRef({
-    active: false,
-    startX: 0,
-    scrollLeft: 0,
-  });
 
   const hasRequiredError = (key: string) => requiredErrors.includes(key);
 
@@ -759,15 +816,18 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
             active: category.active,
             sortOrder: category.sortOrder,
           })),
-          banners: nextBanners.map((banner) => ({
-            id: banner.id,
-            title: banner.title,
-            imageUrls: banner.imageUrls,
-            active: banner.active,
-            intervalSeconds: banner.intervalSeconds,
-            heightPercent: banner.heightPercent,
-            sortOrder: banner.sortOrder,
-          })),
+          banners: nextBanners.map((banner) => {
+            const normalizedBanner = normalizeBannerTiming(banner);
+            return {
+              id: normalizedBanner.id,
+              title: normalizedBanner.title,
+              imageUrls: normalizedBanner.imageUrls,
+              active: normalizedBanner.active,
+              intervalSeconds: normalizedBanner.intervalSeconds,
+              heightPercent: normalizedBanner.heightPercent,
+              sortOrder: normalizedBanner.sortOrder,
+            };
+          }),
         }),
       });
       const data = await res.json();
@@ -802,30 +862,6 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
   const saveProducts = () => persistProducts(sortedProducts);
 
-  const startProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest("button, a, input, textarea, label")) {
-      return;
-    }
-
-    dragRef.current = {
-      active: true,
-      startX: event.pageX,
-      scrollLeft: event.currentTarget.scrollLeft,
-    };
-  };
-
-  const moveProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!dragRef.current.active) return;
-
-    event.preventDefault();
-    const dragDistance = event.pageX - dragRef.current.startX;
-    event.currentTarget.scrollLeft = dragRef.current.scrollLeft - dragDistance;
-  };
-
-  const stopProductRailDrag = () => {
-    dragRef.current.active = false;
-  };
-
   const reorderProducts = async (sourceId: number | string, targetId: number | string) => {
     if (String(sourceId) === String(targetId)) return;
 
@@ -840,6 +876,34 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     setProducts(reordered);
     await persistProducts(reordered, sortedShowcases, sortedBanners, sortedCategories, false);
     setStatus("Product order saved.");
+  };
+
+  const reorderShowcaseProducts = async (
+    showcase: ShowcaseForm,
+    sourceProductId: number | string,
+    targetProductId: number | string
+  ) => {
+    if (String(sourceProductId) === String(targetProductId)) return;
+
+    const visibleIds = getShowcaseProductsForAdmin(sortedProducts, showcase).map((product) => String(product.id));
+    const sourceIndex = visibleIds.findIndex((id) => id === String(sourceProductId));
+    const targetIndex = visibleIds.findIndex((id) => id === String(targetProductId));
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const [moved] = visibleIds.splice(sourceIndex, 1);
+    visibleIds.splice(targetIndex, 0, moved);
+    const nextShowcases = sortedShowcases.map((item) =>
+      item.id === showcase.id
+        ? {
+            ...item,
+            mode: "manual" as const,
+            manualProductIds: visibleIds,
+          }
+        : item
+    );
+    setShowcases(nextShowcases);
+    await persistProducts(products, nextShowcases, sortedBanners, sortedCategories, false);
+    setStatus("Showcase product order saved.");
   };
 
   const openProductRelations = (product: ProductForm, mode: ProductRelationMode) => {
@@ -945,11 +1009,11 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
   };
 
   const updateDraftBanner = (patch: Partial<BannerForm>) => {
-    setDraftBanner((current) => ({ ...current, ...patch }));
+    setDraftBanner((current) => normalizeBannerTiming({ ...current, ...patch }));
   };
 
   const updateEditingBanner = (patch: Partial<BannerForm>) => {
-    setEditingBanner((current) => (current ? { ...current, ...patch } : current));
+    setEditingBanner((current) => (current ? normalizeBannerTiming({ ...current, ...patch }) : current));
   };
 
   const updateEditingProduct = (patch: Partial<ProductForm>) => {
@@ -1078,10 +1142,11 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       !draftProduct.description.trim() && "draftProduct.description",
       !draftProduct.discountPrice.trim() && "draftProduct.discountPrice",
       draftProduct.categoryIds.length === 0 && "draftProduct.categoryId",
+      !hasMatchingColorStock(draftProduct) && "draftProduct.colorStock",
     ].filter(Boolean) as string[];
 
     if (errors.length > 0) {
-      showRequiredErrors(errors, "Title, description, new price, and category are required.");
+      showRequiredErrors(errors, "Title, description, new price, category, and matching color stock are required.");
       return;
     }
 
@@ -1126,7 +1191,8 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     }
 
     setRequiredErrors([]);
-    const nextBanners = [...sortedBanners, draftBanner];
+    const normalizedBanner = normalizeBannerTiming(draftBanner);
+    const nextBanners = [...sortedBanners, normalizedBanner];
     setBanners(nextBanners);
     setIsBannerOpen(false);
     await persistProducts(products, sortedShowcases, nextBanners);
@@ -1177,8 +1243,9 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     }
 
     setRequiredErrors([]);
+    const normalizedBanner = normalizeBannerTiming(editingBanner);
     const nextBanners = sortedBanners.map((banner) =>
-      banner.id === editingBanner.id ? editingBanner : banner
+      banner.id === normalizedBanner.id ? normalizedBanner : banner
     );
     setBanners(nextBanners);
     setIsEditBannerOpen(false);
@@ -1244,10 +1311,11 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       !editingProduct.description.trim() && "editingProduct.description",
       !editingProduct.discountPrice.trim() && "editingProduct.discountPrice",
       editingProduct.categoryIds.length === 0 && "editingProduct.categoryId",
+      !hasMatchingColorStock(editingProduct) && "editingProduct.colorStock",
     ].filter(Boolean) as string[];
 
     if (errors.length > 0) {
-      showRequiredErrors(errors, "Title, description, new price, and category are required.");
+      showRequiredErrors(errors, "Title, description, new price, category, and matching color stock are required.");
       return;
     }
 
@@ -1319,6 +1387,37 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
   const saveStorefrontPlacement = () => persistProducts(products, sortedShowcases, sortedBanners, sortedCategories);
 
+  const storefrontKey = (entry: { type: "banner" | "showcase"; item: { id: string } }) => `${entry.type}:${entry.item.id}`;
+
+  const reorderStorefrontSections = async (sourceKey: string, targetKey: string) => {
+    if (!sourceKey || sourceKey === targetKey) return;
+    const ordered = displaySections.map((entry) => ({
+      type: entry.type,
+      item: entry.item,
+      key: storefrontKey(entry),
+    }));
+    const sourceIndex = ordered.findIndex((entry) => entry.key === sourceKey);
+    const targetIndex = ordered.findIndex((entry) => entry.key === targetKey);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const [moved] = ordered.splice(sourceIndex, 1);
+    ordered.splice(targetIndex, 0, moved);
+    const nextOrder = new Map(ordered.map((entry, index) => [entry.key, index + 1]));
+    const nextBanners = banners.map((banner) => ({
+      ...banner,
+      sortOrder: nextOrder.get(`banner:${banner.id}`) ?? banner.sortOrder,
+    }));
+    const nextShowcases = showcases.map((showcase) => ({
+      ...showcase,
+      sortOrder: nextOrder.get(`showcase:${showcase.id}`) ?? showcase.sortOrder,
+    }));
+
+    setBanners(nextBanners);
+    setShowcases(nextShowcases);
+    await persistProducts(products, nextShowcases, nextBanners, sortedCategories, false);
+    setStatus("Storefront order saved.");
+  };
+
   return (
     <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
@@ -1382,6 +1481,16 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
                 <CustomButton
                   size="sm"
                   rounded="full"
+                  variant="primary"
+                  border="base"
+                  icon={<IoCreateOutline />}
+                  onClick={() => openEditModal(product)}
+                >
+                  Edit
+                </CustomButton>
+                <CustomButton
+                  size="sm"
+                  rounded="full"
                   variant="neutral"
                   border="base"
                   onClick={() => openProductRelations(product, "category")}
@@ -1426,11 +1535,10 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
               showcases={[showcase]}
               onEditShowcase={openEditShowcaseModal}
               onDeleteShowcase={deleteShowcase}
-              onEditProduct={openEditModal}
+              onReorderProducts={(targetShowcase, sourceId, targetId) => {
+                void reorderShowcaseProducts(targetShowcase, sourceId, targetId);
+              }}
               onPreview={openImagePreview}
-              onDragStart={startProductRailDrag}
-              onDragMove={moveProductRailDrag}
-              onDragStop={stopProductRailDrag}
               formatPrice={formatPrice}
               isLoading={loading}
             />
@@ -1472,8 +1580,32 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
       {section === "storefront" ? (
         <div className="flex flex-col gap-4">
-          {[...sortedBanners.map((banner) => ({ type: "banner" as const, item: banner, sortOrder: banner.sortOrder })), ...sortedShowcases.map((showcase) => ({ type: "showcase" as const, item: showcase, sortOrder: showcase.sortOrder }))].sort((a, b) => a.sortOrder - b.sortOrder).map((entry) => (
-            <div key={`${entry.type}-${entry.item.id}`} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3 sm:flex-row sm:items-center sm:justify-between">
+          {displaySections.map((entry) => {
+            const key = storefrontKey(entry);
+            return (
+            <div
+              key={key}
+              draggable
+              onDragStart={(event) => {
+                setDraggingStorefrontKey(key);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", key);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const sourceKey = event.dataTransfer.getData("text/plain") || draggingStorefrontKey;
+                if (sourceKey) void reorderStorefrontSections(sourceKey, key);
+                setDraggingStorefrontKey(null);
+              }}
+              onDragEnd={() => setDraggingStorefrontKey(null)}
+              className={`flex cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing sm:flex-row sm:items-center sm:justify-between ${
+                draggingStorefrontKey === key ? "border-primary opacity-70" : "border-primary-border"
+              }`}
+            >
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-bold text-primary-text">{entry.item.title || `Untitled ${entry.type}`}</div>
                 <span className="text-xs text-secondary-text">{entry.type === "banner" ? "Banner" : "Showcase"}</span>
@@ -1489,7 +1621,8 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
                 }}
               />
             </div>
-          ))}
+            );
+          })}
           <CustomButton border="base" icon={<IoSaveOutline />} onClick={() => void saveStorefrontPlacement()}>
             Save placement
           </CustomButton>
@@ -1614,13 +1747,21 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
           />
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomInput
+              name="draft-banner-interval-seconds"
               type="number"
+              min={1}
+              max={60}
+              step={1}
               value={draftBanner.intervalSeconds}
               placeholder="Auto advance seconds"
               onChange={(event) => updateDraftBanner({ intervalSeconds: Number(event.target.value) })}
             />
             <CustomInput
+              name="draft-banner-height-percent"
               type="number"
+              min={10}
+              max={100}
+              step={1}
               value={draftBanner.heightPercent}
               placeholder="Height percent"
               onChange={(event) => updateDraftBanner({ heightPercent: Number(event.target.value) })}
@@ -1724,13 +1865,21 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
             />
             <div className="flex flex-col gap-2 sm:flex-row">
               <CustomInput
+                name="edit-banner-interval-seconds"
                 type="number"
+                min={1}
+                max={60}
+                step={1}
                 value={editingBanner.intervalSeconds}
                 placeholder="Auto advance seconds"
                 onChange={(event) => updateEditingBanner({ intervalSeconds: Number(event.target.value) })}
               />
               <CustomInput
+                name="edit-banner-height-percent"
                 type="number"
+                min={10}
+                max={100}
+                step={1}
                 value={editingBanner.heightPercent}
                 placeholder="Height percent"
                 onChange={(event) => updateEditingBanner({ heightPercent: Number(event.target.value) })}

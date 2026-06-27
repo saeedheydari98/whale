@@ -1,16 +1,12 @@
-"use client";
-
-import { useRouter } from "next/navigation";
 import React from "react";
-import { CustomButton } from "./button";
+import CustomLink from "./custom-link";
 import { slugifyCatalogValue } from "@/lib/products-client";
 
 type Props = {
   productId: string | number;
   productTitle?: string;
   children?: React.ReactNode;
-  variant?: Parameters<typeof CustomButton>[0]["variant"];
-  size?: Parameters<typeof CustomButton>[0]["size"];
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   icon?: React.ReactNode;
   iconAfter?: React.ReactNode;
   className?: string;
@@ -21,37 +17,33 @@ export default function ProductLink({
   productId,
   productTitle,
   children,
-  variant = "primary",
   size = "sm",
   className,
   icon,
   iconAfter,
   externalHref,
 }: Props) {
-  const router = useRouter();
   const slug = slugifyCatalogValue(productTitle || productId);
   const internalHref = `/products/${slug || productId}`;
 
   if (externalHref && externalHref !== "#") {
     return (
-      <CustomButton href={externalHref} className={className} variant={variant} size={size} rounded="md">
+      <CustomLink href={externalHref} className={className} size={size} rounded="md" external>
         {children ?? "View"}
-      </CustomButton>
+      </CustomLink>
     );
   }
 
   return (
-    <CustomButton
-      type="button"
+    <CustomLink
+      href={internalHref}
       className={className}
       icon={icon}
       iconAfter={iconAfter}
-      variant={variant}
       size={size}
       rounded="md"
-      onClick={() => router.push(internalHref)}
     >
       {children ?? "View"}
-    </CustomButton>
+    </CustomLink>
   );
 }

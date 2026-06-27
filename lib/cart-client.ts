@@ -116,7 +116,7 @@ async function saveCartToApi(items: CartItemRecord[], profile: UserProfile) {
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.error || "Cart save failed");
+    throw new Error(data?.message || data?.error || "Cart save failed");
   }
   const apiItems = readCartItemsFromApiData(data);
   return Array.isArray(apiItems)
@@ -136,7 +136,7 @@ export async function getCart(): Promise<CartSnapshot> {
     const res = await fetch(`/api/cart?${getProfileQuery(profile)}`, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok || data?.ok === false) {
-      throw new Error(data?.error || "Cart load failed");
+      throw new Error(data?.message || data?.error || "Cart load failed");
     }
 
     const items = readCartItemsFromApiData(data);
@@ -236,7 +236,7 @@ export async function checkoutCart(profile = readUserProfile()) {
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.error || "Checkout failed");
+    throw new Error(data?.message || data?.error || "Checkout failed");
   }
 
   writeLocalCart([]);

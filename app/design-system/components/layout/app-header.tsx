@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { IoClose, IoMenu } from "react-icons/io5";
-import { useRouter } from "next/navigation";
+import { IoArrowBack, IoClose, IoMenu } from "react-icons/io5";
+import { usePathname, useRouter } from "next/navigation";
 import Toggle from "../shared/toggle";
 import GlobalSearch from "../ui/global-search";
 import { useTheme } from "../../theme/provider";
@@ -13,6 +13,7 @@ import { RiShoppingCartFill } from "react-icons/ri";
 import { CustomButton } from "../ui/button";
 import { CustomInput } from "../ui/input";
 import { CustomModal } from "../ui/modal";
+import HeaderNavLink from "../ui/header-nav-link";
 import {
   fetchAdminAccess,
   isAdminAccessUnlocked,
@@ -24,6 +25,12 @@ import {
   getCartCount,
   readLocalCart,
 } from "@/lib/cart-client";
+import {
+  clearCachedAuthUser,
+  fetchCurrentUser,
+  setCachedAuthUser,
+  subscribeAuthUser,
+} from "@/lib/auth-client";
 import { GiSpermWhale } from "react-icons/gi";
 
 type HeaderUser = {
@@ -34,10 +41,10 @@ type HeaderUser = {
 };
 
 const navItems = [
-  { href: "/", label: "home", tone: "bg-primary-soft text-primary-text" },
-  { href: "/products", label: "products", tone: "bg-primary-soft text-primary-text" },
-  { href: "/panel/admin", label: "admin panel", tone: "bg-primary-soft text-primary-text", adminOnly: true },
-  { href: "/panel/user", label: "user panel", tone: "bg-primary-soft text-primary-text" },
+  { href: "/", label: "home" },
+  { href: "/products", label: "products" },
+  { href: "/panel/admin", label: "admin panel", adminOnly: true },
+  { href: "/panel/user", label: "user panel" },
 ];
 
 function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
@@ -73,6 +80,8 @@ export function AppHeader() {
   const [authStatus, setAuthStatus] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const showMobileBack = isMobile && pathname !== "/";
 
   useEffect(() => {
     const syncCartCount = () => setCartCount(getCartCount(readLocalCart()));
@@ -85,22 +94,25 @@ export function AppHeader() {
       setHasAdminAccess(await fetchAdminAccess());
     };
 
-    syncCartCount();
-    void syncCartFromApi();
-    syncAdminAccess();
-    void syncAdminAccessFromApi();
-    void fetch("/api/auth/session", { cache: "no-store" })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => setAuthUser(data?.data?.user ?? null))
-      .catch(() => setAuthUser(null));
+    void fetchCurrentUser().then((user) => {
+      setAuthUser(user);
+      syncCartCount();
+      void syncCartFromApi();
+      syncAdminAccess();
+      void syncAdminAccessFromApi();
+    });
     window.addEventListener("storage", syncCartCount);
     window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
     const unsubscribeAdminAccess = subscribeAdminAccess(syncAdminAccess);
+    const unsubscribeAuthUser = subscribeAuthUser(() => {
+      void fetchCurrentUser().then(setAuthUser);
+    });
 
     return () => {
       window.removeEventListener("storage", syncCartCount);
       window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
       unsubscribeAdminAccess();
+      unsubscribeAuthUser();
     };
   }, []);
 
@@ -124,7 +136,9 @@ export function AppHeader() {
       });
       const data = await res.json();
       if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "Auth failed.");
-      setAuthUser(data?.data?.user ?? null);
+      const user = data?.data?.user ?? null;
+      setCachedAuthUser(user);
+      setAuthUser(user);
       setAuthOpen(false);
       setAuthPassword("");
       setAuthStatus("");
@@ -141,6 +155,7 @@ export function AppHeader() {
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    clearCachedAuthUser();
     setAuthUser(null);
     setHasAdminAccess(false);
     router.refresh();
@@ -158,6 +173,16 @@ export function AppHeader() {
       <div className="relative flex justify-between items-center w-full gap-3 px-4">
         {/* Left: logo, theme toggle, global search */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
+          {showMobileBack ? (
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="go back"
+              className="flex shrink-0 items-center justify-center p-1 text-xl text-primary-text transition-colors hover:text-primary"
+            >
+              <IoArrowBack />
+            </button>
+          ) : null}
           <div className="shrink-0 text-blue-dark-700"><GiSpermWhale size={40}/></div>
           <div className="shrink-0">
             <Toggle checked={mode === "dark"} onChange={(isDark: boolean) => setMode(isDark ? "dark" : "light")} />
@@ -171,25 +196,25 @@ export function AppHeader() {
 
         {/* Center: desktop nav */}
         {!isMobile && (
-          <nav className="flex-1 flex justify-end items-center gap-3">
+          <nav className="flex flex-1 justify-end items-stretch gap-1 self-stretch">
             {visibleNavItems.map((item) => (
-              <Link key={item.href} className={`rounded-md px-4 py-2 text-sm font-semibold transition-all hover:scale-105 ${item.tone}`} href={item.href}>
+              <HeaderNavLink key={item.href} href={item.href}>
                 {item.label}
-              </Link>
+              </HeaderNavLink>
             ))}
           </nav>
         )}
 
         {/* Right: cart and mobile menu */}
         <div className="flex shrink-0 items-center gap-3">
-          {authUser ? (
+          {authUser && !isMobile ? (
             <div className="flex items-center gap-2">
               <span className="hidden text-xs font-semibold text-primary-text sm:inline">{authUser.username || authUser.name || "account"}</span>
               <CustomButton size="sm" variant="neutral" border="base" onClick={logout}>
                 Sign out
               </CustomButton>
             </div>
-          ) : (
+          ) : !authUser ? (
             <CustomButton
               size="sm"
               border="base"
@@ -201,7 +226,7 @@ export function AppHeader() {
             >
               acount
             </CustomButton>
-          )}
+          ) : null}
           <CartLink count={cartCount} />
           {isMobile && (
             <button
@@ -227,15 +252,29 @@ export function AppHeader() {
         >
           <div className="flex flex-col p-4 gap-2 w-full">
             {visibleNavItems.map((item) => (
-              <Link
+              <HeaderNavLink
                 key={item.href}
-                className={`rounded-md px-4 py-3 text-sm font-semibold transition-all hover:scale-105 text-center backdrop-blur-md bg-bg-base/80 border border-primary-border ${item.tone}`}
                 href={item.href}
                 onClick={closeMenu}
+                className="h-auto rounded-md border border-primary-border bg-transparent py-3 text-center backdrop-blur-md"
               >
                 {item.label}
-              </Link>
+              </HeaderNavLink>
             ))}
+            {authUser ? (
+              <CustomButton
+                size="sm"
+                variant="neutral"
+                border="base"
+                fullWidth
+                onClick={() => {
+                  closeMenu();
+                  void logout();
+                }}
+              >
+                Sign out
+              </CustomButton>
+            ) : null}
           </div>
         </div>
       )}

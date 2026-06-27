@@ -1,16 +1,12 @@
-"use client";
-
-import { useRouter } from "next/navigation";
 import React from "react";
-import { CustomButton } from "./button";
+import CustomLink from "./custom-link";
 import { slugifyCatalogValue } from "@/lib/products-client";
 
 type Props = {
   showcaseId: string | number;
   showcaseTitle?: string;
   children?: React.ReactNode;
-  variant?: Parameters<typeof CustomButton>[0]["variant"];
-  size?: Parameters<typeof CustomButton>[0]["size"];
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
   className?: string;
 };
 
@@ -18,25 +14,20 @@ export default function ShowcaseLink({
   showcaseId,
   showcaseTitle,
   children,
-  variant = "neutral",
   size = "sm",
   className,
 }: Props) {
-  const router = useRouter();
   const slug = slugifyCatalogValue(showcaseTitle || showcaseId);
   const href = `/products/showcase/${slug || showcaseId}`;
 
   return (
-    <CustomButton
-      type="button"
+    <CustomLink
+      href={href}
       className={className}
-      variant={variant}
       size={size}
       rounded="full"
-      border="base"
-      onClick={() => router.push(href)}
     >
       {children ?? "See all"}
-    </CustomButton>
+    </CustomLink>
   );
 }

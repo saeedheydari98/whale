@@ -54,6 +54,8 @@ export type ProductRecord = {
   placement?: number | string;
   publishedAt?: string | null;
   deletedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   colorStock?: unknown;
   sortOrder: number;
 };

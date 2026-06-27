@@ -14,6 +14,7 @@ import { applyCSSVariables } from "./engine";
 import { generateCSSVariables } from "./css-vars";
 import { createTheme, resolveDynamicColor, ThemeStyle, ThemeColorKey, ThemeTone } from "./theme";
 import { readUserProfile, USER_PROFILE_UPDATED_EVENT } from "@/lib/user-profile";
+import { fetchCurrentUser } from "@/lib/auth-client";
 
 type ThemeMode = "light" | "dark";
 type ThemeModePreference = ThemeMode | "system";
@@ -84,6 +85,7 @@ export function ThemeProvider({
   children: React.ReactNode;
 }) {
   const [isHydrated, setIsHydrated] = useState(false);
+  const [hasLoadedRemoteTheme, setHasLoadedRemoteTheme] = useState(false);
   const [modePreference, setModePreference] = useState<ThemeModePreference>(() => {
     if (typeof window === "undefined") return "light";
     const savedPref = localStorage.getItem("theme-mode-pref");
@@ -257,11 +259,12 @@ export function ThemeProvider({
   useEffect(() => {
     let cancelled = false;
 
-    const loadThemes = () => void Promise.all([
-      fetch("/api/admin/theme", { cache: "no-store" }).then((res) => res.json()),
-      fetch(getUserThemeUrl(), { cache: "no-store" }).then((res) => res.json()),
-    ])
-      .then(([nextAdminTheme, nextUserTheme]) => {
+    const loadThemes = async (markReady = false) => {
+      try {
+        const [nextAdminTheme, nextUserTheme] = await Promise.all([
+          fetch("/api/admin/theme", { cache: "no-store" }).then((res) => res.json()),
+          fetch(getUserThemeUrl(), { cache: "no-store" }).then((res) => res.json()),
+        ]);
         if (cancelled) return;
         setAdminTheme((current) => ({
           ...current,
@@ -271,17 +274,23 @@ export function ThemeProvider({
           ...current,
           ...readThemePayload(nextUserTheme, defaultUserTheme),
         }));
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("Failed to load theme API settings:", error);
-      });
+      } finally {
+        if (!cancelled && markReady) {
+          await fetchCurrentUser();
+          if (!cancelled) setHasLoadedRemoteTheme(true);
+        }
+      }
+    };
 
-    loadThemes();
-    window.addEventListener(USER_PROFILE_UPDATED_EVENT, loadThemes);
+    void loadThemes(true);
+    const reloadThemes = () => void loadThemes();
+    window.addEventListener(USER_PROFILE_UPDATED_EVENT, reloadThemes);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(USER_PROFILE_UPDATED_EVENT, loadThemes);
+      window.removeEventListener(USER_PROFILE_UPDATED_EVENT, reloadThemes);
     };
   }, []);
 
@@ -370,7 +379,7 @@ export function ThemeProvider({
 
   return (
     <ThemeContext.Provider value={contextValue}>
-      {isHydrated ? children : null}
+      {isHydrated && hasLoadedRemoteTheme ? children : null}
     </ThemeContext.Provider>
   );
 }

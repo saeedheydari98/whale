@@ -17,10 +17,11 @@ type ProductReviewsSectionProps = {
   text: string;
   rating?: number;
   isPurchased: boolean;
+  hasRated: boolean;
+  error?: string;
   onTextChange: (value: string) => void;
   onRatingChange: (value: number | undefined) => void;
   onSubmit: () => void;
-  onMarkPurchased: () => void;
 };
 
 function formatReviewDate(value: string) {
@@ -56,10 +57,11 @@ export function ProductReviewsSection({
   text,
   rating,
   isPurchased,
+  hasRated,
+  error,
   onTextChange,
   onRatingChange,
   onSubmit,
-  onMarkPurchased,
 }: ProductReviewsSectionProps) {
   const ratedReviews = useMemo(
     () => reviews.filter((review) => Number(review.rating) > 0),
@@ -74,6 +76,7 @@ export function ProductReviewsSection({
 
   const distribution = useMemo(() => buildDistribution(reviews), [reviews]);
   const maxCount = Math.max(1, ...distribution.map((item) => item.count));
+  const canRate = isPurchased && !hasRated;
 
   return (
     <section
@@ -135,11 +138,13 @@ export function ProductReviewsSection({
                   value={rating ?? 0}
                   size="lg"
                   interactive
-                  disabled={!isPurchased}
+                  disabled={!canRate}
                   onChange={(value) => onRatingChange(value)}
                 />
                 {rating ? (
                   <div className="text-sm font-semibold text-amber-500">{rating}.0 out of 5</div>
+                ) : hasRated ? (
+                  <div className="text-sm text-secondary-text">You already rated this product</div>
                 ) : (
                   <div className="text-sm text-secondary-text">Tap a star to rate</div>
                 )}
@@ -147,6 +152,11 @@ export function ProductReviewsSection({
               {!isPurchased ? (
                 <div className="text-xs leading-5 text-secondary-text">
                   Only verified buyers can leave a star rating. You can still post a comment below.
+                </div>
+              ) : hasRated ? (
+                <div className="flex items-center gap-1 text-xs font-medium text-secondary-text">
+                  <IoCheckmarkCircle aria-hidden="true" />
+                  <span>Your star rating has already been recorded for this product.</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1 text-xs font-medium text-green-600">
@@ -157,11 +167,12 @@ export function ProductReviewsSection({
             </div>
 
             <div className="flex flex-col gap-2">
-              <label htmlFor="review-text" className="text-sm font-medium text-primary-text">
+              <div className="text-sm font-medium text-primary-text">
                 Your review
-              </label>
+              </div>
               <textarea
                 id="review-text"
+                aria-label="Your review"
                 value={text}
                 onChange={(event) => onTextChange(event.target.value)}
                 placeholder="What did you like or dislike? How was the quality and value?"
@@ -171,14 +182,14 @@ export function ProductReviewsSection({
 
             <div className="flex flex-wrap items-center gap-3">
               <CustomButton type="button" variant="primary" onClick={onSubmit}>
-                Submit review
+                <span>Submit review</span>
               </CustomButton>
-              {rating && !isPurchased ? (
-                <CustomButton type="button" variant="neutral" onClick={onMarkPurchased}>
-                  Mark as purchased (demo)
-                </CustomButton>
-              ) : null}
             </div>
+            {error ? (
+              <div className="rounded-md border border-danger-border-nomode bg-bg-base px-3 py-2 text-sm font-semibold text-danger-text-nomode">
+                {error}
+              </div>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-4">

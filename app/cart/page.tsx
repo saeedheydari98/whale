@@ -26,6 +26,9 @@ import {
   writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
+import { fetchCurrentUser } from "@/lib/auth-client";
+import { useProductsCatalog } from "@/lib/products-catalog-context";
+import ColorStockDots from "../design-system/components/ui/color-stock-dots";
 
 function getFinalPrice(item: CartItemRecord) {
   return item.discountPrice || item.price;
@@ -58,6 +61,7 @@ const NATIONAL_ID_PATTERN = /^\d{10}$/;
 const PHONE_PATTERN = /^09\d{9}$/;
 
 export default function CartPage() {
+  const { products } = useProductsCatalog();
   const [items, setItems] = useState<CartItemRecord[]>([]);
   const [previewImage, setPreviewImage] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -66,6 +70,8 @@ export default function CartPage() {
   const [profileError, setProfileError] = useState("");
   const [showProfileRequiredErrors, setShowProfileRequiredErrors] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState("");
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const [isCheckoutSuccessOpen, setIsCheckoutSuccessOpen] = useState(false);
   const [authUser, setAuthUser] = useState<any>(null);
   const profileFormRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -76,14 +82,12 @@ export default function CartPage() {
     void (async () => {
       const snapshot = await getCart();
       const savedProfile = await fetchUserProfile().catch(() => snapshot.profile);
-      const me = await fetch("/api/auth/session", { cache: "no-store" })
-        .then((res) => res.ok ? res.json() : null)
-        .catch(() => null);
+      const user = await fetchCurrentUser();
       if (cancelled) return;
       setItems(snapshot.items);
       setProfile(savedProfile);
       setProfileDraft(savedProfile ?? snapshot.profile ?? EMPTY_USER_PROFILE);
-      setAuthUser(me?.data?.user ?? null);
+      setAuthUser(user);
     })();
 
     return () => {
@@ -110,7 +114,17 @@ export default function CartPage() {
     setItems(nextItems);
   };
 
+  const updateItemColor = async (targetIndex: number, nextColor: string) => {
+    const nextItems = items.map((item, index) =>
+      index === targetIndex ? { ...item, selectedColor: nextColor } : item
+    );
+    setItems(nextItems);
+    const savedItems = await persistCart(nextItems, readUserProfile());
+    setItems(savedItems);
+  };
+
   const clearCart = async () => {
+    if (isCheckoutLoading) return;
     const nextItems = await clearCartData();
     setItems(nextItems);
   };
@@ -169,6 +183,7 @@ export default function CartPage() {
   };
 
   const continueCheckout = () => {
+    if (isCheckoutLoading) return;
     if (!authUser) {
       router.push("/panel/user?auth=register");
       return;
@@ -184,14 +199,26 @@ export default function CartPage() {
     }
 
     setProfile(savedProfile);
+    const purchasedItems = [...items];
+    setIsCheckoutLoading(true);
+    setCheckoutMessage("");
     void persistCart(items, savedProfile)
       .then(() => checkoutCart(savedProfile))
       .then((nextItems) => {
+        purchasedItems.forEach((item) => {
+          if (item.productId) {
+            localStorage.setItem(`purchased:${item.productId}`, "1");
+          }
+        });
         setItems(nextItems);
         setCheckoutMessage("Checkout completed. Inventory was updated.");
+        setIsCheckoutSuccessOpen(true);
       })
       .catch((error) => {
         setCheckoutMessage(error instanceof Error ? error.message : "Checkout failed.");
+      })
+      .finally(() => {
+        setIsCheckoutLoading(false);
       });
   };
 
@@ -214,11 +241,13 @@ export default function CartPage() {
                 border="base"
                 size="sm"
                 icon={<IoCardOutline />}
+                isLoading={isCheckoutLoading}
+                loadingText="Paying"
                 onClick={continueCheckout}
               >
                 Pay
               </CustomButton>
-              <CustomButton variant="danger" border="base" size="sm" onClick={clearCart}>
+              <CustomButton variant="danger" border="base" size="sm" disabled={isCheckoutLoading} onClick={clearCart}>
                 Clear cart
               </CustomButton>
             </div>
@@ -237,9 +266,11 @@ export default function CartPage() {
           </div>
         ) : (
           <div className="grid gap-4">
-            {items.map((item, index) => (
+            {items.map((item, index) => {
+              const product = products.find((entry) => String(entry.id) === String(item.productId ?? item.id));
+              return (
               <article
-                key={String(item.id ?? `${item.title}-${index}`)}
+                key={String(item.id ?? `${item.title}-${index}-${item.selectedColor ?? ""}`)}
                 className="grid gap-4 rounded-lg border border-primary-border bg-primary-card p-4 sm:grid-cols-[120px_1fr_auto]"
               >
                 <button
@@ -263,6 +294,18 @@ export default function CartPage() {
                       Color: {item.selectedColor}
                     </span>
                   ) : null}
+                  {product?.colorStock ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-secondary-text">Select color</span>
+                      <ColorStockDots
+                        value={product.colorStock}
+                        selectedColor={item.selectedColor ?? ""}
+                        onSelect={(color) => void updateItemColor(index, color)}
+                        disabledUnavailable
+                        size="sm"
+                      />
+                    </div>
+                  ) : null}
                   <div className="text-sm font-semibold text-primary">
                     {item.originalPrice && getDiscountPercent(item) > 0 && (
                       <span className="mr-2 text-danger-text-nomode line-through">
@@ -278,6 +321,7 @@ export default function CartPage() {
                       variant="neutral"
                       border="base"
                       size="sm"
+                      disabled={isCheckoutLoading}
                       onClick={() => updateQuantity(item, item.quantity - 1)}
                     >
                       -
@@ -287,6 +331,7 @@ export default function CartPage() {
                       variant="neutral"
                       border="base"
                       size="sm"
+                      disabled={isCheckoutLoading}
                       onClick={() => updateQuantity(item, item.quantity + 1)}
                     >
                       +
@@ -297,13 +342,15 @@ export default function CartPage() {
                     border="base"
                     size="sm"
                     icon={<IoTrashOutline />}
+                    disabled={isCheckoutLoading}
                     onClick={() => removeItem(item)}
                   >
                     Remove
                   </CustomButton>
                 </div>
               </article>
-            ))}
+            );
+            })}
           </div>
         )}
 
@@ -433,6 +480,25 @@ export default function CartPage() {
             <CustomButton border="base" fullWidth icon={<IoCardOutline />} onClick={saveProfileDraft}>
               Save and continue
             </CustomButton>
+          </div>
+        </CustomModal>
+
+        <CustomModal
+          open={isCheckoutSuccessOpen}
+          onClose={() => setIsCheckoutSuccessOpen(false)}
+          title="Purchase completed"
+          closeText="Close"
+          rounded="lg"
+          border="base"
+          shadow="lg"
+        >
+          <div className="flex flex-col gap-3">
+            <div className="text-sm font-semibold text-primary-text">
+              Purchase completed successfully.
+            </div>
+            <div className="text-sm text-secondary-text">
+              Your products were added to your purchases and inventory was updated.
+            </div>
           </div>
         </CustomModal>
 
