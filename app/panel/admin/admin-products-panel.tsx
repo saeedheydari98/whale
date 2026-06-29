@@ -215,7 +215,7 @@ function InventoryControls({ product, onChange }: InventoryControlsProps) {
                 }`}
                 style={{ backgroundColor: getStockColorValue(color) }}
               >
-                <span className="rounded-full bg-bg-base/85 px-1 leading-4">{count > 10 ? "+10" : count}</span>
+                <span className="rounded-full bg-primary-base/85 px-1 leading-4">{count > 10 ? "+10" : count}</span>
               </button>
             );
           })}
@@ -2996,7 +2996,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
         border="base"
         shadow="lg"
       >
-        <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-bg-base">
+        <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-primary-base">
           {previewImage && (
             <img
               src={previewImage}

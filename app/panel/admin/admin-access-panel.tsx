@@ -89,7 +89,7 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
       </div>
 
       {status ? (
-        <div className="rounded-md border border-primary-border bg-bg-base px-3 py-2 text-sm font-semibold text-primary-text">
+        <div className="rounded-md border border-primary-border bg-primary-base px-3 py-2 text-sm font-semibold text-primary-text">
           {status}
         </div>
       ) : null}

@@ -66,7 +66,7 @@ export default function AdminPanelPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-bg-base p-6 text-primary-text">
+    <main className="min-h-screen bg-primary-base p-6 text-primary-text">
       {hasAdminAccess === null ? (
         <div className="flex min-h-[50vh] items-center justify-center">
           <div className="rounded-lg border border-primary-border bg-primary-card p-6 text-sm font-semibold text-primary-text">
@@ -76,7 +76,7 @@ export default function AdminPanelPage() {
       ) : hasAdminAccess ? (
         <div className="flex w-full flex-col gap-6">
           <section className="flex flex-col gap-4">
-            <div className="text-admin-admin-admin text-2xl font-bold">پنل مدیریت</div>
+            <div className="text-primary text-2xl font-bold">پنل مدیریت</div>
             <div className="flex flex-wrap gap-2 rounded-lg border border-primary-border bg-primary-soft p-2">
               {tabs.map((tab) => (
                 <button

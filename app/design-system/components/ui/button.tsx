@@ -69,7 +69,6 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
       token,
       state: theme.state,
       admin: theme.admin,
-      user: theme.user,
     });
 
     if (token.startsWith("bg-")) {

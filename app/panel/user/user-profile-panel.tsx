@@ -94,6 +94,7 @@ export function UserProfilePanel() {
     birthDate: profileDraft.birthDate.trim(),
     phone: profileDraft.phone.trim(),
     address: profileDraft.address.trim(),
+    themeMode: profileDraft.themeMode,
     isAdminUnlocked: profileDraft.isAdminUnlocked,
   });
 
@@ -235,7 +236,7 @@ export function UserProfilePanel() {
       </div>
 
       {authUser ? (
-        <div className="flex flex-col gap-2 rounded-md border border-secondary-border bg-bg-base p-3">
+        <div className="flex flex-col gap-2 rounded-md border border-secondary-border bg-primary-base p-3">
           <RequiredLabel className="text-secondary-text">نام کاربری</RequiredLabel>
           <CustomInput
             value={authUser.username || ""}
@@ -250,7 +251,7 @@ export function UserProfilePanel() {
           ) : null}
         </div>
       ) : (
-        <div className="flex flex-col gap-3 rounded-md border border-secondary-border bg-bg-base p-3">
+        <div className="flex flex-col gap-3 rounded-md border border-secondary-border bg-primary-base p-3">
           <div className="flex flex-col gap-2">
             <RequiredLabel required className="text-secondary-text">نام کاربری</RequiredLabel>
             <CustomInput
@@ -435,7 +436,7 @@ export function UserProfilePanel() {
       </CustomButton>
 
       {authUser ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-secondary-border bg-bg-base p-3">
+        <div className="flex flex-col gap-3 rounded-lg border border-secondary-border bg-primary-base p-3">
           {showPasswordForm ? (
             <>
               <div className="text-sm font-bold text-secondary-text">تغییر رمز عبور</div>

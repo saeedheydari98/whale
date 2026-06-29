@@ -178,7 +178,7 @@ export default function ShowcasePage() {
 
   if (loading && !showcase) {
     return (
-      <main className="min-h-screen bg-bg-base text-primary-text">
+      <main className="min-h-screen bg-primary-base text-primary-text">
         <div className="p-4 w-full">
           <div className="flex items-center justify-between">
             <Loading loading="skeleton-item" isLoading>

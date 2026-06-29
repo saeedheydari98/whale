@@ -12,6 +12,7 @@ function normalizeProfile(value: any) {
     birthDate: String(value?.birthDate ?? "").trim(),
     phone: String(value?.phone ?? "").trim(),
     address: String(value?.address ?? "").trim(),
+    themeMode: value?.themeMode === "dark" ? "dark" : "light",
   };
 }
 
@@ -61,6 +62,7 @@ export async function POST(request: Request) {
         birthDate: profile.birthDate,
         phone: profile.phone,
         address: profile.address,
+        themeMode: profile.themeMode,
         ...(includesAdminUnlocked
           ? { isAdminUnlocked: readAdminUnlocked(rawProfile) }
           : {}),

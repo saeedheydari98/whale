@@ -1,13 +1,10 @@
 "use client";
 
-import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { ThemePalettePicker } from "@/app/panel/theme-palette-picker";
 import { useTheme } from "../../design-system/theme/provider";
-import { resolveColor } from "../../design-system/theme/theme";
 
 export function AdminThemePanel() {
-  const { adminTheme, userTheme, updateAdminTheme, updateUserTheme } = useTheme();
-  const adminColor = resolveColor(adminTheme.primary, adminTheme.style, adminTheme.tone);
+  const { adminTheme, updateAdminTheme } = useTheme();
 
   const updatePalette = (next: Parameters<typeof updateAdminTheme>[0]) => {
     const themeUpdate: Parameters<typeof updateAdminTheme>[0] = {};
@@ -18,10 +15,6 @@ export function AdminThemePanel() {
 
     if (next.style) {
       themeUpdate.style = next.style;
-    }
-
-    if (next.tone) {
-      themeUpdate.tone = next.tone;
     }
 
     return updateAdminTheme(themeUpdate);
@@ -35,33 +28,14 @@ export function AdminThemePanel() {
         scope="admin"
         selectedColor={adminTheme.primary}
         selectedStyle={adminTheme.style}
-        selectedTone={adminTheme.tone}
-        selectionClassName="text-admin-admin-admin"
+        selectionClassName="text-primary"
         onChange={(next) =>
           updatePalette({
             primary: next.color,
             style: next.style,
-            tone: next.tone,
           })
         }
       />
-
-      <div
-        className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-card p-3"
-      >
-        <div className="flex flex-col gap-1">
-          <span className="text-sm font-bold text-admin-admin-admin">پنل رنگ کاربر</span>
-          <span className="text-xs font-semibold text-primary-text">
-            کنترل‌های انتخاب رنگ کاربر را از پنل مدیریت قفل کنید.
-          </span>
-        </div>
-        <CustomSwitch
-          checked={userTheme.isColorPanelLocked}
-          customColor={adminColor}
-          label={userTheme.isColorPanelLocked ? "قفل" : "باز"}
-          onChange={(isColorPanelLocked) => updateUserTheme({ isColorPanelLocked })}
-        />
-      </div>
     </section>
   );
 }

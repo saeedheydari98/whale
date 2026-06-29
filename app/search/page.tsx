@@ -55,7 +55,7 @@ export default function SearchPage() {
   };
 
   return (
-    <main className="min-h-screen bg-bg-base text-primary-text">
+    <main className="min-h-screen bg-primary-base text-primary-text">
       <section className="mx-auto w-full px-4 py-8">
         <div className="flex items-center justify-between mb-4">
           <div className="text-2xl font-bold">نتایج جست‌وجو برای «{q}»</div>

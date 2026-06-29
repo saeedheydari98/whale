@@ -228,7 +228,7 @@ export function ProductShowcase() {
   };
 
   return (
-    <main className="min-h-screen bg-bg-base text-primary-text">
+    <main className="min-h-screen bg-primary-base text-primary-text">
       <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex flex-col gap-2 border-b border-primary-border pb-4">
           <div className="text-3xl font-bold">محصولات</div>
@@ -306,7 +306,7 @@ export function ProductShowcase() {
           border="base"
           shadow="lg"
         >
-          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-bg-base">
+          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-primary-base">
             {previewImage && (
               <img
                 src={previewImage}

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { IoCheckmarkCircleOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import { UserProfilePanel } from "./user-profile-panel";
-import { UserThemePanel } from "./user-theme-panel";
 import { readUserProfile } from "@/lib/user-profile";
 
 type OrderItem = {
@@ -46,7 +45,7 @@ function UserOrdersPanel() {
             order.items.map((item) => (
               <div
                 key={item.id}
-                className="flex w-full max-w-sm flex-col gap-3 rounded-md border border-secondary-border bg-bg-base p-3"
+                className="flex w-full max-w-sm flex-col gap-3 rounded-md border border-secondary-border bg-primary-base p-3"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
@@ -88,17 +87,16 @@ function UserOrdersPanel() {
 }
 
 export default function UserPanelPage() {
-  const [activeTab, setActiveTab] = useState<"profile" | "theme" | "orders">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "orders">("profile");
 
   return (
-    <main className="min-h-screen bg-bg-base p-6 text-primary-text">
+    <main className="min-h-screen bg-primary-base p-6 text-primary-text">
       <div className="flex flex-col gap-4">
-        <div className="text-2xl text-user-user-user font-bold">حساب کاربری</div>
+        <div className="text-2xl text-secondary-text font-bold">حساب کاربری</div>
         <div className="flex flex-wrap gap-2 rounded-lg border border-secondary-border bg-secondary-card p-2">
           {[
             { id: "profile", label: "پروفایل" },
             { id: "orders", label: "خریدها" },
-            { id: "theme", label: "ظاهر" },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -106,7 +104,7 @@ export default function UserPanelPage() {
               className={`rounded-md border px-4 py-2 text-sm font-semibold transition ${
                 activeTab === tab.id
                   ? "border-secondary-border bg-secondary text-secondary-contrast"
-                  : "border-secondary-border bg-bg-base text-secondary-text hover:bg-secondary-card"
+                  : "border-secondary-border bg-primary-base text-secondary-text hover:bg-secondary-card"
               }`}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
             >
@@ -116,7 +114,6 @@ export default function UserPanelPage() {
         </div>
         {activeTab === "profile" ? <UserProfilePanel /> : null}
         {activeTab === "orders" ? <UserOrdersPanel /> : null}
-        {activeTab === "theme" ? <UserThemePanel /> : null}
       </div>
     </main>
   );

@@ -30,8 +30,7 @@ export type SemanticColor =
     | "warning"
     | "info"
     | "neutral"
-    | "accent"
-    | "fancy";
+    | "accent";
 
 export type ThemeState = {
     mode: ThemeMode;
@@ -50,16 +49,38 @@ export const semanticThemeMap: Record<
     SemanticColor,
     ThemeColorKey
 > = {
-    primary: "green",
+    primary: "gray",
     secondary: "gray",
     success: "green",
     danger: "red",
     warning: "yellow",
     info: "blue",
-    neutral: "gray",
+    neutral: "orange",
     accent: "purple",
-    fancy: "purple",
 };
+
+export const variantNames = [
+    "primary",
+    "secondary",
+    "success",
+    "danger",
+    "warning",
+    "info",
+    "neutral",
+    "accent",
+] as const satisfies readonly SemanticColor[];
+
+export const elementTones = {
+    base: { light: 50, dark: 950 },
+    text: { light: 950, dark: 50 },
+    mutedText: { light: 800, dark: 200 },
+    subtleText: { light: 700, dark: 300 },
+    bg: { light: 100, dark: 900 },
+    card: { light: 200, dark: 800 },
+    media: { light: 300, dark: 700 },
+    action: 500,
+    border: 500,
+} as const;
 
 /**
  * =========================
@@ -70,7 +91,6 @@ export const semanticThemeMap: Record<
 export type AdminThemeOverride = Partial<{
     primary: ThemeColorKey;
     style: ThemeStyle;
-    tone: ThemeTone;
     header: ThemeColorKey;
     footer: ThemeColorKey;
     background: ThemeColorKey;
@@ -86,14 +106,6 @@ export interface Theme {
     state: ThemeState;
 
     admin?: AdminThemeOverride;
-
-    user?: {
-        preferredColor: ThemeColorKey;
-        style: ThemeStyle;
-        tone: ThemeTone;
-        density: "compact" | "comfortable" | "spacious";
-        isColorPanelLocked?: boolean;
-    };
 
     tokens: {
         colors: {
@@ -188,21 +200,15 @@ type ResolveDynamicColorInput = {
     token: ThemeColorToken | string;
     state: ThemeState;
     admin?: AdminThemeOverride;
-    user?: Theme["user"];
 };
 
 function resolveDynamicColorKey(
     value: string | undefined,
     state: ThemeState,
-    admin?: AdminThemeOverride,
-    user?: Theme["user"]
+    admin?: AdminThemeOverride
 ): ThemeColorKey {
     if (value === "admin") {
-        return admin?.primary ?? semanticThemeMap.primary;
-    }
-
-    if (value === "user") {
-        return user?.preferredColor ?? semanticThemeMap.primary;
+        return admin?.primary ?? semanticThemeMap.secondary;
     }
 
     if (value === "mode") {
@@ -213,21 +219,16 @@ function resolveDynamicColorKey(
         return value;
     }
 
-    return semanticThemeMap.primary;
+    return semanticThemeMap.secondary;
 }
 
 function resolveDynamicStyle(
     value: string | undefined,
     state: ThemeState,
-    admin?: AdminThemeOverride,
-    user?: Theme["user"]
+    admin?: AdminThemeOverride
 ): ThemeStyle {
     if (value === "admin") {
         return admin?.style ?? state.style;
-    }
-
-    if (value === "user") {
-        return user?.style ?? state.style;
     }
 
     if (value === "mode") {
@@ -241,19 +242,7 @@ function resolveDynamicStyle(
     return state.style || styleFallback;
 }
 
-function resolveDynamicTone(
-    value: string | undefined,
-    admin?: AdminThemeOverride,
-    user?: Theme["user"]
-): ThemeTone {
-    if (value === "admin") {
-        return admin?.tone ?? toneFallback;
-    }
-
-    if (value === "user") {
-        return user?.tone ?? toneFallback;
-    }
-
+function resolveDynamicTone(value: string | undefined): ThemeTone {
     return toTone(value);
 }
 
@@ -261,7 +250,6 @@ export function resolveDynamicColor({
     token,
     state,
     admin,
-    user,
 }: ResolveDynamicColorInput): string {
     const [prefix, part1, part2, part3] = token.split("-");
 
@@ -269,9 +257,9 @@ export function resolveDynamicColor({
         return resolveColor("gray", state.style, toneFallback);
     }
 
-    const color = resolveDynamicColorKey(part1, state, admin, user);
-    const style = resolveDynamicStyle(part2, state, admin, user);
-    const tone = resolveDynamicTone(part3, admin, user);
+    const color = resolveDynamicColorKey(part1, state, admin);
+    const style = resolveDynamicStyle(part2, state, admin);
+    const tone = resolveDynamicTone(part3);
 
     return resolveColor(color, style, tone);
 }
@@ -284,140 +272,50 @@ export function resolveDynamicColor({
 
 export function createTheme(
     state: ThemeState,
-    admin?: AdminThemeOverride,
-    userOverride?: Theme["user"]
+    admin?: AdminThemeOverride
 ): Theme {
     const mode = state.mode;
     const style: ThemeStyle =
         state.style ?? (mode === "dark" ? "dark" : "light");
-    const user: Theme["user"] = userOverride ?? {
-        preferredColor: "green",
-        style: "light",
-        tone: 500,
-        density: "comfortable",
-    };
+    const adminColor = admin?.primary || semanticThemeMap.secondary;
+    const adminStyle = admin?.style ?? style;
+    const modeKey = mode === "dark" ? "dark" : "light";
+    const resolveVariantColor = (variant: SemanticColor) =>
+        resolveColor(
+            variant === "primary" ? adminColor : semanticThemeMap[variant],
+            adminStyle,
+            elementTones.action
+        );
 
     return {
         state: { ...state, style },
         admin,
-        user,
 
         tokens: {
             colors: {
-                ui: {
-                    primary: resolveColor(
-                        admin?.primary || semanticThemeMap.primary,
-                        admin?.style ?? style,
-                        admin?.tone ?? 500
-                    ),
-
-                    secondary: resolveColor(
-                        user?.preferredColor || semanticThemeMap.secondary,
-                        user?.style ?? style,
-                        user?.tone ?? 500
-                    ),
-
-                    success: resolveColor(
-                        semanticThemeMap.success,
-                        style,
-                        500
-                    ),
-
-                    danger: resolveColor(
-                        semanticThemeMap.danger,
-                        style,
-                        500
-                    ),
-
-                    warning: resolveColor(
-                        semanticThemeMap.warning,
-                        style,
-                        500
-                    ),
-
-                    info: resolveColor(
-                        semanticThemeMap.info,
-                        style,
-                        500
-                    ),
-
-                    neutral: resolveColor(
-                        semanticThemeMap.neutral,
-                        style,
-                        400
-                    ),
-
-                    accent: resolveColor(
-                        semanticThemeMap.accent,
-                        style,
-                        500
-                    ),
-
-                    fancy: resolveColor(
-                        semanticThemeMap.fancy,
-                        style,
-                        500
-                    ),
-                },
+                ui: Object.fromEntries(
+                    variantNames.map((variant) => [variant, resolveVariantColor(variant)])
+                ) as Record<SemanticColor, string>,
 
                 text: {
                     primary:
-                        mode === "dark"
-                            ? resolveColor(
-                                admin?.primary || semanticThemeMap.primary,
-                                admin?.style ?? style,
-                                50
-                            )
-                            : resolveColor(
-                                admin?.primary || semanticThemeMap.primary,
-                                admin?.style ?? style,
-                                950
-                            ),
+                        resolveColor(adminColor, adminStyle, elementTones.text[modeKey]),
 
                     secondary:
-                        mode === "dark"
-                            ? resolveColor(
-                                admin?.primary || semanticThemeMap.primary,
-                                admin?.style ?? style,
-                                200
-                            )
-                            : resolveColor(
-                                admin?.primary || semanticThemeMap.primary,
-                                admin?.style ?? style,
-                                800
-                            ),
+                        resolveColor(adminColor, adminStyle, elementTones.mutedText[modeKey]),
 
                     muted:
-                        mode === "dark"
-                            ? resolveColor(
-                                admin?.primary || semanticThemeMap.primary,
-                                admin?.style ?? style,
-                                300
-                            )
-                            : resolveColor(
-                                admin?.primary || semanticThemeMap.primary,
-                                admin?.style ?? style,
-                                700
-                            ),
+                        resolveColor(adminColor, adminStyle, elementTones.subtleText[modeKey]),
                 },
 
                 background: {
-                    base:
-                        mode === "dark"
-                            ? "#0a0a0a"
-                            : "#ffffff",
+                    base: resolveColor(adminColor, adminStyle, elementTones.base[modeKey]),
 
-                    surface:
-                        mode === "dark"
-                            ? "#141414"
-                            : "#f5f5f5",
+                    surface: resolveColor(adminColor, adminStyle, elementTones.bg[modeKey]),
                 },
 
                 border: {
-                    default:
-                        mode === "dark"
-                            ? "#2a2a2a"
-                            : "#e5e5e5",
+                    default: resolveColor(adminColor, adminStyle, elementTones.border),
                 },
             },
 

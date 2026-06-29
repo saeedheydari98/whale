@@ -7,7 +7,8 @@ export type UICommonVariant =
   | "danger"
   | "warning"
   | "info"
-  | "neutral";
+  | "neutral"
+  | "accent";
 
 export type VariantColorStyle = {
   backgroundColor: string;
@@ -38,28 +39,22 @@ function createVariantStyle(backgroundColor: string, color: string): VariantColo
   };
 }
 
-type ThemeTextSource = "admin" | "user";
-
-function getThemeTextSource(theme: Theme, source: ThemeTextSource) {
-  if (source === "user") {
-    return {
-      color: theme.user?.preferredColor ?? "green",
-      style: theme.user?.style ?? theme.state.style,
-    };
-  }
-
+function getAdminThemeTextSource(theme: Theme) {
   return {
-    color: theme.admin?.primary ?? "green",
+    color: theme.admin?.primary ?? "gray",
     style: theme.admin?.style ?? theme.state.style,
   };
 }
 
+function getAdminThemeStyle(theme: Theme) {
+  return theme.admin?.style ?? theme.state.style;
+}
+
 export function resolveThemeTextColor(
   theme: Theme,
-  source: ThemeTextSource,
   tone: 50 | 200 | 300 | 700 | 800 | 950
 ) {
-  const themeSource = getThemeTextSource(theme, source);
+  const themeSource = getAdminThemeTextSource(theme);
 
   return resolveColor(
     themeSource.color as ThemeColorKey,
@@ -73,7 +68,7 @@ export function resolveSemanticTextColor(
   color: ThemeColorKey,
   tone: 50 | 200 | 300 | 700 | 800 | 950
 ) {
-  return resolveColor(color, theme.state.style, tone);
+  return resolveColor(color, getAdminThemeStyle(theme), tone);
 }
 
 export function resolveTokenTextColor(
@@ -81,52 +76,36 @@ export function resolveTokenTextColor(
   token: string,
   tone: 50 | 200 | 300 | 700 | 800 | 950
 ) {
-  if (token.includes("-user-")) {
-    return resolveThemeTextColor(theme, "user", tone);
-  }
-
-  return resolveThemeTextColor(theme, "admin", tone);
+  return token.includes("-admin-")
+    ? resolveThemeTextColor(theme, tone)
+    : resolveSemanticTextColor(theme, semanticThemeMap.neutral, tone);
 }
 
 export function resolveVariantColors(
   variant: UICommonVariant,
   theme: Theme
 ): VariantColorStyle {
+  const colorVariantMap: Partial<Record<UICommonVariant, ThemeColorKey>> = {
+    secondary: "gray",
+    success: "green",
+    danger: "red",
+    warning: "yellow",
+    info: "blue",
+    neutral: "orange",
+    accent: "purple",
+  };
+  const staticColor = colorVariantMap[variant];
+
+  if (staticColor) {
+    return createVariantStyle(
+      theme.tokens.colors.ui[variant],
+      resolveSemanticTextColor(theme, staticColor, staticColor === "yellow" ? 950 : 50)
+    );
+  }
+
   switch (variant) {
-    case "secondary":
-      return createVariantStyle(
-        theme.tokens.colors.ui.secondary,
-        theme.state.mode === "dark"
-          ? resolveThemeTextColor(theme, "user", 50)
-          : resolveThemeTextColor(theme, "user", 950)
-      );
-    case "success":
-      return createVariantStyle(
-        theme.tokens.colors.ui.success,
-        resolveSemanticTextColor(theme, semanticThemeMap.success, 50)
-      );
-    case "danger":
-      return createVariantStyle(
-        theme.tokens.colors.ui.danger,
-        resolveSemanticTextColor(theme, semanticThemeMap.danger, 50)
-      );
-    case "warning":
-      return createVariantStyle(
-        theme.tokens.colors.ui.warning,
-        resolveSemanticTextColor(theme, semanticThemeMap.warning, 950)
-      );
-    case "info":
-      return createVariantStyle(
-        theme.tokens.colors.ui.info,
-        resolveSemanticTextColor(theme, semanticThemeMap.info, 50)
-      );
-    case "neutral":
-      return createVariantStyle(
-        theme.tokens.colors.ui.neutral,
-        resolveSemanticTextColor(theme, semanticThemeMap.neutral, 50)
-      );
     case "primary":
     default:
-      return createVariantStyle(theme.tokens.colors.ui.primary, resolveThemeTextColor(theme, "admin", 50));
+      return createVariantStyle(theme.tokens.colors.ui.primary, resolveThemeTextColor(theme, 50));
   }
 }

@@ -1,0 +1,7 @@
+ALTER TABLE "CustomerProfile"
+ADD COLUMN IF NOT EXISTS "themeMode" TEXT NOT NULL DEFAULT 'light';
+
+ALTER TABLE "AdminTheme"
+DROP COLUMN IF EXISTS "tone";
+
+DROP TABLE IF EXISTS "UserTheme";

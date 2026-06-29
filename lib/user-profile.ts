@@ -5,6 +5,7 @@ export type UserProfile = {
   birthDate: string;
   phone: string;
   address: string;
+  themeMode: "light" | "dark";
   isAdminUnlocked: boolean;
 };
 
@@ -18,6 +19,7 @@ export const EMPTY_USER_PROFILE: UserProfile = {
   birthDate: "",
   phone: "",
   address: "",
+  themeMode: "light",
   isAdminUnlocked: false,
 };
 
@@ -35,11 +37,14 @@ function areProfilesEqual(first: UserProfile | null, second: UserProfile | null)
     first.birthDate === second.birthDate &&
     first.phone === second.phone &&
     first.address === second.address &&
+    first.themeMode === second.themeMode &&
     first.isAdminUnlocked === second.isAdminUnlocked
   );
 }
 
 export function normalizeUserProfile(value: Partial<UserProfile> | null | undefined): UserProfile {
+  const themeMode = value?.themeMode === "dark" ? "dark" : "light";
+
   return {
     firstName: String(value?.firstName ?? ""),
     lastName: String(value?.lastName ?? ""),
@@ -47,6 +52,7 @@ export function normalizeUserProfile(value: Partial<UserProfile> | null | undefi
     birthDate: String(value?.birthDate ?? ""),
     phone: String(value?.phone ?? ""),
     address: String(value?.address ?? ""),
+    themeMode,
     isAdminUnlocked: value?.isAdminUnlocked === true,
   };
 }

@@ -62,7 +62,7 @@ export default function CategoryProductsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-bg-base text-primary-text">
+    <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-5 px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary-border pb-4">
           <div className="flex flex-col gap-1">

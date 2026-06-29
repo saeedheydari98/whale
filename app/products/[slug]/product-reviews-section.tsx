@@ -186,7 +186,7 @@ export function ProductReviewsSection({
               </CustomButton>
             </div>
             {error ? (
-              <div className="rounded-md border border-danger-border-nomode bg-bg-base px-3 py-2 text-sm font-semibold text-danger-text-nomode">
+              <div className="rounded-md border border-danger-border-nomode bg-primary-base px-3 py-2 text-sm font-semibold text-danger-text-nomode">
                 {error}
               </div>
             ) : null}

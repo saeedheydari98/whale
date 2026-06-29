@@ -68,20 +68,12 @@ export const changePasswordSchema = z.object({
 
 export const profileSchema = customerProfileSchema.extend({
   avatarUrl: z.string().trim().optional().nullable(),
+  themeMode: z.enum(["light", "dark"]).optional(),
   isAdminUnlocked: z.boolean().optional(),
 });
 
 export const avatarSchema = z.object({
   avatarUrl: z.string().trim().min(1),
-});
-
-export const themeSchema = z.object({
-  primary: z.string().trim().optional(),
-  preferredColor: z.string().trim().optional(),
-  style: z.string().trim().optional(),
-  tone: z.coerce.number().int().optional(),
-  density: z.string().trim().optional(),
-  isColorPanelLocked: z.boolean().optional(),
 });
 
 export const bannerSchema = z.object({

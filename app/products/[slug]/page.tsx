@@ -205,7 +205,7 @@ export default function ProductPage() {
 
   if (catalogLoading && !product) {
     return (
-      <main className="min-h-screen bg-bg-base text-primary-text">
+      <main className="min-h-screen bg-primary-base text-primary-text">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 py-8 px-4">
           <section className="flex w-full flex-col gap-8 rounded-2xl border border-border-default bg-primary-soft p-6 shadow-sm lg:flex-row lg:items-start">
             <div className="flex w-full flex-col gap-4 lg:max-w-md lg:shrink-0">
@@ -313,7 +313,7 @@ export default function ProductPage() {
 
   if (!product) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 bg-bg-base p-6">
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 bg-primary-base p-6">
         <div className="text-lg font-bold text-primary-text">محصول پیدا نشد</div>
         <div className="text-sm text-secondary-text">محصول موردنظر در فروشگاه پیدا نشد.</div>
       </div>
@@ -342,7 +342,7 @@ export default function ProductPage() {
   const finalPriceDate = formatDate(product.updatedAt || product.publishedAt || product.createdAt);
 
   return (
-    <main className="min-h-screen bg-bg-base text-primary-text">
+    <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         {cartMessage ? (
           <div className="rounded-lg border border-primary-border bg-primary-card px-4 py-3 text-sm font-semibold text-primary">

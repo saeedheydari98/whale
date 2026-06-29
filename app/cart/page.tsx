@@ -166,6 +166,7 @@ export default function CartPage() {
       birthDate: profileDraft.birthDate.trim(),
       phone: profileDraft.phone.trim(),
       address: profileDraft.address.trim(),
+      themeMode: profileDraft.themeMode,
       isAdminUnlocked: profileDraft.isAdminUnlocked,
     };
 
@@ -223,7 +224,7 @@ export default function CartPage() {
   };
 
   return (
-    <main className="min-h-screen bg-bg-base text-primary-text">
+    <main className="min-h-screen bg-primary-base text-primary-text">
       <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex items-center justify-between gap-3 border-b border-primary-border pb-4">
           <div>
@@ -363,7 +364,7 @@ export default function CartPage() {
           border="base"
           shadow="lg"
         >
-          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-bg-base">
+          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-primary-base">
             {previewImage && (
               <img
                 src={previewImage}
@@ -473,7 +474,7 @@ export default function CartPage() {
             </div>
             </div>
             {profileError ? (
-              <div className="rounded-md border border-danger-border-nomode bg-bg-base px-3 py-2 text-sm font-semibold text-danger-text-nomode">
+              <div className="rounded-md border border-danger-border-nomode bg-primary-base px-3 py-2 text-sm font-semibold text-danger-text-nomode">
                 {profileError}
               </div>
             ) : null}

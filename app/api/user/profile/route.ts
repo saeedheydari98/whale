@@ -72,6 +72,7 @@ async function saveProfile(request: Request) {
         birthDate: profile.birthDate,
         address: profile.address,
         avatarUrl: profile.avatarUrl ?? null,
+        ...(profile.themeMode ? { themeMode: profile.themeMode } : {}),
         ...(profile.isAdminUnlocked !== undefined
           ? { isAdminUnlocked: profile.isAdminUnlocked }
           : {}),
@@ -85,6 +86,7 @@ async function saveProfile(request: Request) {
         phone: profile.phone,
         address: profile.address,
         avatarUrl: profile.avatarUrl ?? null,
+        themeMode: profile.themeMode ?? "light",
         isAdminUnlocked: profile.isAdminUnlocked ?? false,
       },
     });

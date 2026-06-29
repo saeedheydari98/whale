@@ -76,7 +76,7 @@ export function ColorStockDots({
             style={{ backgroundColor: getStockColorValue(color) }}
           >
             <span className={cx(
-              "inline-flex items-center justify-center rounded-full border border-primary-border bg-bg-base/90 px-1 text-center shadow-sm backdrop-blur-sm",
+              "inline-flex items-center justify-center rounded-full border border-primary-border bg-primary-base/90 px-1 text-center shadow-sm backdrop-blur-sm",
               labelSize
             )}>
               {label}

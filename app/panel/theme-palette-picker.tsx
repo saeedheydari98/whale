@@ -16,8 +16,8 @@ const colorOptions: ThemeColorKey[] = [
 ];
 
 const styleOptions: ThemeStyle[] = ["light", "dark", "fantasy"];
-const toneOptions = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const;
 const previewTones: ThemeTone[] = [100, 300, 500, 700, 900];
+const staticTone: ThemeTone = 500;
 
 const colorLabels: Record<ThemeColorKey, string> = {
   green: "سبز",
@@ -35,7 +35,7 @@ const styleLabels: Record<ThemeStyle, string> = {
   fantasy: "فانتزی",
 };
 
-type PaletteSection = "colors" | "styles" | "tones";
+type PaletteSection = "colors" | "styles";
 type PaletteScope = "admin" | "user";
 
 const paletteScopeClasses: Record<
@@ -90,12 +90,10 @@ type ThemePalettePickerProps = {
   scope: PaletteScope;
   selectedColor: ThemeColorKey;
   selectedStyle: ThemeStyle;
-  selectedTone: ThemeTone;
   selectionClassName: string;
   onChange: (next: {
     color?: ThemeColorKey;
     style?: ThemeStyle;
-    tone?: ThemeTone;
   }) => void | Promise<void>;
 };
 
@@ -163,7 +161,6 @@ export function ThemePalettePicker({
   scope,
   selectedColor,
   selectedStyle,
-  selectedTone,
   selectionClassName,
   onChange,
 }: ThemePalettePickerProps) {
@@ -171,10 +168,9 @@ export function ThemePalettePicker({
   const [openSections, setOpenSections] = useState<Record<PaletteSection, boolean>>({
     colors: true,
     styles: false,
-    tones: false,
   });
-  const selectedThemeLabel = `${colorLabels[selectedColor]} / ${styleLabels[selectedStyle]} / ${selectedTone}`;
-  const selectedPreviewColor = resolveColor(selectedColor, selectedStyle, selectedTone);
+  const selectedThemeLabel = `${colorLabels[selectedColor]} / ${styleLabels[selectedStyle]}`;
+  const selectedPreviewColor = resolveColor(selectedColor, selectedStyle, staticTone);
   const scopeClasses = paletteScopeClasses[scope];
 
   const toggleSection = (section: PaletteSection) => {
@@ -224,7 +220,7 @@ export function ThemePalettePicker({
           }
         >
           {colorOptions.map((color) => {
-            const background = resolveColor(color, selectedStyle, selectedTone);
+            const background = resolveColor(color, selectedStyle, staticTone);
             const selected = selectedColor === color;
             const textColor = getThemeContrastColor(background, color, selectedStyle);
 
@@ -265,14 +261,14 @@ export function ThemePalettePicker({
                 <span
                   key={style}
                   className="h-8 w-2.5 rounded-full"
-                  style={{ backgroundColor: resolveColor(selectedColor, style, selectedTone) }}
+                  style={{ backgroundColor: resolveColor(selectedColor, style, staticTone) }}
                 />
               ))}
             </span>
           }
         >
           {styleOptions.map((item) => {
-            const background = resolveColor(selectedColor, item, selectedTone);
+            const background = resolveColor(selectedColor, item, staticTone);
             const selected = selectedStyle === item;
             const selectedTextColor = getThemeContrastColor(background, selectedColor, item);
 
@@ -296,50 +292,6 @@ export function ThemePalettePicker({
               >
                 {styleLabels[item]}
               </CustomButton>
-            );
-          })}
-        </PaletteSection>
-
-        <PaletteSection
-          id={`${paletteId}-tones`}
-          open={openSections.tones}
-          scopeClasses={scopeClasses}
-          title="شدت رنگ"
-          value={String(selectedTone)}
-          valueClassName={selectionClassName}
-          onToggle={() => toggleSection("tones")}
-          preview={
-            <span
-              className="h-8 w-8 shrink-0 rounded-full"
-              style={{ backgroundColor: selectedPreviewColor }}
-              aria-hidden="true"
-            />
-          }
-        >
-          {toneOptions.map((tone) => {
-            const toneColor = resolveColor(selectedColor, selectedStyle, tone);
-            const selected = selectedTone === tone;
-            const textColor = getThemeContrastColor(toneColor, selectedColor, selectedStyle);
-
-            return (
-              <button
-                key={tone}
-                type="button"
-                className="flex h-8 min-w-8 cursor-pointer touch-manipulation items-center justify-center rounded-full border text-xs font-bold tabular-nums transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary-border focus-visible:ring-offset-2"
-                disabled={disabled}
-                style={{
-                  backgroundColor: toneColor,
-                  borderColor: selected ? getContrastColor(toneColor) : hexToRgba(toneColor, 0.28),
-                  boxShadow: selected ? `0 0 0 2px ${hexToRgba(toneColor, 0.45)}` : "none",
-                  color: textColor,
-                }}
-                onClick={() => {
-                  if (!disabled) void onChange({ tone });
-                }}
-                aria-label={`${selectedColor} ${tone}`}
-              >
-                <span>{tone}</span>
-              </button>
             );
           })}
         </PaletteSection>
