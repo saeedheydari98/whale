@@ -43,15 +43,15 @@ export function AppFooter() {
   const visibleNavItems = mobileNavItems.filter((item) => !item.adminOnly || hasAdminAccess);
 
   return (
-    <footer className="bg-primary-panel text-primary-text border-primary-border font-bold p-4 w-full h-14 flex justify-center items-center border-t">
+    <footer className="bg-primary-panel text-primary-text border-primary-border font-bold p-2 w-full h-12 flex justify-center items-center border-t">
       {isMobile ? (
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-primary-border bg-primary-panel px-2 py-2 shadow-lg backdrop-blur">
+        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-primary-border bg-primary-panel px-2 py-1 shadow-lg backdrop-blur">
           {visibleNavItems.map((item) => (
             <HeaderNavLink
               key={item.href}
               href={item.href}
               icon={item.icon}
-              className="h-14 flex-1 flex-col gap-1 rounded-md border-0 px-1 py-1 text-[11px]"
+              className="h-11 flex-1 flex-col gap-0.5 rounded-md border-0 px-1 py-0.5 text-[10px]"
             >
               <span>{item.label}</span>
             </HeaderNavLink>

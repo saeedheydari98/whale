@@ -15,7 +15,7 @@ import { clearProductsCache, getProducts } from "@/lib/products-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { AdminBannerList } from "./products-panel/admin-banner-list";
 import { AdminShowcaseList } from "./products-panel/admin-showcase-list";
-import type { BannerForm, BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "./products-panel/types";
+import type { BannerForm, BrandForm, CatalogLinkGroupForm, CategoryForm, ProductForm, ShowcaseForm } from "./products-panel/types";
 
 export type AdminCatalogSection = "products" | "banners" | "showcases" | "categories" | "brands" | "storefront";
 type ProductRelationMode = "category" | "showcase";
@@ -37,6 +37,7 @@ const createShowcase = (): ShowcaseForm => ({
 
 const createCategory = (): CategoryForm => ({
   id: `category-${Date.now()}`,
+  groupId: "default-categories",
   title: "",
   slug: "",
   imageUrl: "",
@@ -47,12 +48,20 @@ const createCategory = (): CategoryForm => ({
 
 const createBrand = (): BrandForm => ({
   id: `brand-${Date.now()}`,
+  groupId: "default-brands",
   title: "",
   slug: "",
   imageUrl: "",
   active: true,
   sortOrder: 1,
   homeSortOrder: 1,
+});
+
+const createCatalogLinkGroup = (kind: "category" | "brand"): CatalogLinkGroupForm => ({
+  id: `${kind}-group-${Date.now()}`,
+  title: "",
+  active: true,
+  sortOrder: 1,
 });
 
 const createBanner = (): BannerForm => ({
@@ -188,9 +197,8 @@ function InventoryControls({ product, onChange }: InventoryControlsProps) {
   return (
     <div
       data-invalid={!stockMatchesTotal ? "true" : undefined}
-      className={`flex flex-col gap-3 rounded-lg border bg-primary-card p-3 ${
-        stockMatchesTotal ? "border-primary-border" : "border-danger-border-nomode"
-      }`}
+      className={`flex flex-col gap-3 rounded-lg border bg-primary-card p-3 ${stockMatchesTotal ? "border-primary-border" : "border-danger-border-nomode"
+        }`}
     >
       <div className="flex flex-col gap-1">
         <div className="text-sm font-bold text-primary-text">موجودی</div>
@@ -226,9 +234,8 @@ function InventoryControls({ product, onChange }: InventoryControlsProps) {
                 type="button"
                 aria-label={`${color} stock`}
                 onClick={() => setSelectedColor(color)}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border text-[10px] font-bold tabular-nums transition hover:scale-105 ${
-                  selected ? "border-primary text-primary-text ring-2 ring-primary-border" : "border-primary-border text-primary-text"
-                }`}
+                className={`flex h-10 w-10 items-center justify-center rounded-full border text-[10px] font-bold tabular-nums transition hover:scale-105 ${selected ? "border-primary text-primary-text ring-2 ring-primary-border" : "border-primary-border text-primary-text"
+                  }`}
                 style={{ backgroundColor: getStockColorValue(color) }}
               >
                 <span className="rounded-full bg-primary-base/85 px-1 leading-4">{count > 10 ? "+10" : count}</span>
@@ -290,11 +297,10 @@ function ProductAdvancedFields({ product, categories, brands, onChange, hasRequi
       <RequiredLabel required className="text-primary-text">دسته‌بندی</RequiredLabel>
       <div
         data-invalid={hasRequiredError(categoryErrorKey) && !product.categoryId.trim() ? "true" : undefined}
-        className={`flex flex-wrap gap-3 rounded-md border p-2 ${
-          hasRequiredError(categoryErrorKey) && !product.categoryId.trim()
+        className={`flex flex-wrap gap-3 rounded-md border p-2 ${hasRequiredError(categoryErrorKey) && !product.categoryId.trim()
             ? "border-danger-border-nomode"
             : "border-primary-border"
-        }`}
+          }`}
       >
         {categories.map((category) => (
           <CategoryOption
@@ -316,6 +322,12 @@ function ProductAdvancedFields({ product, categories, brands, onChange, hasRequi
       <div className="flex flex-col gap-2">
         <RequiredLabel className="text-primary-text">برند</RequiredLabel>
         <div className="flex flex-wrap gap-3 rounded-md border border-primary-border p-2">
+          <CategoryOption
+            label="بدون برند"
+            selected={!product.brand}
+            size="sm"
+            onClick={() => onChange({ brand: "" })}
+          />
           {brands.length === 0 ? (
             <span className="text-xs text-secondary-text">ابتدا از بخش برندها، برند تعریف کنید.</span>
           ) : null}
@@ -514,6 +526,7 @@ function normalizeCategory(item: Partial<CategoryForm>, index: number): Category
 
   return {
     id: String(item.id ?? (slug || `category-${Date.now()}-${index}`)),
+    groupId: String(item.groupId ?? "default-categories"),
     title,
     slug,
     imageUrl: String(item.imageUrl ?? "").trim(),
@@ -530,12 +543,25 @@ function normalizeBrand(item: Partial<BrandForm>, index: number): BrandForm {
 
   return {
     id,
+    groupId: String(item.groupId ?? "default-brands"),
     title,
     slug,
     imageUrl: String(item.imageUrl ?? "").trim(),
     active: item.active !== false,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
     homeSortOrder: Number.isFinite(Number(item.homeSortOrder)) ? Number(item.homeSortOrder) : 1,
+  };
+}
+
+function normalizeCatalogLinkGroup(item: Partial<CatalogLinkGroupForm>, index: number, fallbackId: string, fallbackTitle: string): CatalogLinkGroupForm {
+  const title = String(item.title ?? "").trim();
+  const id = String(item.id ?? (slugifyValue(title) || `${fallbackId}-${index + 1}`)).trim();
+
+  return {
+    id: id || fallbackId,
+    title: title || fallbackTitle,
+    active: item.active !== false,
+    sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
 }
 
@@ -731,18 +757,28 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
   const [products, setProducts] = useState<ProductForm[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseForm[]>([]);
   const [categories, setCategories] = useState<CategoryForm[]>([
-    normalizeCategory({ id: "general", title: "عمومی", slug: "general", imageUrl: "", active: true, sortOrder: 1 }, 0),
+    normalizeCategory({ id: "general", groupId: "default-categories", title: "عمومی", slug: "general", imageUrl: "", active: true, sortOrder: 1 }, 0),
+  ]);
+  const [categoryGroups, setCategoryGroups] = useState<CatalogLinkGroupForm[]>([
+    normalizeCatalogLinkGroup({ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: 1 }, 0, "default-categories", "دسته بندی ها"),
   ]);
   const [brands, setBrands] = useState<BrandForm[]>([]);
+  const [brandGroups, setBrandGroups] = useState<CatalogLinkGroupForm[]>([
+    normalizeCatalogLinkGroup({ id: "default-brands", title: "برندها", active: true, sortOrder: 1 }, 0, "default-brands", "برندها"),
+  ]);
   const [banners, setBanners] = useState<BannerForm[]>([]);
   const [draftProduct, setDraftProduct] = useState<ProductForm>(createProduct);
   const [draftShowcase, setDraftShowcase] = useState<ShowcaseForm>(createShowcase);
   const [draftCategory, setDraftCategory] = useState<CategoryForm>(createCategory);
+  const [draftCategoryGroup, setDraftCategoryGroup] = useState<CatalogLinkGroupForm>(() => createCatalogLinkGroup("category"));
   const [draftBrand, setDraftBrand] = useState<BrandForm>(createBrand);
+  const [draftBrandGroup, setDraftBrandGroup] = useState<CatalogLinkGroupForm>(() => createCatalogLinkGroup("brand"));
   const [draftBanner, setDraftBanner] = useState<BannerForm>(createBanner);
   const [editingShowcase, setEditingShowcase] = useState<ShowcaseForm | null>(null);
   const [editingCategory, setEditingCategory] = useState<CategoryForm | null>(null);
   const [editingBrand, setEditingBrand] = useState<BrandForm | null>(null);
+  const [editingCategoryGroup, setEditingCategoryGroup] = useState<CatalogLinkGroupForm | null>(null);
+  const [editingBrandGroup, setEditingBrandGroup] = useState<CatalogLinkGroupForm | null>(null);
   const [editingBanner, setEditingBanner] = useState<BannerForm | null>(null);
   const [editingProduct, setEditingProduct] = useState<ProductForm | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -750,6 +786,10 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
   const [isEditShowcaseOpen, setIsEditShowcaseOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isBrandOpen, setIsBrandOpen] = useState(false);
+  const [isCategoryGroupOpen, setIsCategoryGroupOpen] = useState(false);
+  const [isBrandGroupOpen, setIsBrandGroupOpen] = useState(false);
+  const [isEditCategoryGroupOpen, setIsEditCategoryGroupOpen] = useState(false);
+  const [isEditBrandGroupOpen, setIsEditBrandGroupOpen] = useState(false);
   const [isEditCategoryOpen, setIsEditCategoryOpen] = useState(false);
   const [isEditBrandOpen, setIsEditBrandOpen] = useState(false);
   const [isBannerOpen, setIsBannerOpen] = useState(false);
@@ -771,6 +811,8 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
   const [storefrontLayoutTab, setStorefrontLayoutTab] = useState<StorefrontLayoutTab>("home");
   const [draftBannerImageUrl, setDraftBannerImageUrl] = useState("");
   const [editingBannerImageUrl, setEditingBannerImageUrl] = useState("");
+  const [categoryGroupLinkIds, setCategoryGroupLinkIds] = useState<string[]>([]);
+  const [brandGroupLinkIds, setBrandGroupLinkIds] = useState<string[]>([]);
 
   const hasRequiredError = (key: string) => requiredErrors.includes(key);
 
@@ -825,50 +867,85 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
         );
         const nextCategories = catalog.categories.length > 0
           ? catalog.categories.map((item, index) =>
-              normalizeCategory(
-                {
-                  id: item.id,
-                  title: item.title,
-                  slug: item.slug,
-                  imageUrl: item.imageUrl ?? "",
-                  active: item.active,
-                  sortOrder: Number(item.sortOrder),
-                  pageSortOrder: Number(item.pageSortOrder ?? 1),
-                },
-                index
-              )
+            normalizeCategory(
+              {
+                id: item.id,
+                groupId: item.groupId ?? "default-categories",
+                title: item.title,
+                slug: item.slug,
+                imageUrl: item.imageUrl ?? "",
+                active: item.active,
+                sortOrder: Number(item.sortOrder),
+                pageSortOrder: Number(item.pageSortOrder ?? 1),
+              },
+              index
             )
+          )
           : [
-              normalizeCategory({
-                id: "general",
-                title: "عمومی",
-                slug: "general",
-                imageUrl: "",
-                active: true,
-                sortOrder: 1,
-                pageSortOrder: 1,
-              }, 0),
-            ];
+            normalizeCategory({
+              id: "general",
+              groupId: "default-categories",
+              title: "عمومی",
+              slug: "general",
+              imageUrl: "",
+              active: true,
+              sortOrder: 1,
+              pageSortOrder: 1,
+            }, 0),
+          ];
         const nextBrands = Array.isArray(catalog.brands)
           ? catalog.brands.map((item, index) =>
-              normalizeBrand(
-                {
-                  id: String(item.id),
-                  title: String(item.title ?? ""),
-                  slug: String(item.slug ?? ""),
-                  imageUrl: String(item.imageUrl ?? ""),
-                  active: item.active !== false,
-                  sortOrder: Number(item.sortOrder),
-                  homeSortOrder: Number(item.homeSortOrder ?? 1),
-                },
-                index
-              )
+            normalizeBrand(
+              {
+                id: String(item.id),
+                groupId: String(item.groupId ?? "default-brands"),
+                title: String(item.title ?? ""),
+                slug: String(item.slug ?? ""),
+                imageUrl: String(item.imageUrl ?? ""),
+                active: item.active !== false,
+                sortOrder: Number(item.sortOrder),
+                homeSortOrder: Number(item.homeSortOrder ?? 1),
+              },
+              index
             )
+          )
           : [];
+        const nextCategoryGroups = Array.isArray(catalog.categoryGroups) && catalog.categoryGroups.length > 0
+          ? catalog.categoryGroups.map((item, index) =>
+            normalizeCatalogLinkGroup(
+              {
+                id: String(item.id),
+                title: String(item.title ?? ""),
+                active: item.active !== false,
+                sortOrder: Number(item.sortOrder),
+              },
+              index,
+              "default-categories",
+              "دسته بندی ها"
+            )
+          )
+          : [normalizeCatalogLinkGroup({ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: Number(nextCategories[0]?.pageSortOrder ?? 1) }, 0, "default-categories", "دسته بندی ها")];
+        const nextBrandGroups = Array.isArray(catalog.brandGroups) && catalog.brandGroups.length > 0
+          ? catalog.brandGroups.map((item, index) =>
+            normalizeCatalogLinkGroup(
+              {
+                id: String(item.id),
+                title: String(item.title ?? ""),
+                active: item.active !== false,
+                sortOrder: Number(item.sortOrder),
+              },
+              index,
+              "default-brands",
+              "برندها"
+            )
+          )
+          : [normalizeCatalogLinkGroup({ id: "default-brands", title: "برندها", active: true, sortOrder: Number(nextBrands[0]?.homeSortOrder ?? 1) }, 0, "default-brands", "برندها")];
         setProducts(apiProducts);
         setShowcases(nextShowcases);
-        setCategories(nextCategories);
-        setBrands(nextBrands);
+        setCategoryGroups(nextCategoryGroups);
+        setCategories(nextCategories.map((category) => ({ ...category, groupId: category.groupId || nextCategoryGroups[0]?.id || "default-categories" })));
+        setBrandGroups(nextBrandGroups);
+        setBrands(nextBrands.map((brand) => ({ ...brand, groupId: brand.groupId || nextBrandGroups[0]?.id || "default-brands" })));
         setBanners(nextBanners);
         await waitForMinimumLoading(startedAt);
       } catch {
@@ -876,7 +953,9 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
         setProducts([]);
         setShowcases([]);
         setCategories([]);
+        setCategoryGroups([]);
         setBrands([]);
+        setBrandGroups([]);
         setBanners([]);
         setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
         await waitForMinimumLoading(startedAt);
@@ -909,9 +988,19 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     [categories]
   );
 
+  const sortedCategoryGroups = useMemo(
+    () => [...categoryGroups].sort((a, b) => a.sortOrder - b.sortOrder),
+    [categoryGroups]
+  );
+
   const sortedBrands = useMemo(
     () => [...brands].sort((a, b) => a.sortOrder - b.sortOrder),
     [brands]
+  );
+
+  const sortedBrandGroups = useMemo(
+    () => [...brandGroups].sort((a, b) => a.sortOrder - b.sortOrder),
+    [brandGroups]
   );
 
   const sortedBanners = useMemo(
@@ -941,17 +1030,29 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
       const categorySections = sortedCategories.length > 0
         ? [{
-            type: "categoryGroup" as const,
-            item: {
-              id: "category-group",
-              title: "دسته‌بندی‌ها",
-              sortOrder: Number(sortedCategories[0]?.pageSortOrder ?? 1),
-            },
+          type: "categoryGroup" as const,
+          item: {
+            id: "category-group",
+            title: "دسته‌بندی‌ها",
             sortOrder: Number(sortedCategories[0]?.pageSortOrder ?? 1),
-          }]
+          },
+          sortOrder: Number(sortedCategories[0]?.pageSortOrder ?? 1),
+        }]
         : [];
 
-      return [...bannerSections, ...categorySections].sort((a, b) => a.sortOrder - b.sortOrder);
+      const groupedCategorySections = sortedCategoryGroups
+        .filter((group) => group.active !== false)
+        .map((group) => ({
+          type: "categoryGroup" as const,
+          item: {
+            id: group.id,
+            title: group.title,
+            sortOrder: Number(group.sortOrder ?? 1),
+          },
+          sortOrder: Number(group.sortOrder ?? 1),
+        }));
+
+      return [...bannerSections, ...(groupedCategorySections.length > 0 ? groupedCategorySections : categorySections)].sort((a, b) => a.sortOrder - b.sortOrder);
     }
 
     if (storefrontLayoutTab === "products") {
@@ -974,28 +1075,40 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
     const brandSections = sortedBrands.length > 0
       ? [{
-          type: "brandGroup" as const,
-          item: {
-            id: "brand-group",
-            title: "برندها",
-            sortOrder: Number(sortedBrands[0]?.homeSortOrder ?? 1),
-          },
+        type: "brandGroup" as const,
+        item: {
+          id: "brand-group",
+          title: "برندها",
           sortOrder: Number(sortedBrands[0]?.homeSortOrder ?? 1),
-        }]
+        },
+        sortOrder: Number(sortedBrands[0]?.homeSortOrder ?? 1),
+      }]
       : [];
+
+    const groupedBrandSections = sortedBrandGroups
+      .filter((group) => group.active !== false)
+      .map((group) => ({
+        type: "brandGroup" as const,
+        item: {
+          id: group.id,
+          title: group.title,
+          sortOrder: Number(group.sortOrder ?? 1),
+        },
+        sortOrder: Number(group.sortOrder ?? 1),
+      }));
 
     return [
       ...sortedBanners
-      .filter((banner) => banner.showOnHome)
-      .map((banner) => ({
-        type: "banner" as const,
-        item: banner,
-        sortOrder: Number(banner.homeSortOrder ?? banner.sortOrder),
-      })),
-      ...brandSections,
+        .filter((banner) => banner.showOnHome)
+        .map((banner) => ({
+          type: "banner" as const,
+          item: banner,
+          sortOrder: Number(banner.homeSortOrder ?? banner.sortOrder),
+        })),
+      ...(groupedBrandSections.length > 0 ? groupedBrandSections : brandSections),
     ]
       .sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [sortedBanners, sortedBrands, sortedCategories, sortedShowcases, storefrontLayoutTab]);
+  }, [sortedBanners, sortedBrandGroups, sortedBrands, sortedCategories, sortedCategoryGroups, sortedShowcases, storefrontLayoutTab]);
 
   const persistProducts = async (
     nextProducts: ProductForm[],
@@ -1003,7 +1116,9 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     nextBanners = sortedBanners,
     nextCategories = sortedCategories,
     nextBrands = sortedBrands,
-    showSavedStatus = true
+    showSavedStatus = true,
+    nextCategoryGroups = sortedCategoryGroups,
+    nextBrandGroups = sortedBrandGroups
   ) => {
     const validProducts = dedupeProducts(
       nextProducts.filter((item) => item.title.trim() && item.description.trim() && item.price.trim())
@@ -1031,6 +1146,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
           })),
           categories: nextCategories.map((category) => ({
             id: category.id,
+            groupId: category.groupId,
             title: category.title,
             slug: category.slug,
             imageUrl: category.imageUrl,
@@ -1038,14 +1154,27 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
             sortOrder: category.sortOrder,
             pageSortOrder: category.pageSortOrder,
           })),
+          categoryGroups: nextCategoryGroups.map((group) => ({
+            id: group.id,
+            title: group.title,
+            active: group.active,
+            sortOrder: group.sortOrder,
+          })),
           brands: nextBrands.map((brand) => ({
             id: brand.id,
+            groupId: brand.groupId,
             title: brand.title,
             slug: brand.slug,
             imageUrl: brand.imageUrl,
             active: brand.active,
             sortOrder: brand.sortOrder,
             homeSortOrder: brand.homeSortOrder,
+          })),
+          brandGroups: nextBrandGroups.map((group) => ({
+            id: group.id,
+            title: group.title,
+            active: group.active,
+            sortOrder: group.sortOrder,
           })),
           banners: nextBanners.map((banner) => {
             const normalizedBanner = normalizeBannerTiming(banner);
@@ -1086,12 +1215,20 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       const savedCategories = Array.isArray(data?.data?.categories)
         ? data.data.categories.map(normalizeCategory)
         : nextCategories;
+      const savedCategoryGroups = Array.isArray(data?.data?.categoryGroups)
+        ? data.data.categoryGroups.map((group: Partial<CatalogLinkGroupForm>, index: number) => normalizeCatalogLinkGroup(group, index, "default-categories", "دسته بندی ها"))
+        : nextCategoryGroups;
       const savedBrands = Array.isArray(data?.data?.brands)
         ? data.data.brands.map(normalizeBrand)
         : nextBrands;
+      const savedBrandGroups = Array.isArray(data?.data?.brandGroups)
+        ? data.data.brandGroups.map((group: Partial<CatalogLinkGroupForm>, index: number) => normalizeCatalogLinkGroup(group, index, "default-brands", "برندها"))
+        : nextBrandGroups;
       setProducts(savedProducts);
       setShowcases(savedShowcases);
+      setCategoryGroups(savedCategoryGroups);
       setCategories(savedCategories);
+      setBrandGroups(savedBrandGroups);
       setBrands(savedBrands);
       setBanners(savedBanners);
       clearProductsCache();
@@ -1171,10 +1308,10 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     const nextShowcases = sortedShowcases.map((item) =>
       item.id === showcase.id
         ? {
-            ...item,
-            mode: "manual" as const,
-            manualProductIds: visibleIds,
-          }
+          ...item,
+          mode: "manual" as const,
+          manualProductIds: visibleIds,
+        }
         : item
     );
     setShowcases(nextShowcases);
@@ -1223,16 +1360,44 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     setIsShowcaseOpen(true);
   };
 
-  const openCategoryModal = () => {
+  const openCategoryModal = (groupId?: string) => {
     setRequiredErrors([]);
-    setDraftCategory({ ...createCategory(), sortOrder: nextCategoryOrder });
+    setDraftCategory({ ...createCategory(), groupId: groupId || sortedCategoryGroups[0]?.id || "default-categories", sortOrder: nextCategoryOrder });
     setIsCategoryOpen(true);
   };
 
-  const openBrandModal = () => {
+  const openBrandModal = (groupId?: string) => {
     setRequiredErrors([]);
-    setDraftBrand({ ...createBrand(), sortOrder: (Math.max(0, ...sortedBrands.map((brand) => brand.sortOrder)) || 0) + 1 });
+    setDraftBrand({ ...createBrand(), groupId: groupId || sortedBrandGroups[0]?.id || "default-brands", sortOrder: (Math.max(0, ...sortedBrands.map((brand) => brand.sortOrder)) || 0) + 1 });
     setIsBrandOpen(true);
+  };
+
+  const openCategoryGroupModal = () => {
+    setRequiredErrors([]);
+    setDraftCategoryGroup({ ...createCatalogLinkGroup("category"), sortOrder: (Math.max(0, ...sortedCategoryGroups.map((group) => group.sortOrder)) || 0) + 1 });
+    setCategoryGroupLinkIds([]);
+    setIsCategoryGroupOpen(true);
+  };
+
+  const openBrandGroupModal = () => {
+    setRequiredErrors([]);
+    setDraftBrandGroup({ ...createCatalogLinkGroup("brand"), sortOrder: (Math.max(0, ...sortedBrandGroups.map((group) => group.sortOrder)) || 0) + 1 });
+    setBrandGroupLinkIds([]);
+    setIsBrandGroupOpen(true);
+  };
+
+  const openEditCategoryGroupModal = (group: CatalogLinkGroupForm) => {
+    setRequiredErrors([]);
+    setEditingCategoryGroup(group);
+    setCategoryGroupLinkIds(sortedCategories.filter((category) => category.groupId === group.id).map((category) => category.id));
+    setIsEditCategoryGroupOpen(true);
+  };
+
+  const openEditBrandGroupModal = (group: CatalogLinkGroupForm) => {
+    setRequiredErrors([]);
+    setEditingBrandGroup(group);
+    setBrandGroupLinkIds(sortedBrands.filter((brand) => brand.groupId === group.id).map((brand) => brand.id));
+    setIsEditBrandGroupOpen(true);
   };
 
   const openBannerModal = () => {
@@ -1543,6 +1708,60 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     await persistProducts(products, sortedShowcases, sortedBanners, nextCategories);
   };
 
+  const submitDraftCategoryGroup = async () => {
+    if (!draftCategoryGroup.title.trim()) {
+      showRequiredErrors(["draftCategoryGroup.title"], "عنوان بخش دسته‌بندی الزامی است.");
+      return;
+    }
+
+    const normalized = normalizeCatalogLinkGroup(
+      {
+        ...draftCategoryGroup,
+        id: slugifyValue(draftCategoryGroup.title) || draftCategoryGroup.id,
+        sortOrder: (Math.max(0, ...sortedCategoryGroups.map((group) => group.sortOrder)) || 0) + 1,
+      },
+      sortedCategoryGroups.length,
+      "default-categories",
+      "دسته بندی ها"
+    );
+    const nextGroups = [...sortedCategoryGroups, normalized];
+    const nextCategories = sortedCategories.map((category) =>
+      categoryGroupLinkIds.includes(category.id) ? { ...category, groupId: normalized.id } : category
+    );
+    setRequiredErrors([]);
+    setCategoryGroups(nextGroups);
+    setCategories(nextCategories);
+    setDraftCategoryGroup(createCatalogLinkGroup("category"));
+    setCategoryGroupLinkIds([]);
+    setIsCategoryGroupOpen(false);
+    await persistProducts(products, sortedShowcases, sortedBanners, nextCategories, sortedBrands, false, nextGroups, sortedBrandGroups);
+  };
+
+  const submitEditingCategoryGroup = async () => {
+    if (!editingCategoryGroup) return;
+    if (!editingCategoryGroup.title.trim()) {
+      showRequiredErrors(["editingCategoryGroup.title"], "عنوان بخش دسته‌بندی الزامی است.");
+      return;
+    }
+
+    const normalized = normalizeCatalogLinkGroup(editingCategoryGroup, editingCategoryGroup.sortOrder, "default-categories", "دسته بندی ها");
+    const nextGroups = sortedCategoryGroups.map((group) => (group.id === editingCategoryGroup.id ? normalized : group));
+    const fallbackGroupId = sortedCategoryGroups.find((group) => group.id !== editingCategoryGroup.id)?.id || normalized.id;
+    const nextCategories = sortedCategories.map((category) => {
+      if (categoryGroupLinkIds.includes(category.id)) return { ...category, groupId: normalized.id };
+      if (category.groupId === normalized.id) return { ...category, groupId: fallbackGroupId };
+      return category;
+    });
+
+    setRequiredErrors([]);
+    setCategoryGroups(nextGroups);
+    setCategories(nextCategories);
+    setEditingCategoryGroup(null);
+    setCategoryGroupLinkIds([]);
+    setIsEditCategoryGroupOpen(false);
+    await persistProducts(products, sortedShowcases, sortedBanners, nextCategories, sortedBrands, false, nextGroups, sortedBrandGroups);
+  };
+
   const submitDraftBrand = async () => {
     if (!draftBrand.title.trim()) {
       showRequiredErrors(["draftBrand.title"], "عنوان برند الزامی است.");
@@ -1555,6 +1774,60 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     setBrands(nextBrands);
     setIsBrandOpen(false);
     await persistProducts(products, sortedShowcases, sortedBanners, sortedCategories, nextBrands);
+  };
+
+  const submitDraftBrandGroup = async () => {
+    if (!draftBrandGroup.title.trim()) {
+      showRequiredErrors(["draftBrandGroup.title"], "عنوان بخش برند الزامی است.");
+      return;
+    }
+
+    const normalized = normalizeCatalogLinkGroup(
+      {
+        ...draftBrandGroup,
+        id: slugifyValue(draftBrandGroup.title) || draftBrandGroup.id,
+        sortOrder: (Math.max(0, ...sortedBrandGroups.map((group) => group.sortOrder)) || 0) + 1,
+      },
+      sortedBrandGroups.length,
+      "default-brands",
+      "برندها"
+    );
+    const nextGroups = [...sortedBrandGroups, normalized];
+    const nextBrands = sortedBrands.map((brand) =>
+      brandGroupLinkIds.includes(brand.id) ? { ...brand, groupId: normalized.id } : brand
+    );
+    setRequiredErrors([]);
+    setBrandGroups(nextGroups);
+    setBrands(nextBrands);
+    setDraftBrandGroup(createCatalogLinkGroup("brand"));
+    setBrandGroupLinkIds([]);
+    setIsBrandGroupOpen(false);
+    await persistProducts(products, sortedShowcases, sortedBanners, sortedCategories, nextBrands, false, sortedCategoryGroups, nextGroups);
+  };
+
+  const submitEditingBrandGroup = async () => {
+    if (!editingBrandGroup) return;
+    if (!editingBrandGroup.title.trim()) {
+      showRequiredErrors(["editingBrandGroup.title"], "عنوان بخش برند الزامی است.");
+      return;
+    }
+
+    const normalized = normalizeCatalogLinkGroup(editingBrandGroup, editingBrandGroup.sortOrder, "default-brands", "برندها");
+    const nextGroups = sortedBrandGroups.map((group) => (group.id === editingBrandGroup.id ? normalized : group));
+    const fallbackGroupId = sortedBrandGroups.find((group) => group.id !== editingBrandGroup.id)?.id || normalized.id;
+    const nextBrands = sortedBrands.map((brand) => {
+      if (brandGroupLinkIds.includes(brand.id)) return { ...brand, groupId: normalized.id };
+      if (brand.groupId === normalized.id) return { ...brand, groupId: fallbackGroupId };
+      return brand;
+    });
+
+    setRequiredErrors([]);
+    setBrandGroups(nextGroups);
+    setBrands(nextBrands);
+    setEditingBrandGroup(null);
+    setBrandGroupLinkIds([]);
+    setIsEditBrandGroupOpen(false);
+    await persistProducts(products, sortedShowcases, sortedBanners, sortedCategories, nextBrands, false, sortedCategoryGroups, nextGroups);
   };
 
   const submitDraftBanner = async () => {
@@ -1754,7 +2027,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
   const updateProductAssignment = async (
     product: ProductForm,
-    patch: Pick<Partial<ProductForm>, "categoryId" | "showcaseId" | "categoryIds" | "showcaseIds">
+    patch: Pick<Partial<ProductForm>, "brand" | "categoryId" | "showcaseId" | "categoryIds" | "showcaseIds">
   ) => {
     const nextProducts = products.map((item) =>
       item.id === product.id ? { ...item, ...patch } : item
@@ -1772,6 +2045,11 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       : [...current, category.id];
     const normalized = next.length > 0 ? next : [sortedCategories[0]?.id ?? "general"];
     await updateProductAssignment(product, { categoryId: normalized[0], categoryIds: normalized });
+  };
+
+  const assignBrandProduct = async (brand: BrandForm, product: ProductForm) => {
+    const nextBrand = product.brand === brand.id ? "" : brand.id;
+    await updateProductAssignment(product, { brand: nextBrand });
   };
 
   const toggleShowcaseProduct = async (showcase: ShowcaseForm, product: ProductForm) => {
@@ -1844,12 +2122,12 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     );
   };
 
-  const updateCategoryGroupPlacement = (sortOrder: number) => {
-    setCategories((current) => current.map((item) => ({ ...item, pageSortOrder: sortOrder })));
+  const updateCategoryGroupPlacement = (groupId: string, sortOrder: number) => {
+    setCategoryGroups((current) => current.map((item) => (item.id === groupId ? { ...item, sortOrder } : item)));
   };
 
-  const updateBrandGroupPlacement = (sortOrder: number) => {
-    setBrands((current) => current.map((item) => ({ ...item, homeSortOrder: sortOrder })));
+  const updateBrandGroupPlacement = (groupId: string, sortOrder: number) => {
+    setBrandGroups((current) => current.map((item) => (item.id === groupId ? { ...item, sortOrder } : item)));
   };
 
   const saveStorefrontPlacement = () => persistProducts(products, sortedShowcases, sortedBanners, sortedCategories, sortedBrands);
@@ -1883,18 +2161,26 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
     }));
     const nextCategories = categories.map((category) => ({
       ...category,
-      pageSortOrder: storefrontLayoutTab === "categories" ? nextOrder.get("categoryGroup:category-group") ?? category.pageSortOrder : category.pageSortOrder,
     }));
     const nextBrands = brands.map((brand) => ({
       ...brand,
-      homeSortOrder: storefrontLayoutTab === "home" ? nextOrder.get("brandGroup:brand-group") ?? brand.homeSortOrder : brand.homeSortOrder,
+    }));
+    const nextCategoryGroups = categoryGroups.map((group) => ({
+      ...group,
+      sortOrder: storefrontLayoutTab === "categories" ? nextOrder.get(`categoryGroup:${group.id}`) ?? group.sortOrder : group.sortOrder,
+    }));
+    const nextBrandGroups = brandGroups.map((group) => ({
+      ...group,
+      sortOrder: storefrontLayoutTab === "home" ? nextOrder.get(`brandGroup:${group.id}`) ?? group.sortOrder : group.sortOrder,
     }));
 
     setBanners(nextBanners);
     setShowcases(nextShowcases);
     setCategories(nextCategories);
     setBrands(nextBrands);
-    await persistProducts(products, nextShowcases, nextBanners, nextCategories, nextBrands, false);
+    setCategoryGroups(nextCategoryGroups);
+    setBrandGroups(nextBrandGroups);
+    await persistProducts(products, nextShowcases, nextBanners, nextCategories, nextBrands, false, nextCategoryGroups, nextBrandGroups);
     setStatus("چیدمان فروشگاه ذخیره شد.");
   };
 
@@ -1929,73 +2215,76 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
       {section === "products" ? (
         <div className="flex flex-wrap gap-3">
-          {sortedProducts.map((product) => (
-            <div
-              key={product.id}
-              draggable
-              onDragStart={(event) => {
-                setDraggingProductId(product.id);
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", String(product.id));
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const sourceId = event.dataTransfer.getData("text/plain") || draggingProductId;
-                if (sourceId) void reorderProducts(sourceId, product.id);
-                setDraggingProductId(null);
-              }}
-              onDragEnd={() => setDraggingProductId(null)}
-              className={`flex w-full max-w-80 cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing ${
-                draggingProductId === product.id ? "border-primary opacity-70" : "border-primary-border"
-              }`}
-            >
-              <button type="button" className="flex gap-3 text-right" onClick={() => openEditModal(product)}>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
-                  {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs text-secondary-text">بدون تصویر</span>
-                  )}
+          {sortedProducts.map((product) => {
+            const productBrand = sortedBrands.find((brand) => brand.id === product.brand || brand.title === product.brand);
+            return (
+              <div
+                key={product.id}
+                draggable
+                onDragStart={(event) => {
+                  setDraggingProductId(product.id);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", String(product.id));
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const sourceId = event.dataTransfer.getData("text/plain") || draggingProductId;
+                  if (sourceId) void reorderProducts(sourceId, product.id);
+                  setDraggingProductId(null);
+                }}
+                onDragEnd={() => setDraggingProductId(null)}
+                className={`flex w-full max-w-80 cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing ${draggingProductId === product.id ? "border-primary opacity-70" : "border-primary-border"
+                  }`}
+              >
+                <button type="button" className="flex gap-3 text-right" onClick={() => openEditModal(product)}>
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                    {product.imageUrl ? (
+                      <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="text-xs text-secondary-text">بدون تصویر</span>
+                    )}
+                  </div>
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <div className="line-clamp-1 text-sm font-bold text-primary-text">{product.title || "محصول بدون عنوان"}</div>
+                    <span className="text-xs text-secondary-text">{formatPrice(product.discountPrice || product.price) || "بدون قیمت"}</span>
+                    <span className="text-xs text-secondary-text">{productBrand ? productBrand.title : "بدون برند"}</span>
+                    <span className="text-xs text-secondary-text">{product.categoryIds.length} دسته‌بندی / {product.showcaseIds.length} ویترین</span>
+                  </div>
+                </button>
+                <div className="flex flex-wrap gap-2">
+                  <CustomButton
+                    size="sm"
+                    rounded="full"
+                    variant="primary"
+                    icon={<IoCreateOutline />}
+                    onClick={() => openEditModal(product)}
+                  >
+                    ویرایش
+                  </CustomButton>
+                  <CustomButton
+                    size="sm"
+                    rounded="full"
+                    variant="neutral"
+                    onClick={() => openProductRelations(product, "category")}
+                  >
+                    دسته‌بندی
+                  </CustomButton>
+                  <CustomButton
+                    size="sm"
+                    rounded="full"
+                    variant="neutral"
+                    onClick={() => openProductRelations(product, "showcase")}
+                  >
+                    ویترین
+                  </CustomButton>
                 </div>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <div className="line-clamp-1 text-sm font-bold text-primary-text">{product.title || "محصول بدون عنوان"}</div>
-                  <span className="text-xs text-secondary-text">{formatPrice(product.discountPrice || product.price) || "بدون قیمت"}</span>
-                  <span className="text-xs text-secondary-text">{product.categoryIds.length} دسته‌بندی / {product.showcaseIds.length} ویترین</span>
-                </div>
-              </button>
-              <div className="flex flex-wrap gap-2">
-                <CustomButton
-                  size="sm"
-                  rounded="full"
-                  variant="primary"
-                  icon={<IoCreateOutline />}
-                  onClick={() => openEditModal(product)}
-                >
-                  ویرایش
-                </CustomButton>
-                <CustomButton
-                  size="sm"
-                  rounded="full"
-                  variant="neutral"
-                  onClick={() => openProductRelations(product, "category")}
-                >
-                  دسته‌بندی
-                </CustomButton>
-                <CustomButton
-                  size="sm"
-                  rounded="full"
-                  variant="neutral"
-                  onClick={() => openProductRelations(product, "showcase")}
-                >
-                  ویترین
-                </CustomButton>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
 
@@ -2035,8 +2324,59 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
       {section === "categories" ? (
         <div className="flex flex-col gap-4">
-          <div className="text-sm font-bold text-primary-text">دیو دسته بندی ها</div>
-          {sortedCategories.map((category) => {
+          <div className="hidden flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-3 sm:flex-row">
+            <CustomInput
+              value={draftCategoryGroup.title}
+              placeholder="نام بخش دسته‌بندی"
+              invalid={hasRequiredError("draftCategoryGroup.title") && !draftCategoryGroup.title.trim()}
+              onChange={(event) => setDraftCategoryGroup((current) => ({ ...current, title: event.target.value }))}
+            />
+            <CustomButton icon={<IoAdd />} onClick={() => void submitDraftCategoryGroup()}>
+              ساخت بخش
+            </CustomButton>
+          </div>
+          {sortedCategoryGroups.map((group) => {
+            const groupCategories = sortedCategories.filter((category) => category.groupId === group.id);
+            return (
+              <div key={group.id} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <div className="text-sm font-bold text-primary-text">{group.title}</div>
+                    <span className="text-xs text-secondary-text">{groupCategories.length} دسته بندی</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <CustomButton size="sm" variant="neutral" onClick={() => openEditCategoryGroupModal(group)}>
+                      ویرایش بخش
+                    </CustomButton>
+                    <CustomButton size="sm" icon={<IoAdd />} onClick={() => openCategoryModal(group.id)}>
+                      افزودن دسته بندی
+                    </CustomButton>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {groupCategories.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-primary-border bg-primary-soft p-3 text-xs text-secondary-text">
+                      لینکی در این بخش نیست.
+                    </div>
+                  ) : null}
+                  {groupCategories.map((category) => (
+                    <div key={category.id} className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-soft p-2">
+                      <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" />
+                      <div className="flex gap-2">
+                        <CustomButton size="sm" variant="neutral" onClick={() => openEditCategoryModal(category)}>
+                          ویرایش
+                        </CustomButton>
+                        <div className="flex items-center rounded-md border border-primary-border px-2 text-xs font-semibold text-secondary-text">
+                          {sortedProducts.filter((product) => product.categoryIds.includes(category.id)).length} محصول
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {false && sortedCategories.map((category) => {
             const categoryProducts = sortedProducts.filter((product) => {
               const ids = product.categoryIds.length > 0 ? product.categoryIds : [product.categoryId];
               return ids.includes(category.id);
@@ -2062,9 +2402,8 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
                   setDraggingCategoryId(null);
                 }}
                 onDragEnd={() => setDraggingCategoryId(null)}
-                className={`flex cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing ${
-                  draggingCategoryId === category.id ? "border-primary opacity-70" : "border-primary-border"
-                }`}
+                className={`flex cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing ${draggingCategoryId === category.id ? "border-primary opacity-70" : "border-primary-border"
+                  }`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
@@ -2155,55 +2494,61 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
       {section === "brands" ? (
         <div className="flex flex-col gap-4">
-          <div className="text-sm font-bold text-primary-text">دیو برندها</div>
-          {sortedBrands.length === 0 ? (
-            <div className="rounded-md border border-dashed border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
-              هنوز برندی تعریف نشده است.
-            </div>
-          ) : null}
-          {sortedBrands.map((brand) => {
-            const brandProducts = sortedProducts.filter((product) => product.brand === brand.id || product.brand === brand.title);
+          <div className="hidden flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-3 sm:flex-row">
+            <CustomInput
+              value={draftBrandGroup.title}
+              placeholder="نام بخش برند"
+              invalid={hasRequiredError("draftBrandGroup.title") && !draftBrandGroup.title.trim()}
+              onChange={(event) => setDraftBrandGroup((current) => ({ ...current, title: event.target.value }))}
+            />
+            <CustomButton icon={<IoAdd />} onClick={() => void submitDraftBrandGroup()}>
+              ساخت بخش
+            </CustomButton>
+          </div>
+          {sortedBrandGroups.map((group) => {
+            const groupBrands = sortedBrands.filter((brand) => brand.groupId === group.id);
             return (
-              <div
-                key={brand.id}
-                draggable
-                onDragStart={(event) => {
-                  setDraggingBrandId(brand.id);
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData("text/plain", brand.id);
-                }}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  event.dataTransfer.dropEffect = "move";
-                }}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  const sourceId = event.dataTransfer.getData("text/plain") || draggingBrandId;
-                  if (sourceId) void reorderBrands(sourceId, brand.id);
-                  setDraggingBrandId(null);
-                }}
-                onDragEnd={() => setDraggingBrandId(null)}
-                className={`flex cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing ${
-                  draggingBrandId === brand.id ? "border-primary opacity-70" : "border-primary-border"
-                }`}
-              >
+              <div key={group.id} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" />
-                    <div className="flex flex-col gap-1">
-                      <div className="text-sm font-bold text-primary-text">{brand.title || "برند بدون عنوان"}</div>
-                      <span className="text-xs text-secondary-text">{brandProducts.length} محصول</span>
-                    </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="text-sm font-bold text-primary-text">{group.title}</div>
+                    <span className="text-xs text-secondary-text">{groupBrands.length} برند</span>
                   </div>
-                  <CustomButton size="sm" variant="neutral" onClick={() => openEditBrandModal(brand)}>
-                    ویرایش
-                  </CustomButton>
+                  <div className="flex flex-wrap gap-2">
+                    <CustomButton size="sm" variant="neutral" onClick={() => openEditBrandGroupModal(group)}>
+                      ویرایش بخش
+                    </CustomButton>
+                    <CustomButton size="sm" icon={<IoAdd />} onClick={() => openBrandModal(group.id)}>
+                      افزودن برند
+                    </CustomButton>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {groupBrands.length === 0 ? (
+                    <div className="rounded-md border border-dashed border-primary-border bg-primary-soft p-3 text-xs text-secondary-text">
+                      لینکی در این بخش نیست.
+                    </div>
+                  ) : null}
+                  {groupBrands.map((brand) => (
+                    <div key={brand.id} className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-soft p-2">
+                      <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" />
+                      <div className="flex gap-2">
+                        <CustomButton size="sm" variant="neutral" onClick={() => openEditBrandModal(brand)}>
+                          ویرایش
+                        </CustomButton>
+                        <div className="flex items-center rounded-md border border-primary-border px-2 text-xs font-semibold text-secondary-text">
+                          {sortedProducts.filter((product) => product.brand === brand.id).length} محصول
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             );
           })}
         </div>
       ) : null}
+
 
       {section === "storefront" ? (
         <div className="flex flex-col gap-4">
@@ -2235,52 +2580,51 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
                 ? entry.item.sortOrder
                 : entry.type === "brandGroup"
                   ? entry.item.sortOrder
-              : entry.item.sortOrder;
+                  : entry.item.sortOrder;
             return (
-            <div
-              key={key}
-              draggable
-              onDragStart={(event) => {
-                setDraggingStorefrontKey(key);
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", key);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = "move";
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
-                const sourceKey = event.dataTransfer.getData("text/plain") || draggingStorefrontKey;
-                if (sourceKey) void reorderStorefrontSections(sourceKey, key);
-                setDraggingStorefrontKey(null);
-              }}
-              onDragEnd={() => setDraggingStorefrontKey(null)}
-              className={`flex cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing sm:flex-row sm:items-center sm:justify-between ${
-                draggingStorefrontKey === key ? "border-primary opacity-70" : "border-primary-border"
-              }`}
-            >
-              <div className="flex flex-col gap-1">
-                <div className="text-sm font-bold text-primary-text">
-                  {entry.item.title || `${entry.type === "banner" ? "بنر" : entry.type === "categoryGroup" || entry.type === "brandGroup" ? "دیو لینک ها" : "ویترین"} بدون عنوان`}
-                </div>
-                <span className="text-xs text-secondary-text">
-                  {entry.type === "banner" ? "بنر" : entry.type === "categoryGroup" || entry.type === "brandGroup" ? "دیو لینک ها" : "ویترین"}
-                </span>
-              </div>
-              <CustomInput
-                type="number"
-                value={entrySortOrder}
-                placeholder="ترتیب"
-                onChange={(event) => {
-                  const sortOrder = Number(event.target.value);
-                  if (entry.type === "banner") updateBannerPlacement(entry.item, sortOrder);
-                  else if (entry.type === "brandGroup") updateBrandGroupPlacement(sortOrder);
-                  else if (entry.type === "categoryGroup") updateCategoryGroupPlacement(sortOrder);
-                  else updateShowcasePlacement(entry.item, sortOrder);
+              <div
+                key={key}
+                draggable
+                onDragStart={(event) => {
+                  setDraggingStorefrontKey(key);
+                  event.dataTransfer.effectAllowed = "move";
+                  event.dataTransfer.setData("text/plain", key);
                 }}
-              />
-            </div>
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "move";
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  const sourceKey = event.dataTransfer.getData("text/plain") || draggingStorefrontKey;
+                  if (sourceKey) void reorderStorefrontSections(sourceKey, key);
+                  setDraggingStorefrontKey(null);
+                }}
+                onDragEnd={() => setDraggingStorefrontKey(null)}
+                className={`flex cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing sm:flex-row sm:items-center sm:justify-between ${draggingStorefrontKey === key ? "border-primary opacity-70" : "border-primary-border"
+                  }`}
+              >
+                <div className="flex flex-col gap-1">
+                  <div className="text-sm font-bold text-primary-text">
+                    {entry.item.title || `${entry.type === "banner" ? "بنر" : entry.type === "categoryGroup" || entry.type === "brandGroup" ? "دیو لینک ها" : "ویترین"} بدون عنوان`}
+                  </div>
+                  <span className="text-xs text-secondary-text">
+                    {entry.type === "banner" ? "بنر" : entry.type === "categoryGroup" || entry.type === "brandGroup" ? "دیو لینک ها" : "ویترین"}
+                  </span>
+                </div>
+                <CustomInput
+                  type="number"
+                  value={entrySortOrder}
+                  placeholder="ترتیب"
+                  onChange={(event) => {
+                    const sortOrder = Number(event.target.value);
+                    if (entry.type === "banner") updateBannerPlacement(entry.item, sortOrder);
+                    else if (entry.type === "brandGroup") updateBrandGroupPlacement(entry.item.id, sortOrder);
+                    else if (entry.type === "categoryGroup") updateCategoryGroupPlacement(entry.item.id, sortOrder);
+                    else updateShowcasePlacement(entry.item, sortOrder);
+                  }}
+                />
+              </div>
             );
           })}
           <CustomButton icon={<IoSaveOutline />} onClick={() => void saveStorefrontPlacement()}>
@@ -2291,9 +2635,243 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
 
       {section === "products" ? <FloatButton label="New product" icon={<IoAdd />} position="bottom-right" shadow="lg" onClick={openCreateModal} /> : null}
       {section === "showcases" ? <FloatButton label="New showcase" icon={<IoAdd />} position="bottom-right" shadow="lg" onClick={openShowcaseModal} /> : null}
-      {section === "categories" ? <FloatButton label="دسته‌بندی جدید" icon={<IoAdd />} position="bottom-right" shadow="lg" onClick={openCategoryModal} /> : null}
-      {section === "brands" ? <FloatButton label="برند جدید" icon={<IoAdd />} position="bottom-right" shadow="lg" onClick={openBrandModal} /> : null}
+      {section === "categories" ? <FloatButton label="بخش دسته‌بندی جدید" icon={<IoAdd />} position="bottom-right" shadow="lg" onClick={openCategoryGroupModal} /> : null}
+      {section === "brands" ? <FloatButton label="بخش برند جدید" icon={<IoAdd />} position="bottom-right" shadow="lg" onClick={openBrandGroupModal} /> : null}
       {section === "banners" ? <FloatButton label="New banner" icon={<IoAdd />} position="bottom-right" shadow="lg" onClick={openBannerModal} /> : null}
+
+      <CustomModal
+        open={isCategoryGroupOpen}
+        onClose={() => setIsCategoryGroupOpen(false)}
+        title="ثبت بخش دسته‌بندی"
+        rounded="lg"
+        shadow="lg"
+      >
+        <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <RequiredLabel required className="text-primary-text">نام بخش</RequiredLabel>
+          <CustomInput
+            value={draftCategoryGroup.title}
+            placeholder="نام بخش دسته‌بندی"
+            invalid={hasRequiredError("draftCategoryGroup.title") && !draftCategoryGroup.title.trim()}
+            onChange={(event) => setDraftCategoryGroup((current) => ({ ...current, title: event.target.value }))}
+          />
+          <CustomInput
+            type="number"
+            value={draftCategoryGroup.sortOrder}
+            placeholder="ترتیب نمایش بخش"
+            onChange={(event) => setDraftCategoryGroup((current) => ({ ...current, sortOrder: Number(event.target.value) }))}
+          />
+          <CustomSwitch
+            checked={draftCategoryGroup.active}
+            onChange={(active) => setDraftCategoryGroup((current) => ({ ...current, active }))}
+            label={draftCategoryGroup.active ? "فعال" : "مخفی"}
+            size="sm"
+          />
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-bold text-primary-text">لینک‌های داخل بخش</div>
+            <div className="flex flex-wrap gap-3 rounded-md border border-primary-border p-2">
+              {sortedCategories.length === 0 ? (
+                <span className="text-xs text-secondary-text">بعد از ساخت بخش می‌توانید لینک جدید اضافه کنید.</span>
+              ) : null}
+              {sortedCategories.map((category) => (
+                <CategoryOption
+                  key={category.id}
+                  label={category.title}
+                  imageUrl={category.imageUrl}
+                  selected={categoryGroupLinkIds.includes(category.id)}
+                  size="sm"
+                  onClick={() =>
+                    setCategoryGroupLinkIds((current) =>
+                      current.includes(category.id)
+                        ? current.filter((id) => id !== category.id)
+                        : [...current, category.id]
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </div>
+          <CustomButton fullWidth icon={<IoSaveOutline />} onClick={submitDraftCategoryGroup}>
+            ذخیره بخش
+          </CustomButton>
+        </div>
+      </CustomModal>
+
+      <CustomModal
+        open={isEditCategoryGroupOpen}
+        onClose={() => {
+          setIsEditCategoryGroupOpen(false);
+          setEditingCategoryGroup(null);
+          setCategoryGroupLinkIds([]);
+        }}
+        title={editingCategoryGroup?.title || "ویرایش بخش دسته‌بندی"}
+        rounded="lg"
+        shadow="lg"
+      >
+        {editingCategoryGroup ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+            <RequiredLabel required className="text-primary-text">نام بخش</RequiredLabel>
+            <CustomInput
+              value={editingCategoryGroup.title}
+              placeholder="نام بخش دسته‌بندی"
+              invalid={hasRequiredError("editingCategoryGroup.title") && !editingCategoryGroup.title.trim()}
+              onChange={(event) => setEditingCategoryGroup((current) => current ? { ...current, title: event.target.value } : current)}
+            />
+            <CustomInput
+              type="number"
+              value={editingCategoryGroup.sortOrder}
+              placeholder="ترتیب نمایش بخش"
+              onChange={(event) => setEditingCategoryGroup((current) => current ? { ...current, sortOrder: Number(event.target.value) } : current)}
+            />
+            <CustomSwitch
+              checked={editingCategoryGroup.active}
+              onChange={(active) => setEditingCategoryGroup((current) => current ? { ...current, active } : current)}
+              label={editingCategoryGroup.active ? "فعال" : "مخفی"}
+              size="sm"
+            />
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-bold text-primary-text">لینک‌های داخل بخش</div>
+              <div className="flex flex-wrap gap-3 rounded-md border border-primary-border p-2">
+                {sortedCategories.map((category) => (
+                  <CategoryOption
+                    key={category.id}
+                    label={category.title}
+                    imageUrl={category.imageUrl}
+                    selected={categoryGroupLinkIds.includes(category.id)}
+                    size="sm"
+                    onClick={() =>
+                      setCategoryGroupLinkIds((current) =>
+                        current.includes(category.id)
+                          ? current.filter((id) => id !== category.id)
+                          : [...current, category.id]
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+            <CustomButton fullWidth icon={<IoSaveOutline />} onClick={submitEditingCategoryGroup}>
+              ذخیره بخش
+            </CustomButton>
+          </div>
+        ) : null}
+      </CustomModal>
+
+      <CustomModal
+        open={isBrandGroupOpen}
+        onClose={() => setIsBrandGroupOpen(false)}
+        title="ثبت بخش برند"
+        rounded="lg"
+        shadow="lg"
+      >
+        <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <RequiredLabel required className="text-primary-text">نام بخش</RequiredLabel>
+          <CustomInput
+            value={draftBrandGroup.title}
+            placeholder="نام بخش برند"
+            invalid={hasRequiredError("draftBrandGroup.title") && !draftBrandGroup.title.trim()}
+            onChange={(event) => setDraftBrandGroup((current) => ({ ...current, title: event.target.value }))}
+          />
+          <CustomInput
+            type="number"
+            value={draftBrandGroup.sortOrder}
+            placeholder="ترتیب نمایش بخش"
+            onChange={(event) => setDraftBrandGroup((current) => ({ ...current, sortOrder: Number(event.target.value) }))}
+          />
+          <CustomSwitch
+            checked={draftBrandGroup.active}
+            onChange={(active) => setDraftBrandGroup((current) => ({ ...current, active }))}
+            label={draftBrandGroup.active ? "فعال" : "مخفی"}
+            size="sm"
+          />
+          <div className="flex flex-col gap-2">
+            <div className="text-sm font-bold text-primary-text">لینک‌های داخل بخش</div>
+            <div className="flex flex-wrap gap-3 rounded-md border border-primary-border p-2">
+              {sortedBrands.length === 0 ? (
+                <span className="text-xs text-secondary-text">بعد از ساخت بخش می‌توانید لینک جدید اضافه کنید.</span>
+              ) : null}
+              {sortedBrands.map((brand) => (
+                <CategoryOption
+                  key={brand.id}
+                  label={brand.title}
+                  imageUrl={brand.imageUrl}
+                  selected={brandGroupLinkIds.includes(brand.id)}
+                  size="sm"
+                  onClick={() =>
+                    setBrandGroupLinkIds((current) =>
+                      current.includes(brand.id)
+                        ? current.filter((id) => id !== brand.id)
+                        : [...current, brand.id]
+                    )
+                  }
+                />
+              ))}
+            </div>
+          </div>
+          <CustomButton fullWidth icon={<IoSaveOutline />} onClick={submitDraftBrandGroup}>
+            ذخیره بخش
+          </CustomButton>
+        </div>
+      </CustomModal>
+
+      <CustomModal
+        open={isEditBrandGroupOpen}
+        onClose={() => {
+          setIsEditBrandGroupOpen(false);
+          setEditingBrandGroup(null);
+          setBrandGroupLinkIds([]);
+        }}
+        title={editingBrandGroup?.title || "ویرایش بخش برند"}
+        rounded="lg"
+        shadow="lg"
+      >
+        {editingBrandGroup ? (
+          <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+            <RequiredLabel required className="text-primary-text">نام بخش</RequiredLabel>
+            <CustomInput
+              value={editingBrandGroup.title}
+              placeholder="نام بخش برند"
+              invalid={hasRequiredError("editingBrandGroup.title") && !editingBrandGroup.title.trim()}
+              onChange={(event) => setEditingBrandGroup((current) => current ? { ...current, title: event.target.value } : current)}
+            />
+            <CustomInput
+              type="number"
+              value={editingBrandGroup.sortOrder}
+              placeholder="ترتیب نمایش بخش"
+              onChange={(event) => setEditingBrandGroup((current) => current ? { ...current, sortOrder: Number(event.target.value) } : current)}
+            />
+            <CustomSwitch
+              checked={editingBrandGroup.active}
+              onChange={(active) => setEditingBrandGroup((current) => current ? { ...current, active } : current)}
+              label={editingBrandGroup.active ? "فعال" : "مخفی"}
+              size="sm"
+            />
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-bold text-primary-text">لینک‌های داخل بخش</div>
+              <div className="flex flex-wrap gap-3 rounded-md border border-primary-border p-2">
+                {sortedBrands.map((brand) => (
+                  <CategoryOption
+                    key={brand.id}
+                    label={brand.title}
+                    imageUrl={brand.imageUrl}
+                    selected={brandGroupLinkIds.includes(brand.id)}
+                    size="sm"
+                    onClick={() =>
+                      setBrandGroupLinkIds((current) =>
+                        current.includes(brand.id)
+                          ? current.filter((id) => id !== brand.id)
+                          : [...current, brand.id]
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+            <CustomButton fullWidth icon={<IoSaveOutline />} onClick={submitEditingBrandGroup}>
+              ذخیره بخش
+            </CustomButton>
+          </div>
+        ) : null}
+      </CustomModal>
 
       <CustomModal
         open={isCategoryOpen}
@@ -2304,6 +2882,17 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       >
         <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
           <RequiredLabel required className="text-primary-text">عنوان دسته‌بندی</RequiredLabel>
+          <CustomSelect
+            value={draftCategory.groupId}
+            aria-label="بخش دسته‌بندی"
+            onChange={(event) => updateDraftCategory({ groupId: event.target.value })}
+          >
+            {sortedCategoryGroups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.title}
+              </option>
+            ))}
+          </CustomSelect>
           <CustomInput
             value={draftCategory.title}
             placeholder="عنوان دسته‌بندی"
@@ -2362,6 +2951,17 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
         {editingCategory && (
           <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
             <RequiredLabel required className="text-primary-text">عنوان دسته‌بندی</RequiredLabel>
+            <CustomSelect
+              value={editingCategory.groupId}
+              aria-label="بخش دسته‌بندی"
+              onChange={(event) => updateEditingCategory({ groupId: event.target.value })}
+            >
+              {sortedCategoryGroups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.title}
+                </option>
+              ))}
+            </CustomSelect>
             <CustomInput
               value={editingCategory.title}
               placeholder="عنوان دسته‌بندی"
@@ -2422,6 +3022,17 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
       >
         <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
           <RequiredLabel required className="text-primary-text">عنوان برند</RequiredLabel>
+          <CustomSelect
+            value={draftBrand.groupId}
+            aria-label="بخش برند"
+            onChange={(event) => updateDraftBrand({ groupId: event.target.value })}
+          >
+            {sortedBrandGroups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.title}
+              </option>
+            ))}
+          </CustomSelect>
           <CustomInput
             value={draftBrand.title}
             placeholder="عنوان برند"
@@ -2479,6 +3090,17 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
         {editingBrand && (
           <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
             <RequiredLabel required className="text-primary-text">عنوان برند</RequiredLabel>
+            <CustomSelect
+              value={editingBrand.groupId}
+              aria-label="بخش برند"
+              onChange={(event) => updateEditingBrand({ groupId: event.target.value })}
+            >
+              {sortedBrandGroups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.title}
+                </option>
+              ))}
+            </CustomSelect>
             <CustomInput
               value={editingBrand.title}
               placeholder="عنوان برند"
@@ -2537,11 +3159,11 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
         shadow="lg"
       >
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto rounded-lg border border-primary-border bg-primary-card p-3">
-            <CustomInput
-              value={draftBanner.title}
-              placeholder="Banner title"
-              onChange={(event) => updateDraftBanner({ title: event.target.value })}
-            />
+          <CustomInput
+            value={draftBanner.title}
+            placeholder="Banner title"
+            onChange={(event) => updateDraftBanner({ title: event.target.value })}
+          />
           <CustomInput
             type="number"
             value={draftBanner.homeSortOrder}
@@ -2827,7 +3449,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
               tabIndex={-1}
               className={`flex flex-col gap-3 rounded-lg border bg-primary-soft p-3 outline-none ${hasRequiredError("editingBanner.images") && editingBanner.imageUrls.length === 0 ? "border-danger-border-nomode" : "border-primary-border"}`}
             >
-            <RequiredLabel required>Banner images</RequiredLabel>
+              <RequiredLabel required>Banner images</RequiredLabel>
               <div className="flex gap-2">
                 <CustomInput
                   value={editingBannerImageUrl}
@@ -3298,7 +3920,7 @@ export function AdminProductsPanel({ section = "storefront" }: AdminProductsPane
                 value={editingProduct.badge}
                 placeholder="برچسب"
                 onChange={(event) => updateEditingProduct({ badge: event.target.value })}
-            />
+              />
               <InventoryControls product={editingProduct} onChange={updateEditingProduct} />
               <ProductAdvancedFields
                 product={editingProduct}

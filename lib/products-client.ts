@@ -79,6 +79,7 @@ export type ShowcaseRecord = {
 
 export type CategoryRecord = {
   id: string;
+  groupId?: string | null;
   title: string;
   slug?: string;
   imageUrl?: string | null;
@@ -89,12 +90,20 @@ export type CategoryRecord = {
 
 export type BrandRecord = {
   id: string;
+  groupId?: string | null;
   title: string;
   slug?: string;
   imageUrl?: string | null;
   active?: boolean;
   sortOrder?: number | string;
   homeSortOrder?: number | string;
+};
+
+export type CatalogLinkGroupRecord = {
+  id: string;
+  title: string;
+  active?: boolean;
+  sortOrder?: number | string;
 };
 
 export type BannerRecord = {
@@ -138,7 +147,9 @@ export type CatalogTree = {
 export type CatalogObject = {
   placement?: number;
   showcases: Array<ShowcaseRecord & { products: ProductRecord[] }>;
+  categoryGroups: CatalogLinkGroupRecord[];
   categories: CategoryRecord[];
+  brandGroups: CatalogLinkGroupRecord[];
   brands: BrandRecord[];
   banners: BannerRecord[];
 };
@@ -147,7 +158,9 @@ type CatalogApiTree = {
   type?: "root";
   placement?: number | string;
   categories?: CategoryRecord[];
+  categoryGroups?: CatalogLinkGroupRecord[];
   brands?: BrandRecord[];
+  brandGroups?: CatalogLinkGroupRecord[];
   banners?: BannerRecord[];
   children?: Array<
     | (BannerRecord & { type: "banner" })
@@ -159,7 +172,9 @@ export type ProductsCache = {
   products: ProductRecord[];
   showcases: ShowcaseRecord[];
   categories: CategoryRecord[];
+  categoryGroups: CatalogLinkGroupRecord[];
   brands: BrandRecord[];
+  brandGroups: CatalogLinkGroupRecord[];
   banners: BannerRecord[];
   tree: CatalogTree;
   catalog: CatalogObject;
@@ -252,10 +267,12 @@ function emptyProductsCache(): ProductsCache {
     products: [],
     showcases: [],
     categories: [],
+    categoryGroups: [],
     brands: [],
+    brandGroups: [],
     banners: [],
     tree: { sections: [] },
-    catalog: { placement: 0, showcases: [], categories: [], brands: [], banners: [] },
+    catalog: { placement: 0, showcases: [], categoryGroups: [], categories: [], brandGroups: [], brands: [], banners: [] },
   };
 }
 
@@ -414,6 +431,7 @@ function normalizeCategoryRecord(category: CategoryRecord, fallbackOrder: number
 
   return {
     id: String(category.id ?? (slug || `category-${fallbackOrder}`)),
+    groupId: String(category.groupId ?? "default-categories"),
     title: title || `Category ${fallbackOrder}`,
     slug,
     imageUrl: String(category.imageUrl ?? "").trim(),
@@ -430,12 +448,25 @@ function normalizeBrandRecord(brand: BrandRecord, fallbackOrder: number): BrandR
 
   return {
     id: String(brand.id ?? (slug || `brand-${fallbackOrder}`)),
+    groupId: String(brand.groupId ?? "default-brands"),
     title: title || `Brand ${fallbackOrder}`,
     slug,
     imageUrl: String(brand.imageUrl ?? "").trim(),
     active: brand.active !== false,
     sortOrder: placement,
     homeSortOrder: Number.isFinite(Number(brand.homeSortOrder)) ? Number(brand.homeSortOrder) : 1,
+  };
+}
+
+function normalizeLinkGroupRecord(group: CatalogLinkGroupRecord, fallbackOrder: number): CatalogLinkGroupRecord {
+  const title = String(group.title ?? group.id ?? "").trim();
+  const slug = slugifyCatalogValue(group.id || title || `group-${fallbackOrder}`);
+
+  return {
+    id: String(group.id ?? slug),
+    title: title || `Group ${fallbackOrder}`,
+    active: group.active !== false,
+    sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : fallbackOrder,
   };
 }
 
@@ -462,7 +493,7 @@ function readTreePayload(payload: unknown): CatalogObject | null {
   const tree = payload as CatalogApiTree;
   const children = Array.isArray(tree.children) ? tree.children : [];
   const bannerSource = Array.isArray(tree.banners) ? tree.banners : children.filter((item) => item.type === "banner");
-  if (!Array.isArray(tree.children) && !Array.isArray(tree.banners) && !Array.isArray(tree.categories) && !Array.isArray(tree.brands)) return null;
+  if (!Array.isArray(tree.children) && !Array.isArray(tree.banners) && !Array.isArray(tree.categories) && !Array.isArray(tree.brands) && !Array.isArray(tree.categoryGroups) && !Array.isArray(tree.brandGroups)) return null;
 
   const showcases = children
     .filter((item) => item.type === "showcase")
@@ -487,7 +518,9 @@ function readTreePayload(payload: unknown): CatalogObject | null {
   return {
     placement: getPlacement(tree, 0),
     showcases,
+    categoryGroups: Array.isArray(tree.categoryGroups) ? tree.categoryGroups.map(normalizeLinkGroupRecord) : [],
     categories: Array.isArray(tree.categories) ? tree.categories.map(normalizeCategoryRecord) : [],
+    brandGroups: Array.isArray(tree.brandGroups) ? tree.brandGroups.map(normalizeLinkGroupRecord) : [],
     brands: Array.isArray(tree.brands) ? tree.brands.map(normalizeBrandRecord) : [],
     banners,
   };
@@ -508,7 +541,9 @@ function parseApiPayload(payload: unknown): ProductsCache {
   const record = payload as {
     products?: ProductRecord[];
     showcases?: ShowcaseRecord[];
+    categoryGroups?: CatalogLinkGroupRecord[];
     categories?: CategoryRecord[];
+    brandGroups?: CatalogLinkGroupRecord[];
     brands?: BrandRecord[];
     banners?: BannerRecord[];
     children?: Array<
@@ -578,12 +613,36 @@ function parseApiPayload(payload: unknown): ProductsCache {
     : Array.from(new Set(products.flatMap((product) => normalizeStringList(product.categoryIds, [String(product.categoryId ?? "")]))))
         .filter(Boolean)
         .map((categoryId, index) => normalizeCategoryRecord({ id: categoryId, title: categoryId, slug: categoryId }, index + 1));
+  const categoryGroups = treeCatalog?.categoryGroups && treeCatalog.categoryGroups.length > 0
+    ? treeCatalog.categoryGroups
+    : Array.isArray(record.categoryGroups)
+      ? record.categoryGroups.map(normalizeLinkGroupRecord)
+      : Array.isArray(record.catalog?.categoryGroups)
+        ? record.catalog.categoryGroups.map(normalizeLinkGroupRecord)
+        : [{ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: Number(fallbackCategories[0]?.pageSortOrder ?? 1) }];
+  const brandGroups = treeCatalog?.brandGroups && treeCatalog.brandGroups.length > 0
+    ? treeCatalog.brandGroups
+    : Array.isArray(record.brandGroups)
+      ? record.brandGroups.map(normalizeLinkGroupRecord)
+      : Array.isArray(record.catalog?.brandGroups)
+        ? record.catalog.brandGroups.map(normalizeLinkGroupRecord)
+        : [{ id: "default-brands", title: "برندها", active: true, sortOrder: Number(brands[0]?.homeSortOrder ?? 1) }];
+  const categoriesWithGroups = fallbackCategories.map((category) => ({
+    ...category,
+    groupId: category.groupId || categoryGroups[0]?.id || "default-categories",
+  }));
+  const brandsWithGroups = brands.map((brand) => ({
+    ...brand,
+    groupId: brand.groupId || brandGroups[0]?.id || "default-brands",
+  }));
 
   return {
     products: dedupeProducts(products),
     showcases,
-    categories: fallbackCategories,
-    brands,
+    categoryGroups,
+    categories: categoriesWithGroups,
+    brandGroups,
+    brands: brandsWithGroups,
     banners,
     tree:
       record.tree && Array.isArray(record.tree.sections)
@@ -592,8 +651,10 @@ function parseApiPayload(payload: unknown): ProductsCache {
     catalog: {
       placement: Number(treeCatalog?.placement ?? record.catalog?.placement ?? 0),
       showcases: catalogShowcases,
-      categories: fallbackCategories,
-      brands,
+      categoryGroups,
+      categories: categoriesWithGroups,
+      brandGroups,
+      brands: brandsWithGroups,
       banners: catalogBanners,
     },
   };

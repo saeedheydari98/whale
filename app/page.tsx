@@ -8,7 +8,7 @@ import { useProductsCatalog } from "@/lib/products-catalog-context";
 
 export default function Home() {
   const router = useRouter();
-  const { brands: catalogBrands, banners: catalogBanners, loading } = useProductsCatalog();
+  const { brands: catalogBrands, brandGroups, banners: catalogBanners, loading } = useProductsCatalog();
   const [previewImage, setPreviewImage] = useState("");
 
   const brands = useMemo(
@@ -31,16 +31,18 @@ export default function Home() {
       item: banner,
       sortOrder: Number(banner.homeSortOrder ?? banner.sortOrder ?? 0),
     }));
-    const brandSections = brands.length > 0
-      ? [{
+    const brandSections = brandGroups
+      .filter((group) => group.active !== false)
+      .map((group) => ({
           type: "brands" as const,
-          item: brands,
-          sortOrder: Number(brands[0]?.homeSortOrder ?? 1),
-        }]
-      : [];
+          item: brands.filter((brand) => (brand.groupId || "default-brands") === group.id),
+          title: group.title,
+          sortOrder: Number(group.sortOrder ?? 1),
+        }))
+      .filter((section) => section.item.length > 0);
 
     return [...bannerSections, ...brandSections].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [banners, brands]);
+  }, [banners, brandGroups, brands]);
 
   return (
     <main className="min-h-screen bg-primary-base text-primary-text">
@@ -61,8 +63,8 @@ export default function Home() {
                 onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
               />
             ) : (
-              <div key="brand-group" className="flex flex-col gap-3">
-                <div className="text-xl font-bold">برندها</div>
+              <div key={`brand-group-${section.title}`} className="flex flex-col gap-3">
+                <div className="text-xl font-bold">{section.title}</div>
                 {brands.length === 0 ? (
                   <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">در حال حاضر برند فعالی وجود ندارد.</div>
                 ) : null}

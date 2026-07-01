@@ -9,7 +9,7 @@ import { slugifyCatalogValue } from "@/lib/products-client";
 
 export default function CategoriesPage() {
   const router = useRouter();
-  const { categories, banners, loading } = useProductsCatalog();
+  const { categories, categoryGroups, banners, loading } = useProductsCatalog();
   const [previewImage, setPreviewImage] = useState("");
 
   const visibleCategories = useMemo(
@@ -26,16 +26,18 @@ export default function CategoriesPage() {
         sortOrder: Number(banner.categorySortOrder ?? banner.sortOrder ?? 0),
       }));
 
-    const categorySections = visibleCategories.length > 0
-      ? [{
+    const categorySections = categoryGroups
+      .filter((group) => group.active !== false)
+      .map((group) => ({
         type: "categories" as const,
-        item: visibleCategories,
-        sortOrder: Number(visibleCategories[0]?.pageSortOrder ?? 1),
-      }]
-      : [];
+        item: visibleCategories.filter((category) => (category.groupId || "default-categories") === group.id),
+        title: group.title,
+        sortOrder: Number(group.sortOrder ?? 1),
+      }))
+      .filter((section) => section.item.length > 0);
 
     return [...bannerSections, ...categorySections].sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [banners, visibleCategories]);
+  }, [banners, categoryGroups, visibleCategories]);
 
   return (
     <main className="min-h-screen bg-primary-base text-primary-text">
@@ -73,8 +75,8 @@ export default function CategoriesPage() {
               );
             }
             return (
-              <div key="category-group" className="flex flex-col gap-3">
-                <div className="text-xl font-bold">دسته بندی ها</div>
+              <div key={`category-group-${section.title}`} className="flex flex-col gap-3">
+                <div className="text-xl font-bold">{section.title}</div>
                 <div className="flex w-full flex-wrap gap-4">
                   {section.item.map((category) => {
                     const slug = slugifyCatalogValue(category.slug || category.title || category.id);

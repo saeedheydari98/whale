@@ -65,6 +65,7 @@ export type ShowcaseForm = {
 
 export type CategoryForm = {
   id: string;
+  groupId: string;
   title: string;
   slug: string;
   imageUrl: string;
@@ -75,12 +76,20 @@ export type CategoryForm = {
 
 export type BrandForm = {
   id: string;
+  groupId: string;
   title: string;
   slug: string;
   imageUrl: string;
   active: boolean;
   sortOrder: number;
   homeSortOrder: number;
+};
+
+export type CatalogLinkGroupForm = {
+  id: string;
+  title: string;
+  active: boolean;
+  sortOrder: number;
 };
 
 export type BannerForm = {

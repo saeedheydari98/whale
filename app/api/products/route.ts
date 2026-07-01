@@ -108,12 +108,15 @@ type CatalogTreePayload = {
   children?: Array<ShowcasePayload | BannerPayload>;
   showcases?: ShowcasePayload[];
   categories?: CategoryPayload[];
+  categoryGroups?: CatalogLinkGroupPayload[];
   brands?: BrandPayload[];
+  brandGroups?: CatalogLinkGroupPayload[];
   banners?: BannerPayload[];
 };
 
 type CategoryPayload = {
   id?: string;
+  groupId?: string | null;
   title?: string;
   slug?: string;
   imageUrl?: string | null;
@@ -124,12 +127,20 @@ type CategoryPayload = {
 
 type BrandPayload = {
   id?: string;
+  groupId?: string | null;
   title?: string;
   slug?: string;
   imageUrl?: string | null;
   active?: boolean;
   sortOrder?: number | string;
   homeSortOrder?: number | string;
+};
+
+type CatalogLinkGroupPayload = {
+  id?: string;
+  title?: string;
+  active?: boolean;
+  sortOrder?: number | string;
 };
 
 type BannerRecord = {
@@ -468,6 +479,7 @@ function normalizeCategory(value: Partial<CategoryPayload>, index: number) {
 
   return {
     id,
+    groupId: String(value.groupId ?? "default-categories"),
     title: title || id,
     slug,
     imageUrl: String(value.imageUrl ?? "").trim(),
@@ -484,6 +496,7 @@ function normalizeBrand(value: Partial<BrandPayload>, index: number) {
 
   return {
     id,
+    groupId: String(value.groupId ?? "default-brands"),
     title: title || id,
     slug,
     imageUrl: String(value.imageUrl ?? "").trim(),
@@ -493,8 +506,21 @@ function normalizeBrand(value: Partial<BrandPayload>, index: number) {
   };
 }
 
+function normalizeLinkGroup(value: Partial<CatalogLinkGroupPayload>, index: number, fallbackId: string, fallbackTitle: string) {
+  const title = String(value.title ?? "").trim();
+  const id = String(value.id ?? (slugifyCatalogValue(title) || `${fallbackId}-${index + 1}`)).trim();
+
+  return {
+    id: id || fallbackId,
+    title: title || fallbackTitle,
+    active: value.active !== false,
+    sortOrder: Number.isFinite(Number(value.sortOrder)) ? Number(value.sortOrder) : index + 1,
+  };
+}
+
 function toClientCategory(category: {
   id: string;
+  groupId?: string | null;
   title: string;
   slug: string;
   imageUrl?: string | null;
@@ -504,6 +530,7 @@ function toClientCategory(category: {
 }) {
   return {
     id: category.id,
+    groupId: category.groupId ?? "default-categories",
     title: category.title,
     slug: category.slug,
     imageUrl: category.imageUrl ?? "",
@@ -515,6 +542,7 @@ function toClientCategory(category: {
 
 function toClientBrand(brand: {
   id: string;
+  groupId?: string | null;
   title: string;
   slug: string;
   imageUrl?: string | null;
@@ -524,12 +552,27 @@ function toClientBrand(brand: {
 }) {
   return {
     id: brand.id,
+    groupId: brand.groupId ?? "default-brands",
     title: brand.title,
     slug: brand.slug,
     imageUrl: brand.imageUrl ?? "",
     active: brand.active,
     sortOrder: brand.sortOrder,
     homeSortOrder: brand.homeSortOrder ?? 1,
+  };
+}
+
+function toClientLinkGroup(group: {
+  id: string;
+  title: string;
+  active: boolean;
+  sortOrder: number;
+}) {
+  return {
+    id: group.id,
+    title: group.title,
+    active: group.active,
+    sortOrder: group.sortOrder,
   };
 }
 
@@ -550,6 +593,7 @@ function buildCatalogTree(
   }>,
   categories: Array<{
     id: string;
+    groupId?: string | null;
     title: string;
     slug: string;
     imageUrl?: string | null;
@@ -557,14 +601,27 @@ function buildCatalogTree(
     sortOrder: number;
     pageSortOrder?: number;
   }>,
+  categoryGroups: Array<{
+    id: string;
+    title: string;
+    active: boolean;
+    sortOrder: number;
+  }>,
   brands: Array<{
     id: string;
+    groupId?: string | null;
     title: string;
     slug: string;
     imageUrl?: string | null;
     active: boolean;
     sortOrder: number;
     homeSortOrder?: number;
+  }>,
+  brandGroups: Array<{
+    id: string;
+    title: string;
+    active: boolean;
+    sortOrder: number;
   }>,
   banners: BannerRecord[],
   includeInactive: boolean
@@ -583,6 +640,8 @@ function buildCatalogTree(
   const bannerSections = allBannerSections.filter((banner) => banner.showOnHome !== false);
   const visibleCategories = categories.filter((category) => includeInactive || category.active !== false);
   const visibleBrands = brands.filter((brand) => includeInactive || brand.active !== false);
+  const visibleCategoryGroups = categoryGroups.filter((group) => includeInactive || group.active !== false);
+  const visibleBrandGroups = brandGroups.filter((group) => includeInactive || group.active !== false);
   const fallbackCategories = visibleCategories.length > 0
     ? visibleCategories
     : Array.from(
@@ -607,6 +666,20 @@ function buildCatalogTree(
             normalizeBrand({ id: slugifyCatalogValue(brandTitle), title: brandTitle, slug: brandTitle, active: true }, index),
           ])
       ).values());
+  const fallbackCategoryGroups = visibleCategoryGroups.length > 0
+    ? visibleCategoryGroups
+    : [{ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: Number(fallbackCategories[0]?.pageSortOrder ?? 1) }];
+  const fallbackBrandGroups = visibleBrandGroups.length > 0
+    ? visibleBrandGroups
+    : [{ id: "default-brands", title: "برندها", active: true, sortOrder: Number(fallbackBrands[0]?.homeSortOrder ?? 1) }];
+  const categoriesWithGroups = fallbackCategories.map((category) => ({
+    ...category,
+    groupId: category.groupId || fallbackCategoryGroups[0]?.id || "default-categories",
+  }));
+  const brandsWithGroups = fallbackBrands.map((brand) => ({
+    ...brand,
+    groupId: brand.groupId || fallbackBrandGroups[0]?.id || "default-brands",
+  }));
 
   const showcaseSections = visibleShowcases
     .map((showcase) => {
@@ -645,10 +718,16 @@ function buildCatalogTree(
     placement: 0,
     products: visibleProducts.map(toClientProduct),
     showcases: visibleShowcases.map(toClientShowcase),
-    categories: fallbackCategories
+    categoryGroups: fallbackCategoryGroups
+      .map(toClientLinkGroup)
+      .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
+    categories: categoriesWithGroups
       .map(toClientCategory)
       .sort((a, b) => a.sortOrder - b.sortOrder),
-    brands: fallbackBrands
+    brandGroups: fallbackBrandGroups
+      .map(toClientLinkGroup)
+      .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
+    brands: brandsWithGroups
       .map(toClientBrand)
       .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
     banners: allBannerSections,
@@ -871,6 +950,12 @@ export async function GET(request: Request) {
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           })
         : [];
+    const categoryGroups =
+      "categoryGroup" in prisma && typeof (prisma as any).categoryGroup?.findMany === "function"
+        ? await (prisma as any).categoryGroup.findMany({
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : [];
 
     const banners =
       "banner" in prisma && typeof prisma.banner?.findMany === "function"
@@ -884,11 +969,19 @@ export async function GET(request: Request) {
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           })
         : [];
+    const brandGroups =
+      "brandGroup" in prisma && typeof (prisma as any).brandGroup?.findMany === "function"
+        ? await (prisma as any).brandGroup.findMany({
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : [];
     const tree = buildCatalogTree(
       limitedProducts,
       showcases,
       categories,
+      categoryGroups,
       brands,
+      brandGroups,
       banners as BannerRecord[],
       includeInactive
     );
@@ -945,10 +1038,20 @@ export async function POST(request: Request) {
     : Array.isArray(treePayload?.categories)
       ? treePayload.categories.map(normalizeCategory)
       : [];
+  const categoryGroups = Array.isArray(body.categoryGroups)
+    ? (body.categoryGroups as CatalogLinkGroupPayload[]).map((group, index) => normalizeLinkGroup(group, index, "default-categories", "دسته بندی ها"))
+    : Array.isArray(treePayload?.categoryGroups)
+      ? treePayload.categoryGroups.map((group, index) => normalizeLinkGroup(group, index, "default-categories", "دسته بندی ها"))
+      : [];
   const brands = Array.isArray(body.brands)
     ? (body.brands as BrandPayload[]).map(normalizeBrand)
     : Array.isArray(treePayload?.brands)
       ? treePayload.brands.map(normalizeBrand)
+      : [];
+  const brandGroups = Array.isArray(body.brandGroups)
+    ? (body.brandGroups as CatalogLinkGroupPayload[]).map((group, index) => normalizeLinkGroup(group, index, "default-brands", "برندها"))
+    : Array.isArray(treePayload?.brandGroups)
+      ? treePayload.brandGroups.map((group, index) => normalizeLinkGroup(group, index, "default-brands", "برندها"))
       : [];
   const banners = catalogBanners.length > 0
     ? catalogBanners
@@ -984,6 +1087,24 @@ export async function POST(request: Request) {
       if (!categoryIds.has(categoryId)) {
         normalizedCategories.push(normalizeCategory({ id: categoryId, title: categoryId, slug: categoryId }, normalizedCategories.length));
         categoryIds.add(categoryId);
+      }
+    }
+    const normalizedCategoryGroups = categoryGroups.length > 0
+      ? categoryGroups
+      : [normalizeLinkGroup({ id: "default-categories", title: "دسته بندی ها", sortOrder: Number(normalizedCategories[0]?.pageSortOrder ?? 1) }, 0, "default-categories", "دسته بندی ها")];
+    const categoryGroupIds = new Set(normalizedCategoryGroups.map((group) => group.id));
+    for (const category of normalizedCategories) {
+      if (!category.groupId || !categoryGroupIds.has(category.groupId)) {
+        category.groupId = normalizedCategoryGroups[0]?.id || "default-categories";
+      }
+    }
+    const normalizedBrandGroups = brandGroups.length > 0
+      ? brandGroups
+      : [normalizeLinkGroup({ id: "default-brands", title: "برندها", sortOrder: Number(brands[0]?.homeSortOrder ?? 1) }, 0, "default-brands", "برندها")];
+    const brandGroupIds = new Set(normalizedBrandGroups.map((group) => group.id));
+    for (const brand of brands) {
+      if (!brand.groupId || !brandGroupIds.has(brand.groupId)) {
+        brand.groupId = normalizedBrandGroups[0]?.id || "default-brands";
       }
     }
 
@@ -1023,6 +1144,26 @@ export async function POST(request: Request) {
       }
 
       if ("category" in tx && typeof (tx as any).category?.deleteMany === "function") {
+        if ("categoryGroup" in tx && typeof (tx as any).categoryGroup?.deleteMany === "function") {
+          await (tx as any).categoryGroup.deleteMany({
+            where: {
+              id: { notIn: normalizedCategoryGroups.map((group) => group.id) },
+            },
+          });
+
+          for (const group of normalizedCategoryGroups) {
+            await (tx as any).categoryGroup.upsert({
+              where: { id: group.id },
+              update: {
+                title: group.title,
+                active: group.active,
+                sortOrder: group.sortOrder,
+              },
+              create: group,
+            });
+          }
+        }
+
         await (tx as any).category.deleteMany({
           where: {
             id: { notIn: normalizedCategories.map((category) => category.id) },
@@ -1034,6 +1175,7 @@ export async function POST(request: Request) {
             where: { id: category.id },
             update: {
               title: category.title,
+              groupId: category.groupId,
               slug: category.slug,
               imageUrl: category.imageUrl,
               active: category.active,
@@ -1046,6 +1188,26 @@ export async function POST(request: Request) {
       }
 
       if ("brand" in tx && typeof (tx as any).brand?.deleteMany === "function") {
+        if ("brandGroup" in tx && typeof (tx as any).brandGroup?.deleteMany === "function") {
+          await (tx as any).brandGroup.deleteMany({
+            where: {
+              id: { notIn: normalizedBrandGroups.map((group) => group.id) },
+            },
+          });
+
+          for (const group of normalizedBrandGroups) {
+            await (tx as any).brandGroup.upsert({
+              where: { id: group.id },
+              update: {
+                title: group.title,
+                active: group.active,
+                sortOrder: group.sortOrder,
+              },
+              create: group,
+            });
+          }
+        }
+
         await (tx as any).brand.deleteMany({
           where: {
             id: { notIn: brands.map((brand) => brand.id) },
@@ -1057,6 +1219,7 @@ export async function POST(request: Request) {
             where: { id: brand.id },
             update: {
               title: brand.title,
+              groupId: brand.groupId,
               slug: brand.slug,
               imageUrl: brand.imageUrl,
               active: brand.active,
@@ -1181,6 +1344,12 @@ export async function POST(request: Request) {
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           })
         : [];
+    const savedCategoryGroups =
+      "categoryGroup" in prisma && typeof (prisma as any).categoryGroup?.findMany === "function"
+        ? await (prisma as any).categoryGroup.findMany({
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : [];
     const savedBanners =
       "banner" in prisma && typeof prisma.banner?.findMany === "function"
         ? await prisma.banner.findMany({
@@ -1193,11 +1362,19 @@ export async function POST(request: Request) {
             orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           })
         : [];
+    const savedBrandGroups =
+      "brandGroup" in prisma && typeof (prisma as any).brandGroup?.findMany === "function"
+        ? await (prisma as any).brandGroup.findMany({
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : [];
     const tree = buildCatalogTree(
       data as ProductPayload[],
       savedShowcases,
       savedCategories,
+      savedCategoryGroups,
       savedBrands,
+      savedBrandGroups,
       savedBanners as BannerRecord[],
       true
     );

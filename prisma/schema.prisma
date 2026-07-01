@@ -154,6 +154,7 @@ model Showcase {
 
 model Category {
   id        String   @id
+  groupId   String?
   title     String
   slug      String   @unique
   imageUrl  String?
@@ -162,10 +163,22 @@ model Category {
   pageSortOrder Int   @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  group     CategoryGroup? @relation(fields: [groupId], references: [id])
+}
+
+model CategoryGroup {
+  id        String     @id
+  title     String
+  active    Boolean    @default(true)
+  sortOrder Int        @default(1)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  categories Category[]
 }
 
 model Brand {
   id        String   @id
+  groupId   String?
   title     String
   slug      String   @unique
   imageUrl  String?
@@ -174,6 +187,17 @@ model Brand {
   homeSortOrder Int  @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  group     BrandGroup? @relation(fields: [groupId], references: [id])
+}
+
+model BrandGroup {
+  id        String   @id
+  title     String
+  active    Boolean  @default(true)
+  sortOrder Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  brands    Brand[]
 }
 
 model Banner {

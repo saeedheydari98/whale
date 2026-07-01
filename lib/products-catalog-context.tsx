@@ -16,6 +16,7 @@ import {
   PRODUCTS_CATALOG_UPDATED_EVENT,
   type BannerRecord,
   type BrandRecord,
+  type CatalogLinkGroupRecord,
   type CatalogTree,
   type CategoryRecord,
   type ProductRecord,
@@ -26,7 +27,9 @@ type ProductsCatalogContextValue = {
   products: ProductRecord[];
   showcases: ShowcaseRecord[];
   categories: CategoryRecord[];
+  categoryGroups: CatalogLinkGroupRecord[];
   brands: BrandRecord[];
+  brandGroups: CatalogLinkGroupRecord[];
   banners: BannerRecord[];
   tree: CatalogTree;
   loading: boolean;
@@ -49,7 +52,9 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<ProductRecord[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseRecord[]>([]);
   const [categories, setCategories] = useState<CategoryRecord[]>([]);
+  const [categoryGroups, setCategoryGroups] = useState<CatalogLinkGroupRecord[]>([]);
   const [brands, setBrands] = useState<BrandRecord[]>([]);
+  const [brandGroups, setBrandGroups] = useState<CatalogLinkGroupRecord[]>([]);
   const [banners, setBanners] = useState<BannerRecord[]>([]);
   const [tree, setTree] = useState<CatalogTree>({ sections: [] });
   const [loading, setLoading] = useState(true);
@@ -62,7 +67,9 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
       setProducts(data.products);
       setShowcases(data.showcases);
       setCategories(data.categories);
+      setCategoryGroups(data.categoryGroups);
       setBrands(data.brands);
+      setBrandGroups(data.brandGroups);
       setBanners(data.banners);
       setTree(data.tree);
       await waitForMinimumLoading(startedAt);
@@ -81,7 +88,9 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
       setProducts(data.products);
       setShowcases(data.showcases);
       setCategories(data.categories);
+      setCategoryGroups(data.categoryGroups);
       setBrands(data.brands);
+      setBrandGroups(data.brandGroups);
       setBanners(data.banners);
       setTree(data.tree);
       await waitForMinimumLoading(startedAt);
@@ -118,7 +127,9 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
       products,
       showcases,
       categories,
+      categoryGroups,
       brands,
+      brandGroups,
       banners,
       tree,
       loading,
@@ -126,7 +137,7 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
       getShowcaseById,
       refresh: () => load(true),
     }),
-    [products, showcases, categories, brands, banners, tree, loading, getProductById, getShowcaseById, load]
+    [products, showcases, categories, categoryGroups, brands, brandGroups, banners, tree, loading, getProductById, getShowcaseById, load]
   );
 
   return (
