@@ -8,6 +8,7 @@ export type UICommonVariant =
   | "warning"
   | "info"
   | "neutral"
+  | "edit"
   | "accent";
 
 export type VariantColorStyle = {
@@ -91,7 +92,8 @@ export function resolveVariantColors(
     danger: "red",
     warning: "yellow",
     info: "blue",
-    neutral: "orange",
+    neutral: "gray",
+    edit: "orange",
     accent: "purple",
   };
   const staticColor = colorVariantMap[variant];

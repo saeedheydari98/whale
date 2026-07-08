@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { parseJsonBody, validationError } from "@/lib/api/validation";
 import { requireAdmin } from "@/lib/api/auth";
 import { bannerSchema, productSchema, showcaseSchema } from "@/lib/api/schemas";
-import { normalizeProductData } from "@/lib/api/catalog-service";
+import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -213,7 +213,10 @@ async function updateEntity(request: Request, context: Context, partial: boolean
       const body = await request.json().catch(() => null);
       const parsed = (partial ? productSchema.partial() : productSchema).safeParse(body);
       if (!parsed.success) return validationError(parsed.error);
-      const product = await prisma.product.update({ where: { id: Number(path[1]) }, data: normalizeProductData(parsed.data) });
+      const product = await prisma.product.update({
+        where: { id: Number(path[1]) },
+        data: partial ? normalizeProductPatchData(parsed.data) : normalizeProductData(parsed.data),
+      });
       return apiOk({ product });
     }
 

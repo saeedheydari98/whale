@@ -51,7 +51,7 @@ export function normalizeProductData(data: any) {
     images: Array.isArray(data.images) && data.images.length > 0 ? data.images : Prisma.JsonNull,
     videoUrl: data.videoUrl || null,
     badge: data.badge || null,
-    ctaLabel: "مشاهده محصول",
+    ctaLabel: data.ctaLabel || "مشاهده محصول",
     ctaHref: data.ctaHref || null,
     active: data.active ?? data.isActive ?? true,
     isActive: data.isActive ?? data.active ?? true,
@@ -88,6 +88,91 @@ export function normalizeProductData(data: any) {
     colorStock: data.colorStock === undefined ? Prisma.JsonNull : data.colorStock,
     sortOrder: data.sortOrder ?? 0,
   };
+}
+
+function hasOwn(data: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(data, key);
+}
+
+function nullableText(value: unknown) {
+  const text = String(value ?? "").trim();
+  return text || null;
+}
+
+function nullableDate(value: unknown) {
+  const text = String(value ?? "").trim();
+  return text ? new Date(text) : null;
+}
+
+export function normalizeProductPatchData(data: Record<string, unknown>): Prisma.ProductUncheckedUpdateInput {
+  const patch: Prisma.ProductUncheckedUpdateInput = {};
+
+  if (hasOwn(data, "showcaseId")) patch.showcaseId = nullableText(data.showcaseId);
+  if (hasOwn(data, "showcaseIds")) {
+    const showcaseIds = Array.isArray(data.showcaseIds)
+      ? data.showcaseIds.map((item) => String(item).trim()).filter(Boolean)
+      : [];
+    patch.showcaseIds = showcaseIds.length > 0 ? showcaseIds : Prisma.JsonNull;
+  }
+  if (hasOwn(data, "title")) patch.title = String(data.title ?? "").trim();
+  if (hasOwn(data, "description")) patch.description = String(data.description ?? "").trim();
+  if (hasOwn(data, "slug")) patch.slug = nullableText(data.slug);
+  if (hasOwn(data, "price")) patch.price = String(data.price ?? "").trim();
+  if (hasOwn(data, "originalPrice")) patch.originalPrice = nullableText(data.originalPrice);
+  if (hasOwn(data, "discountPrice")) patch.discountPrice = nullableText(data.discountPrice);
+  if (hasOwn(data, "discountPercent")) patch.discountPercent = data.discountPercent as number | null;
+  if (hasOwn(data, "imageUrl")) patch.imageUrl = nullableText(data.imageUrl);
+  if (hasOwn(data, "images")) {
+    patch.images = Array.isArray(data.images) && data.images.length > 0 ? data.images : Prisma.JsonNull;
+  }
+  if (hasOwn(data, "videoUrl")) patch.videoUrl = nullableText(data.videoUrl);
+  if (hasOwn(data, "badge")) patch.badge = nullableText(data.badge);
+  if (hasOwn(data, "ctaLabel")) patch.ctaLabel = nullableText(data.ctaLabel);
+  if (hasOwn(data, "ctaHref")) patch.ctaHref = nullableText(data.ctaHref);
+  if (hasOwn(data, "active")) patch.active = Boolean(data.active);
+  if (hasOwn(data, "isActive")) patch.isActive = Boolean(data.isActive);
+  if (hasOwn(data, "active") && !hasOwn(data, "isActive")) patch.isActive = Boolean(data.active);
+  if (hasOwn(data, "isActive") && !hasOwn(data, "active")) patch.active = Boolean(data.isActive);
+  if (hasOwn(data, "isFeatured")) patch.isFeatured = Boolean(data.isFeatured);
+  if (hasOwn(data, "isAvailable")) patch.isAvailable = Boolean(data.isAvailable);
+  if (hasOwn(data, "stockQuantity")) patch.stockQuantity = Math.max(0, Math.round(Number(data.stockQuantity)));
+  if (hasOwn(data, "stockStatus")) patch.stockStatus = String(data.stockStatus ?? "").trim();
+  if (hasOwn(data, "minOrder")) patch.minOrder = Math.max(1, Math.round(Number(data.minOrder)));
+  if (hasOwn(data, "maxOrder")) patch.maxOrder = data.maxOrder === null ? null : Math.max(1, Math.round(Number(data.maxOrder)));
+  if (hasOwn(data, "weight")) patch.weight = data.weight === null ? null : Number(data.weight);
+  if (hasOwn(data, "length")) patch.length = data.length === null ? null : Number(data.length);
+  if (hasOwn(data, "width")) patch.width = data.width === null ? null : Number(data.width);
+  if (hasOwn(data, "height")) patch.height = data.height === null ? null : Number(data.height);
+  if (hasOwn(data, "salesCount")) patch.salesCount = Math.max(0, Math.round(Number(data.salesCount)));
+  if (hasOwn(data, "views")) patch.views = Math.max(0, Math.round(Number(data.views)));
+  if (hasOwn(data, "wishlistCount")) patch.wishlistCount = Math.max(0, Math.round(Number(data.wishlistCount)));
+  if (hasOwn(data, "ratingAverage")) patch.ratingAverage = Math.max(0, Math.min(5, Number(data.ratingAverage)));
+  if (hasOwn(data, "ratingCount")) patch.ratingCount = Math.max(0, Math.round(Number(data.ratingCount)));
+  if (hasOwn(data, "discountStartAt")) patch.discountStartAt = nullableDate(data.discountStartAt);
+  if (hasOwn(data, "discountEndAt")) patch.discountEndAt = nullableDate(data.discountEndAt);
+  if (hasOwn(data, "categoryId")) patch.categoryId = String(data.categoryId ?? "").trim() || "general";
+  if (hasOwn(data, "categoryIds")) {
+    const categoryIds = Array.isArray(data.categoryIds)
+      ? data.categoryIds.map((item) => String(item).trim()).filter(Boolean)
+      : [];
+    patch.categoryIds = categoryIds.length > 0 ? categoryIds : Prisma.JsonNull;
+    if (!hasOwn(data, "categoryId") && categoryIds[0]) patch.categoryId = categoryIds[0];
+  }
+  if (hasOwn(data, "manufactureYear")) patch.manufactureYear = data.manufactureYear === null ? null : Math.round(Number(data.manufactureYear));
+  if (hasOwn(data, "brand")) patch.brand = nullableText(data.brand);
+  if (hasOwn(data, "vendor")) patch.vendor = nullableText(data.vendor);
+  if (hasOwn(data, "sku")) patch.sku = nullableText(data.sku);
+  if (hasOwn(data, "barcode")) patch.barcode = nullableText(data.barcode);
+  if (hasOwn(data, "metaTitle")) patch.metaTitle = nullableText(data.metaTitle);
+  if (hasOwn(data, "metaDescription")) patch.metaDescription = nullableText(data.metaDescription);
+  if (hasOwn(data, "metaKeywords")) patch.metaKeywords = nullableText(data.metaKeywords);
+  if (hasOwn(data, "placement")) patch.placement = nullableText(data.placement);
+  if (hasOwn(data, "publishedAt")) patch.publishedAt = nullableDate(data.publishedAt);
+  if (hasOwn(data, "deletedAt")) patch.deletedAt = nullableDate(data.deletedAt);
+  if (hasOwn(data, "colorStock")) patch.colorStock = data.colorStock === undefined ? Prisma.JsonNull : data.colorStock as Prisma.InputJsonValue;
+  if (hasOwn(data, "sortOrder")) patch.sortOrder = Math.round(Number(data.sortOrder));
+
+  return patch;
 }
 
 function dateRange(field: "createdAt" | "updatedAt", searchParams: URLSearchParams) {

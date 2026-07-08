@@ -30,6 +30,7 @@ export type SemanticColor =
     | "warning"
     | "info"
     | "neutral"
+    | "edit"
     | "accent";
 
 export type ThemeState = {
@@ -55,7 +56,8 @@ export const semanticThemeMap: Record<
     danger: "red",
     warning: "yellow",
     info: "blue",
-    neutral: "orange",
+    neutral: "gray",
+    edit: "orange",
     accent: "purple",
 };
 
@@ -67,6 +69,7 @@ export const variantNames = [
     "warning",
     "info",
     "neutral",
+    "edit",
     "accent",
 ] as const satisfies readonly SemanticColor[];
 

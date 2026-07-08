@@ -6,10 +6,9 @@ import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
 import {
-  fetchAdminAccess,
   subscribeAdminAccess,
 } from "@/lib/admin-access";
-import { fetchCurrentUser, subscribeAuthUser } from "@/lib/auth-client";
+import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
 
 type AdminPanelUser = {
   username?: string | null;
@@ -23,8 +22,8 @@ export default function AdminPanelPage() {
 
   useEffect(() => {
     const syncAccessFromApi = async () => {
-      const user = await fetchCurrentUser({ force: true });
-      const access = await fetchAdminAccess({ force: true });
+      const user = await fetchCurrentUser();
+      const access = hasAdminRole(user);
       setAuthUser(user);
       setHasAdminAccess(access);
     };

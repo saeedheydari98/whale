@@ -1,3 +1,9 @@
+export type AdminCatalogSection = "products" | "banners" | "showcases" | "categories" | "brands" | "storefront";
+
+export type ProductRelationMode = "category" | "showcase";
+
+export type StorefrontLayoutTab = "home" | "categories" | "products";
+
 export type ProductForm = {
   id: number | string;
   showcaseId: string;
@@ -110,3 +116,20 @@ export type BannerForm = {
   productSortOrder: number;
   sortOrder: number;
 };
+
+export type StorefrontDisplayEntry =
+  | {
+      type: "banner";
+      item: BannerForm;
+      sortOrder: number;
+    }
+  | {
+      type: "showcase";
+      item: ShowcaseForm;
+      sortOrder: number;
+    }
+  | {
+      type: "categoryGroup" | "brandGroup";
+      item: Pick<CatalogLinkGroupForm, "id" | "title" | "sortOrder">;
+      sortOrder: number;
+    };

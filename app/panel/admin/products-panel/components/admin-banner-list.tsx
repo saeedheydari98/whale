@@ -1,9 +1,9 @@
 "use client";
 
 import { IoCreateOutline, IoImageOutline } from "react-icons/io5";
-import { CustomButton } from "../../../design-system/components/ui/button";
+import { CustomButton } from "@/app/design-system/components/ui/button";
 import Loading from "@/app/design-system/components/loading/loading";
-import type { BannerForm } from "./types";
+import type { BannerForm } from "../types";
 
 type AdminBannerListProps = {
   banner: BannerForm;
@@ -31,7 +31,7 @@ export function AdminBannerList({ banner, onEdit, onPreview, isLoading = false }
           </Loading>
           <Loading loading="skeleton-item" isLoading={isLoading}>
             <CustomButton
-              variant="neutral"
+              variant="edit"
               rounded="full"
               size="sm"
               icon={<IoCreateOutline />}

@@ -221,7 +221,7 @@ export function AppHeader() {
           {authUser && !isMobile ? (
             <div className="flex items-center gap-2">
               <span className="hidden text-xs font-semibold text-primary-text sm:inline">{authUser.username || authUser.name || "حساب کاربری"}</span>
-              <CustomButton size="sm" variant="neutral" onClick={logout}>
+              <CustomButton size="sm" variant="danger" onClick={logout}>
                 خروج
               </CustomButton>
             </div>
@@ -274,7 +274,7 @@ export function AppHeader() {
             {authUser ? (
               <CustomButton
                 size="sm"
-                variant="neutral"
+                variant="danger"
                 fullWidth
                 onClick={() => {
                   closeMenu();

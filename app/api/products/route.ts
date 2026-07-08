@@ -810,6 +810,19 @@ function getBannerImageData(value: unknown) {
   };
 }
 
+function catalogErrorMessage(error: unknown) {
+  const code = typeof error === "object" && error && "code" in error
+    ? String((error as { code?: unknown }).code)
+    : "";
+  if (code === "P1001") return "database unavailable";
+  if (code === "P2021") return "database schema is missing a required table";
+  if (code === "P2002") return "duplicate value";
+  if (code === "P2003") return "invalid related record";
+  if (code === "P2025") return "record not found";
+  if (process.env.NODE_ENV !== "production" && error instanceof Error) return error.message;
+  return "server error";
+}
+
 function splitTreePayload(tree: CatalogTreePayload | null) {
   const children = Array.isArray(tree?.children) ? tree.children : [];
   const showcaseChildren = children.filter((item) => item.type === "showcase") as ShowcasePayload[];
@@ -993,7 +1006,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Products GET error:", error);
     return NextResponse.json(
-      { ok: false, error: "server error", data: { type: "root", placement: 0, children: [] } },
+      { ok: false, error: catalogErrorMessage(error), data: { type: "root", placement: 0, children: [] } },
       { status: 500 }
     );
   }
@@ -1113,6 +1126,7 @@ export async function POST(request: Request) {
         ...showcases.map((item) => String(item.id ?? "").trim()).filter(Boolean),
       ]),
     ];
+    const validShowcaseIds = new Set(showcaseIds);
 
     const showcaseById = new Map(
       showcases
@@ -1120,121 +1134,119 @@ export async function POST(request: Request) {
         .filter(([id]) => Boolean(id))
     );
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      if ("banner" in tx && typeof tx.banner?.deleteMany === "function") {
-        await tx.banner.deleteMany();
-      }
+    // Execute operations sequentially (avoid long interactive transaction)
+    if ((prisma as any).banner && typeof (prisma as any).banner?.deleteMany === "function") {
+      await (prisma as any).banner.deleteMany();
+    }
 
-      const existingProductIds = normalized
-        .map(getExistingProductId)
-        .filter((id): id is number => id !== null);
+    const existingProductIds = normalized
+      .map(getExistingProductId)
+      .filter((id): id is number => id !== null);
 
-      await tx.product.deleteMany({
+    if (hasProductModel) {
+      await prisma.product.deleteMany({
         where: existingProductIds.length > 0
           ? { id: { notIn: existingProductIds } }
           : {},
       });
+    }
 
-      if (hasShowcaseModel) {
-        await tx.showcase.deleteMany({
-          where: {
-            id: { notIn: showcaseIds },
-          },
-        });
-      }
-
-      if ("category" in tx && typeof (tx as any).category?.deleteMany === "function") {
-        if ("categoryGroup" in tx && typeof (tx as any).categoryGroup?.deleteMany === "function") {
-          await (tx as any).categoryGroup.deleteMany({
-            where: {
-              id: { notIn: normalizedCategoryGroups.map((group) => group.id) },
-            },
-          });
-
-          for (const group of normalizedCategoryGroups) {
-            await (tx as any).categoryGroup.upsert({
-              where: { id: group.id },
-              update: {
-                title: group.title,
-                active: group.active,
-                sortOrder: group.sortOrder,
-              },
-              create: group,
-            });
-          }
-        }
-
-        await (tx as any).category.deleteMany({
-          where: {
-            id: { notIn: normalizedCategories.map((category) => category.id) },
-          },
-        });
-
-        for (const category of normalizedCategories) {
-          await (tx as any).category.upsert({
-            where: { id: category.id },
+    if ((prisma as any).category && typeof (prisma as any).category?.deleteMany === "function") {
+      if ((prisma as any).categoryGroup && typeof (prisma as any).categoryGroup?.upsert === "function") {
+        for (const group of normalizedCategoryGroups) {
+          await (prisma as any).categoryGroup.upsert({
+            where: { id: group.id },
             update: {
-              title: category.title,
-              groupId: category.groupId,
-              slug: category.slug,
-              imageUrl: category.imageUrl,
-              active: category.active,
-              sortOrder: category.sortOrder,
-              pageSortOrder: category.pageSortOrder,
+              title: group.title,
+              active: group.active,
+              sortOrder: group.sortOrder,
             },
-            create: category,
+            create: group,
           });
         }
       }
 
-      if ("brand" in tx && typeof (tx as any).brand?.deleteMany === "function") {
-        if ("brandGroup" in tx && typeof (tx as any).brandGroup?.deleteMany === "function") {
-          await (tx as any).brandGroup.deleteMany({
-            where: {
-              id: { notIn: normalizedBrandGroups.map((group) => group.id) },
-            },
-          });
+      await (prisma as any).category.deleteMany({
+        where: {
+          id: { notIn: normalizedCategories.map((category) => category.id) },
+        },
+      });
 
-          for (const group of normalizedBrandGroups) {
-            await (tx as any).brandGroup.upsert({
-              where: { id: group.id },
-              update: {
-                title: group.title,
-                active: group.active,
-                sortOrder: group.sortOrder,
-              },
-              create: group,
-            });
-          }
-        }
+      for (const category of normalizedCategories) {
+        await (prisma as any).category.upsert({
+          where: { id: category.id },
+          update: {
+            title: category.title,
+            groupId: category.groupId,
+            slug: category.slug,
+            imageUrl: category.imageUrl,
+            active: category.active,
+            sortOrder: category.sortOrder,
+            pageSortOrder: category.pageSortOrder,
+          },
+          create: category,
+        });
+      }
 
-        await (tx as any).brand.deleteMany({
+      if ((prisma as any).categoryGroup && typeof (prisma as any).categoryGroup?.deleteMany === "function") {
+        await (prisma as any).categoryGroup.deleteMany({
           where: {
-            id: { notIn: brands.map((brand) => brand.id) },
+            id: { notIn: normalizedCategoryGroups.map((group) => group.id) },
           },
         });
+      }
+    }
 
-        for (const brand of brands) {
-          await (tx as any).brand.upsert({
-            where: { id: brand.id },
+    if ((prisma as any).brand && typeof (prisma as any).brand?.deleteMany === "function") {
+      if ((prisma as any).brandGroup && typeof (prisma as any).brandGroup?.upsert === "function") {
+        for (const group of normalizedBrandGroups) {
+          await (prisma as any).brandGroup.upsert({
+            where: { id: group.id },
             update: {
-              title: brand.title,
-              groupId: brand.groupId,
-              slug: brand.slug,
-              imageUrl: brand.imageUrl,
-              active: brand.active,
-              sortOrder: brand.sortOrder,
-              homeSortOrder: brand.homeSortOrder,
+              title: group.title,
+              active: group.active,
+              sortOrder: group.sortOrder,
             },
-            create: brand,
+            create: group,
           });
         }
       }
 
+      await (prisma as any).brand.deleteMany({
+        where: {
+          id: { notIn: brands.map((brand) => brand.id) },
+        },
+      });
+
+      for (const brand of brands) {
+        await (prisma as any).brand.upsert({
+          where: { id: brand.id },
+          update: {
+            title: brand.title,
+            groupId: brand.groupId,
+            slug: brand.slug,
+            imageUrl: brand.imageUrl,
+            active: brand.active,
+            sortOrder: brand.sortOrder,
+            homeSortOrder: brand.homeSortOrder,
+          },
+          create: brand,
+        });
+      }
+
+      if ((prisma as any).brandGroup && typeof (prisma as any).brandGroup?.deleteMany === "function") {
+        await (prisma as any).brandGroup.deleteMany({
+          where: {
+            id: { notIn: normalizedBrandGroups.map((group) => group.id) },
+          },
+        });
+      }
+    }
+
+    if (hasShowcaseModel) {
       for (const showcaseId of showcaseIds) {
-        if (!hasShowcaseModel) continue;
         const meta = showcaseById.get(showcaseId);
-        await (tx as any).showcase.upsert({
+        await prisma.showcase.upsert({
           where: { id: showcaseId },
           update: {
             title: meta?.title ?? undefined,
@@ -1263,71 +1275,86 @@ export async function POST(request: Request) {
           },
         });
       }
+    }
 
-      for (const item of sortProducts(normalized)) {
-        const productData = {
-          ...normalizeProductData({
-            ...item,
-            colorStock: Object.keys(normalizeColorStock(item.colorStock)).length > 0
-              ? normalizeColorStock(item.colorStock)
+    // Upsert products sequentially to avoid a long-running interactive transaction
+    for (const item of sortProducts(normalized)) {
+      const itemShowcaseId = String(item.showcaseId ?? "").trim();
+      const itemShowcaseIds = Array.isArray(item.showcaseIds)
+        ? item.showcaseIds.map((id) => String(id).trim()).filter((id) => id && validShowcaseIds.has(id))
+        : [];
+      const productData = {
+        ...normalizeProductData({
+          ...item,
+          showcaseId: validShowcaseIds.has(itemShowcaseId) ? itemShowcaseId : null,
+          showcaseIds: itemShowcaseIds,
+          colorStock: Object.keys(normalizeColorStock(item.colorStock)).length > 0
+            ? normalizeColorStock(item.colorStock)
+            : Prisma.JsonNull,
+          stockStatus: item.stockStatus || (Number(item.stockQuantity) > 0 ? "in_stock" : "out_of_stock"),
+        }),
+        showcaseId: validShowcaseIds.has(itemShowcaseId) ? itemShowcaseId : null,
+        showcaseIds: itemShowcaseIds.length > 0 ? itemShowcaseIds : Prisma.JsonNull,
+        categoryIds: item.categoryIds,
+      };
+      const existingProductId = getExistingProductId(item);
+
+      if (existingProductId) {
+        await prisma.product.update({
+          where: { id: existingProductId },
+          data: productData,
+        });
+      } else {
+        await prisma.product.create({
+          data: productData,
+        });
+      }
+    }
+
+    if (hasShowcaseModel) {
+      await prisma.showcase.deleteMany({
+        where: {
+          id: { notIn: showcaseIds },
+        },
+      });
+    }
+
+    if ((prisma as any).banner && typeof (prisma as any).banner?.create === "function") {
+      for (const item of sortByOrder(banners)) {
+        const bannerId = String(item.id ?? "").trim();
+        const imageUrls = getImageUrls(item);
+        const showcaseId = item.showOnShowcase && item.showcaseId ? String(item.showcaseId) : null;
+        const homeSortOrder = Number.isFinite(Number(item.homeSortOrder)) ? Number(item.homeSortOrder) : getPlacement(item, 0);
+        const showcaseSortOrder = Number.isFinite(Number(item.showcaseSortOrder)) ? Number(item.showcaseSortOrder) : getPlacement(item, 0);
+        const categorySortOrder = Number.isFinite(Number(item.categorySortOrder)) ? Number(item.categorySortOrder) : homeSortOrder;
+        const productSortOrder = Number.isFinite(Number(item.productSortOrder)) ? Number(item.productSortOrder) : showcaseSortOrder;
+        await (prisma as any).banner.create({
+          data: {
+            id: bannerId || undefined,
+            title: item.title ?? null,
+            showcaseId,
+            images: imageUrls.length > 0
+              ? {
+                  urls: imageUrls,
+                  showOnHome: item.showOnHome !== false,
+                  showOnShowcase: Boolean(showcaseId),
+                  showOnCategories: item.showOnCategories === true,
+                  showOnProducts: item.showOnProducts === true || item.showOnShowcase === true,
+                  showcaseId: showcaseId ?? "",
+                  homeSortOrder,
+                  showcaseSortOrder,
+                  categorySortOrder,
+                  productSortOrder,
+                }
               : Prisma.JsonNull,
-            stockStatus: item.stockStatus || (Number(item.stockQuantity) > 0 ? "in_stock" : "out_of_stock"),
-          }),
-          showcaseId: String(item.showcaseId ?? "").trim(),
-          showcaseIds: item.showcaseIds,
-          categoryIds: item.categoryIds,
-        };
-        const existingProductId = getExistingProductId(item);
-
-        if (existingProductId) {
-          await tx.product.update({
-            where: { id: existingProductId },
-            data: productData,
-          });
-        } else {
-          await tx.product.create({
-            data: productData,
-          });
-        }
+            active: item.active ?? true,
+            intervalSeconds: clampWholeNumber(item.intervalSeconds, 1, 60, 5),
+            heightPercent: clampWholeNumber(item.heightPercent, 10, 100, 28),
+            sortOrder: homeSortOrder,
+          },
+        });
       }
-
-      if ("banner" in tx && typeof tx.banner?.create === "function") {
-        for (const item of sortByOrder(banners)) {
-          const bannerId = String(item.id ?? "").trim();
-          const imageUrls = getImageUrls(item);
-          const showcaseId = item.showOnShowcase && item.showcaseId ? String(item.showcaseId) : null;
-          const homeSortOrder = Number.isFinite(Number(item.homeSortOrder)) ? Number(item.homeSortOrder) : getPlacement(item, 0);
-          const showcaseSortOrder = Number.isFinite(Number(item.showcaseSortOrder)) ? Number(item.showcaseSortOrder) : getPlacement(item, 0);
-          const categorySortOrder = Number.isFinite(Number(item.categorySortOrder)) ? Number(item.categorySortOrder) : homeSortOrder;
-          const productSortOrder = Number.isFinite(Number(item.productSortOrder)) ? Number(item.productSortOrder) : showcaseSortOrder;
-          await (tx as any).banner.create({
-            data: {
-              id: bannerId || undefined,
-              title: item.title ?? null,
-              showcaseId,
-              images: imageUrls.length > 0
-                ? {
-                    urls: imageUrls,
-                    showOnHome: item.showOnHome !== false,
-                    showOnShowcase: Boolean(showcaseId),
-                    showOnCategories: item.showOnCategories === true,
-                    showOnProducts: item.showOnProducts === true || item.showOnShowcase === true,
-                    showcaseId: showcaseId ?? "",
-                    homeSortOrder,
-                    showcaseSortOrder,
-                    categorySortOrder,
-                    productSortOrder,
-                  }
-                : Prisma.JsonNull,
-              active: item.active ?? true,
-              intervalSeconds: clampWholeNumber(item.intervalSeconds, 1, 60, 5),
-              heightPercent: clampWholeNumber(item.heightPercent, 10, 100, 28),
-              sortOrder: homeSortOrder,
-            },
-          });
-        }
-      }
-    });
+    }
 
     const data = await prisma.product.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
@@ -1385,6 +1412,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Products POST error:", error);
-    return NextResponse.json({ ok: false, error: "server error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: catalogErrorMessage(error) }, { status: 500 });
   }
 }

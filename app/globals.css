@@ -12,7 +12,8 @@
   --ui-danger: #ff2323;
   --ui-warning: #ffd90d;
   --ui-info: #2f7ce1;
-  --ui-neutral: #ff5722;
+  --ui-neutral: #637594;
+  --ui-edit: #ff5722;
   --ui-accent: #e61cff;
 
   --primary: var(--ui-primary);
@@ -110,14 +111,23 @@
   --info-border: color-mix(in srgb, var(--info) 50%, transparent);
   --info-border-nomode: color-mix(in srgb, var(--info-nomode) 50%, transparent);
   --neutral-text: #434343;
-  --neutral-base: #fff4ed;
+  --neutral-base: #f5f7fb;
   --neutral-text-nomode: #434343;
-  --neutral: #ff5722;
-  --neutral-nomode: #ff5722;
+  --neutral: #637594;
+  --neutral-nomode: #637594;
   --neutral-bg: color-mix(in srgb, var(--neutral) 30%, transparent);
   --neutral-bg-nomode: color-mix(in srgb, var(--neutral-nomode) 30%, transparent);
   --neutral-border: color-mix(in srgb, var(--neutral) 50%, transparent);
   --neutral-border-nomode: color-mix(in srgb, var(--neutral-nomode) 50%, transparent);
+  --edit-text: #7a2500;
+  --edit-base: #fff4ed;
+  --edit-text-nomode: #7a2500;
+  --edit: #ff5722;
+  --edit-nomode: #ff5722;
+  --edit-bg: color-mix(in srgb, var(--edit) 30%, transparent);
+  --edit-bg-nomode: color-mix(in srgb, var(--edit-nomode) 30%, transparent);
+  --edit-border: color-mix(in srgb, var(--edit) 50%, transparent);
+  --edit-border-nomode: color-mix(in srgb, var(--edit-nomode) 50%, transparent);
   --accent-text: #c600d4;
   --accent-base: #fdf1ff;
   --accent-text-nomode: #c600d4;
@@ -160,6 +170,10 @@
     --neutral: #637594;
     --neutral-bg: color-mix(in srgb, var(--neutral) 30%, transparent);
     --neutral-border: color-mix(in srgb, var(--neutral) 50%, transparent);
+    --edit-text: #ffe2d4;
+    --edit: #ff7a45;
+    --edit-bg: color-mix(in srgb, var(--edit) 30%, transparent);
+    --edit-border: color-mix(in srgb, var(--edit) 50%, transparent);
   }
 }
 
@@ -175,6 +189,7 @@
   --color-ui-warning: var(--ui-warning);
   --color-ui-info: var(--ui-info);
   --color-ui-neutral: var(--ui-neutral);
+  --color-ui-edit: var(--ui-edit);
   --color-ui-accent: var(--ui-accent);
 
   --color-primary: var(--primary);
@@ -292,6 +307,15 @@
   --color-neutral-bg-nomode: var(--neutral-bg-nomode);
   --color-neutral-border: var(--neutral-border);
   --color-neutral-border-nomode: var(--neutral-border-nomode);
+  --color-edit-text: var(--edit-text);
+  --color-edit-base: var(--edit-base);
+  --color-edit-text-nomode: var(--edit-text-nomode);
+  --color-edit: var(--edit);
+  --color-edit-nomode: var(--edit-nomode);
+  --color-edit-bg: var(--edit-bg);
+  --color-edit-bg-nomode: var(--edit-bg-nomode);
+  --color-edit-border: var(--edit-border);
+  --color-edit-border-nomode: var(--edit-border-nomode);
   --color-accent-text: var(--accent-text);
   --color-accent-base: var(--accent-base);
   --color-accent-text-nomode: var(--accent-text-nomode);

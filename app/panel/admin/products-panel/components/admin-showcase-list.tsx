@@ -1,9 +1,10 @@
 "use client";
 
 import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5";
-import { CustomButton } from "../../../design-system/components/ui/button";
+import { CustomButton } from "@/app/design-system/components/ui/button";
 import Loading from "@/app/design-system/components/loading/loading";
-import type { ProductForm, ShowcaseForm } from "./types";
+import type { ProductForm, ShowcaseForm } from "../types";
+import { getShowcaseProductsForAdmin } from "../utils";
 
 type AdminShowcaseListProps = {
   products: ProductForm[];
@@ -15,48 +16,6 @@ type AdminShowcaseListProps = {
   formatPrice: (value?: string) => string;
   isLoading?: boolean;
 };
-
-function priceValue(value?: string) {
-  const parsed = Number(String(value || "").replace(/[^\d.]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function sortedByRule(products: ProductForm[], sort: string) {
-  return [...products].sort((a, b) => {
-    switch (sort) {
-      case "cheapest":
-        return priceValue(a.discountPrice || a.price) - priceValue(b.discountPrice || b.price);
-      case "expensive":
-        return priceValue(b.discountPrice || b.price) - priceValue(a.discountPrice || a.price);
-      case "oldest":
-        return Number(a.id) - Number(b.id);
-      case "bestseller":
-        return b.salesCount - a.salesCount;
-      case "mostDiscounted":
-        return Number(b.discountPercent || 0) - Number(a.discountPercent || 0);
-      case "newest":
-      default:
-        return Number(b.id) - Number(a.id);
-    }
-  });
-}
-
-function getShowcaseProducts(products: ProductForm[], showcase: ShowcaseForm) {
-  const activeProducts = products.filter((product) => product.isActive !== false);
-  if (showcase.mode === "auto") {
-    const filtered = activeProducts.filter((product) => !showcase.categoryId || product.categoryId === showcase.categoryId);
-    return sortedByRule(filtered, showcase.autoSort).slice(0, Math.max(1, showcase.limit));
-  }
-
-  const manualIds = showcase.manualProductIds.map((item) => String(item));
-  if (manualIds.length > 0) {
-    return manualIds
-      .map((id) => activeProducts.find((product) => String(product.id) === id))
-      .filter(Boolean) as ProductForm[];
-  }
-
-  return activeProducts.filter((product) => product.showcaseIds.includes(showcase.id) || product.showcaseId === showcase.id);
-}
 
 export function AdminShowcaseList({
   products,
@@ -71,7 +30,7 @@ export function AdminShowcaseList({
   return (
     <div className="flex flex-col gap-5">
       {showcases.map((showcase) => {
-        const showcaseProducts = getShowcaseProducts(products, showcase);
+        const showcaseProducts = getShowcaseProductsForAdmin(products, showcase);
 
         return (
           <div
@@ -92,7 +51,7 @@ export function AdminShowcaseList({
                 </Loading>
                 <Loading loading="skeleton-item" isLoading={isLoading}>
                   <CustomButton
-                    variant="neutral"
+                    variant="edit"
                     rounded="full"
                     size="sm"
                     icon={<IoCreateOutline />}

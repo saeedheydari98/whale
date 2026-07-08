@@ -10,6 +10,7 @@ export type LoadingVariant =
   | "dots"
   | "pulse"
   | "bars"
+  | "page"
   | "skeleton"
   | "skeleton-block"
   | "skeleton-card"
@@ -147,6 +148,26 @@ export default function Loading({
             transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
           />
         ))}
+      </div>
+    );
+  }
+
+  if (loading === "page") {
+    if (!isLoading) return <>{children}</>;
+    return (
+      <div className={cx("flex flex-col items-center justify-center w-full h-full text-primary", className)}>
+        <img src="/next.svg" alt="logo" className="w-24 h-24 mb-4" />
+        <div className="flex items-center gap-2">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="rounded-full bg-current"
+              style={{ width: resolvedSize / 2.5, height: resolvedSize / 2.5 }}
+              animate={{ y: [0, -6, 0] }}
+              transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.12 }}
+            />
+          ))}
+        </div>
       </div>
     );
   }

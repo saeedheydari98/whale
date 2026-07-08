@@ -6,6 +6,7 @@ export const variantOptions = [
   "warning",
   "info",
   "neutral",
+  "edit",
 ] as const;
 
 export const sizeOptions = ["xs", "sm", "md", "lg", "xl", "xxl", "xxxl"] as const;
