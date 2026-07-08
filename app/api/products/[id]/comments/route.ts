@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { parseJsonBody } from "@/lib/api/validation";
 import { commentSchema } from "@/lib/api/schemas";
 import { getAuthUser } from "@/lib/api/auth";
+import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -114,7 +115,9 @@ export async function POST(request: Request, context: Context) {
           ratingCount: stats._count.rating,
         },
       });
+      await invalidateCatalogCache("comments.rating");
     }
+    await invalidateCatalogCache("comments.create");
     return apiOk({ comment }, { status: 201 });
   } catch (error) {
     console.error("Comment POST error:", error);

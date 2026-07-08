@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { clearProductsCache, getProducts } from "@/lib/products-client";
+import { clearProductsCache, getCatalogStructure, getProducts } from "@/lib/products-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { useFileDataUrl } from "@/hooks/useFileDataUrl";
 import { createBanner, createBrand, createCatalogLinkGroup, createCategory, createProduct, createShowcase } from "../factories";
 import type {
   BannerForm,
   BrandForm,
+  AdminCatalogSection,
   CatalogLinkGroupForm,
   CategoryForm,
   ProductForm,
@@ -36,7 +37,7 @@ import {
   waitForMinimumLoading,
 } from "../utils";
 
-export function useAdminProductsPanel() {
+export function useAdminProductsPanel(activeSection: AdminCatalogSection = "products") {
   const [products, setProducts] = useState<ProductForm[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseForm[]>([]);
   const [categories, setCategories] = useState<CategoryForm[]>([
@@ -110,7 +111,13 @@ export function useAdminProductsPanel() {
     const loadProducts = async () => {
       const startedAt = Date.now();
       try {
-        const catalog = await getProducts({ all: true });
+        const needsProducts = activeSection === "products"
+          || activeSection === "showcases"
+          || activeSection === "categories"
+          || activeSection === "brands";
+        const catalog = needsProducts
+          ? await getProducts({ all: true, full: true })
+          : await getCatalogStructure({ all: true });
         if (cancelled) return;
 
         const apiProducts = dedupeProducts(
@@ -223,7 +230,7 @@ export function useAdminProductsPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeSection]);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.sortOrder - b.sortOrder), [products]);
   const sortedShowcases = useMemo(() => ensureShowcases(products, showcases), [products, showcases]);

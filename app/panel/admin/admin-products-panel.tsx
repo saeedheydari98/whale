@@ -9,7 +9,7 @@ type AdminProductsPanelProps = {
 };
 
 export function AdminProductsPanel({ section = "storefront" }: AdminProductsPanelProps) {
-  const panel = useAdminProductsPanel();
+  const panel = useAdminProductsPanel(section);
 
   return <AdminProductsPanelContent section={section} panel={panel} />;
 }

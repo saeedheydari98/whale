@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../design-system/components/ui/button";
@@ -27,7 +28,7 @@ import {
   type UserProfile,
 } from "@/lib/user-profile";
 import { fetchCurrentUser } from "@/lib/auth-client";
-import { useProductsCatalog } from "@/lib/products-catalog-context";
+import { getProductDetail } from "@/lib/products-client";
 import { isValidPastPersianDate, normalizePersianDate } from "@/lib/persian-date";
 import ColorStockDots from "../design-system/components/ui/color-stock-dots";
 
@@ -62,7 +63,6 @@ const NATIONAL_ID_PATTERN = /^\d{10}$/;
 const PHONE_PATTERN = /^09\d{9}$/;
 
 export default function CartPage() {
-  const { products } = useProductsCatalog();
   const [items, setItems] = useState<CartItemRecord[]>([]);
   const [previewImage, setPreviewImage] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -76,6 +76,22 @@ export default function CartPage() {
   const [authUser, setAuthUser] = useState<any>(null);
   const profileFormRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const productQueries = useQueries({
+    queries: items.map((item) => {
+      const productId = item.productId ?? item.id;
+      return {
+        queryKey: ["catalog", "product", productId],
+        queryFn: () => getProductDetail(productId ?? ""),
+        enabled: Boolean(productId),
+      };
+    }),
+  });
+  const products = useMemo(
+    () => productQueries
+      .map((query) => query.data?.product)
+      .filter((product): product is NonNullable<typeof product> => Boolean(product)),
+    [productQueries]
+  );
 
   useEffect(() => {
     let cancelled = false;

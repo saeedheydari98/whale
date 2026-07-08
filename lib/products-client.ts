@@ -4,6 +4,8 @@ import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
 const CATALOG_URL_ACTIVE = "/api/products";
 const CATALOG_URL_ALL = "/api/products?all=1";
+const CATALOG_STRUCTURE_URL_ACTIVE = "/api/catalog/structure";
+const CATALOG_STRUCTURE_URL_ALL = "/api/catalog/structure?all=1";
 export const PRODUCTS_CATALOG_UPDATED_EVENT = "products-catalog-updated";
 
 export type ProductRecord = {
@@ -180,6 +182,30 @@ export type ProductsCache = {
   catalog: CatalogObject;
 };
 
+export type ProductPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type ProductPageResult = {
+  products: ProductRecord[];
+  pagination: ProductPagination;
+};
+
+export type SectionProductsResult<TSection> = ProductPageResult & {
+  section: TSection | null;
+};
+
+export type ProductDetailResult = {
+  product: ProductRecord | null;
+  comments: unknown[];
+  recommendations: ProductRecord[];
+  isPurchased?: boolean;
+  hasRated?: boolean;
+};
+
 export function slugifyCatalogValue(value: string | number | null | undefined) {
   return String(value ?? "")
     .trim()
@@ -232,6 +258,8 @@ export function getStockStatusLabel(value?: string | null) {
 export type GetProductsOptions = {
   /** Include inactive products (admin). */
   all?: boolean;
+  /** Include full product fields for admin edit forms. */
+  full?: boolean;
   /** Bypass session cache and refetch. */
   force?: boolean;
 };
@@ -756,14 +784,216 @@ function resolveOptions(options?: boolean | GetProductsOptions): GetProductsOpti
   return options ?? {};
 }
 
-/** Single catalog fetch per URL — deduped in-flight, cached for the session. */
-export async function getProducts(options?: boolean | GetProductsOptions): Promise<ProductsCache> {
+function withQuery(path: string, params?: Record<string, string | number | boolean | null | undefined>) {
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value === undefined || value === null || value === false || value === "") continue;
+    searchParams.set(key, value === true ? "1" : String(value));
+  }
+
+  const query = searchParams.toString();
+  return query ? `${path}?${query}` : path;
+}
+
+function parsePagination(value: unknown, fallbackCount: number): ProductPagination {
+  const record = value && typeof value === "object" ? value as Partial<ProductPagination> : {};
+  const page = Number.isFinite(Number(record.page)) ? Number(record.page) : 1;
+  const limit = Number.isFinite(Number(record.limit)) ? Number(record.limit) : fallbackCount || 1;
+  const total = Number.isFinite(Number(record.total)) ? Number(record.total) : fallbackCount;
+  const totalPages = Number.isFinite(Number(record.totalPages)) ? Number(record.totalPages) : Math.max(1, Math.ceil(total / limit));
+
+  return { page, limit, total, totalPages };
+}
+
+function parseProductPage(data: unknown): ProductPageResult {
+  const record = data && typeof data === "object" ? data as {
+    products?: ProductRecord[] | { items?: ProductRecord[]; page?: number; limit?: number; total?: number; totalPages?: number };
+    pagination?: ProductPagination;
+  } : {};
+  const productContainer = record.products;
+  const products = Array.isArray(productContainer)
+    ? productContainer
+    : Array.isArray(productContainer?.items)
+      ? productContainer.items
+      : [];
+  const pagination = Array.isArray(productContainer)
+    ? parsePagination(record.pagination, products.length)
+    : parsePagination(productContainer, products.length);
+
+  return {
+    products: products.map(normalizeProductRecord),
+    pagination,
+  };
+}
+
+export async function getCatalogStructure(options?: boolean | GetProductsOptions): Promise<ProductsCache> {
   const { all = false, force = false } = resolveOptions(options);
-  const url = all ? CATALOG_URL_ALL : CATALOG_URL_ACTIVE;
+  const url = all ? CATALOG_STRUCTURE_URL_ALL : CATALOG_STRUCTURE_URL_ACTIVE;
 
   try {
     const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force });
     return withResolvedTree(parseApiPayload(json?.data));
+  } catch {
+    return emptyProductsCache();
+  }
+}
+
+export async function getProductPage(
+  params?: Record<string, string | number | boolean | null | undefined>,
+  options?: GetProductsOptions
+): Promise<ProductPageResult> {
+  const { all = false, full = false, force = false } = options ?? {};
+  const url = withQuery(CATALOG_URL_ACTIVE, {
+    ...params,
+    all,
+    ...(full ? { fields: "full" } : {}),
+  });
+
+  try {
+    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force });
+    return parseProductPage(json?.data);
+  } catch {
+    return {
+      products: [],
+      pagination: parsePagination(null, 0),
+    };
+  }
+}
+
+async function getSectionProducts<TSection>(
+  url: string,
+  sectionKey: "showcase" | "category" | "brand",
+  force = false
+): Promise<SectionProductsResult<TSection>> {
+  try {
+    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force });
+    const data = json?.data && typeof json.data === "object" ? json.data as Record<string, unknown> : {};
+    const page = parseProductPage(data);
+    const section = sectionKey === "showcase" ? data : data[sectionKey] ?? null;
+
+    return {
+      ...page,
+      section: section as TSection | null,
+    };
+  } catch {
+    return {
+      products: [],
+      pagination: parsePagination(null, 0),
+      section: null,
+    };
+  }
+}
+
+export function getShowcaseProducts(
+  id: string | number,
+  params?: Record<string, string | number | boolean | null | undefined>,
+  options?: Pick<GetProductsOptions, "force">
+) {
+  return getSectionProducts<ShowcaseRecord>(
+    withQuery(`/api/showcase/${encodeURIComponent(String(id))}/products`, params),
+    "showcase",
+    options?.force
+  );
+}
+
+export function getCategoryProducts(
+  id: string | number,
+  params?: Record<string, string | number | boolean | null | undefined>,
+  options?: Pick<GetProductsOptions, "force">
+) {
+  return getSectionProducts<CategoryRecord>(
+    withQuery(`/api/category/${encodeURIComponent(String(id))}/products`, params),
+    "category",
+    options?.force
+  );
+}
+
+export function getBrandProducts(
+  id: string | number,
+  params?: Record<string, string | number | boolean | null | undefined>,
+  options?: Pick<GetProductsOptions, "force">
+) {
+  return getSectionProducts<BrandRecord>(
+    withQuery(`/api/brand/${encodeURIComponent(String(id))}/products`, params),
+    "brand",
+    options?.force
+  );
+}
+
+export async function getProductDetail(
+  id: string | number,
+  options?: Pick<GetProductsOptions, "force">
+): Promise<ProductDetailResult> {
+  try {
+    const json = await fetchJsonDeduped<{ data?: any }>(
+      `/api/products/${encodeURIComponent(String(id))}`,
+      { force: options?.force }
+    );
+    const product = json?.data?.product
+      ? normalizeProductRecord(json.data.product, 1)
+      : null;
+    const recommendations = Array.isArray(json?.data?.recommendations)
+      ? json.data.recommendations.map(normalizeProductRecord)
+      : [];
+
+    return {
+      product,
+      comments: Array.isArray(json?.data?.comments) ? json.data.comments : [],
+      recommendations,
+      isPurchased: Boolean(json?.data?.isPurchased),
+      hasRated: Boolean(json?.data?.hasRated),
+    };
+  } catch {
+    return {
+      product: null,
+      comments: [],
+      recommendations: [],
+    };
+  }
+}
+
+export async function getRecommendations(
+  params?: Record<string, string | number | boolean | null | undefined>,
+  options?: Pick<GetProductsOptions, "force">
+) {
+  try {
+    const json = await fetchJsonDeduped<{ data?: { products?: ProductRecord[] } }>(
+      withQuery("/api/products/recommendations", params),
+      { force: options?.force }
+    );
+
+    return Array.isArray(json?.data?.products)
+      ? json.data.products.map(normalizeProductRecord)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Single catalog fetch per URL — deduped in-flight, cached for the session. */
+export async function getProducts(options?: boolean | GetProductsOptions): Promise<ProductsCache> {
+  const { all = false, full = false, force = false } = resolveOptions(options);
+
+  try {
+    const [structure, productPage] = await Promise.all([
+      getCatalogStructure({ all, force }),
+      getProductPage({ limit: all ? 500 : 100 }, { all, full, force }),
+    ]);
+    const products = productPage.products;
+    const catalogShowcases = structure.showcases.map((showcase) => ({
+      ...showcase,
+      products: resolveShowcaseProducts(products, showcase, true),
+    }));
+
+    return withResolvedTree({
+      ...structure,
+      products,
+      catalog: {
+        ...structure.catalog,
+        showcases: catalogShowcases,
+      },
+    });
   } catch {
     return emptyProductsCache();
   }
@@ -805,9 +1035,14 @@ export function findShowcaseById(
 
 export function clearProductsCache() {
   invalidateFetchCache("/api/products");
+  invalidateFetchCache("/api/catalog");
+  invalidateFetchCache("/api/showcase");
+  invalidateFetchCache("/api/showcases");
+  invalidateFetchCache("/api/category");
+  invalidateFetchCache("/api/brand");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event(PRODUCTS_CATALOG_UPDATED_EVENT));
   }
 }
 
-export default { getProducts, findProductById, findShowcaseById, clearProductsCache };
+export default { getProducts, getCatalogStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache };

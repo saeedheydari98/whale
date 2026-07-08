@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
 import { addProductToCart } from "@/lib/cart-client";
-import { isProductAvailable, normalizeStringList } from "@/lib/products-client";
+import { getProductPage, getShowcaseProducts, isProductAvailable } from "@/lib/products-client";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
 import { ShowcaseSection } from "./product-showcase/showcase-section";
@@ -118,7 +119,7 @@ type ProductShowcaseProps = {
 
 export function ProductShowcase({ mode = "storefront", root = "main" }: ProductShowcaseProps) {
   // header search is handled on the separate `/search` route
-  const { products: catalogProducts, showcases: catalogShowcases, banners: catalogBanners, tree, loading } = useProductsCatalog();
+  const { showcases: catalogShowcases, banners: catalogBanners, tree, loading: structureLoading } = useProductsCatalog();
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
   const dragRef = useRef({
@@ -127,17 +128,52 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     scrollLeft: 0,
   });
 
+  const sortedShowcases = useMemo(
+    () =>
+      ensureShowcases([], catalogShowcases as Showcase[]).filter(
+        (showcase) => showcase.active
+      ),
+    [catalogShowcases]
+  );
+
+  const allProductsQuery = useQuery({
+    queryKey: ["catalog", "products", "page", mode],
+    queryFn: () => getProductPage({ limit: 100 }),
+    enabled: mode === "products",
+  });
+
+  const showcaseQueries = useQueries({
+    queries: sortedShowcases.map((showcase) => ({
+      queryKey: ["catalog", "showcase", showcase.id, "products", Number(showcase.limit ?? 8)],
+      queryFn: () => getShowcaseProducts(showcase.id, { limit: Number(showcase.limit ?? 8) }),
+      enabled: mode !== "products" && !structureLoading,
+    })),
+  });
+
+  const showcaseProductsById = useMemo(() => {
+    const map = new Map<string, Product[]>();
+    sortedShowcases.forEach((showcase, index) => {
+      map.set(showcase.id, (showcaseQueries[index]?.data?.products ?? []) as Product[]);
+    });
+    return map;
+  }, [showcaseQueries, sortedShowcases]);
+
+  const catalogProducts = useMemo(
+    () =>
+      mode === "products"
+        ? allProductsQuery.data?.products ?? []
+        : Array.from(showcaseProductsById.values()).flat(),
+    [allProductsQuery.data?.products, mode, showcaseProductsById]
+  );
+
+  const loading = structureLoading
+    || (mode === "products"
+      ? allProductsQuery.isLoading
+      : showcaseQueries.some((query) => query.isLoading));
+
   const sortedProducts = useMemo(
     () => catalogProducts.filter((item) => item.active !== false && item.isActive !== false).sort((a, b) => a.sortOrder - b.sortOrder),
     [catalogProducts]
-  );
-
-  const sortedShowcases = useMemo(
-    () =>
-      ensureShowcases(sortedProducts, catalogShowcases as Showcase[]).filter(
-        (showcase) => showcase.active
-      ),
-    [sortedProducts, catalogShowcases]
   );
 
   const displaySections = useMemo(() => {
@@ -168,13 +204,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
 
       const showcaseSections = sortedShowcases
         .map((showcase) => {
-          const allProducts = sortedProducts.filter((product) => {
-            const showcaseIds = normalizeStringList(
-              (product as { showcaseIds?: unknown }).showcaseIds,
-              product.showcaseId ? [String(product.showcaseId)] : []
-            );
-            return showcaseIds.includes(showcase.id);
-          });
+          const allProducts = showcaseProductsById.get(showcase.id) ?? [];
 
           return {
             type: "showcase" as const,
@@ -200,7 +230,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
             : {
                 type: "showcase" as const,
                 item: normalizeShowcase(section.item as Showcase, section.sortOrder),
-                products: section.products as Product[],
+                products: showcaseProductsById.get(String(section.item.id)) ?? [],
                 sortOrder: section.sortOrder,
               }
         )
@@ -213,13 +243,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
 
     const showcaseSections = sortedShowcases
       .map((showcase) => {
-        const allProducts = sortedProducts.filter((product) => {
-          const showcaseIds = normalizeStringList(
-            (product as { showcaseIds?: unknown }).showcaseIds,
-            product.showcaseId ? [String(product.showcaseId)] : []
-          );
-          return showcaseIds.includes(showcase.id);
-        });
+        const allProducts = showcaseProductsById.get(showcase.id) ?? [];
 
         return {
           type: "showcase" as const,
@@ -231,36 +255,22 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
       .filter((section) => section.products.length > 0);
 
     return showcaseSections.sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [catalogBanners, mode, sortedProducts, sortedShowcases, tree]);
+  }, [catalogBanners, mode, showcaseProductsById, sortedProducts, sortedShowcases, tree]);
 
   
 
   const loadingSections = useMemo(() => {
-    const activeProducts = sortedProducts
-      .filter((item) => item.active !== false)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-    const localSortedShowcases = ensureShowcases(
-      activeProducts,
-      sortedShowcases as Showcase[]
-    ).filter((showcase) => showcase.active !== false);
-
-    const showcaseSections = localSortedShowcases
+    const showcaseSections = sortedShowcases.slice(0, 4)
       .map((showcase) => ({
         type: "showcase" as const,
         item: showcase,
-        products: activeProducts.filter((product) => {
-          const showcaseIds = normalizeStringList(
-            (product as { showcaseIds?: unknown }).showcaseIds,
-            product.showcaseId ? [String(product.showcaseId)] : []
-          );
-          return showcaseIds.includes(showcase.id);
-        }),
+        products: showcaseProductsById.get(showcase.id) ?? [],
         sortOrder: showcase.sortOrder,
       }))
-      .filter((section) => section.products.length > 0);
+      .filter((section) => section.item.active !== false);
 
     return showcaseSections.sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [sortedProducts, sortedShowcases]);
+  }, [showcaseProductsById, sortedShowcases]);
 
   const startProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button, a")) {

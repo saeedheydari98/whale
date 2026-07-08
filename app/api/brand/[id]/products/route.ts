@@ -1,6 +1,6 @@
 import { apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getShowcaseProducts } from "@/lib/api/catalog-layer-service";
+import { getBrandProducts } from "@/lib/api/catalog-layer-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,10 +14,11 @@ export async function GET(request: Request, context: Context) {
   try {
     const { id } = await context.params;
     const url = new URL(request.url);
-    const data = await getShowcaseProducts(id, url.searchParams);
+    const data = await getBrandProducts(id, url.searchParams);
     return apiOk(data);
   } catch (error) {
-    console.error("Showcase products error:", error);
+    console.error("Brand products GET error:", error);
     return apiServerError();
   }
 }
+

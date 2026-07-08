@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { FiExternalLink, FiSearch } from "react-icons/fi";
 import { IoBagAddOutline } from "react-icons/io5";
@@ -15,6 +16,7 @@ import { addProductToCart } from "@/lib/cart-client";
 import { useProductsCatalog } from "@/lib/products-catalog-context";
 import {
   decodeCatalogSegment,
+  getShowcaseProducts,
   isProductAvailable,
   normalizeColorStock,
   sortProductsBy,
@@ -47,9 +49,19 @@ export default function ShowcasePage() {
   const rawSlug = params?.slug ?? "";
   const showcaseId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const displayShowcaseId = decodeCatalogSegment(showcaseId);
-  const { getShowcaseById, banners, loading } = useProductsCatalog();
-  const showcase = useMemo(() => getShowcaseById(showcaseId), [getShowcaseById, showcaseId]);
-  const products = showcase?.products ?? [];
+  const { showcases, banners, loading: structureLoading } = useProductsCatalog();
+  const structureShowcase = useMemo(
+    () => showcases.find((item) => item.id === showcaseId || item.title === displayShowcaseId),
+    [displayShowcaseId, showcaseId, showcases]
+  );
+  const showcaseProductsQuery = useQuery({
+    queryKey: ["catalog", "showcase", structureShowcase?.id ?? showcaseId, "products", "page"],
+    queryFn: () => getShowcaseProducts(structureShowcase?.id ?? showcaseId, { limit: 100 }),
+    enabled: !structureLoading,
+  });
+  const showcase = (showcaseProductsQuery.data?.section ?? structureShowcase) as typeof structureShowcase;
+  const products = showcaseProductsQuery.data?.products ?? [];
+  const loading = structureLoading || showcaseProductsQuery.isLoading;
   const [searchQuery, setSearchQuery] = useState("");
   const [sort, setSort] = useState("newest");
   const [cartMessage, setCartMessage] = useState("");

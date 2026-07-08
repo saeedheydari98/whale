@@ -4,15 +4,14 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   findProductById,
   findShowcaseById,
-  getProducts,
+  getCatalogStructure,
   PRODUCTS_CATALOG_UPDATED_EVENT,
   type BannerRecord,
   type BrandRecord,
@@ -39,78 +38,29 @@ type ProductsCatalogContextValue = {
 };
 
 const ProductsCatalogContext = createContext<ProductsCatalogContextValue | null>(null);
-const MIN_LOADING_MS = 350;
 
-function waitForMinimumLoading(startedAt: number) {
-  const remaining = MIN_LOADING_MS - (Date.now() - startedAt);
-  return remaining > 0
-    ? new Promise((resolve) => window.setTimeout(resolve, remaining))
-    : Promise.resolve();
-}
+const EMPTY_TREE: CatalogTree = { sections: [] };
 
 export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
-  const [products, setProducts] = useState<ProductRecord[]>([]);
-  const [showcases, setShowcases] = useState<ShowcaseRecord[]>([]);
-  const [categories, setCategories] = useState<CategoryRecord[]>([]);
-  const [categoryGroups, setCategoryGroups] = useState<CatalogLinkGroupRecord[]>([]);
-  const [brands, setBrands] = useState<BrandRecord[]>([]);
-  const [brandGroups, setBrandGroups] = useState<CatalogLinkGroupRecord[]>([]);
-  const [banners, setBanners] = useState<BannerRecord[]>([]);
-  const [tree, setTree] = useState<CatalogTree>({ sections: [] });
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "structure"],
+    queryFn: () => getCatalogStructure(),
+  });
+  const catalog = structureQuery.data;
+  const products = catalog?.products ?? [];
+  const showcases = catalog?.showcases ?? [];
+  const categories = catalog?.categories ?? [];
+  const categoryGroups = catalog?.categoryGroups ?? [];
+  const brands = catalog?.brands ?? [];
+  const brandGroups = catalog?.brandGroups ?? [];
+  const banners = catalog?.banners ?? [];
+  const tree = catalog?.tree ?? EMPTY_TREE;
 
-  const load = useCallback(async (force = false) => {
-    const startedAt = Date.now();
-    if (!force) setLoading(true);
-    try {
-      const data = await getProducts({ force });
-      setProducts(data.products);
-      setShowcases(data.showcases);
-      setCategories(data.categories);
-      setCategoryGroups(data.categoryGroups);
-      setBrands(data.brands);
-      setBrandGroups(data.brandGroups);
-      setBanners(data.banners);
-      setTree(data.tree);
-      await waitForMinimumLoading(startedAt);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      const startedAt = Date.now();
-      const data = await getProducts();
-      if (cancelled) return;
-      setProducts(data.products);
-      setShowcases(data.showcases);
-      setCategories(data.categories);
-      setCategoryGroups(data.categoryGroups);
-      setBrands(data.brands);
-      setBrandGroups(data.brandGroups);
-      setBanners(data.banners);
-      setTree(data.tree);
-      await waitForMinimumLoading(startedAt);
-      if (cancelled) return;
-      setLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const refreshCatalog = () => {
-      void load(true);
-    };
-
-    window.addEventListener(PRODUCTS_CATALOG_UPDATED_EVENT, refreshCatalog);
-    return () => window.removeEventListener(PRODUCTS_CATALOG_UPDATED_EVENT, refreshCatalog);
-  }, [load]);
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["catalog"] });
+    window.dispatchEvent(new Event(PRODUCTS_CATALOG_UPDATED_EVENT));
+  }, [queryClient]);
 
   const getProductById = useCallback(
     (id: string | number) => findProductById(products, id),
@@ -132,12 +82,12 @@ export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
       brandGroups,
       banners,
       tree,
-      loading,
+      loading: structureQuery.isLoading,
       getProductById,
       getShowcaseById,
-      refresh: () => load(true),
+      refresh,
     }),
-    [products, showcases, categories, categoryGroups, brands, brandGroups, banners, tree, loading, getProductById, getShowcaseById, load]
+    [products, showcases, categories, categoryGroups, brands, brandGroups, banners, tree, structureQuery.isLoading, getProductById, getShowcaseById, refresh]
   );
 
   return (

@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
-import { useProductsCatalog } from "@/lib/products-catalog-context";
-import { getStockStatusLabel, isProductAvailable, type ProductRecord } from "@/lib/products-client";
+import { getProductDetail, getStockStatusLabel, isProductAvailable, type ProductRecord } from "@/lib/products-client";
 import { addProductToCart } from "@/lib/cart-client";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomTag } from "@/app/design-system/components/ui/tag";
@@ -73,8 +73,14 @@ export default function ProductPage() {
   const params = useParams();
   const rawSlug = params?.slug ?? params?.id ?? "";
   const productId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
-  const { getProductById, loading: catalogLoading, refresh } = useProductsCatalog();
-  const product = useMemo(() => getProductById(productId), [getProductById, productId]);
+  const queryClient = useQueryClient();
+  const productQuery = useQuery({
+    queryKey: ["catalog", "product", productId],
+    queryFn: () => getProductDetail(productId),
+    enabled: Boolean(productId),
+  });
+  const product = productQuery.data?.product ?? null;
+  const catalogLoading = productQuery.isLoading;
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [text, setText] = useState("");
   const [rating, setRating] = useState<number | undefined>(undefined);
@@ -174,7 +180,7 @@ export default function ProductPage() {
       await loadReviews();
       if (rating) {
         setHasRated(true);
-        await refresh();
+        await queryClient.invalidateQueries({ queryKey: ["catalog"] });
       }
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : "دیدگاه ثبت نشد.");

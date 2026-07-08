@@ -5,6 +5,8 @@ import { requireAdmin } from "@/lib/api/auth";
 import { productSchema } from "@/lib/api/schemas";
 import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
 import { validationError } from "@/lib/api/validation";
+import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
+import { getProductDetail } from "@/lib/api/catalog-layer-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,10 +19,9 @@ export async function GET(request: Request, context: Context) {
 
   try {
     const { id } = await context.params;
-    const product = await prisma.product.findFirst({
-      where: { id: Number(id), active: true },
-    });
-    return product ? apiOk({ product }) : apiFail("not found", 404);
+    const url = new URL(request.url);
+    const detail = await getProductDetail(id, url.searchParams, request);
+    return detail ? apiOk(detail) : apiFail("not found", 404);
   } catch (error) {
     console.error("Product GET error:", error);
     return apiServerError();
@@ -48,6 +49,8 @@ async function updateProduct(request: Request, context: Context, partial: boolea
       data: partial ? normalizeProductPatchData(parsed.data) : normalizeProductData(parsed.data),
     });
 
+    await invalidateCatalogCache("products.update");
+
     return apiOk({ product });
   } catch (error: any) {
     if (error?.code === "P2025") return apiFail("not found", 404);
@@ -71,6 +74,7 @@ export async function DELETE(request: Request, context: Context) {
   try {
     const { id } = await context.params;
     await prisma.product.delete({ where: { id: Number(id) } });
+    await invalidateCatalogCache("products.delete");
     return apiOk({ deleted: true });
   } catch (error: any) {
     if (error?.code === "P2025") return apiFail("not found", 404);

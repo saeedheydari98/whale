@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { matchesSearchQuery } from "@/lib/product-search";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { normalizeProductData } from "@/lib/api/catalog-service";
+import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
+import { getCatalogStructure, getProductList } from "@/lib/api/catalog-layer-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -865,143 +867,28 @@ export async function GET(request: Request) {
   if (limited) return limited;
 
   const url = new URL(request.url);
-  const includeInactive = url.searchParams.get("all") === "1";
-  const id = url.searchParams.get("id") ?? null;
-  const query = String(url.searchParams.get("q") ?? url.searchParams.get("search") ?? "").trim();
-  const showcaseId = String(url.searchParams.get("showcaseId") ?? "").trim();
-  const categoryId = String(url.searchParams.get("categoryId") ?? "").trim();
-  const badge = String(url.searchParams.get("badge") ?? "").trim();
-  const sort = String(url.searchParams.get("sort") ?? "sortOrder").trim();
-  const limitParam = url.searchParams.get("limit");
-  const limit = Number.isFinite(Number(limitParam)) ? Math.max(1, Math.min(100, Number(limitParam))) : null;
-  const onlyDiscounted = url.searchParams.get("discounted") === "1" || url.searchParams.get("hasDiscount") === "true";
-  const inStock = url.searchParams.get("inStock") === "true";
-  const minRatingParam = url.searchParams.get("minRating");
-  const minRating = minRatingParam ? Number(minRatingParam) : NaN;
-  const isActiveParam = url.searchParams.get("isActive");
-  const isFeaturedParam = url.searchParams.get("isFeatured");
-  const priceMinParam = url.searchParams.get("priceMin") ?? url.searchParams.get("minPrice");
-  const priceMaxParam = url.searchParams.get("priceMax") ?? url.searchParams.get("maxPrice");
-  const priceMin = priceMinParam ? Number(priceMinParam) : NaN;
-  const priceMax = priceMaxParam ? Number(priceMaxParam) : NaN;
-
-  const parsePrice = (value: unknown) => {
-    const normalized = String(value || "").replace(/[^\d.]/g, "");
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : NaN;
-  };
 
   if (!hasProductModel) {
     return NextResponse.json({ ok: true, data: { type: "root", placement: 0, children: [] } });
   }
 
   try {
-    if (id) {
-      const maybeIdNum = Number(id);
-      const where =
-        Number.isFinite(maybeIdNum) && !Number.isNaN(maybeIdNum)
-          ? { id: maybeIdNum }
-          : { id: String(id) };
-      const item = await prisma.product.findFirst({ where });
-      if (!item) {
-        return NextResponse.json({ ok: false, data: { product: null } }, { status: 404 });
-      }
-      return NextResponse.json({ ok: true, data: { product: toClientProduct(item as ProductPayload) } });
+    if (url.searchParams.get("structure") === "1") {
+      const structure = await getCatalogStructure(url.searchParams);
+      return NextResponse.json({ ok: true, data: structure });
     }
 
-    const productsData = await prisma.product.findMany({
-      where: {
-        ...(includeInactive ? {} : { active: true }),
-        ...(showcaseId ? { showcaseId } : {}),
-      },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    const result = await getProductList(url.searchParams, {
+      includeFull: url.searchParams.get("fields") === "full" || url.searchParams.get("full") === "1",
     });
-    const products = dedupeProducts(productsData as ProductPayload[]).filter((product) => {
-      if (query && !matchesSearchQuery(product, query)) return false;
-      if (categoryId) {
-        const productCategoryIds = Array.isArray(product.categoryIds) ? product.categoryIds : [String(product.categoryId ?? "")];
-        if (!productCategoryIds.includes(categoryId)) return false;
-      }
-      if (badge && String(product.badge ?? "") !== badge) return false;
-      if (inStock && Number(product.stockQuantity ?? 0) <= 0) return false;
-      if (Number.isFinite(minRating) && Number(product.ratingAverage ?? 0) < minRating) return false;
-      if (isActiveParam !== null && (product.active !== false && product.isActive !== false) !== (isActiveParam === "true")) return false;
-      if (isFeaturedParam !== null && Boolean(product.isFeatured) !== (isFeaturedParam === "true")) return false;
-      if (onlyDiscounted) {
-        const percent = Number(product.discountPercent || 0);
-        if (!(percent > 0 || String(product.discountPrice || "").trim())) return false;
-      }
-      const productPrice = Number.isFinite(parsePrice(product.discountPrice))
-        ? parsePrice(product.discountPrice)
-        : parsePrice(product.price);
-      if (Number.isFinite(priceMin) && Number.isFinite(productPrice) && productPrice < priceMin) return false;
-      if (Number.isFinite(priceMax) && Number.isFinite(productPrice) && productPrice > priceMax) return false;
-      return true;
-    }).sort(getSortComparer(sort));
-    const limitedProducts = limit ? products.slice(0, limit) : products;
-
-    if (showcaseId) {
-      const showcase = hasShowcaseModel
-        ? await prisma.showcase.findUnique({ where: { id: showcaseId } })
-        : null;
-
-      return NextResponse.json({
-        ok: true,
-        data: buildShowcaseProductsNode(showcase, showcaseId, limitedProducts),
-      });
-    }
-
-    const showcases = hasShowcaseModel
-      ? await prisma.showcase.findMany({
-          include: { products: true, banners: true },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-        })
-      : [];
-    const categories =
-      "category" in prisma && typeof (prisma as any).category?.findMany === "function"
-        ? await (prisma as any).category.findMany({
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          })
-        : [];
-    const categoryGroups =
-      "categoryGroup" in prisma && typeof (prisma as any).categoryGroup?.findMany === "function"
-        ? await (prisma as any).categoryGroup.findMany({
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          })
-        : [];
-
-    const banners =
-      "banner" in prisma && typeof prisma.banner?.findMany === "function"
-        ? await prisma.banner.findMany({
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          })
-        : [];
-    const brands =
-      "brand" in prisma && typeof (prisma as any).brand?.findMany === "function"
-        ? await (prisma as any).brand.findMany({
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          })
-        : [];
-    const brandGroups =
-      "brandGroup" in prisma && typeof (prisma as any).brandGroup?.findMany === "function"
-        ? await (prisma as any).brandGroup.findMany({
-            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-          })
-        : [];
-    const tree = buildCatalogTree(
-      limitedProducts,
-      showcases,
-      categories,
-      categoryGroups,
-      brands,
-      brandGroups,
-      banners as BannerRecord[],
-      includeInactive
-    );
+    const { items, ...pagination } = result.products;
 
     return NextResponse.json({
       ok: true,
-      data: tree,
+      data: {
+        products: items,
+        pagination,
+      },
     });
   } catch (error) {
     console.error("Products GET error:", error);
@@ -1405,6 +1292,8 @@ export async function POST(request: Request) {
       savedBanners as BannerRecord[],
       true
     );
+
+    await invalidateCatalogCache("products.post");
 
     return NextResponse.json({
       ok: true,
