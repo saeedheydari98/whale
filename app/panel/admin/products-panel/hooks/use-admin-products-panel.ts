@@ -327,7 +327,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     nextBrandGroups = sortedBrandGroups
   ) => {
     const validProducts = dedupeProducts(
-      nextProducts.filter((item) => item.title.trim() && item.description.trim() && item.price.trim())
+      nextProducts.filter((item) => item.title.trim() && item.price.trim())
     );
 
     setSaving(true);
@@ -530,13 +530,12 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openCreateModal = () => {
-    const firstShowcase = sortedShowcases[0]?.id ?? "";
     const firstCategory = sortedCategories[0]?.id ?? "general";
     setRequiredErrors([]);
     setDraftProduct({
       ...createProduct(),
-      showcaseId: firstShowcase,
-      showcaseIds: firstShowcase ? [firstShowcase] : [],
+      showcaseId: "",
+      showcaseIds: [],
       categoryId: firstCategory,
       categoryIds: [firstCategory],
       sortOrder: products.length + 1,
@@ -623,15 +622,16 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openEditModal = (product: ProductForm) => {
+    const selectedBrand = sortedBrands.find((brand) => product.brand === brand.id || product.brand === brand.title);
     setRequiredErrors([]);
-    setEditingProduct(product);
+    setEditingProduct(product.brand ? { ...product, brand: selectedBrand?.id ?? "" } : product);
     setIsEditOpen(true);
   };
 
-  const updateDraftProduct = (patch: Partial<ProductForm>) => setDraftProduct((current) => ({ ...current, ...patch }));
+  const updateDraftProduct = (patch: Partial<ProductForm>) => setDraftProduct((current) => updateProductPatch(current, patch));
   const updateDraftShowcase = (patch: Partial<ShowcaseForm>) => setDraftShowcase((current) => ({ ...current, ...patch }));
   const updateEditingShowcase = (patch: Partial<ShowcaseForm>) => setEditingShowcase((current) => (current ? { ...current, ...patch } : current));
-  const updateEditingProduct = (patch: Partial<ProductForm>) => setEditingProduct((current) => (current ? { ...current, ...patch } : current));
+  const updateEditingProduct = (patch: Partial<ProductForm>) => setEditingProduct((current) => (current ? updateProductPatch(current, patch) : current));
   const updateDraftBanner = (patch: Partial<BannerForm>) => setDraftBanner((current) => normalizeBannerTiming({ ...current, ...patch }));
   const updateEditingBanner = (patch: Partial<BannerForm>) => setEditingBanner((current) => (current ? normalizeBannerTiming({ ...current, ...patch }) : current));
 
@@ -754,13 +754,12 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     if (saving) return;
     const errors = [
       !draftProduct.title.trim() && "draftProduct.title",
-      !draftProduct.description.trim() && "draftProduct.description",
       !draftProduct.discountPrice.trim() && "draftProduct.discountPrice",
       draftProduct.categoryIds.length === 0 && "draftProduct.categoryId",
       !hasMatchingColorStock(draftProduct) && "draftProduct.colorStock",
     ].filter(Boolean) as string[];
     if (errors.length > 0) {
-      showRequiredErrors(errors, "عنوان، توضیحات، قیمت جدید، دسته‌بندی و موجودی رنگ‌ها الزامی است.");
+      showRequiredErrors(errors, "نام، قیمت جدید، دسته‌بندی و موجودی رنگ‌ها الزامی است.");
       return;
     }
     setRequiredErrors([]);
@@ -1036,13 +1035,12 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     if (saving || !editingProduct) return;
     const errors = [
       !editingProduct.title.trim() && "editingProduct.title",
-      !editingProduct.description.trim() && "editingProduct.description",
       !editingProduct.discountPrice.trim() && "editingProduct.discountPrice",
       editingProduct.categoryIds.length === 0 && "editingProduct.categoryId",
       !hasMatchingColorStock(editingProduct) && "editingProduct.colorStock",
     ].filter(Boolean) as string[];
     if (errors.length > 0) {
-      showRequiredErrors(errors, "عنوان، توضیحات، قیمت جدید، دسته‌بندی و موجودی رنگ‌ها الزامی است.");
+      showRequiredErrors(errors, "نام، قیمت جدید، دسته‌بندی و موجودی رنگ‌ها الزامی است.");
       return;
     }
     setRequiredErrors([]);
@@ -1335,6 +1333,22 @@ function updatePricingPatch(product: ProductForm, patch: Partial<ProductForm>) {
       discountPercent,
       price: next.discountPrice,
     };
+  }
+
+  return next;
+}
+
+function updateProductPatch(product: ProductForm, patch: Partial<ProductForm>) {
+  const next = { ...product, ...patch };
+
+  if (patch.slug !== undefined) {
+    return { ...next, slug: slugifyValue(String(patch.slug ?? "")) };
+  }
+
+  if (patch.title !== undefined) {
+    const previousAutoSlug = slugifyValue(product.title);
+    const shouldSyncSlug = !product.slug.trim() || product.slug === previousAutoSlug;
+    if (shouldSyncSlug) return { ...next, slug: slugifyValue(String(patch.title ?? "")) };
   }
 
   return next;

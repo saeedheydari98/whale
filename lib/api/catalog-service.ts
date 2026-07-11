@@ -41,7 +41,7 @@ export function normalizeProductData(data: any) {
     showcaseId: data.showcaseId || null,
     showcaseIds: showcaseIds.length > 0 ? showcaseIds : Prisma.JsonNull,
     title: data.title,
-    description: data.description,
+    description: String(data.description ?? "").trim(),
     slug: data.slug || null,
     price: data.price,
     originalPrice: data.originalPrice || null,

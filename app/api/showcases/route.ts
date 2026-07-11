@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       if (Array.isArray(incoming.products)) {
         await tx.product.deleteMany({ where: { showcaseId: sc.id } });
         for (const p of incoming.products) {
-          await tx.product.create({ data: { title: p.title ?? "", description: p.description ?? "", price: p.price ?? "", showcaseId: sc.id, originalPrice: p.originalPrice ?? null, discountPrice: p.discountPrice ?? null, discountPercent: p.discountPercent ?? null, imageUrl: p.imageUrl ?? null, badge: p.badge ?? null, ctaLabel: "مشاهده محصول", ctaHref: p.ctaHref ?? null, active: p.active ?? true, sortOrder: p.sortOrder ?? 0 } });
+          await tx.product.create({ data: { title: p.title ?? "", description: p.description ?? "", price: p.price ?? "", showcaseId: sc.id, originalPrice: p.originalPrice ?? null, discountPrice: p.discountPrice ?? null, discountPercent: p.discountPercent ?? null, imageUrl: p.imageUrl ?? null, badge: p.badge ?? null, ctaLabel: "مشاهده", ctaHref: p.ctaHref ?? null, active: p.active ?? true, sortOrder: p.sortOrder ?? 0 } });
         }
       }
 

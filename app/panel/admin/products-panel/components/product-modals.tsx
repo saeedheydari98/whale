@@ -5,9 +5,8 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
-import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
-import { InventoryControls, ProductAdvancedFields } from "./product-form-fields";
+import { InventoryControls, ProductAdvancedFields, ProductPlacementFields } from "./product-form-fields";
 
 type ProductModalsProps = {
   showcases: ShowcaseForm[];
@@ -47,7 +46,6 @@ export function ProductModals(props: ProductModalsProps) {
         saving={props.saving}
         titleErrorKey="draftProduct.title"
         priceErrorKey="draftProduct.discountPrice"
-        descriptionErrorKey="draftProduct.description"
         categoryErrorKey="draftProduct.categoryId"
         hasRequiredError={props.hasRequiredError}
         onPatch={props.updateDraftProduct}
@@ -68,7 +66,6 @@ export function ProductModals(props: ProductModalsProps) {
         saving={props.saving}
         titleErrorKey="editingProduct.title"
         priceErrorKey="editingProduct.discountPrice"
-        descriptionErrorKey="editingProduct.description"
         categoryErrorKey="editingProduct.categoryId"
         hasRequiredError={props.hasRequiredError}
         onPatch={props.updateEditingProduct}
@@ -94,7 +91,6 @@ type ProductModalProps = {
   saving: boolean;
   titleErrorKey: string;
   priceErrorKey: string;
-  descriptionErrorKey: string;
   categoryErrorKey: string;
   hasRequiredError: (key: string) => boolean;
   onPatch: (patch: Partial<ProductForm>) => void;
@@ -117,7 +113,6 @@ function ProductModal({
   saving,
   titleErrorKey,
   priceErrorKey,
-  descriptionErrorKey,
   categoryErrorKey,
   hasRequiredError,
   onPatch,
@@ -133,28 +128,22 @@ function ProductModal({
       {product ? (
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
           <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-2">
-              <div className="text-sm font-bold">ویترین</div>
-              <div className="flex flex-wrap gap-2">
-                {showcases.map((showcase) => (
-                  <CustomButton
-                    key={showcase.id}
-                    variant={product.showcaseId === showcase.id ? "primary" : "neutral"}
-                    rounded="full"
-                    size="sm"
-                    onClick={() => onPatch({ showcaseId: showcase.id })}
-                  >
-                    {showcase.title || "بدون عنوان"}
-                  </CustomButton>
-                ))}
-              </div>
-            </div>
-            <CustomInput value={product.title} placeholder="عنوان" invalid={hasRequiredError(titleErrorKey) && !product.title.trim()} onChange={(event) => onPatch({ title: event.target.value })} />
+            <CustomInput value={product.title} placeholder="نام" invalid={hasRequiredError(titleErrorKey) && !product.title.trim()} onChange={(event) => onPatch({ title: event.target.value })} />
+            <CustomInput value={product.slug} placeholder="اسلاگ" onChange={(event) => onPatch({ slug: event.target.value })} />
             <CustomInput value={product.originalPrice} placeholder="قیمت قبل از تخفیف" onChange={(event) => onPricingPatch({ originalPrice: event.target.value })} />
             <CustomInput value={product.discountPrice} placeholder="قیمت با تخفیف" invalid={hasRequiredError(priceErrorKey) && !product.discountPrice.trim()} onChange={(event) => onPricingPatch({ discountPrice: event.target.value })} />
             <CustomInput value={product.badge} placeholder="برچسب" onChange={(event) => onPatch({ badge: event.target.value })} />
+            <ProductPlacementFields
+              product={product}
+              showcases={showcases}
+              categories={categories}
+              brands={brands}
+              onChange={onPatch}
+              hasRequiredError={hasRequiredError}
+              categoryErrorKey={categoryErrorKey}
+            />
             <InventoryControls product={product} onChange={onPatch} />
-            <ProductAdvancedFields product={product} categories={categories} brands={brands} onChange={onPatch} hasRequiredError={hasRequiredError} categoryErrorKey={categoryErrorKey} />
+            <ProductAdvancedFields product={product} onChange={onPatch} />
             <CustomInput type="number" value={product.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
             <CustomInput value={product.ctaHref} placeholder="لینک دکمه" onChange={(event) => onPatch({ ctaHref: event.target.value })} />
           </div>
@@ -165,18 +154,12 @@ function ProductModal({
             </span>
           </div>
 
-          <RequiredLabel required className="text-primary-text">توضیحات</RequiredLabel>
+          <RequiredLabel className="text-primary-text">توضیحات</RequiredLabel>
           <textarea
             value={product.description}
             placeholder="توضیحات"
-            aria-invalid={hasRequiredError(descriptionErrorKey) && !product.description.trim()}
-            data-invalid={hasRequiredError(descriptionErrorKey) && !product.description.trim() ? "true" : undefined}
             onChange={(event) => onPatch({ description: event.target.value })}
-            className={`min-h-24 rounded-md border bg-primary-card p-3 text-sm text-primary-text outline-none focus:ring-2 ${
-              hasRequiredError(descriptionErrorKey) && !product.description.trim()
-                ? "border-danger-border-nomode focus:ring-danger-border-nomode"
-                : "border-primary-border focus:ring-primary-border"
-            }`}
+            className="min-h-24 rounded-md border border-primary-border bg-primary-card p-3 text-sm text-primary-text outline-none focus:ring-2 focus:ring-primary-border"
           />
 
           <div className="flex flex-col gap-3 rounded-lg border border-primary-border">
@@ -198,7 +181,6 @@ function ProductModal({
             </div>
           </div>
 
-          <CustomSwitch checked={product.isActive} onChange={(isActive) => onPatch({ isActive, active: isActive })} label={product.isActive ? "فعال" : "مخفی"} size="sm" />
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton isLoading={saving} loading="dots" loadingText="در حال ذخیره..." fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
               {submitLabel}

@@ -37,30 +37,35 @@ function SkeletonShell({
   className?: string;
   children?: React.ReactNode;
 }) {
-  const backgroundColor = tone === "card" ? "#f3f3f3" : "#eeeeee";
+  const backgroundColor = tone === "card"
+    ? "color-mix(in srgb, var(--primary-card) 70%, var(--bg-surface))"
+    : "color-mix(in srgb, var(--primary-media) 52%, var(--bg-surface))";
+  const shimmerColor = tone === "card"
+    ? "color-mix(in srgb, var(--primary-soft) 70%, var(--bg-base))"
+    : "color-mix(in srgb, var(--primary-card) 72%, var(--bg-base))";
 
   return (
     <div
       aria-busy="true"
       aria-live="polite"
       className={cx(
-        "pointer-events-none relative overflow-hidden",
+        "pointer-events-none relative block h-full w-full overflow-hidden",
+        tone === "item" ? "max-w-full align-middle" : "",
         tone === "card" ? "shadow-sm" : "",
         radiusVariants.lg,
         className
       )}
-      style={{ backgroundColor, filter: "grayscale(1)" }}
+      style={{ backgroundColor }}
     >
       <motion.div
         className="pointer-events-none absolute inset-0"
         style={{
-          backgroundImage:
-            "linear-gradient(90deg, transparent 0%, #fafafa 50%, transparent 100%)",
+          backgroundImage: `linear-gradient(90deg, transparent 0%, ${shimmerColor} 50%, transparent 100%)`,
         }}
         animate={{ x: ["-100%", "100%"] }}
         transition={{ repeat: Infinity, duration: tone === "card" ? 3.2 : 2.6, ease: "linear" }}
       />
-      <div className="invisible" aria-hidden="true">
+      <div className="invisible h-full w-full min-w-0" aria-hidden="true">
         {children}
       </div>
     </div>
@@ -156,14 +161,22 @@ export default function Loading({
   if (loading === "page") {
     if (!isLoading) return <>{children}</>;
     return (
-      <div className={cx("flex flex-col items-center justify-center w-full h-full text-primary", className)}>
-        <GiSpermWhale aria-label="وال" className="mb-4 h-24 w-24" />
+      <div className={cx("flex h-full w-full flex-col items-center justify-center", className)}>
+        <GiSpermWhale
+          aria-label="وال"
+          className="mb-4 h-24 w-24"
+          style={{ color: "color-mix(in srgb, var(--primary) 78%, var(--primary-text))" }}
+        />
         <div className="flex items-center gap-2">
-          {[0, 1, 2].map((i) => (
+          {[
+            "color-mix(in srgb, var(--primary) 88%, var(--bg-base))",
+            "color-mix(in srgb, var(--primary) 68%, var(--bg-base))",
+            "color-mix(in srgb, var(--primary) 48%, var(--bg-base))",
+          ].map((color, i) => (
             <motion.div
-              key={i}
-              className="rounded-full bg-current"
-              style={{ width: resolvedSize / 2.5, height: resolvedSize / 2.5 }}
+              key={color}
+              className="rounded-full"
+              style={{ width: resolvedSize / 2.5, height: resolvedSize / 2.5, backgroundColor: color }}
               animate={{ y: [0, -6, 0] }}
               transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.12 }}
             />

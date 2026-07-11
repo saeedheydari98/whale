@@ -73,7 +73,7 @@ function UserOrdersPanel() {
                   </span>
                   {item.productId ? (
                     <ProductLink productId={item.productId} productTitle={item.title} size="sm">
-                      مشاهده محصول
+                      مشاهده
                     </ProductLink>
                   ) : null}
                 </div>

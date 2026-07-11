@@ -203,7 +203,7 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
     images: Array.isArray(value.images) ? value.images.map((item) => String(item)).filter(Boolean) : [],
     videoUrl: String(value.videoUrl ?? "").trim(),
     badge: String(value.badge ?? "").trim(),
-    ctaLabel: "مشاهده محصول",
+    ctaLabel: "مشاهده",
     ctaHref: String(value.ctaHref ?? "").trim(),
     active: value.active !== false && value.isActive !== false,
     isActive: value.isActive !== false && value.active !== false,
@@ -961,7 +961,7 @@ export async function POST(request: Request) {
   const normalized = dedupeProducts(
     products
       .map((item: Partial<ProductPayload>, index: number) => normalizeProduct(item, index))
-      .filter((item: ProductPayload) => item.title && item.description && item.price)
+      .filter((item: ProductPayload) => item.title && item.price)
   );
 
   const missingCategory = normalized.some((p) => !String(p.categoryId ?? "").trim());

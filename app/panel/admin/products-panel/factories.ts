@@ -75,7 +75,7 @@ export const createProduct = (): ProductForm => ({
   images: [],
   videoUrl: "",
   badge: "",
-  ctaLabel: "مشاهده محصول",
+  ctaLabel: "مشاهده",
   ctaHref: "#",
   active: true,
   isActive: true,

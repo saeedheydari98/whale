@@ -26,6 +26,14 @@ const LOADING_PRODUCT: ProductRecord = {
   sortOrder: 1,
 };
 
+type ProductTab = "details" | "reviews" | "price";
+
+const PRODUCT_TABS: Array<{ id: ProductTab; label: string }> = [
+  { id: "details", label: "مشخصات محصول" },
+  { id: "reviews", label: "دیدگاه و امتیاز" },
+  { id: "price", label: "تغییرات قیمت" },
+];
+
 function getFinalPrice(product: ProductRecord) {
   return product.discountPrice || product.price;
 }
@@ -96,7 +104,7 @@ export default function ProductPage() {
   const [reviewError, setReviewError] = useState("");
   const [cartMessage, setCartMessage] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
-  const [activeTab, setActiveTab] = useState<"details" | "reviews" | "price">("details");
+  const [activeTab, setActiveTab] = useState<ProductTab>("details");
 
   const productApiId = product?.id;
   const productStorageKey = String(productApiId ?? productId);
@@ -266,20 +274,10 @@ export default function ProductPage() {
                   <div className="text-3xl font-bold text-primary">{loadingProduct.price}</div>
                 </Loading>
               </div>
-              <div className="flex flex-col gap-2">
-                <Loading loading="skeleton-item" isLoading>
-                  <div className="text-sm font-bold text-primary-text">درباره این محصول</div>
-                </Loading>
-                <Loading loading="skeleton-item" isLoading>
-                  <div className="text-sm leading-7 text-secondary-text whitespace-pre-wrap">
-                    {loadingProduct.description}
-                  </div>
-                </Loading>
-              </div>
               <div className="flex flex-wrap gap-3">
               <Loading loading="skeleton-item" isLoading>
                 <CustomButton type="button" variant="success" icon={<IoBagAddOutline />}>
-                  افزودن به سبد
+                  افزودن
                 </CustomButton>
               </Loading>
             </div>
@@ -367,7 +365,6 @@ export default function ProductPage() {
         ) : null}
 
         <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
-        <Loading loading="skeleton-card" isLoading={catalogLoading}>
           <section className="flex w-full flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:w-[42rem] lg:max-w-[42rem] lg:shrink-0">
             <div className="flex w-full flex-col gap-4">
               <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-primary-border bg-primary-media">
@@ -424,13 +421,6 @@ export default function ProductPage() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <div className="text-sm font-bold text-primary-text">درباره این محصول</div>
-              <div className="text-sm leading-7 text-secondary-text whitespace-pre-wrap">
-                {product.description}
-              </div>
-            </div>
-
             <div className="flex flex-wrap gap-3">
               <CustomButton
                 type="button"
@@ -439,24 +429,19 @@ export default function ProductPage() {
                 disabled={!available}
                 onClick={() => addToCart(product)}
               >
-                {available ? "افزودن به سبد" : "ناموجود"}
+                {available ? "افزودن" : "ناموجود"}
               </CustomButton>
             </div>
             </div>
           </section>
-        </Loading>
 
         <section id="product-tabs" className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="flex flex-wrap gap-2 border-b border-primary-border">
-            {[
-              { id: "details", label: "جزئیات محصول" },
-              { id: "reviews", label: "دیدگاه و امتیاز" },
-              { id: "price", label: "تغییرات قیمت" },
-            ].map((tab) => (
+            {PRODUCT_TABS.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors hover:bg-primary-soft ${
                   activeTab === tab.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
                 }`}
@@ -467,11 +452,19 @@ export default function ProductPage() {
           </div>
 
           {activeTab === "details" ? (
-            <Loading loading="skeleton-card" isLoading={catalogLoading}>
               <section className="flex flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6">
                 <div className="flex flex-col gap-2">
-                  <div className="text-2xl font-bold text-primary-text">اطلاعات کامل محصول</div>
-                  <div className="text-sm leading-7 text-secondary-text whitespace-pre-wrap">{product.description}</div>
+                  <div className="text-2xl font-bold text-primary-text">مشخصات محصول</div>
+                </div>
+                <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
+                  <div className="text-sm font-bold text-primary-text">توضیحات محصول</div>
+                  {product.description.trim() ? (
+                    <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">{product.description}</div>
+                  ) : (
+                    <div className="text-sm leading-7 text-secondary-text">
+                      توضیحی برای این محصول ثبت نشده است.
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {detailRows.length > 0 ? detailRows.map(([label, value]) => (
@@ -497,11 +490,9 @@ export default function ProductPage() {
                   />
                 </div>
               </section>
-            </Loading>
           ) : null}
 
           {activeTab === "reviews" ? (
-            <Loading loading="skeleton-card" isLoading={catalogLoading}>
               <ProductReviewsSection
                 reviews={reviews}
                 text={text}
@@ -513,11 +504,9 @@ export default function ProductPage() {
                 onRatingChange={setRating}
                 onSubmit={submitReview}
               />
-            </Loading>
           ) : null}
 
           {activeTab === "price" ? (
-            <Loading loading="skeleton-card" isLoading={catalogLoading}>
               <section className="flex flex-col gap-5 rounded-2xl border border-primary-border bg-primary-soft p-6">
                 <div className="flex flex-col gap-2">
                   <div className="text-2xl font-bold text-primary-text">تغییرات قیمت</div>
@@ -533,7 +522,6 @@ export default function ProductPage() {
                   <span className="text-lg font-bold text-primary">{finalPrice || "بدون قیمت"}</span>
                 </div>
               </section>
-            </Loading>
           ) : null}
         </section>
         </div>

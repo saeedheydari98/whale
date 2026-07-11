@@ -97,7 +97,7 @@ export const productSchema = z.object({
   showcaseId: z.string().trim().optional().nullable(),
   showcaseIds: z.array(z.string().trim()).optional(),
   title: z.string().trim().min(1),
-  description: z.string().trim().min(1),
+  description: z.string().trim().optional().nullable(),
   slug: z.string().trim().optional().nullable(),
   price: z.string().trim().min(1),
   originalPrice: z.string().trim().optional().nullable(),

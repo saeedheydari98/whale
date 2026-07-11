@@ -70,7 +70,7 @@ export function normalizeProduct(item: Partial<ProductForm>, index: number): Pro
     images: Array.isArray(item.images) ? item.images.map((value) => String(value)).filter(Boolean) : [],
     videoUrl: String(item.videoUrl ?? ""),
     badge: String(item.badge ?? ""),
-    ctaLabel: "مشاهده محصول",
+    ctaLabel: "مشاهده",
     ctaHref: String(item.ctaHref ?? "#"),
     active: item.active !== false && item.isActive !== false,
     isActive: item.isActive !== false && item.active !== false,

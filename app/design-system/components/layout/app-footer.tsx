@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { BiCategoryAlt } from "react-icons/bi";
 import { GiSpermWhale } from "react-icons/gi";
 import { MdAdminPanelSettings } from "react-icons/md";
 import { IoHomeOutline, IoPersonCircleOutline, IoStorefrontOutline } from "react-icons/io5";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import HeaderNavLink from "../ui/header-nav-link";
 import {
   isAdminAccessUnlocked,
   subscribeAdminAccess,
@@ -24,6 +25,7 @@ const mobileNavItems = [
 export function AppFooter() {
   const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
   const isMobile = useIsMobile();
+  const pathname = usePathname();
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
 
   useEffect(() => {
@@ -48,24 +50,38 @@ export function AppFooter() {
   }, [refreshGlobal]);
 
   const visibleNavItems = mobileNavItems.filter((item) => !item.adminOnly || hasAdminAccess);
+  const isActiveLink = (href: string) => href === "/"
+    ? pathname === "/" || pathname.startsWith("/brand/")
+    : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <footer className="bg-primary-panel text-primary-text border-primary-border font-bold p-2 w-full h-12 flex justify-center items-center border-t">
+    <footer className="flex h-11 w-full items-center justify-center border-t border-primary-border bg-primary-panel p-2 font-bold text-primary-text md:h-12">
       {isMobile ? (
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-primary-border bg-primary-panel px-2 py-1 shadow-lg backdrop-blur">
-          {visibleNavItems.map((item) => (
-            <HeaderNavLink
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              className="h-11 flex-1 flex-col gap-0.5 rounded-md border-0 px-1 py-0.5 text-[10px]"
-            >
-              <span>{item.label}</span>
-            </HeaderNavLink>
-          ))}
+        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-1 border-t border-primary-border bg-primary-panel/95 px-2 py-1.5 shadow-lg backdrop-blur">
+          {visibleNavItems.map((item) => {
+            const active = isActiveLink(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex h-10 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-[10px] font-bold transition-colors ${
+                  active ? "text-primary-text" : "text-secondary-text hover:text-primary"
+                }`}
+              >
+                <span className={`flex h-6 min-w-8 items-center justify-center rounded-full text-base transition ${
+                  active ? "bg-primary-soft text-primary-text ring-1 ring-primary-border" : "text-secondary-text"
+                }`}>
+                  {item.icon}
+                </span>
+                <span className="max-w-full truncate leading-none">{item.label}</span>
+                <span className={`h-0.5 rounded-full transition-all ${active ? "w-4 bg-primary" : "w-1 bg-transparent"}`} aria-hidden="true" />
+              </Link>
+            );
+          })}
         </nav>
       ) : (
-        <div className="flex justify-center items-center gap-2 text-xl font-bold">
+        <div className="flex items-center justify-center gap-2 text-xl font-bold">
           <GiSpermWhale aria-hidden="true" />
           <span>وال</span>
         </div>
