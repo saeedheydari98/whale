@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppFooter } from "./design-system/components/layout/app-footer";
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
+import { AppGlobalProvider } from "@/lib/app-global-context";
 
 const storeFont = localFont({
   variable: "--font-store",
@@ -29,13 +30,15 @@ export default function RootLayout({
       <body className="flex flex-col min-h-screen text-right" dir="rtl">
         <ThemeProvider>
           <CatalogQueryProvider>
-            <ProductsCatalogProvider>
-              <AppHeader />
-              <main className="flex-1 pb-14 md:pb-0">
-                {children}
-              </main>
-              <AppFooter />
-            </ProductsCatalogProvider>
+            <AppGlobalProvider>
+              <ProductsCatalogProvider>
+                <AppHeader />
+                <main className="flex-1 pb-14 md:pb-0">
+                  {children}
+                </main>
+                <AppFooter />
+              </ProductsCatalogProvider>
+            </AppGlobalProvider>
           </CatalogQueryProvider>
         </ThemeProvider>
       </body>

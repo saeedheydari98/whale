@@ -6,6 +6,9 @@ const CATALOG_URL_ACTIVE = "/api/products";
 const CATALOG_URL_ALL = "/api/products?all=1";
 const CATALOG_STRUCTURE_URL_ACTIVE = "/api/catalog/structure";
 const CATALOG_STRUCTURE_URL_ALL = "/api/catalog/structure?all=1";
+const HOME_PAGE_STRUCTURE_URL = "/api/home/structure";
+const CATEGORIES_PAGE_STRUCTURE_URL = "/api/categories/structure";
+const PRODUCTS_PAGE_STRUCTURE_URL = "/api/products/structure";
 export const PRODUCTS_CATALOG_UPDATED_EVENT = "products-catalog-updated";
 
 export type ProductRecord = {
@@ -839,6 +842,43 @@ export async function getCatalogStructure(options?: boolean | GetProductsOptions
   }
 }
 
+async function getPageStructure(url: string, options?: Pick<GetProductsOptions, "force">): Promise<ProductsCache> {
+  try {
+    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force });
+    return withResolvedTree(parseApiPayload(json?.data));
+  } catch {
+    return emptyProductsCache();
+  }
+}
+
+export function getHomePageStructure(options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(HOME_PAGE_STRUCTURE_URL, options);
+}
+
+export function getCategoriesPageStructure(options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(CATEGORIES_PAGE_STRUCTURE_URL, options);
+}
+
+export function getProductsPageStructure(options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(PRODUCTS_PAGE_STRUCTURE_URL, options);
+}
+
+export function getCategoryPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(`/api/category/${encodeURIComponent(String(id))}/structure`, options);
+}
+
+export function getBrandPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(`/api/brand/${encodeURIComponent(String(id))}/structure`, options);
+}
+
+export function getShowcasePageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(`/api/showcase/${encodeURIComponent(String(id))}/structure`, options);
+}
+
+export function getProductDetailPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(`/api/products/${encodeURIComponent(String(id))}/structure`, options);
+}
+
 export async function getProductPage(
   params?: Record<string, string | number | boolean | null | undefined>,
   options?: GetProductsOptions
@@ -1036,6 +1076,8 @@ export function findShowcaseById(
 export function clearProductsCache() {
   invalidateFetchCache("/api/products");
   invalidateFetchCache("/api/catalog");
+  invalidateFetchCache("/api/home");
+  invalidateFetchCache("/api/categories");
   invalidateFetchCache("/api/showcase");
   invalidateFetchCache("/api/showcases");
   invalidateFetchCache("/api/category");
@@ -1045,4 +1087,4 @@ export function clearProductsCache() {
   }
 }
 
-export default { getProducts, getCatalogStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache };
+export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache };

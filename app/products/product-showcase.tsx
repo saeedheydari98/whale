@@ -2,9 +2,9 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
-import { useProductsCatalog } from "@/lib/products-catalog-context";
 import { addProductToCart } from "@/lib/cart-client";
-import { getProductPage, getShowcaseProducts, isProductAvailable } from "@/lib/products-client";
+import { getProductPage, getProductsPageStructure, getShowcaseProducts, isProductAvailable } from "@/lib/products-client";
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
 import { ShowcaseSection } from "./product-showcase/showcase-section";
@@ -112,6 +112,23 @@ function ensureShowcases(products: Product[], savedShowcases: Showcase[]) {
   return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+const LOADING_PRODUCTS: Product[] = Array.from({ length: 4 }, (_, index) => ({
+  id: `loading-product-${index + 1}`,
+  title: "محصول",
+  description: "توضیح کوتاه محصول",
+  price: "$0",
+  active: true,
+  isActive: true,
+  isAvailable: true,
+  stockQuantity: 1,
+  sortOrder: index + 1,
+}));
+
+const LOADING_SHOWCASES: Showcase[] = [
+  { id: "loading-showcase-1", title: "ویترین", active: true, sortOrder: 1 },
+  { id: "loading-showcase-2", title: "ویترین", active: true, sortOrder: 2 },
+];
+
 type ProductShowcaseProps = {
   mode?: "storefront" | "showcase" | "products";
   root?: "main" | "div";
@@ -119,7 +136,15 @@ type ProductShowcaseProps = {
 
 export function ProductShowcase({ mode = "storefront", root = "main" }: ProductShowcaseProps) {
   // header search is handled on the separate `/search` route
-  const { showcases: catalogShowcases, banners: catalogBanners, tree, loading: structureLoading } = useProductsCatalog();
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "products"],
+    queryFn: () => getPageBootstrap(() => getProductsPageStructure()),
+  });
+  const structure = structureQuery.data?.page;
+  const catalogShowcases = structure?.showcases ?? [];
+  const catalogBanners = structure?.banners ?? [];
+  const tree = structure?.tree ?? { sections: [] };
+  const structureLoading = structureQuery.isLoading;
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
   const dragRef = useRef({
@@ -260,11 +285,12 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
   
 
   const loadingSections = useMemo(() => {
-    const showcaseSections = sortedShowcases.slice(0, 4)
+    const sourceShowcases = sortedShowcases.length > 0 ? sortedShowcases : LOADING_SHOWCASES;
+    const showcaseSections = sourceShowcases.slice(0, 4)
       .map((showcase) => ({
         type: "showcase" as const,
         item: showcase,
-        products: showcaseProductsById.get(showcase.id) ?? [],
+        products: showcaseProductsById.get(showcase.id) ?? LOADING_PRODUCTS,
         sortOrder: showcase.sortOrder,
       }))
       .filter((section) => section.item.active !== false);

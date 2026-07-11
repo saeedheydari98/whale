@@ -18,7 +18,8 @@ import {
   USER_PROFILE_UPDATED_EVENT,
   writeUserProfile,
 } from "@/lib/user-profile";
-import { fetchCurrentUser } from "@/lib/auth-client";
+import { fetchAppGlobal } from "@/lib/app-global-client";
+import Loading from "../components/loading/loading";
 
 type ThemeMode = "light" | "dark";
 
@@ -50,6 +51,15 @@ function readThemePayload<T>(payload: unknown, fallback: T): T {
   return (record.data?.theme && typeof record.data.theme === "object"
     ? record.data.theme
     : fallback) as T;
+}
+
+function readProfileThemeMode(user: { profile?: unknown } | null | undefined) {
+  const profile = user?.profile && typeof user.profile === "object"
+    ? user.profile as { themeMode?: unknown }
+    : null;
+  return profile?.themeMode === "dark" || profile?.themeMode === "light"
+    ? profile.themeMode
+    : null;
 }
 
 export function ThemeProvider({
@@ -118,23 +128,22 @@ export function ThemeProvider({
 
     const loadThemes = async (markReady = false) => {
       try {
-        const [nextAdminTheme] = await Promise.all([
-          fetch("/api/admin/theme", { cache: "no-store" }).then((res) => res.json()),
-        ]);
+        const globalData = await fetchAppGlobal();
         if (cancelled) return;
         setAdminTheme((current) => ({
           ...current,
-          ...readThemePayload(nextAdminTheme, defaultAdminTheme),
+          ...readThemePayload({ data: { theme: globalData.theme } }, defaultAdminTheme),
         }));
+        if (markReady) {
+          const profileMode = readProfileThemeMode(globalData.user) ?? readUserProfile()?.themeMode;
+          if (!cancelled && (profileMode === "light" || profileMode === "dark")) {
+            setModeState(profileMode);
+          }
+        }
       } catch (error) {
         console.error("Failed to load theme API settings:", error);
       } finally {
         if (!cancelled && markReady) {
-          await fetchCurrentUser();
-          const profileMode = readUserProfile()?.themeMode;
-          if (!cancelled && (profileMode === "light" || profileMode === "dark")) {
-            setModeState(profileMode);
-          }
           if (!cancelled) setHasLoadedRemoteTheme(true);
         }
       }
@@ -202,7 +211,13 @@ export function ThemeProvider({
 
   return (
     <ThemeContext.Provider value={contextValue}>
-      {isHydrated && hasLoadedRemoteTheme ? children : null}
+      {isHydrated && hasLoadedRemoteTheme ? children : (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg-base/80">
+          <div className="flex w-full max-w-xs flex-col items-center justify-center p-6">
+            <Loading loading="page" size="xl" />
+          </div>
+        </div>
+      )}
     </ThemeContext.Provider>
   );
 }

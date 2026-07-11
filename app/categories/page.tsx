@@ -2,14 +2,24 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
+import Loading from "@/app/design-system/components/loading/loading";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
-import { useProductsCatalog } from "@/lib/products-catalog-context";
-import { slugifyCatalogValue } from "@/lib/products-client";
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
+import { getCategoriesPageStructure, slugifyCatalogValue } from "@/lib/products-client";
 
 export default function CategoriesPage() {
   const router = useRouter();
-  const { categories, categoryGroups, banners, loading } = useProductsCatalog();
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "categories"],
+    queryFn: () => getPageBootstrap(() => getCategoriesPageStructure()),
+  });
+  const structure = structureQuery.data?.page;
+  const categories = structure?.categories ?? [];
+  const categoryGroups = structure?.categoryGroups ?? [];
+  const banners = structure?.banners ?? [];
+  const loading = structureQuery.isLoading;
   const [previewImage, setPreviewImage] = useState("");
 
   const visibleCategories = useMemo(
@@ -48,7 +58,21 @@ export default function CategoriesPage() {
         </div>
 
         {loading ? (
-          <div className="text-sm text-secondary-text">در حال بارگذاری دسته بندی ها...</div>
+          <div className="flex flex-col gap-4">
+            <Loading loading="skeleton-item" isLoading>
+              <div className="h-[24vh] w-full rounded-xl border border-primary-border bg-primary-media" />
+            </Loading>
+            <Loading loading="skeleton-item" isLoading>
+              <div className="text-xl font-bold">دسته بندی ها</div>
+            </Loading>
+            <div className="flex flex-wrap gap-4">
+              {[0, 1, 2, 3].map((item) => (
+                <Loading key={item} loading="skeleton-item" isLoading>
+                  <CategoryOption label="دسته بندی" imageUrl="" size="lg" />
+                </Loading>
+              ))}
+            </div>
+          </div>
         ) : null}
 
         {!loading && visibleCategories.length === 0 ? (
@@ -57,44 +81,46 @@ export default function CategoriesPage() {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-4">
-          {displaySections.map((section) => {
-            if (section.type === "banner") {
+        {!loading ? (
+          <div className="flex flex-col gap-4">
+            {displaySections.map((section) => {
+              if (section.type === "banner") {
+                return (
+                  <BannerCarousel
+                    key={`banner-${section.item.id}`}
+                    banner={{
+                      ...section.item,
+                      title: section.item.title ?? "",
+                      imageUrls: section.item.imageUrls ?? [],
+                      active: section.item.active !== false,
+                      sortOrder: Number(section.item.categorySortOrder ?? section.item.sortOrder ?? 0),
+                    }}
+                    onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
+                  />
+                );
+              }
               return (
-                <BannerCarousel
-                  key={`banner-${section.item.id}`}
-                  banner={{
-                    ...section.item,
-                    title: section.item.title ?? "",
-                    imageUrls: section.item.imageUrls ?? [],
-                    active: section.item.active !== false,
-                    sortOrder: Number(section.item.categorySortOrder ?? section.item.sortOrder ?? 0)
-                  }}
-                  onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
-                />
-              );
-            }
-            return (
-              <div key={`category-group-${section.title}`} className="flex flex-col gap-3">
-                <div className="text-xl font-bold">{section.title}</div>
-                <div className="flex w-full flex-wrap gap-4">
-                  {section.item.map((category) => {
-                    const slug = slugifyCatalogValue(category.slug || category.title || category.id);
-                    return (
-                      <CategoryOption
-                        key={category.id}
-                        label={category.title}
-                        imageUrl={category.imageUrl}
-                        size="lg"
-                        onClick={() => router.push(`/categories/${slug || category.id}`)}
-                      />
-                    );
-                  })}
+                <div key={`category-group-${section.title}`} className="flex flex-col gap-3">
+                  <div className="text-xl font-bold">{section.title}</div>
+                  <div className="flex w-full flex-wrap gap-4">
+                    {section.item.map((category) => {
+                      const slug = slugifyCatalogValue(category.slug || category.title || category.id);
+                      return (
+                        <CategoryOption
+                          key={category.id}
+                          label={category.title}
+                          imageUrl={category.imageUrl}
+                          size="lg"
+                          onClick={() => router.push(`/categories/${slug || category.id}`)}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
 
       {previewImage ? (

@@ -8,10 +8,10 @@ import { IoHomeOutline, IoPersonCircleOutline, IoStorefrontOutline } from "react
 import { useIsMobile } from "@/hooks/useIsMobile";
 import HeaderNavLink from "../ui/header-nav-link";
 import {
-  fetchAdminAccess,
   isAdminAccessUnlocked,
   subscribeAdminAccess,
 } from "@/lib/admin-access";
+import { useAppGlobal } from "@/lib/app-global-context";
 
 const mobileNavItems = [
   { href: "/", label: "خانه", icon: <IoHomeOutline /> },
@@ -22,13 +22,20 @@ const mobileNavItems = [
 ];
 
 export function AppFooter() {
+  const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
   const isMobile = useIsMobile();
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
 
   useEffect(() => {
+    if (!globalData) return;
+    setHasAdminAccess(globalData.user?.role === "admin" || globalData.user?.role === "superadmin");
+  }, [globalData]);
+
+  useEffect(() => {
     const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
     const syncAdminAccessFromApi = async () => {
-      setHasAdminAccess(await fetchAdminAccess());
+      const next = await refreshGlobal();
+      setHasAdminAccess(next.user?.role === "admin" || next.user?.role === "superadmin");
     };
 
     syncAdminAccess();
@@ -38,7 +45,7 @@ export function AppFooter() {
     return () => {
       unsubscribeAdminAccess();
     };
-  }, []);
+  }, [refreshGlobal]);
 
   const visibleNavItems = mobileNavItems.filter((item) => !item.adminOnly || hasAdminAccess);
 

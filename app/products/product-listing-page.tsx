@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FiExternalLink } from "react-icons/fi";
 import { IoBagAddOutline } from "react-icons/io5";
+import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
@@ -24,6 +25,18 @@ const SORT_OPTIONS = [
   { value: "mostDiscounted", label: "بیشترین تخفیف" },
 ];
 
+const LOADING_PRODUCTS: ProductRecord[] = Array.from({ length: 8 }, (_, index) => ({
+  id: `loading-product-${index + 1}`,
+  title: "عنوان محصول",
+  description: "توضیح کوتاه محصول برای نمایش اسکلتون",
+  price: "$0",
+  active: true,
+  isActive: true,
+  isAvailable: true,
+  stockQuantity: 1,
+  sortOrder: index + 1,
+}));
+
 type ProductListingPageProps = {
   title: string;
   emptyText: string;
@@ -36,6 +49,7 @@ export function ProductListingPage({ title, emptyText, loading, products }: Prod
   const [cartMessage, setCartMessage] = useState("");
 
   const visibleProducts = useMemo(() => sortProductsBy(products, sort), [products, sort]);
+  const renderedProducts = loading ? LOADING_PRODUCTS : visibleProducts;
 
   const addToCart = async (product: ProductRecord) => {
     if (!isProductAvailable(product)) {
@@ -61,19 +75,23 @@ export function ProductListingPage({ title, emptyText, loading, products }: Prod
       <div className="mx-auto flex w-full flex-col gap-5 px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary-border pb-4">
           <div className="flex flex-col gap-1">
-            <div className="text-2xl font-bold">{title}</div>
-            <span className="text-xs font-semibold text-secondary-text">{visibleProducts.length} محصول</span>
+            <Loading loading="skeleton-item" isLoading={loading}>
+              <div className="text-2xl font-bold">{title}</div>
+            </Loading>
+            <Loading loading="skeleton-item" isLoading={loading}>
+              <span className="text-xs font-semibold text-secondary-text">{visibleProducts.length} محصول</span>
+            </Loading>
           </div>
-          <CustomSelect value={sort} aria-label="مرتب سازی محصولات" onChange={(event) => setSort(event.target.value)}>
-            {SORT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </CustomSelect>
+          <Loading loading="skeleton-item" isLoading={loading}>
+            <CustomSelect value={sort} aria-label="مرتب سازی محصولات" onChange={(event) => setSort(event.target.value)}>
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </CustomSelect>
+          </Loading>
         </div>
-
-        {loading ? <div className="text-sm text-secondary-text">در حال بارگذاری محصولات...</div> : null}
 
         {!loading && visibleProducts.length === 0 ? (
           <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">{emptyText}</div>
@@ -84,41 +102,55 @@ export function ProductListingPage({ title, emptyText, loading, products }: Prod
         ) : null}
 
         <div className="flex flex-wrap gap-3">
-          {visibleProducts.map((product) => {
+          {renderedProducts.map((product) => {
             const available = isProductAvailable(product);
             return (
               <div key={product.id} className="flex w-full max-w-72 flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
                 <div className="flex gap-3">
                   <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md bg-primary-media">
-                    {product.imageUrl ? (
-                      <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-sm text-secondary-text">بدون تصویر</div>
-                    )}
+                    <Loading loading="skeleton-item" isLoading={loading} className="h-full w-full">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm text-secondary-text">بدون تصویر</div>
+                      )}
+                    </Loading>
                   </div>
                   <div className="flex flex-1 flex-col gap-1">
-                    <div className="line-clamp-1 text-sm font-bold">{product.title}</div>
-                    <span className="line-clamp-2 text-xs text-secondary-text">{product.description}</span>
-                    <div className="text-sm font-bold text-primary">{product.discountPrice || product.price}</div>
-                    <ProductRatingSummary average={product.ratingAverage} count={product.ratingCount} />
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <div className="line-clamp-1 text-sm font-bold">{product.title}</div>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <span className="line-clamp-2 text-xs text-secondary-text">{product.description}</span>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <div className="text-sm font-bold text-primary">{product.discountPrice || product.price}</div>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <ProductRatingSummary average={product.ratingAverage} count={product.ratingCount} />
+                    </Loading>
                   </div>
                 </div>
                 <div className="flex gap-2 border-t border-primary-border pt-3">
-                  <CustomButton
-                    type="button"
-                    variant="success"
-                    size="sm"
-                    fullWidth
-                    className="flex-1"
-                    icon={<IoBagAddOutline />}
-                    disabled={!available}
-                    onClick={() => void addToCart(product)}
-                  >
-                    {available ? "افزودن" : "ناموجود"}
-                  </CustomButton>
-                  <ProductLink productId={product.id ?? ""} productTitle={product.slug || product.title} className="flex-1" iconAfter={<FiExternalLink />}>
-                    مشاهده
-                  </ProductLink>
+                  <Loading loading="skeleton-item" isLoading={loading} className="flex-1">
+                    <CustomButton
+                      type="button"
+                      variant="success"
+                      size="sm"
+                      fullWidth
+                      className="flex-1"
+                      icon={<IoBagAddOutline />}
+                      disabled={loading || !available}
+                      onClick={() => void addToCart(product)}
+                    >
+                      {available ? "افزودن" : "ناموجود"}
+                    </CustomButton>
+                  </Loading>
+                  <Loading loading="skeleton-item" isLoading={loading} className="flex-1">
+                    <ProductLink productId={product.id ?? ""} productTitle={product.slug || product.title} className="flex-1" iconAfter={<FiExternalLink />}>
+                      مشاهده
+                    </ProductLink>
+                  </Loading>
                 </div>
               </div>
             );

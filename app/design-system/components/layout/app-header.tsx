@@ -17,22 +17,21 @@ import { CustomInput } from "../ui/input";
 import { CustomModal } from "../ui/modal";
 import HeaderNavLink from "../ui/header-nav-link";
 import {
-  fetchAdminAccess,
   isAdminAccessUnlocked,
   subscribeAdminAccess,
 } from "@/lib/admin-access";
 import {
   CART_UPDATED_EVENT,
-  getCart,
   getCartCount,
   readLocalCart,
 } from "@/lib/cart-client";
 import {
   clearCachedAuthUser,
-  fetchCurrentUser,
   setCachedAuthUser,
   subscribeAuthUser,
 } from "@/lib/auth-client";
+import { clearAppGlobalCache } from "@/lib/app-global-client";
+import { useAppGlobal } from "@/lib/app-global-context";
 import { GiSpermWhale } from "react-icons/gi";
 
 type HeaderUser = {
@@ -77,6 +76,7 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
 }
 
 export function AppHeader() {
+  const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
   const { mode, setMode } = useTheme();
   const hideHeader = useScrollHeaderHide(10);
   const isMobile = useIsMobile();
@@ -95,28 +95,34 @@ export function AppHeader() {
   const showMobileBack = isMobile && pathname !== "/";
 
   useEffect(() => {
+    if (!globalData) return;
+    setAuthUser(globalData.user);
+    setCartCount(globalData.cart.count);
+    setHasAdminAccess(globalData.user?.role === "admin" || globalData.user?.role === "superadmin");
+  }, [globalData]);
+
+  useEffect(() => {
     const syncCartCount = () => setCartCount(getCartCount(readLocalCart()));
-    const syncCartFromApi = async () => {
-      const snapshot = await getCart();
-      setCartCount(getCartCount(snapshot.items));
+    const syncGlobalFromApi = async (force = false) => {
+      const next = await refreshGlobal({ force });
+      setAuthUser(next.user);
+      setCartCount(next.cart.count);
+      setHasAdminAccess(next.user?.role === "admin" || next.user?.role === "superadmin");
     };
     const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
-    const syncAdminAccessFromApi = async () => {
-      setHasAdminAccess(await fetchAdminAccess());
-    };
 
-    void fetchCurrentUser().then((user) => {
-      setAuthUser(user);
-      syncCartCount();
-      void syncCartFromApi();
+    void syncGlobalFromApi().then(() => {
       syncAdminAccess();
-      void syncAdminAccessFromApi();
+      syncCartCount();
     });
     window.addEventListener("storage", syncCartCount);
     window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
-    const unsubscribeAdminAccess = subscribeAdminAccess(syncAdminAccess);
+    const unsubscribeAdminAccess = subscribeAdminAccess(() => {
+      syncAdminAccess();
+      void syncGlobalFromApi(true);
+    });
     const unsubscribeAuthUser = subscribeAuthUser(() => {
-      void fetchCurrentUser().then(setAuthUser);
+      void syncGlobalFromApi(true);
     });
 
     return () => {
@@ -125,7 +131,7 @@ export function AppHeader() {
       unsubscribeAdminAccess();
       unsubscribeAuthUser();
     };
-  }, []);
+  }, [refreshGlobal]);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
@@ -153,9 +159,9 @@ export function AppHeader() {
       setAuthOpen(false);
       setAuthPassword("");
       setAuthStatus("");
-      setHasAdminAccess(await fetchAdminAccess());
-      const snapshot = await getCart();
-      setCartCount(getCartCount(snapshot.items));
+      const nextGlobal = await refreshGlobal({ force: true });
+      setHasAdminAccess(nextGlobal.user?.role === "admin" || nextGlobal.user?.role === "superadmin");
+      setCartCount(nextGlobal.cart.count);
       router.refresh();
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : "ورود ناموفق بود.");
@@ -166,9 +172,13 @@ export function AppHeader() {
 
   const logout = async () => {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    clearAppGlobalCache();
     clearCachedAuthUser();
     setAuthUser(null);
     setHasAdminAccess(false);
+    void refreshGlobal({ force: true }).then((nextGlobal) => {
+      setCartCount(nextGlobal.cart.count);
+    });
     router.refresh();
   };
 

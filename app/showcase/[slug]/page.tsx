@@ -13,9 +13,10 @@ import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import ProductRatingSummary from "@/app/design-system/components/ui/product-rating-summary";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import { addProductToCart } from "@/lib/cart-client";
-import { useProductsCatalog } from "@/lib/products-catalog-context";
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
 import {
   decodeCatalogSegment,
+  getShowcasePageStructure,
   getShowcaseProducts,
   isProductAvailable,
   normalizeColorStock,
@@ -25,12 +26,24 @@ import {
 
 const SORT_OPTIONS = [
   { value: "newest", label: "جدیدترین" },
-  { value: "oldest", label: "قدیمی‌ترین" },
-  { value: "cheapest", label: "ارزان‌ترین" },
-  { value: "expensive", label: "گران‌ترین" },
-  { value: "bestseller", label: "پرفروش‌ترین" },
+  { value: "oldest", label: "قدیمی ترین" },
+  { value: "cheapest", label: "ارزان ترین" },
+  { value: "expensive", label: "گران ترین" },
+  { value: "bestseller", label: "پرفروش ترین" },
   { value: "mostDiscounted", label: "بیشترین تخفیف" },
 ];
+
+const LOADING_PRODUCTS: ProductRecord[] = Array.from({ length: 8 }, (_, index) => ({
+  id: `loading-showcase-product-${index + 1}`,
+  title: "محصول",
+  description: "توضیح کوتاه محصول",
+  price: "$0",
+  active: true,
+  isActive: true,
+  isAvailable: true,
+  stockQuantity: 1,
+  sortOrder: index + 1,
+}));
 
 function searchableProductText(product: ProductRecord) {
   const typedProduct = product as ProductRecord & { type?: unknown; productType?: unknown };
@@ -49,19 +62,22 @@ export default function ShowcasePage() {
   const rawSlug = params?.slug ?? "";
   const showcaseId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const displayShowcaseId = decodeCatalogSegment(showcaseId);
-  const { showcases, banners, loading: structureLoading } = useProductsCatalog();
-  const structureShowcase = useMemo(
-    () => showcases.find((item) => item.id === showcaseId || item.title === displayShowcaseId),
-    [displayShowcaseId, showcaseId, showcases]
-  );
-  const showcaseProductsQuery = useQuery({
-    queryKey: ["catalog", "showcase", structureShowcase?.id ?? showcaseId, "products", "page"],
-    queryFn: () => getShowcaseProducts(structureShowcase?.id ?? showcaseId, { limit: 100 }),
-    enabled: !structureLoading,
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "showcase", showcaseId],
+    queryFn: () => getPageBootstrap(() => getShowcasePageStructure(showcaseId)),
+    enabled: Boolean(showcaseId),
   });
-  const showcase = (showcaseProductsQuery.data?.section ?? structureShowcase) as typeof structureShowcase;
+  const pageStructure = structureQuery.data?.page;
+  const structureShowcase = pageStructure?.showcases[0];
+  const banners = pageStructure?.banners ?? [];
+  const showcaseProductsQuery = useQuery({
+    queryKey: ["catalog", "showcase", showcaseId, "products", "page"],
+    queryFn: () => getShowcaseProducts(showcaseId, { limit: 100 }),
+    enabled: Boolean(showcaseId),
+  });
+  const showcase = showcaseProductsQuery.data?.section ?? structureShowcase;
   const products = showcaseProductsQuery.data?.products ?? [];
-  const loading = structureLoading || showcaseProductsQuery.isLoading;
+  const loading = structureQuery.isLoading || showcaseProductsQuery.isLoading;
   const [searchQuery, setSearchQuery] = useState("");
   const [sort, setSort] = useState("newest");
   const [cartMessage, setCartMessage] = useState("");
@@ -75,9 +91,10 @@ export default function ShowcasePage() {
     });
     return sortProductsBy(filtered, sort);
   }, [products, searchQuery, sort]);
+  const renderedProducts = loading ? LOADING_PRODUCTS : visibleProducts;
 
   const showcaseBanners = useMemo(
-    () => banners.filter(() => false),
+    () => banners.filter((banner) => banner.active !== false && banner.showOnShowcase === true),
     [banners]
   );
 
@@ -120,7 +137,7 @@ export default function ShowcasePage() {
               className="bg-primary-media text-sm"
               style={{ backgroundColor: "var(--primary-media)" }}
             />
-            <CustomSelect value={sort} aria-label="مرتب‌سازی محصولات ویترین" onChange={(event) => setSort(event.target.value)}>
+            <CustomSelect value={sort} aria-label="مرتب سازی محصولات ویترین" onChange={(event) => setSort(event.target.value)}>
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
@@ -131,7 +148,9 @@ export default function ShowcasePage() {
         </div>
 
         {showcase?.description ? (
-          <div className="text-sm text-secondary-text">{showcase.description}</div>
+          <Loading loading="skeleton-item" isLoading={loading}>
+            <div className="text-sm text-secondary-text">{showcase.description}</div>
+          </Loading>
         ) : null}
 
         {cartMessage ? (
@@ -172,41 +191,55 @@ export default function ShowcasePage() {
         ) : null}
 
         <div className="flex flex-wrap gap-3">
-          {visibleProducts.map((product) => {
+          {renderedProducts.map((product) => {
             const available = isProductAvailable(product);
             return (
               <div key={product.id} className="flex w-full max-w-72 flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
                 <div className="flex gap-3">
                   <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md bg-primary-media">
-                    {product.imageUrl ? (
-                      <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-sm text-secondary-text">بدون تصویر</div>
-                    )}
+                    <Loading loading="skeleton-item" isLoading={loading} className="h-full w-full">
+                      {product.imageUrl ? (
+                        <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-sm text-secondary-text">بدون تصویر</div>
+                      )}
+                    </Loading>
                   </div>
                   <div className="flex flex-1 flex-col gap-1">
-                    <div className="line-clamp-1 text-sm font-bold">{product.title}</div>
-                    <span className="line-clamp-2 text-xs text-secondary-text">{product.description}</span>
-                    <div className="text-sm font-bold text-primary">{product.discountPrice || product.price}</div>
-                    <ProductRatingSummary average={product.ratingAverage} count={product.ratingCount} />
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <div className="line-clamp-1 text-sm font-bold">{product.title}</div>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <span className="line-clamp-2 text-xs text-secondary-text">{product.description}</span>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <div className="text-sm font-bold text-primary">{product.discountPrice || product.price}</div>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <ProductRatingSummary average={product.ratingAverage} count={product.ratingCount} />
+                    </Loading>
                   </div>
                 </div>
                 <div className="flex gap-2 border-t border-primary-border pt-3">
-                  <CustomButton
-                    type="button"
-                    variant="success"
-                    size="sm"
-                    fullWidth
-                    className="flex-1"
-                    icon={<IoBagAddOutline />}
-                    disabled={!available}
-                    onClick={() => void addToCart(product)}
-                  >
-                    {available ? "افزودن" : "ناموجود"}
-                  </CustomButton>
-                  <ProductLink productId={product.id ?? product.title} productTitle={product.title} className="flex-1" iconAfter={<FiExternalLink />}>
-                    مشاهده
-                  </ProductLink>
+                  <Loading loading="skeleton-item" isLoading={loading} className="flex-1">
+                    <CustomButton
+                      type="button"
+                      variant="success"
+                      size="sm"
+                      fullWidth
+                      className="flex-1"
+                      icon={<IoBagAddOutline />}
+                      disabled={loading || !available}
+                      onClick={() => void addToCart(product)}
+                    >
+                      {available ? "افزودن" : "ناموجود"}
+                    </CustomButton>
+                  </Loading>
+                  <Loading loading="skeleton-item" isLoading={loading} className="flex-1">
+                    <ProductLink productId={product.id ?? product.title} productTitle={product.slug || product.title} className="flex-1" iconAfter={<FiExternalLink />}>
+                      مشاهده
+                    </ProductLink>
+                  </Loading>
                 </div>
               </div>
             );
@@ -219,7 +252,7 @@ export default function ShowcasePage() {
           <div className="flex max-h-[75vh] w-full max-w-3xl items-center justify-center overflow-hidden rounded-lg border border-primary-border bg-primary-card p-2 shadow-xl">
             <img
               src={previewImage}
-              alt="پیش‌نمایش بنر"
+              alt="پیش نمایش بنر"
               className="max-h-[72vh] w-full object-contain"
               onClick={(event) => event.stopPropagation()}
             />

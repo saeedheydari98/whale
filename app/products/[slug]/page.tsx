@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
-import { getProductDetail, getStockStatusLabel, isProductAvailable, type ProductRecord } from "@/lib/products-client";
+import { getProductDetail, getProductDetailPageStructure, getStockStatusLabel, isProductAvailable, type ProductRecord } from "@/lib/products-client";
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
 import { addProductToCart } from "@/lib/cart-client";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomTag } from "@/app/design-system/components/ui/tag";
@@ -74,12 +75,18 @@ export default function ProductPage() {
   const rawSlug = params?.slug ?? params?.id ?? "";
   const productId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const queryClient = useQueryClient();
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "product", productId],
+    queryFn: () => getPageBootstrap(() => getProductDetailPageStructure(productId)),
+    enabled: Boolean(productId),
+  });
   const productQuery = useQuery({
     queryKey: ["catalog", "product", productId],
     queryFn: () => getProductDetail(productId),
     enabled: Boolean(productId),
   });
   const product = productQuery.data?.product ?? null;
+  const loadingProduct = structureQuery.data?.page.products[0] ?? LOADING_PRODUCT;
   const catalogLoading = productQuery.isLoading;
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [text, setText] = useState("");
@@ -229,13 +236,13 @@ export default function ProductPage() {
               <Loading loading="skeleton-item" isLoading>
                 <div>
                   <CustomTag size="xs" rounded="full" >
-                    {LOADING_PRODUCT.badge}
+                    {loadingProduct.badge}
                   </CustomTag>
                 </div>
               </Loading>
               <Loading loading="skeleton-item" isLoading>
                 <div className="text-3xl font-bold leading-tight text-primary-text">
-                  {LOADING_PRODUCT.title}
+                  {loadingProduct.title}
                 </div>
               </Loading>
               <div className="flex items-center gap-3">
@@ -252,11 +259,11 @@ export default function ProductPage() {
               <div className="flex flex-col gap-1 rounded-xl border border-border-default bg-primary-card p-4">
                 <Loading loading="skeleton-item" isLoading>
                   <div className="text-sm text-danger-text-nomode line-through">
-                    {LOADING_PRODUCT.originalPrice}
+                    {loadingProduct.originalPrice}
                   </div>
                 </Loading>
                 <Loading loading="skeleton-item" isLoading>
-                  <div className="text-3xl font-bold text-primary">{LOADING_PRODUCT.price}</div>
+                  <div className="text-3xl font-bold text-primary">{loadingProduct.price}</div>
                 </Loading>
               </div>
               <div className="flex flex-col gap-2">
@@ -265,7 +272,7 @@ export default function ProductPage() {
                 </Loading>
                 <Loading loading="skeleton-item" isLoading>
                   <div className="text-sm leading-7 text-secondary-text whitespace-pre-wrap">
-                    {LOADING_PRODUCT.description}
+                    {loadingProduct.description}
                   </div>
                 </Loading>
               </div>

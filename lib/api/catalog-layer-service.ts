@@ -426,6 +426,120 @@ function getTtl(searchParams: URLSearchParams, fallback = LIST_TTL_SECONDS) {
   return getIncludeInactive(searchParams) ? ADMIN_TTL_SECONDS : fallback;
 }
 
+const EMPTY_PAGE_STRUCTURE = {
+  products: [],
+  showcases: [],
+  categoryGroups: [],
+  categories: [],
+  brandGroups: [],
+  brands: [],
+  banners: [],
+};
+
+function pageStructure<T extends Record<string, unknown>>(type: string, data: T) {
+  return {
+    type,
+    placement: 0,
+    ...EMPTY_PAGE_STRUCTURE,
+    ...data,
+  };
+}
+
+function visibleBanners(banners: BannerRecord[], target: "home" | "categories" | "products" | "showcase", showcaseId = "") {
+  return banners
+    .map(toClientBanner)
+    .filter((banner) => {
+      if (target === "home") return banner.showOnHome !== false;
+      if (target === "categories") return banner.showOnCategories === true;
+      if (target === "products") return banner.showOnProducts === true;
+      return banner.showOnShowcase === true && (!showcaseId || String(banner.showcaseId ?? "") === showcaseId);
+    });
+}
+
+async function findPageBanners(includeInactive: boolean) {
+  return (prisma as any).banner?.findMany
+    ? (prisma as any).banner.findMany({
+        where: includeInactive ? undefined : { active: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      }) as Promise<BannerRecord[]>
+    : Promise.resolve([]);
+}
+
+export async function getHomePageStructure(searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  return withCatalogCache("page-structure", ["home", includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const [brands, brandGroups, banners] = await Promise.all([
+      (prisma as any).brand?.findMany
+        ? (prisma as any).brand.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ homeSortOrder: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+      (prisma as any).brandGroup?.findMany
+        ? (prisma as any).brandGroup.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+      findPageBanners(includeInactive),
+    ]);
+
+    return pageStructure("home", {
+      brands: brands.map(toClientBrand).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
+      brandGroups: brandGroups.map(toClientLinkGroup).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
+      banners: visibleBanners(banners, "home"),
+    });
+  });
+}
+
+export async function getCategoriesPageStructure(searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  return withCatalogCache("page-structure", ["categories", includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const [categories, categoryGroups, banners] = await Promise.all([
+      (prisma as any).category?.findMany
+        ? (prisma as any).category.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+      (prisma as any).categoryGroup?.findMany
+        ? (prisma as any).categoryGroup.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+      findPageBanners(includeInactive),
+    ]);
+
+    return pageStructure("categories", {
+      categories: categories.map(toClientCategory).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
+      categoryGroups: categoryGroups.map(toClientLinkGroup).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
+      banners: visibleBanners(banners, "categories"),
+    });
+  });
+}
+
+export async function getProductsPageStructure(searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  return withCatalogCache("page-structure", ["products", includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const [showcases, banners] = await Promise.all([
+      prisma.showcase.findMany({
+        where: includeInactive ? undefined : { active: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      }),
+      findPageBanners(includeInactive),
+    ]);
+    const clientShowcases = showcases.map(toClientShowcase);
+    const clientBanners = visibleBanners(banners, "products");
+
+    return pageStructure("products", {
+      showcases: clientShowcases,
+      banners: clientBanners,
+      children: [...clientBanners, ...clientShowcases].sort((a, b) => Number(a.placement ?? 0) - Number(b.placement ?? 0)),
+    });
+  });
+}
+
 async function getStructureData(includeInactive: boolean) {
   const [
     showcases,
@@ -733,6 +847,64 @@ async function findProductByIdentifier(identifier: string, includeInactive = fal
     slugifyCatalogValue(product.slug || "") === slug
     || slugifyCatalogValue(product.title || "") === slug
   ) ?? null;
+}
+
+export async function getCategoryPageStructure(identifier: string, searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  return withCatalogCache("page-structure", ["category", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const category = await findCategory(identifier);
+    if (!category || (!includeInactive && category.active === false)) {
+      return pageStructure("category", { categories: [] });
+    }
+
+    return pageStructure("category", {
+      categories: [toClientCategory(category)],
+    });
+  });
+}
+
+export async function getBrandPageStructure(identifier: string, searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  return withCatalogCache("page-structure", ["brand", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const brand = await findBrand(identifier);
+    if (!brand || (!includeInactive && brand.active === false)) {
+      return pageStructure("brand", { brands: [] });
+    }
+
+    return pageStructure("brand", {
+      brands: [toClientBrand(brand)],
+    });
+  });
+}
+
+export async function getShowcasePageStructure(identifier: string, searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  return withCatalogCache("page-structure", ["showcase", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const [showcase, banners] = await Promise.all([
+      findShowcase(identifier),
+      findPageBanners(includeInactive),
+    ]);
+    if (!showcase || (!includeInactive && showcase.active === false)) {
+      return pageStructure("showcase", { showcases: [], banners: [] });
+    }
+    const clientShowcase = toClientShowcase(showcase);
+
+    return pageStructure("showcase", {
+      showcases: [clientShowcase],
+      banners: visibleBanners(banners, "showcase", clientShowcase.id),
+    });
+  });
+}
+
+export async function getProductDetailPageStructure(identifier: string, searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  return withCatalogCache("page-structure", ["product", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, DETAILS_TTL_SECONDS), async () => {
+    const product = await findProductByIdentifier(identifier, includeInactive);
+
+    return pageStructure("product", {
+      products: product ? [toProductSummary(product)] : [],
+    });
+  });
 }
 
 export async function getRecommendationProducts(product: ProductRecord | null, searchParams: URLSearchParams) {

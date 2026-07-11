@@ -1,40 +1,35 @@
 "use client";
 
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { ProductListingPage } from "@/app/products/product-listing-page";
-import { useProductsCatalog } from "@/lib/products-catalog-context";
-import { decodeCatalogSegment, getBrandProducts, slugifyCatalogValue } from "@/lib/products-client";
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
+import { decodeCatalogSegment, getBrandPageStructure, getBrandProducts } from "@/lib/products-client";
 
 export default function BrandProductsPage() {
   const params = useParams();
   const rawSlug = params?.slug ?? "";
   const slug = decodeCatalogSegment(Array.isArray(rawSlug) ? rawSlug[0] : rawSlug);
-  const { brands, loading: structureLoading } = useProductsCatalog();
 
-  const brand = useMemo(
-    () => brands.find((item) =>
-      slugifyCatalogValue(item.slug || "") === slugifyCatalogValue(slug)
-      || slugifyCatalogValue(item.id) === slugifyCatalogValue(slug)
-      || slugifyCatalogValue(item.title) === slugifyCatalogValue(slug)
-    ),
-    [brands, slug]
-  );
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "brand", slug],
+    queryFn: () => getPageBootstrap(() => getBrandPageStructure(slug)),
+    enabled: Boolean(slug),
+  });
 
   const brandProductsQuery = useQuery({
-    queryKey: ["catalog", "brand", brand?.id ?? slug, "products"],
-    queryFn: () => getBrandProducts(brand?.id ?? slug, { limit: 100 }),
-    enabled: !structureLoading,
+    queryKey: ["catalog", "brand", slug, "products"],
+    queryFn: () => getBrandProducts(slug, { limit: 100 }),
+    enabled: Boolean(slug),
   });
-  const brandTitle = brand?.title || brandProductsQuery.data?.section?.title || slug;
+  const brand = structureQuery.data?.page.brands[0] ?? brandProductsQuery.data?.section;
   const brandProducts = brandProductsQuery.data?.products ?? [];
 
   return (
     <ProductListingPage
-      title={brandTitle}
+      title={brand?.title || slug}
       emptyText="محصولی برای این برند پیدا نشد."
-      loading={structureLoading || brandProductsQuery.isLoading}
+      loading={structureQuery.isLoading || brandProductsQuery.isLoading}
       products={brandProducts}
     />
   );

@@ -149,10 +149,8 @@ function ProductModal({
                 ))}
               </div>
             </div>
-            <RequiredLabel required className="text-primary-text">عنوان</RequiredLabel>
             <CustomInput value={product.title} placeholder="عنوان" invalid={hasRequiredError(titleErrorKey) && !product.title.trim()} onChange={(event) => onPatch({ title: event.target.value })} />
             <CustomInput value={product.originalPrice} placeholder="قیمت قبل از تخفیف" onChange={(event) => onPricingPatch({ originalPrice: event.target.value })} />
-            <RequiredLabel required className="text-primary-text">قیمت با تخفیف</RequiredLabel>
             <CustomInput value={product.discountPrice} placeholder="قیمت با تخفیف" invalid={hasRequiredError(priceErrorKey) && !product.discountPrice.trim()} onChange={(event) => onPricingPatch({ discountPrice: event.target.value })} />
             <CustomInput value={product.badge} placeholder="برچسب" onChange={(event) => onPatch({ badge: event.target.value })} />
             <InventoryControls product={product} onChange={onPatch} />

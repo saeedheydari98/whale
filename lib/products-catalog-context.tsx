@@ -41,11 +41,12 @@ const ProductsCatalogContext = createContext<ProductsCatalogContextValue | null>
 
 const EMPTY_TREE: CatalogTree = { sections: [] };
 
-export function ProductsCatalogProvider({ children }: { children: ReactNode }) {
+export function ProductsCatalogProvider({ children, eager = false }: { children: ReactNode; eager?: boolean }) {
   const queryClient = useQueryClient();
   const structureQuery = useQuery({
     queryKey: ["catalog", "structure"],
     queryFn: () => getCatalogStructure(),
+    enabled: eager,
   });
   const catalog = structureQuery.data;
   const products = catalog?.products ?? [];

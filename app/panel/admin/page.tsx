@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Loading from "@/app/design-system/components/loading/loading";
 import { AdminAccessPanel } from "@/app/panel/admin/admin-access-panel";
 import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
-import {
-  subscribeAdminAccess,
-} from "@/lib/admin-access";
+import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
 
 type AdminPanelUser = {
@@ -65,8 +64,8 @@ export default function AdminPanelPage() {
     ...(isSuperadmin ? [{ id: "security", label: "امنیت" }] : []),
     { id: "products", label: "محصولات" },
     { id: "banners", label: "بنرها" },
-    { id: "showcases", label: "ویترین‌ها" },
-    { id: "categories", label: "دسته‌بندی‌ها" },
+    { id: "showcases", label: "ویترین ها" },
+    { id: "categories", label: "دسته بندی ها" },
     { id: "brands", label: "برندها" },
     { id: "storefront", label: "چیدمان" },
   ];
@@ -75,9 +74,7 @@ export default function AdminPanelPage() {
     <main className="min-h-screen bg-primary-base p-6 text-primary-text">
       {hasAdminAccess === null ? (
         <div className="flex min-h-[50vh] items-center justify-center">
-          <div className="rounded-lg border border-primary-border bg-primary-card p-6 text-sm font-semibold text-primary-text">
-            در حال بررسی دسترسی مدیریت...
-          </div>
+          <Loading loading="page" size="xl" />
         </div>
       ) : hasAdminAccess ? (
         <div className="flex w-full flex-col gap-6">

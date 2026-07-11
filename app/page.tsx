@@ -2,13 +2,24 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "./design-system/components/ui/category-option";
+import Loading from "./design-system/components/loading/loading";
 import { BannerCarousel } from "./products/product-showcase/banner-carousel";
-import { useProductsCatalog } from "@/lib/products-catalog-context";
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
+import { getHomePageStructure } from "@/lib/products-client";
 
 export default function Home() {
   const router = useRouter();
-  const { brands: catalogBrands, brandGroups, banners: catalogBanners, loading } = useProductsCatalog();
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "home"],
+    queryFn: () => getPageBootstrap(() => getHomePageStructure()),
+  });
+  const structure = structureQuery.data?.page;
+  const catalogBrands = structure?.brands ?? [];
+  const brandGroups = structure?.brandGroups ?? [];
+  const catalogBanners = structure?.banners ?? [];
+  const loading = structureQuery.isLoading;
   const [previewImage, setPreviewImage] = useState("");
 
   const brands = useMemo(
@@ -34,11 +45,11 @@ export default function Home() {
     const brandSections = brandGroups
       .filter((group) => group.active !== false)
       .map((group) => ({
-          type: "brands" as const,
-          item: brands.filter((brand) => (brand.groupId || "default-brands") === group.id),
-          title: group.title,
-          sortOrder: Number(group.sortOrder ?? 1),
-        }))
+        type: "brands" as const,
+        item: brands.filter((brand) => (brand.groupId || "default-brands") === group.id),
+        title: group.title,
+        sortOrder: Number(group.sortOrder ?? 1),
+      }))
       .filter((section) => section.item.length > 0);
 
     return [...bannerSections, ...brandSections].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -52,7 +63,25 @@ export default function Home() {
           <span className="text-sm text-secondary-text">اینجا خانه فروشگاه است؛ معرفی فروشگاه، بنرها و برندهای منتخب را از همین صفحه دنبال کنید.</span>
         </div>
 
-        {loading ? <div className="text-sm text-secondary-text">در حال بارگذاری برندها...</div> : null}
+        {loading ? (
+          <div className="flex flex-col gap-8">
+            <Loading loading="skeleton-item" isLoading>
+              <div className="h-[28vh] w-full rounded-xl border border-primary-border bg-primary-media" />
+            </Loading>
+            <div className="flex flex-col gap-3">
+              <Loading loading="skeleton-item" isLoading>
+                <div className="text-xl font-bold">برندهای منتخب</div>
+              </Loading>
+              <div className="flex flex-wrap gap-4">
+                {[0, 1, 2, 3].map((item) => (
+                  <Loading key={item} loading="skeleton-item" isLoading>
+                    <CategoryOption label="برند" imageUrl="" size="lg" />
+                  </Loading>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {!loading ? (
           <div className="flex flex-col gap-8">

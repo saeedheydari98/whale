@@ -2,6 +2,7 @@
 
 import React from "react";
 import { motion } from "motion/react";
+import { GiSpermWhale } from "react-icons/gi";
 import { cx, radiusVariants, sizeVariants } from "../../variants/shared.variant";
 
 export type LoadingVariant =
@@ -156,7 +157,7 @@ export default function Loading({
     if (!isLoading) return <>{children}</>;
     return (
       <div className={cx("flex flex-col items-center justify-center w-full h-full text-primary", className)}>
-        <img src="/next.svg" alt="logo" className="w-24 h-24 mb-4" />
+        <GiSpermWhale aria-label="وال" className="mb-4 h-24 w-24" />
         <div className="flex items-center gap-2">
           {[0, 1, 2].map((i) => (
             <motion.div
