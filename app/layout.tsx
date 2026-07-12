@@ -1,4 +1,5 @@
 import localFont from "next/font/local";
+import Script from "next/script";
 import { ThemeProvider } from "./design-system/theme/provider";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
@@ -6,6 +7,10 @@ import { AppFooter } from "./design-system/components/layout/app-footer";
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppGlobalProvider } from "@/lib/app-global-context";
+import { createTheme } from "./design-system/theme/theme";
+import { generateCSSVariables } from "./design-system/theme/css-vars";
+import { THEME_CSS_VARS_STORAGE_KEY } from "./design-system/theme/storage";
+import { AppNotificationProvider } from "./design-system/components/feedback/notification-provider";
 
 const storeFont = localFont({
   variable: "--font-store",
@@ -20,26 +25,50 @@ const storeFont = localFont({
   ],
 });
 
+const initialThemeVariables = generateCSSVariables(
+  createTheme(
+    {
+      mode: "light",
+      source: "developer",
+      adminActive: true,
+      style: "light",
+    },
+    {
+      primary: "gray",
+      style: "light",
+    }
+  )
+);
+
+const initialThemeScript = `!function(){try{var raw=localStorage.getItem(${JSON.stringify(THEME_CSS_VARS_STORAGE_KEY)});if(raw){var vars=JSON.parse(raw);for(var key in vars){if(Object.prototype.hasOwnProperty.call(vars,key)){document.documentElement.style.setProperty(key,String(vars[key]));}}}var profile=JSON.parse(localStorage.getItem("user-profile")||"null");var legacy=localStorage.getItem("theme-mode");var mode=profile&&profile.themeMode==="dark"?"dark":profile&&profile.themeMode==="light"?"light":legacy==="dark"?"dark":legacy==="light"?"light":"";if(mode){document.documentElement.classList.toggle("dark",mode==="dark");}}catch(error){}}();`;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className={storeFont.variable}>
+    <html lang="fa" dir="rtl" className={storeFont.variable} style={initialThemeVariables} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen text-right" dir="rtl">
+        <Script
+          id="initial-theme"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: initialThemeScript }}
+        />
         <ThemeProvider>
-          <CatalogQueryProvider>
-            <AppGlobalProvider>
-              <ProductsCatalogProvider>
-                <AppHeader />
-                <main className="flex-1 pb-14 md:pb-0">
-                  {children}
-                </main>
-                <AppFooter />
-              </ProductsCatalogProvider>
-            </AppGlobalProvider>
-          </CatalogQueryProvider>
+          <AppNotificationProvider>
+            <CatalogQueryProvider>
+              <AppGlobalProvider>
+                <ProductsCatalogProvider>
+                  <AppHeader />
+                  <main className="flex-1 pb-14 md:pb-0">
+                    {children}
+                  </main>
+                  <AppFooter />
+                </ProductsCatalogProvider>
+              </AppGlobalProvider>
+            </CatalogQueryProvider>
+          </AppNotificationProvider>
         </ThemeProvider>
       </body>
     </html>

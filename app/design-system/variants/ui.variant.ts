@@ -86,13 +86,22 @@ export function resolveVariantColors(
   variant: UICommonVariant,
   theme: Theme
 ): VariantColorStyle {
+  if (variant === "neutral") {
+    const darkMode = theme.state.mode === "dark";
+
+    return {
+      backgroundColor: resolveColor("gray", darkMode ? "dark" : "light", darkMode ? 800 : 100),
+      color: resolveColor("gray", darkMode ? "dark" : "light", darkMode ? 50 : 950),
+      borderColor: resolveColor("gray", darkMode ? "dark" : "light", darkMode ? 600 : 300),
+    };
+  }
+
   const colorVariantMap: Partial<Record<UICommonVariant, ThemeColorKey>> = {
     secondary: "gray",
     success: "green",
     danger: "red",
     warning: "yellow",
     info: "blue",
-    neutral: "gray",
     edit: "orange",
     accent: "purple",
   };

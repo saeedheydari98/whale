@@ -5,10 +5,13 @@ import {
   readUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
+import { NOTIFICATION_SILENT_HEADER, notifyApp } from "@/lib/app-notifications";
 import type { ProductRecord } from "@/lib/products-client";
 
 export const CART_STORAGE_KEY = "product-cart";
 export const CART_UPDATED_EVENT = "product-cart-updated";
+
+const SILENT_NOTIFICATION_HEADERS = { [NOTIFICATION_SILENT_HEADER]: "true" };
 
 export type CartItemRecord = {
   id?: number | string;
@@ -36,9 +39,21 @@ function readCartItemsFromApiData(data: any) {
   return data?.data?.cart?.items ?? data?.data?.items ?? [];
 }
 
+function canSyncCartToApi(profile: UserProfile | null | undefined): profile is UserProfile {
+  return Boolean(profile && isUserProfileComplete(profile));
+}
+
 function emitCartUpdated() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(CART_UPDATED_EVENT));
+}
+
+function notifyCartSuccess(message: string) {
+  notifyApp({ type: "success", message });
+}
+
+function notifyCartError(message: string) {
+  notifyApp({ type: "error", message });
 }
 
 function getItemKey(item: Partial<CartItemRecord>) {
@@ -117,24 +132,24 @@ export function readLocalCart(): CartItemRecord[] {
   }
 }
 
+export function hasLocalCartSnapshot() {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(CART_STORAGE_KEY) !== null;
+}
+
 export function writeLocalCart(items: CartItemRecord[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(dedupeCartItems(items)));
   emitCartUpdated();
 }
 
-function getProfileQuery(profile: UserProfile) {
-  const params = new URLSearchParams({
-    nationalId: profile.nationalId.trim(),
-    phone: profile.phone.trim(),
-  });
-  return params.toString();
-}
-
-async function saveCartToApi(items: CartItemRecord[], profile: UserProfile) {
+async function saveCartToApi(items: CartItemRecord[], profile: UserProfile, options?: { silent?: boolean }) {
   const res = await fetch("/api/cart", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.silent ? SILENT_NOTIFICATION_HEADERS : {}),
+    },
     body: JSON.stringify({ profile, items }),
   });
   const data = await res.json();
@@ -147,36 +162,42 @@ async function saveCartToApi(items: CartItemRecord[], profile: UserProfile) {
     : items;
 }
 
+async function clearCartFromApi(profile?: UserProfile | null, options?: { silent?: boolean }) {
+  const res = await fetch("/api/cart", {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.silent ? SILENT_NOTIFICATION_HEADERS : {}),
+    },
+    body: JSON.stringify(canSyncCartToApi(profile) ? { profile } : {}),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.message || data?.error || "Cart clear failed");
+  }
+  return [];
+}
+
 export async function getCart(): Promise<CartSnapshot> {
   const profile = readUserProfile();
   const localItems = readLocalCart();
 
-  if (!profile || !isUserProfileComplete(profile)) {
-    return { items: localItems, profile: null };
+  if (localItems.length === 0) {
+    writeLocalCart([]);
+    await clearCartFromApi(profile, { silent: true }).catch(() => undefined);
+    return { items: [], profile };
+  }
+
+  if (!canSyncCartToApi(profile)) {
+    return { items: localItems, profile };
   }
 
   try {
-    const res = await fetch(`/api/cart?${getProfileQuery(profile)}`, { cache: "no-store" });
-    const data = await res.json();
-    if (!res.ok || data?.ok === false) {
-      throw new Error(data?.message || data?.error || "Cart load failed");
-    }
-
-    const items = readCartItemsFromApiData(data);
-    const apiItems = Array.isArray(items)
-      ? items.map(normalizeCartItem)
-      : [];
-
-    if (apiItems.length === 0 && localItems.length > 0) {
-      const savedItems = await saveCartToApi(localItems, profile);
-      writeLocalCart(savedItems);
-      return { items: savedItems, profile };
-    }
-
-    writeLocalCart(apiItems);
-    return { items: apiItems, profile };
-  } catch (error) {
-    console.error("Cart API load error:", error);
+    const savedItems = await saveCartToApi(localItems, profile, { silent: true });
+    writeLocalCart(savedItems);
+    return { items: savedItems, profile };
+  } catch {
+    console.warn("Cart API load sync failed; using local cart.");
     return { items: localItems, profile };
   }
 }
@@ -185,16 +206,21 @@ export async function persistCart(items: CartItemRecord[], profile = readUserPro
   const nextItems = dedupeCartItems(items);
   writeLocalCart(nextItems);
 
-  if (!profile || !isUserProfileComplete(profile)) {
+  if (nextItems.length === 0) {
+    await clearCartFromApi(profile, { silent: true }).catch(() => undefined);
+    return nextItems;
+  }
+
+  if (!canSyncCartToApi(profile)) {
     return nextItems;
   }
 
   try {
-    const savedItems = await saveCartToApi(nextItems, profile);
+    const savedItems = await saveCartToApi(nextItems, profile, { silent: true });
     writeLocalCart(savedItems);
     return savedItems;
   } catch (error) {
-    console.error("Cart API save error:", error);
+    console.warn("Cart API save failed; using local cart.");
     return nextItems;
   }
 }
@@ -202,7 +228,9 @@ export async function persistCart(items: CartItemRecord[], profile = readUserPro
 export async function addProductToCart(product: ProductRecord, quantity = 1, selectedColor = "") {
   const stockLimit = getStockLimit(product);
   if (product.isAvailable === false || stockLimit <= 0) {
-    throw new Error("محصول ناموجود است.");
+    const message = "محصول ناموجود است.";
+    notifyCartError(message);
+    throw new Error(message);
   }
 
   const productId = product.id ?? null;
@@ -211,7 +239,9 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
   const existing = currentCart.find((item) => getItemKey(item) === key);
   const nextQuantity = clampCartQuantity(product, (existing?.quantity ?? 0) + quantity);
   if (nextQuantity <= 0) {
-    throw new Error("محصول ناموجود است.");
+    const message = "محصول ناموجود است.";
+    notifyCartError(message);
+    throw new Error(message);
   }
   const nextCart = existing
     ? currentCart.map((item) =>
@@ -232,10 +262,12 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
         ),
       ];
 
-  return persistCart(nextCart);
+  const savedItems = await persistCart(nextCart);
+  notifyCartSuccess(`${product.title} به سبد خرید اضافه شد.`);
+  return savedItems;
 }
 
-export async function updateCartQuantity(target: CartItemRecord, quantity: number) {
+export async function updateCartQuantity(target: CartItemRecord, quantity: number, options?: { notify?: boolean }) {
   const key = getItemKey(target);
   const currentCart = readLocalCart();
   const nextQuantity = clampCartQuantity(target, quantity);
@@ -246,7 +278,11 @@ export async function updateCartQuantity(target: CartItemRecord, quantity: numbe
           getItemKey(item) === key ? { ...item, quantity: nextQuantity } : item
         );
 
-  return persistCart(nextCart);
+  const savedItems = await persistCart(nextCart);
+  if (options?.notify !== false) {
+    notifyCartSuccess(quantity <= 0 || nextQuantity <= 0 ? "محصول از سبد خرید حذف شد." : "سبد خرید به‌روزرسانی شد.");
+  }
+  return savedItems;
 }
 
 export async function removeCartItem(target: CartItemRecord) {
@@ -254,12 +290,16 @@ export async function removeCartItem(target: CartItemRecord) {
 }
 
 export async function clearCart() {
-  return persistCart([]);
+  const savedItems = await persistCart([]);
+  notifyCartSuccess("سبد خرید خالی شد.");
+  return savedItems;
 }
 
 export async function checkoutCart(profile = readUserProfile()) {
   if (!profile || !isUserProfileComplete(profile)) {
-    throw new Error("Complete profile is required.");
+    const message = "برای این عملیات اطلاعات پروفایل باید کامل باشد.";
+    notifyCartError(message);
+    throw new Error(message);
   }
 
   const res = await fetch("/api/cart", {

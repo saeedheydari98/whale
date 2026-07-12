@@ -23,6 +23,7 @@ import {
 import {
   CART_UPDATED_EVENT,
   getCartCount,
+  hasLocalCartSnapshot,
   readLocalCart,
 } from "@/lib/cart-client";
 import {
@@ -102,7 +103,11 @@ export function AppHeader() {
   }, [globalData]);
 
   useEffect(() => {
-    const syncCartCount = () => setCartCount(getCartCount(readLocalCart()));
+    const syncCartCount = () => {
+      if (hasLocalCartSnapshot()) {
+        setCartCount(getCartCount(readLocalCart()));
+      }
+    };
     const syncGlobalFromApi = async (force = false) => {
       const next = await refreshGlobal({ force });
       setAuthUser(next.user);

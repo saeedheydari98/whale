@@ -49,8 +49,9 @@ function SkeletonShell({
       aria-busy="true"
       aria-live="polite"
       className={cx(
-        "pointer-events-none relative block h-full w-full overflow-hidden",
-        tone === "item" ? "max-w-full align-middle" : "",
+        "pointer-events-none relative overflow-hidden",
+        tone === "item" ? "inline-flex min-w-0 max-w-full self-start align-middle" : "",
+        tone === "card" ? "block h-full w-full" : "",
         tone === "card" ? "shadow-sm" : "",
         radiusVariants.lg,
         className

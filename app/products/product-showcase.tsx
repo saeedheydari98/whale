@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { addProductToCart } from "@/lib/cart-client";
-import { getProductPage, getProductsPageStructure, getShowcaseProducts, isProductAvailable } from "@/lib/products-client";
+import { getProducts, isProductAvailable } from "@/lib/products-client";
 import { getPageBootstrap } from "@/lib/page-bootstrap-client";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
@@ -124,10 +124,53 @@ const LOADING_PRODUCTS: Product[] = Array.from({ length: 4 }, (_, index) => ({
   sortOrder: index + 1,
 }));
 
-const LOADING_SHOWCASES: Showcase[] = [
-  { id: "loading-showcase-1", title: "ویترین", active: true, sortOrder: 1 },
-  { id: "loading-showcase-2", title: "ویترین", active: true, sortOrder: 2 },
-];
+const LOADING_BANNER: Banner = {
+  id: "loading-banner",
+  title: "بنر",
+  imageUrls: ["loading-banner"],
+  active: true,
+  showOnHome: true,
+  showOnShowcase: true,
+  showOnProducts: true,
+  intervalSeconds: 5,
+  heightPercent: 28,
+  sortOrder: 1,
+};
+
+const LOADING_SHOWCASE: Showcase = {
+  id: "loading-showcase",
+  title: "ویترین",
+  active: true,
+  limit: 4,
+  sortOrder: 2,
+};
+
+type BannerSection = {
+  type: "banner";
+  item: Banner;
+  sortOrder: number;
+};
+
+type ShowcaseDisplaySection = {
+  type: "showcase";
+  item: Showcase;
+  products: Product[];
+  sortOrder: number;
+};
+
+type DisplaySection = BannerSection | ShowcaseDisplaySection;
+
+function loadingProductsFor(showcase: Showcase) {
+  const limit = Number.isFinite(Number(showcase.limit))
+    ? Math.max(1, Math.min(4, Math.round(Number(showcase.limit))))
+    : LOADING_PRODUCTS.length;
+
+  return LOADING_PRODUCTS.slice(0, limit).map((product, index) => ({
+    ...product,
+    id: `${showcase.id}-loading-product-${index + 1}`,
+    sortOrder: index + 1,
+  }));
+}
 
 type ProductShowcaseProps = {
   mode?: "storefront" | "showcase" | "products";
@@ -136,15 +179,16 @@ type ProductShowcaseProps = {
 
 export function ProductShowcase({ mode = "storefront", root = "main" }: ProductShowcaseProps) {
   // header search is handled on the separate `/search` route
-  const structureQuery = useQuery({
-    queryKey: ["catalog", "page-structure", "products"],
-    queryFn: () => getPageBootstrap(() => getProductsPageStructure()),
+  const catalogQuery = useQuery({
+    queryKey: ["catalog", "products-page"],
+    queryFn: () => getPageBootstrap(() => getProducts()),
+    placeholderData: (previous) => previous,
   });
-  const structure = structureQuery.data?.page;
-  const catalogShowcases = structure?.showcases ?? [];
+  const structure = catalogQuery.data?.page;
+  const catalogShowcases = structure?.catalog.showcases ?? structure?.showcases ?? [];
   const catalogBanners = structure?.banners ?? [];
   const tree = structure?.tree ?? { sections: [] };
-  const structureLoading = structureQuery.isLoading;
+  const loading = catalogQuery.isLoading;
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
   const dragRef = useRef({
@@ -161,47 +205,29 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     [catalogShowcases]
   );
 
-  const allProductsQuery = useQuery({
-    queryKey: ["catalog", "products", "page", mode],
-    queryFn: () => getProductPage({ limit: 100 }),
-    enabled: mode === "products",
-  });
-
-  const showcaseQueries = useQueries({
-    queries: sortedShowcases.map((showcase) => ({
-      queryKey: ["catalog", "showcase", showcase.id, "products", Number(showcase.limit ?? 8)],
-      queryFn: () => getShowcaseProducts(showcase.id, { limit: Number(showcase.limit ?? 8) }),
-      enabled: mode !== "products" && !structureLoading,
-    })),
-  });
-
   const showcaseProductsById = useMemo(() => {
     const map = new Map<string, Product[]>();
-    sortedShowcases.forEach((showcase, index) => {
-      map.set(showcase.id, (showcaseQueries[index]?.data?.products ?? []) as Product[]);
+    catalogShowcases.forEach((showcase) => {
+      const showcaseWithProducts = showcase as Showcase & { products?: Product[] };
+      map.set(showcaseWithProducts.id, Array.isArray(showcaseWithProducts.products) ? showcaseWithProducts.products : []);
     });
     return map;
-  }, [showcaseQueries, sortedShowcases]);
+  }, [catalogShowcases]);
 
   const catalogProducts = useMemo(
     () =>
       mode === "products"
-        ? allProductsQuery.data?.products ?? []
+        ? structure?.products ?? []
         : Array.from(showcaseProductsById.values()).flat(),
-    [allProductsQuery.data?.products, mode, showcaseProductsById]
+    [mode, showcaseProductsById, structure?.products]
   );
-
-  const loading = structureLoading
-    || (mode === "products"
-      ? allProductsQuery.isLoading
-      : showcaseQueries.some((query) => query.isLoading));
 
   const sortedProducts = useMemo(
     () => catalogProducts.filter((item) => item.active !== false && item.isActive !== false).sort((a, b) => a.sortOrder - b.sortOrder),
     [catalogProducts]
   );
 
-  const displaySections = useMemo(() => {
+  const displaySections = useMemo<DisplaySection[]>(() => {
     if (mode === "products") {
       return sortedProducts.length > 0
         ? [{
@@ -284,19 +310,91 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
 
   
 
-  const loadingSections = useMemo(() => {
-    const sourceShowcases = sortedShowcases.length > 0 ? sortedShowcases : LOADING_SHOWCASES;
-    const showcaseSections = sourceShowcases.slice(0, 4)
-      .map((showcase) => ({
-        type: "showcase" as const,
-        item: showcase,
-        products: showcaseProductsById.get(showcase.id) ?? LOADING_PRODUCTS,
-        sortOrder: showcase.sortOrder,
-      }))
-      .filter((section) => section.item.active !== false);
+  const loadingSections = useMemo<DisplaySection[]>(() => {
+    const withLoadingProducts = (showcase: Showcase): ShowcaseDisplaySection => {
+      const products = showcaseProductsById.get(showcase.id) ?? [];
 
-    return showcaseSections.sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [showcaseProductsById, sortedShowcases]);
+      return {
+        type: "showcase",
+        item: showcase,
+        products: products.length > 0 ? products : loadingProductsFor(showcase),
+        sortOrder: showcase.sortOrder,
+      };
+    };
+
+    if (displaySections.length > 0) {
+      return displaySections.map((section) =>
+        section.type === "banner"
+          ? section
+          : {
+              ...section,
+              products: section.products.length > 0 ? section.products : loadingProductsFor(section.item),
+            }
+      );
+    }
+
+    if (mode === "products") {
+      return [{
+        type: "showcase",
+        item: {
+          id: "all-products",
+          title: "محصولات",
+          active: true,
+          limit: 4,
+          sortOrder: 1,
+        },
+        products: loadingProductsFor({ ...LOADING_SHOWCASE, id: "all-products", sortOrder: 1 }),
+        sortOrder: 1,
+      }];
+    }
+
+    if (tree.sections.length > 0) {
+      return tree.sections
+        .map((section): DisplaySection =>
+          section.type === "banner"
+            ? {
+                type: "banner",
+                item: normalizeBanner(section.item, section.sortOrder),
+                sortOrder: section.sortOrder,
+              }
+            : withLoadingProducts(normalizeShowcase(section.item as Showcase, section.sortOrder))
+        )
+        .filter((section) =>
+          section.type === "banner"
+            ? section.item.active !== false && (mode === "showcase" ? section.item.showOnProducts === true : section.item.showOnHome !== false)
+            : section.item.active !== false
+        )
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+
+    const bannerSections = catalogBanners
+      .map((banner, index): BannerSection => ({
+        type: "banner",
+        item: normalizeBanner(banner, index + 1),
+        sortOrder: Number(
+          mode === "showcase"
+            ? banner.productSortOrder ?? banner.sortOrder ?? banner.placement ?? index + 1
+            : banner.homeSortOrder ?? banner.sortOrder ?? banner.placement ?? index + 1
+        ),
+      }))
+      .filter((section) =>
+        section.item.active !== false && (mode === "showcase" ? section.item.showOnProducts === true : section.item.showOnHome !== false)
+      );
+
+    const showcaseSections = sortedShowcases
+      .filter((showcase) => showcase.active !== false)
+      .map(withLoadingProducts);
+
+    const dynamicSections = [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
+    if (dynamicSections.length > 0) return dynamicSections;
+
+    return mode === "showcase" || mode === "storefront"
+      ? [
+          { type: "banner", item: LOADING_BANNER, sortOrder: LOADING_BANNER.sortOrder },
+          { type: "showcase", item: LOADING_SHOWCASE, products: loadingProductsFor(LOADING_SHOWCASE), sortOrder: LOADING_SHOWCASE.sortOrder },
+        ]
+      : [{ type: "showcase", item: LOADING_SHOWCASE, products: loadingProductsFor(LOADING_SHOWCASE), sortOrder: LOADING_SHOWCASE.sortOrder }];
+  }, [catalogBanners, displaySections, mode, showcaseProductsById, sortedShowcases, tree.sections]);
 
   const startProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button, a")) {
@@ -355,7 +453,15 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
 
         {loading ? (
           <div className="flex flex-col gap-8">
-            {loadingSections.map((section) => (
+            {loadingSections.map((section) =>
+              section.type === "banner" ? (
+                <BannerCarousel
+                  key={`loading-banner-${section.item.id}`}
+                  banner={section.item}
+                  onPreview={() => undefined}
+                  isLoading
+                />
+              ) : (
                 <ShowcaseSection
                   key={`loading-showcase-${section.item.id}`}
                   showcase={section.item}
@@ -370,7 +476,8 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
                   getDiscountPercent={(product) => Number(product.discountPercent) || 0}
                   isLoading
                 />
-            ))}
+              )
+            )}
           </div>
         ) : null}
 

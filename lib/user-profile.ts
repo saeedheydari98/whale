@@ -1,4 +1,4 @@
-import { normalizePersianDate } from "@/lib/persian-date";
+import { isValidPastPersianDate, normalizePersianDate } from "@/lib/persian-date";
 
 export type UserProfile = {
   firstName: string;
@@ -24,6 +24,9 @@ export const EMPTY_USER_PROFILE: UserProfile = {
   themeMode: "light",
   isAdminUnlocked: false,
 };
+
+const NATIONAL_ID_PATTERN = /^\d{10}$/;
+const PHONE_PATTERN = /^09\d{9}$/;
 
 function readProfileFromApiData(data: any) {
   return data?.data?.user?.profile ?? data?.data?.profile ?? null;
@@ -65,10 +68,10 @@ export function isUserProfileComplete(profile: Partial<UserProfile> | null | und
   return Boolean(
     normalized.firstName.trim() &&
       normalized.lastName.trim() &&
-      normalized.nationalId.trim() &&
-      normalized.birthDate.trim() &&
-      normalized.phone.trim() &&
-      normalized.address.trim()
+      NATIONAL_ID_PATTERN.test(normalized.nationalId.trim()) &&
+      isValidPastPersianDate(normalized.birthDate) &&
+      PHONE_PATTERN.test(normalized.phone.trim()) &&
+      normalized.address.trim().length >= 5
   );
 }
 

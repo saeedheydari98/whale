@@ -76,7 +76,7 @@ function normalizeGlobalData(data: Partial<AppGlobalData> | null | undefined): A
     menu: Array.isArray(data?.menu) && data.menu.length > 0 ? data.menu : fallbackGlobalData.menu,
     user: data?.user ?? null,
     cart: {
-      count: Math.max(localCartCount, Number(data?.cart?.count ?? 0) || 0),
+      count: localCartCount,
     },
     theme: {
       ...fallbackGlobalData.theme,

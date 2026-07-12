@@ -134,10 +134,12 @@ export function ShowcaseSection({
                     </CustomTag>
                   ) : null}
                 </div>
-                <ProductRatingSummary
-                  average={product.ratingAverage}
-                  count={product.ratingCount}
-                />
+                <Loading loading="skeleton-item" isLoading={isLoading}>
+                  <ProductRatingSummary
+                    average={product.ratingAverage}
+                    count={product.ratingCount}
+                  />
+                </Loading>
               </div>
             </div>
             <div
