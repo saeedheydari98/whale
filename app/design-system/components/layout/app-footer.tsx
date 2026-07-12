@@ -66,11 +66,11 @@ export function AppFooter() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={`flex h-10 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-[10px] font-bold transition-colors ${
-                  active ? "text-primary-text" : "text-secondary-text hover:text-primary"
+                  active ? "text-primary" : "text-secondary-text hover:text-primary"
                 }`}
               >
                 <span className={`flex h-6 min-w-8 items-center justify-center rounded-full text-base transition ${
-                  active ? "bg-primary-soft text-primary-text ring-1 ring-primary-border" : "text-secondary-text"
+                  active ? "bg-primary text-primary-contrast shadow-sm ring-1 ring-primary-border" : "text-secondary-text"
                 }`}>
                   {item.icon}
                 </span>

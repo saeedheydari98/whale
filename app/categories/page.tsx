@@ -100,9 +100,12 @@ export default function CategoriesPage() {
                 );
               }
               return (
-                <div key={`category-group-${section.title}`} className="flex flex-col gap-3">
-                  <div className="text-xl font-bold">{section.title}</div>
-                  <div className="flex w-full flex-wrap gap-4">
+                <div key={`category-group-${section.title}`} className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xl font-bold">{section.title}</div>
+                    <span className="text-xs font-semibold text-secondary-text">{section.item.length} دسته بندی</span>
+                  </div>
+                  <div className="flex w-full gap-4 overflow-x-auto overscroll-x-contain pb-1">
                     {section.item.map((category) => {
                       const slug = slugifyCatalogValue(category.slug || category.title || category.id);
                       return (
@@ -111,6 +114,7 @@ export default function CategoriesPage() {
                           label={category.title}
                           imageUrl={category.imageUrl}
                           size="lg"
+                          className="min-w-28 shrink-0"
                           onClick={() => router.push(`/categories/${slug || category.id}`)}
                         />
                       );

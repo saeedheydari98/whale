@@ -92,18 +92,22 @@ export default function Home() {
                 onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
               />
             ) : (
-              <div key={`brand-group-${section.title}`} className="flex flex-col gap-3">
-                <div className="text-xl font-bold">{section.title}</div>
+              <div key={`brand-group-${section.title}`} className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xl font-bold">{section.title}</div>
+                  <span className="text-xs font-semibold text-secondary-text">{section.item.length} برند</span>
+                </div>
                 {brands.length === 0 ? (
                   <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">در حال حاضر برند فعالی وجود ندارد.</div>
                 ) : null}
-                <div className="flex flex-wrap gap-4">
+                <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-1">
                   {section.item.map((brand) => (
                     <CategoryOption
                       key={brand.id}
                       label={brand.title}
                       imageUrl={brand.imageUrl}
                       size="lg"
+                      className="min-w-28 shrink-0"
                       onClick={() => router.push(`/brand/${brand.slug || brand.id}`)}
                     />
                   ))}

@@ -215,11 +215,14 @@ export async function POST(request: Request) {
   const items: ReturnType<typeof normalizeCartItem>[] = Array.isArray(body.items)
     ? body.items.map(normalizeCartItem)
     : [];
-  if (!isProfileComplete(profile)) return apiFail("complete profile is required", 400);
+  const authUser = await getAuthUser(request);
+  const hasCompleteProfile = isProfileComplete(profile);
+  if (!authUser && !hasCompleteProfile) return apiFail("complete profile is required", 400);
 
   try {
-    const savedProfile = await upsertLegacyProfile(request, profile);
-    const cart = await activeCartForProfile(savedProfile.id);
+    const cart = hasCompleteProfile
+      ? await upsertLegacyProfile(request, profile).then((savedProfile) => activeCartForProfile(savedProfile.id))
+      : await getOrCreateActiveCart(authUser!.id);
     const requestedProductIds = items
       .map((item) => item.productId)
       .filter((id): id is number => typeof id === "number");
@@ -258,7 +261,7 @@ export async function POST(request: Request) {
       }
     });
 
-    const savedCart = await activeCartForProfile(savedProfile.id);
+    const savedCart = await activeCartForProfile(cart.profileId);
     return apiOk({
       user: { profile: savedCart.profile },
       cart: { items: savedCart.items.map(cartItemDto) },

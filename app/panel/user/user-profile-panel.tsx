@@ -158,6 +158,7 @@ export function UserProfilePanel() {
 
     setIsRegistering(true);
     try {
+      const pendingCart = readLocalCart(null);
       const profile = cleanProfile();
       const res = await fetch("/api/auth/register", {
         method: "POST",
@@ -180,7 +181,7 @@ export function UserProfilePanel() {
       setRegisterDraft(EMPTY_REGISTER);
       setShowRequiredErrors(false);
       setStatus("حساب کاربری ساخته شد و وارد شدید.");
-      void persistCart(readLocalCart(), savedProfile);
+      void persistCart(pendingCart, savedProfile);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "ساخت حساب ناموفق بود.");
     } finally {

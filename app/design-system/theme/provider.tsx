@@ -83,29 +83,27 @@ function readInitialAdminTheme() {
   return normalizeAdminTheme(readCachedAppGlobal()?.theme, defaultAdminTheme);
 }
 
+function readInitialThemeMode(): ThemeMode {
+  const profileMode = readUserProfile()?.themeMode;
+  if (profileMode === "light" || profileMode === "dark") return profileMode;
+  const legacy = localStorage.getItem("theme-mode");
+  return legacy === "light" || legacy === "dark" ? legacy : "light";
+}
+
+function readInitialThemeStyle(): ThemeStyle {
+  const savedStyle = localStorage.getItem("theme-style");
+  return savedStyle === "dark" || savedStyle === "fantasy" ? savedStyle : "light";
+}
+
 export function ThemeProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [mode, setModeState] = useState<ThemeMode>(() => {
-    if (typeof window === "undefined") return "light";
-    const profileMode = readUserProfile()?.themeMode;
-    if (profileMode === "light" || profileMode === "dark") return profileMode;
-    const legacy = localStorage.getItem("theme-mode");
-    if (legacy === "light" || legacy === "dark") return legacy;
-    return "light";
-  });
-
-  const [style, setStyle] = useState<ThemeStyle>(() => {
-    if (typeof window === "undefined") return "light";
-    const savedStyle = localStorage.getItem("theme-style");
-    return savedStyle === "dark" || savedStyle === "fantasy" ? savedStyle : "light";
-  });
-
-  const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(() => {
-    return readInitialAdminTheme();
-  });
+  const [hasMounted, setHasMounted] = useState(false);
+  const [mode, setModeState] = useState<ThemeMode>("light");
+  const [style, setStyle] = useState<ThemeStyle>("light");
+  const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(defaultAdminTheme);
 
   const theme = useMemo(
     () =>
@@ -121,28 +119,40 @@ export function ThemeProvider({
     [mode, style, adminTheme]
   );
 
-  useEffect(() => {
-    localStorage.setItem("theme-mode", mode);
-  }, [mode]);
+  useLayoutEffect(() => {
+    setModeState(readInitialThemeMode());
+    setStyle(readInitialThemeStyle());
+    setAdminTheme(readInitialAdminTheme());
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
+    if (!hasMounted) return;
+    localStorage.setItem("theme-mode", mode);
+  }, [hasMounted, mode]);
+
+  useEffect(() => {
+    if (!hasMounted) return;
     localStorage.setItem("theme-style", style);
-  }, [style]);
+  }, [hasMounted, style]);
 
   useLayoutEffect(() => {
+    if (!hasMounted) return;
     const vars = generateCSSVariables(theme);
     applyCSSVariables(vars as Record<string, string>);
     try {
       localStorage.setItem(THEME_CSS_VARS_STORAGE_KEY, JSON.stringify(vars));
     } catch {
     }
-  }, [theme]);
+  }, [hasMounted, theme]);
 
   useLayoutEffect(() => {
+    if (!hasMounted) return;
     document.documentElement.classList.toggle("dark", mode === "dark");
-  }, [mode]);
+  }, [hasMounted, mode]);
 
   useEffect(() => {
+    if (!hasMounted) return;
     let cancelled = false;
 
     const loadThemes = async () => {
@@ -173,7 +183,7 @@ export function ThemeProvider({
       cancelled = true;
       window.removeEventListener(USER_PROFILE_UPDATED_EVENT, reloadThemes);
     };
-  }, []);
+  }, [hasMounted]);
 
   const updateAdminTheme = useCallback(async (next: Partial<AdminThemeConfig>) => {
     const prev = adminTheme;

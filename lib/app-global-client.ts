@@ -66,7 +66,9 @@ function isFresh(cached: CachedGlobalData | null) {
 }
 
 function normalizeGlobalData(data: Partial<AppGlobalData> | null | undefined): AppGlobalData {
-  const localCartCount = getCartCount(readLocalCart());
+  const user = data?.user ?? null;
+  const serverCartCount = Number(data?.cart?.count);
+  const localCartCount = getCartCount(readLocalCart(null));
   return {
     site: {
       ...fallbackGlobalData.site,
@@ -74,9 +76,9 @@ function normalizeGlobalData(data: Partial<AppGlobalData> | null | undefined): A
       dir: data?.site?.dir === "ltr" ? "ltr" : "rtl",
     },
     menu: Array.isArray(data?.menu) && data.menu.length > 0 ? data.menu : fallbackGlobalData.menu,
-    user: data?.user ?? null,
+    user,
     cart: {
-      count: localCartCount,
+      count: user && Number.isFinite(serverCartCount) ? serverCartCount : localCartCount,
     },
     theme: {
       ...fallbackGlobalData.theme,

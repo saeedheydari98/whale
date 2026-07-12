@@ -21,7 +21,7 @@ export function CategoriesSection({ groups, categories, products, onEditGroup, o
         const groupCategories = categories.filter((category) => category.groupId === group.id);
 
         return (
-          <div key={group.id} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <div key={group.id} className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-bold text-primary-text">{group.title}</div>
@@ -36,14 +36,14 @@ export function CategoriesSection({ groups, categories, products, onEditGroup, o
                 </CustomButton>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex gap-3 overflow-x-auto overscroll-x-contain pb-1">
               {groupCategories.length === 0 ? (
-                <div className="rounded-md border border-dashed border-primary-border bg-primary-soft p-3 text-xs text-secondary-text">
+                <div className="rounded-md border border-dashed border-primary-border bg-primary-card p-3 text-xs text-secondary-text">
                   لینکی در این بخش نیست.
                 </div>
               ) : null}
               {groupCategories.map((category) => (
-                <div key={category.id} className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-soft p-2">
+                <div key={category.id} className="flex min-w-44 shrink-0 flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-2 shadow-sm">
                   <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" />
                   <div className="flex gap-2">
                     <CustomButton size="sm" variant="edit" onClick={() => onEditCategory(category)}>
@@ -79,7 +79,7 @@ export function BrandsSection({ groups, brands, products, onEditGroup, onAddBran
         const groupBrands = brands.filter((brand) => brand.groupId === group.id);
 
         return (
-          <div key={group.id} className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <div key={group.id} className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-bold text-primary-text">{group.title}</div>
@@ -94,14 +94,14 @@ export function BrandsSection({ groups, brands, products, onEditGroup, onAddBran
                 </CustomButton>
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex gap-3 overflow-x-auto overscroll-x-contain pb-1">
               {groupBrands.length === 0 ? (
-                <div className="rounded-md border border-dashed border-primary-border bg-primary-soft p-3 text-xs text-secondary-text">
+                <div className="rounded-md border border-dashed border-primary-border bg-primary-card p-3 text-xs text-secondary-text">
                   لینکی در این بخش نیست.
                 </div>
               ) : null}
               {groupBrands.map((brand) => (
-                <div key={brand.id} className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-soft p-2">
+                <div key={brand.id} className="flex min-w-44 shrink-0 flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-2 shadow-sm">
                   <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" />
                   <div className="flex gap-2">
                     <CustomButton size="sm" variant="edit" onClick={() => onEditBrand(brand)}>

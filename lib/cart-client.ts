@@ -2,16 +2,23 @@
 
 import {
   isUserProfileComplete,
+  normalizeUserProfile,
   readUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
 import { NOTIFICATION_SILENT_HEADER, notifyApp } from "@/lib/app-notifications";
 import type { ProductRecord } from "@/lib/products-client";
+import {
+  fetchCurrentUser,
+  readCachedAuthUser,
+  type AuthClientUser,
+} from "@/lib/auth-client";
 
 export const CART_STORAGE_KEY = "product-cart";
 export const CART_UPDATED_EVENT = "product-cart-updated";
 
 const SILENT_NOTIFICATION_HEADERS = { [NOTIFICATION_SILENT_HEADER]: "true" };
+const GUEST_CART_STORAGE_KEY = `${CART_STORAGE_KEY}:guest`;
 
 export type CartItemRecord = {
   id?: number | string;
@@ -39,8 +46,47 @@ function readCartItemsFromApiData(data: any) {
   return data?.data?.cart?.items ?? data?.data?.items ?? [];
 }
 
+function readCartProfileFromApiData(data: any) {
+  const profileData = data?.data?.user?.profile ?? data?.data?.profile ?? null;
+  if (!profileData || typeof profileData !== "object") return null;
+  const profile = normalizeUserProfile(profileData as Partial<UserProfile>);
+  return isUserProfileComplete(profile) ? profile : null;
+}
+
 function canSyncCartToApi(profile: UserProfile | null | undefined): profile is UserProfile {
   return Boolean(profile && isUserProfileComplete(profile));
+}
+
+function canUseAccountCart(user: AuthClientUser | null | undefined) {
+  return Boolean(user?.id ?? user?.username ?? user?.email);
+}
+
+function canUseApiCart(profile: UserProfile | null | undefined, user: AuthClientUser | null | undefined) {
+  return canUseAccountCart(user) || canSyncCartToApi(profile);
+}
+
+function getCartStorageKey(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
+  const userId = user?.id == null ? "" : String(user.id).trim();
+  if (userId) return `${CART_STORAGE_KEY}:user:${userId}`;
+
+  const username = String(user?.username ?? "").trim().toLowerCase();
+  if (username) return `${CART_STORAGE_KEY}:username:${username}`;
+
+  const email = String(user?.email ?? "").trim().toLowerCase();
+  if (email) return `${CART_STORAGE_KEY}:email:${email}`;
+
+  return GUEST_CART_STORAGE_KEY;
+}
+
+function migrateLegacyGuestCart(targetKey: string) {
+  if (typeof window === "undefined" || targetKey !== GUEST_CART_STORAGE_KEY) return;
+  if (localStorage.getItem(targetKey) !== null) return;
+
+  const legacyCart = localStorage.getItem(CART_STORAGE_KEY);
+  if (legacyCart === null) return;
+
+  localStorage.setItem(targetKey, legacyCart);
+  localStorage.removeItem(CART_STORAGE_KEY);
 }
 
 function emitCartUpdated() {
@@ -120,11 +166,13 @@ function dedupeCartItems(items: CartItemRecord[]) {
   return Array.from(byKey.values());
 }
 
-export function readLocalCart(): CartItemRecord[] {
+export function readLocalCart(user: AuthClientUser | null | undefined = readCachedAuthUser()): CartItemRecord[] {
   if (typeof window === "undefined") return [];
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || "[]");
+    const storageKey = getCartStorageKey(user);
+    migrateLegacyGuestCart(storageKey);
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
     if (!Array.isArray(parsed)) return [];
     return dedupeCartItems(parsed.map(normalizeCartItem));
   } catch {
@@ -132,25 +180,53 @@ export function readLocalCart(): CartItemRecord[] {
   }
 }
 
-export function hasLocalCartSnapshot() {
+export function hasLocalCartSnapshot(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
   if (typeof window === "undefined") return false;
-  return localStorage.getItem(CART_STORAGE_KEY) !== null;
+  const storageKey = getCartStorageKey(user);
+  migrateLegacyGuestCart(storageKey);
+  return localStorage.getItem(storageKey) !== null;
 }
 
-export function writeLocalCart(items: CartItemRecord[]) {
+export function writeLocalCart(items: CartItemRecord[], user: AuthClientUser | null | undefined = readCachedAuthUser()) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(dedupeCartItems(items)));
+  localStorage.setItem(getCartStorageKey(user), JSON.stringify(dedupeCartItems(items)));
+  localStorage.removeItem(CART_STORAGE_KEY);
   emitCartUpdated();
 }
 
-async function saveCartToApi(items: CartItemRecord[], profile: UserProfile, options?: { silent?: boolean }) {
+export function clearLocalCartSnapshot(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(getCartStorageKey(user));
+  localStorage.removeItem(CART_STORAGE_KEY);
+  emitCartUpdated();
+}
+
+async function loadCartFromApi(options?: { silent?: boolean }) {
+  const res = await fetch("/api/cart", {
+    cache: "no-store",
+    headers: {
+      ...(options?.silent ? SILENT_NOTIFICATION_HEADERS : {}),
+    },
+  });
+  const data = await res.json();
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.message || data?.error || "Cart load failed");
+  }
+  const apiItems = readCartItemsFromApiData(data);
+  return {
+    items: Array.isArray(apiItems) ? apiItems.map(normalizeCartItem) : [],
+    profile: readCartProfileFromApiData(data),
+  };
+}
+
+async function saveCartToApi(items: CartItemRecord[], profile?: UserProfile | null, options?: { silent?: boolean }) {
   const res = await fetch("/api/cart", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(options?.silent ? SILENT_NOTIFICATION_HEADERS : {}),
     },
-    body: JSON.stringify({ profile, items }),
+    body: JSON.stringify(canSyncCartToApi(profile) ? { profile, items } : { items }),
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
@@ -179,45 +255,42 @@ async function clearCartFromApi(profile?: UserProfile | null, options?: { silent
 }
 
 export async function getCart(): Promise<CartSnapshot> {
+  const user = await fetchCurrentUser({ force: true }).catch(() => readCachedAuthUser());
   const profile = readUserProfile();
-  const localItems = readLocalCart();
 
-  if (localItems.length === 0) {
-    writeLocalCart([]);
-    await clearCartFromApi(profile, { silent: true }).catch(() => undefined);
-    return { items: [], profile };
+  if (canUseAccountCart(user)) {
+    try {
+      const apiCart = await loadCartFromApi({ silent: true });
+      writeLocalCart(apiCart.items, user);
+      return { items: apiCart.items, profile: apiCart.profile ?? profile };
+    } catch {
+      console.warn("Cart API load failed; using account local cart.");
+      return { items: readLocalCart(), profile };
+    }
   }
 
-  if (!canSyncCartToApi(profile)) {
-    return { items: localItems, profile };
-  }
-
-  try {
-    const savedItems = await saveCartToApi(localItems, profile, { silent: true });
-    writeLocalCart(savedItems);
-    return { items: savedItems, profile };
-  } catch {
-    console.warn("Cart API load sync failed; using local cart.");
-    return { items: localItems, profile };
-  }
+  return { items: readLocalCart(), profile };
 }
 
 export async function persistCart(items: CartItemRecord[], profile = readUserProfile()) {
+  const user = readCachedAuthUser();
   const nextItems = dedupeCartItems(items);
-  writeLocalCart(nextItems);
+  writeLocalCart(nextItems, user);
 
   if (nextItems.length === 0) {
-    await clearCartFromApi(profile, { silent: true }).catch(() => undefined);
+    if (canUseApiCart(profile, user)) {
+      await clearCartFromApi(profile, { silent: true }).catch(() => undefined);
+    }
     return nextItems;
   }
 
-  if (!canSyncCartToApi(profile)) {
+  if (!canUseApiCart(profile, user)) {
     return nextItems;
   }
 
   try {
     const savedItems = await saveCartToApi(nextItems, profile, { silent: true });
-    writeLocalCart(savedItems);
+    writeLocalCart(savedItems, user);
     return savedItems;
   } catch (error) {
     console.warn("Cart API save failed; using local cart.");

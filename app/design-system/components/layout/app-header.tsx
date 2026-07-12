@@ -22,6 +22,8 @@ import {
 } from "@/lib/admin-access";
 import {
   CART_UPDATED_EVENT,
+  clearLocalCartSnapshot,
+  getCart,
   getCartCount,
   hasLocalCartSnapshot,
   readLocalCart,
@@ -36,6 +38,7 @@ import { useAppGlobal } from "@/lib/app-global-context";
 import { GiSpermWhale } from "react-icons/gi";
 
 type HeaderUser = {
+  id?: number | string;
   username?: string | null;
   email?: string | null;
   name?: string | null;
@@ -76,6 +79,30 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
   );
 }
 
+function AccountButton({ user, onOpen }: { user: HeaderUser | null; onOpen: () => void }) {
+  const className = "inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-xl text-primary-text transition-colors hover:bg-primary-soft hover:text-primary";
+
+  if (user) {
+    return (
+      <Link href="/panel/user" className={className} aria-label="Account">
+        <IoPersonCircleOutline />
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" className={className} aria-label="Account" onClick={onOpen}>
+      <IoPersonCircleOutline />
+    </button>
+  );
+}
+
+function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount: number) {
+  return hasLocalCartSnapshot(user)
+    ? getCartCount(readLocalCart(user))
+    : fallbackCount;
+}
+
 export function AppHeader() {
   const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
   const { mode, setMode } = useTheme();
@@ -98,20 +125,18 @@ export function AppHeader() {
   useEffect(() => {
     if (!globalData) return;
     setAuthUser(globalData.user);
-    setCartCount(globalData.cart.count);
+    setCartCount(getVisibleCartCount(globalData.user, globalData.cart.count));
     setHasAdminAccess(globalData.user?.role === "admin" || globalData.user?.role === "superadmin");
   }, [globalData]);
 
   useEffect(() => {
     const syncCartCount = () => {
-      if (hasLocalCartSnapshot()) {
-        setCartCount(getCartCount(readLocalCart()));
-      }
+      setCartCount(getVisibleCartCount(undefined, 0));
     };
     const syncGlobalFromApi = async (force = false) => {
       const next = await refreshGlobal({ force });
       setAuthUser(next.user);
-      setCartCount(next.cart.count);
+      setCartCount(getVisibleCartCount(next.user, next.cart.count));
       setHasAdminAccess(next.user?.role === "admin" || next.user?.role === "superadmin");
     };
     const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
@@ -165,8 +190,9 @@ export function AppHeader() {
       setAuthPassword("");
       setAuthStatus("");
       const nextGlobal = await refreshGlobal({ force: true });
+      const accountCart = await getCart();
       setHasAdminAccess(nextGlobal.user?.role === "admin" || nextGlobal.user?.role === "superadmin");
-      setCartCount(nextGlobal.cart.count);
+      setCartCount(getCartCount(accountCart.items));
       router.refresh();
     } catch (error) {
       setAuthStatus(error instanceof Error ? error.message : "ورود ناموفق بود.");
@@ -176,11 +202,15 @@ export function AppHeader() {
   };
 
   const logout = async () => {
+    const currentUser = authUser;
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    clearLocalCartSnapshot(currentUser);
+    clearLocalCartSnapshot(null);
     clearAppGlobalCache();
     clearCachedAuthUser();
     setAuthUser(null);
     setHasAdminAccess(false);
+    setCartCount(0);
     void refreshGlobal({ force: true }).then((nextGlobal) => {
       setCartCount(nextGlobal.cart.count);
     });
@@ -233,14 +263,23 @@ export function AppHeader() {
 
         {/* Right: cart and mobile menu */}
         <div className="flex shrink-0 items-center gap-3">
-          {authUser && !isMobile ? (
+          {isMobile ? (
+            <AccountButton
+              user={authUser}
+              onOpen={() => {
+                setAuthMode("choice");
+                setAuthStatus("");
+                setAuthOpen(true);
+              }}
+            />
+          ) : authUser ? (
             <div className="flex items-center gap-2">
               <span className="hidden text-xs font-semibold text-primary-text sm:inline">{authUser.username || authUser.name || "حساب کاربری"}</span>
               <CustomButton size="sm" variant="danger" onClick={logout}>
                 خروج
               </CustomButton>
             </div>
-          ) : !authUser && !isMobile ? (
+          ) : (
             <CustomButton
               size="sm"
               onClick={() => {
@@ -251,7 +290,7 @@ export function AppHeader() {
             >
               حساب کاربری
             </CustomButton>
-          ) : null}
+          )}
           <CartLink count={cartCount} />
           {false && isMobile && (
             <button

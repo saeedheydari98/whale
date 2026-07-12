@@ -9,10 +9,12 @@ import { CustomInput } from "../design-system/components/ui/input";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { RequiredLabel } from "../design-system/components/ui/required-label";
 import {
+  CART_UPDATED_EVENT,
   clearCart as clearCartData,
   checkoutCart,
   getCart,
   persistCart,
+  readLocalCart,
   removeCartItem,
   updateCartQuantity,
   type CartItemRecord,
@@ -109,6 +111,14 @@ export default function CartPage() {
 
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncLocalCart = () => setItems(readLocalCart());
+    window.addEventListener(CART_UPDATED_EVENT, syncLocalCart);
+    return () => {
+      window.removeEventListener(CART_UPDATED_EVENT, syncLocalCart);
     };
   }, []);
 
