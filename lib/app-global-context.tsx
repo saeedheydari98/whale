@@ -15,6 +15,7 @@ import {
   readCachedAppGlobal,
   type AppGlobalData,
 } from "@/lib/app-global-client";
+import { FullPageLoading } from "@/app/design-system/components/loading/full-page-loading";
 
 type AppGlobalContextValue = {
   data: AppGlobalData | null;
@@ -25,8 +26,9 @@ type AppGlobalContextValue = {
 const AppGlobalContext = createContext<AppGlobalContextValue | null>(null);
 
 export function AppGlobalProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<AppGlobalData | null>(() => readCachedAppGlobal());
-  const [loading, setLoading] = useState(!data);
+  const [mounted, setMounted] = useState(false);
+  const [data, setData] = useState<AppGlobalData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async (options?: { force?: boolean }) => {
     setLoading(true);
@@ -37,7 +39,14 @@ export function AppGlobalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    setMounted(true);
     let cancelled = false;
+    const cached = readCachedAppGlobal();
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+    }
+
     void fetchAppGlobal().then((next) => {
       if (cancelled) return;
       setData(next);
@@ -63,6 +72,7 @@ export function AppGlobalProvider({ children }: { children: ReactNode }) {
   return (
     <AppGlobalContext.Provider value={value}>
       {children}
+      {mounted && loading && !data ? <FullPageLoading activeStep={1} title="" /> : null}
     </AppGlobalContext.Provider>
   );
 }

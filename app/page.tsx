@@ -1,26 +1,32 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "./design-system/components/ui/category-option";
 import Loading from "./design-system/components/loading/loading";
+import { FullPageLoading } from "./design-system/components/loading/full-page-loading";
+import { LazyViewportSection } from "./design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./products/product-showcase/banner-carousel";
-import { getPageBootstrap } from "@/lib/page-bootstrap-client";
-import { getHomePageStructure } from "@/lib/products-client";
+import { getHomePageStructure, readCachedHomePageStructure, type ProductsCache } from "@/lib/products-client";
 
 export default function Home() {
   const router = useRouter();
   const structureQuery = useQuery({
     queryKey: ["catalog", "page-structure", "home"],
-    queryFn: () => getPageBootstrap(() => getHomePageStructure()),
+    queryFn: () => getHomePageStructure(),
   });
-  const structure = structureQuery.data?.page;
+  const [cachedStructure, setCachedStructure] = useState<ProductsCache | null>(null);
+  const structure = structureQuery.data ?? cachedStructure;
   const catalogBrands = structure?.brands ?? [];
   const brandGroups = structure?.brandGroups ?? [];
   const catalogBanners = structure?.banners ?? [];
-  const loading = structureQuery.isLoading;
+  const structureLoading = structureQuery.isLoading;
   const [previewImage, setPreviewImage] = useState("");
+
+  useEffect(() => {
+    setCachedStructure(readCachedHomePageStructure());
+  }, []);
 
   const brands = useMemo(
     () => catalogBrands
@@ -54,6 +60,8 @@ export default function Home() {
 
     return [...bannerSections, ...brandSections].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [banners, brandGroups, brands]);
+  const loading = displaySections.length === 0 && structureLoading;
+  const showWhaleLoading = loading && displaySections.length === 0;
 
   return (
     <main className="min-h-screen bg-primary-base text-primary-text">
@@ -63,9 +71,13 @@ export default function Home() {
           <span className="text-sm text-secondary-text">اینجا خانه فروشگاه است؛ معرفی فروشگاه، بنرها و برندهای منتخب را از همین صفحه دنبال کنید.</span>
         </div>
 
-        {loading ? (
+        {showWhaleLoading ? (
+          <FullPageLoading activeStep={2} title="دریافت ساختار صفحه" />
+        ) : null}
+
+        {false ? (
           <div className="flex flex-col gap-8">
-            {(displaySections.length > 0 ? displaySections : [{ type: "banner" as const, item: null, sortOrder: 0 }, { type: "brandGroup" as const, title: "برندهای منتخب", item: [], sortOrder: 1 }]).map((section, index) => (
+            {displaySections.map((section, index) => (
               section.type === "banner" ? (
                 <Loading key={`loading-home-banner-${index}`} loading="skeleton-item" isLoading className="w-full">
                   <div className="h-[28vh] w-full rounded-xl border border-primary-border bg-primary-media" />
@@ -90,13 +102,37 @@ export default function Home() {
 
         {!loading ? (
           <div className="flex flex-col gap-8">
-            {displaySections.map((section) => section.type === "banner" ? (
+            {displaySections.map((section) => {
+              const fallback = section.type === "banner" ? (
+                <BannerCarousel
+                  banner={{ ...section.item, title: section.item.title ?? "", imageUrls: section.item.imageUrls ?? ["loading-banner"], active: section.item.active !== false, sortOrder: Number(section.item.sortOrder ?? 0) }}
+                  onPreview={() => undefined}
+                  isLoading
+                />
+              ) : (
+                <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
+                  <Loading loading="skeleton-item" isLoading>
+                    <div className="text-xl font-bold">{section.title}</div>
+                  </Loading>
+                  <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-1">
+                    {(section.item.length > 0 ? section.item.slice(0, 4) : [0, 1, 2, 3]).map((brand) => (
+                      <Loading key={typeof brand === "number" ? brand : brand.id} loading="skeleton-item" isLoading>
+                        <CategoryOption label={typeof brand === "number" ? "Ø¨Ø±Ù†Ø¯" : brand.title} imageUrl="" size="lg" className="min-w-28 shrink-0" />
+                      </Loading>
+                    ))}
+                  </div>
+                </div>
+              );
+
+              return (
+                <LazyViewportSection key={`${section.type}-${section.type === "banner" ? section.item.id : section.title}`} fallback={fallback}>
+                  {section.type === "banner" ? (
               <BannerCarousel
                 key={`banner-${section.item.id}`}
                 banner={{ ...section.item, title: section.item.title ?? "", imageUrls: section.item.imageUrls ?? [], active: section.item.active !== false, sortOrder: Number(section.item.sortOrder ?? 0) }}
                 onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
               />
-            ) : (
+                  ) : (
               <div key={`brand-group-${section.title}`} className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-xl font-bold">{section.title}</div>
@@ -118,7 +154,10 @@ export default function Home() {
                   ))}
                 </div>
               </div>
-            ))}
+                  )}
+                </LazyViewportSection>
+              );
+            })}
           </div>
         ) : null}
       </div>

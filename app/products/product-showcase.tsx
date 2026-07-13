@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { addProductToCart } from "@/lib/cart-client";
-import { getProducts, isProductAvailable } from "@/lib/products-client";
-import { getPageBootstrap } from "@/lib/page-bootstrap-client";
+import { getProducts, getProductsPageStructure, getShowcaseProducts, isProductAvailable, readCachedProductsPageStructure, type ProductsCache } from "@/lib/products-client";
+import Loading from "../design-system/components/loading/loading";
+import { FullPageLoading } from "../design-system/components/loading/full-page-loading";
 import { CustomModal } from "../design-system/components/ui/modal";
+import { LazyViewportSection } from "../design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
 import { ShowcaseSection } from "./product-showcase/showcase-section";
 import type { Banner, Product, Showcase } from "./product-showcase/types";
@@ -172,6 +174,60 @@ function loadingProductsFor(showcase: Showcase) {
   }));
 }
 
+type LazyShowcaseSectionProps = {
+  showcase: Showcase;
+  products: Product[];
+  onAddToCart: (product: Product) => void;
+  onPreview: (imageUrl?: string) => void;
+  onDragStart: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onDragMove: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onDragStop: () => void;
+  hideShowcaseLink?: boolean;
+};
+
+function LazyShowcaseSection({
+  showcase,
+  products,
+  onAddToCart,
+  onPreview,
+  onDragStart,
+  onDragMove,
+  onDragStop,
+  hideShowcaseLink = false,
+}: LazyShowcaseSectionProps) {
+  const hasInitialProducts = products.length > 0;
+  const showcaseProductsQuery = useQuery({
+    queryKey: ["catalog", "showcase", showcase.id, "products", "lazy"],
+    queryFn: () => getShowcaseProducts(showcase.id, { limit: Number(showcase.limit ?? 100) || 100 }),
+    enabled: Boolean(showcase.id) && showcase.id !== "all-products" && !hasInitialProducts,
+    placeholderData: (previous) => previous,
+  });
+
+  const loadedProducts = hasInitialProducts
+    ? products
+    : (showcaseProductsQuery.data?.products as Product[] | undefined) ?? [];
+  const isLoading = !hasInitialProducts && showcaseProductsQuery.isLoading;
+
+  if (!isLoading && loadedProducts.length === 0) return null;
+
+  return (
+    <ShowcaseSection
+      showcase={showcaseProductsQuery.data?.section as Showcase ?? showcase}
+      products={isLoading ? loadingProductsFor(showcase) : loadedProducts}
+      onAddToCart={onAddToCart}
+      onPreview={onPreview}
+      onDragStart={onDragStart}
+      onDragMove={onDragMove}
+      onDragStop={onDragStop}
+      formatPrice={formatPrice}
+      getFinalPrice={getFinalPrice}
+      getDiscountPercent={getDiscountPercent}
+      hideShowcaseLink={hideShowcaseLink}
+      isLoading={isLoading}
+    />
+  );
+}
+
 type ProductShowcaseProps = {
   mode?: "storefront" | "showcase" | "products";
   root?: "main" | "div";
@@ -180,15 +236,17 @@ type ProductShowcaseProps = {
 export function ProductShowcase({ mode = "storefront", root = "main" }: ProductShowcaseProps) {
   // header search is handled on the separate `/search` route
   const catalogQuery = useQuery({
-    queryKey: ["catalog", "products-page"],
-    queryFn: () => getPageBootstrap(() => getProducts()),
+    queryKey: ["catalog", mode === "products" ? "products-page-full" : "products-page-structure", mode],
+    queryFn: () => mode === "products" ? getProducts() : getProductsPageStructure(),
     placeholderData: (previous) => previous,
   });
-  const structure = catalogQuery.data?.page;
+  const [cachedStructure, setCachedStructure] = useState<ProductsCache | null>(null);
+  const structure = catalogQuery.data ?? cachedStructure;
   const catalogShowcases = structure?.catalog.showcases ?? structure?.showcases ?? [];
   const catalogBanners = structure?.banners ?? [];
   const tree = structure?.tree ?? { sections: [] };
-  const loading = catalogQuery.isLoading;
+  const structureLoading = catalogQuery.isLoading;
+  const [showSkeletonIntro, setShowSkeletonIntro] = useState(false);
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
   const dragRef = useRef({
@@ -196,6 +254,12 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     startX: 0,
     scrollLeft: 0,
   });
+
+  useEffect(() => {
+    if (mode !== "products") {
+      setCachedStructure(readCachedProductsPageStructure());
+    }
+  }, [mode]);
 
   const sortedShowcases = useMemo(
     () =>
@@ -254,17 +318,12 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
         .filter((section) => section.item.active !== false && section.item.showOnProducts === true);
 
       const showcaseSections = sortedShowcases
-        .map((showcase) => {
-          const allProducts = showcaseProductsById.get(showcase.id) ?? [];
-
-          return {
+        .map((showcase) => ({
             type: "showcase" as const,
             item: showcase,
-            products: allProducts,
+            products: showcaseProductsById.get(showcase.id) ?? [],
             sortOrder: showcase.sortOrder,
-          };
-        })
-        .filter((section) => section.products.length > 0);
+          }));
 
       return [...productBanners, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
     }
@@ -288,22 +347,17 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
         .filter((section) =>
           section.type === "banner"
             ? section.item.active !== false && section.item.showOnHome !== false
-            : section.products.length > 0
+            : section.item.active !== false
         );
     }
 
     const showcaseSections = sortedShowcases
-      .map((showcase) => {
-        const allProducts = showcaseProductsById.get(showcase.id) ?? [];
-
-        return {
+      .map((showcase) => ({
           type: "showcase" as const,
           item: showcase,
-          products: allProducts,
+          products: showcaseProductsById.get(showcase.id) ?? [],
           sortOrder: showcase.sortOrder,
-        };
-      })
-      .filter((section) => section.products.length > 0);
+        }));
 
     return showcaseSections.sort((a, b) => a.sortOrder - b.sortOrder);
   }, [catalogBanners, mode, showcaseProductsById, sortedProducts, sortedShowcases, tree]);
@@ -388,13 +442,19 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     const dynamicSections = [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
     if (dynamicSections.length > 0) return dynamicSections;
 
-    return mode === "showcase" || mode === "storefront"
-      ? [
-          { type: "banner", item: LOADING_BANNER, sortOrder: LOADING_BANNER.sortOrder },
-          { type: "showcase", item: LOADING_SHOWCASE, products: loadingProductsFor(LOADING_SHOWCASE), sortOrder: LOADING_SHOWCASE.sortOrder },
-        ]
-      : [{ type: "showcase", item: LOADING_SHOWCASE, products: loadingProductsFor(LOADING_SHOWCASE), sortOrder: LOADING_SHOWCASE.sortOrder }];
+    return [];
   }, [catalogBanners, displaySections, mode, showcaseProductsById, sortedShowcases, tree.sections]);
+  const loading = (loadingSections.length === 0 && structureLoading) || showSkeletonIntro;
+  const showWhaleLoading = loading && loadingSections.length === 0;
+
+  useEffect(() => {
+    if (structureLoading || !catalogQuery.data || loadingSections.length === 0) return;
+    if (cachedStructure || mode === "products") return;
+
+    setShowSkeletonIntro(true);
+    const timer = window.setTimeout(() => setShowSkeletonIntro(false), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cachedStructure, catalogQuery.data, loadingSections.length, mode, structureLoading]);
 
   const startProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button, a")) {
@@ -451,7 +511,11 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           <div className="text-3xl font-bold">محصولات</div>
         </div>
 
-        {loading ? (
+        {showWhaleLoading ? (
+          <FullPageLoading activeStep={2} title="دریافت ساختار صفحه" />
+        ) : null}
+
+        {loading && !showWhaleLoading ? (
           <div className="flex flex-col gap-8">
             {loadingSections.map((section) =>
               section.type === "banner" ? (
@@ -481,7 +545,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           </div>
         ) : null}
 
-        {!loading && sortedProducts.length === 0 ? (
+        {!loading && mode === "products" && sortedProducts.length === 0 ? (
           <div className="rounded-lg border border-primary-border bg-primary-card p-6 text-sm text-secondary-text">
             در حال حاضر محصول فعالی وجود ندارد.
           </div>
@@ -497,30 +561,48 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
         <div className="flex flex-col gap-8">
           {/* Normal showcase/banner sections */}
 
-          {displaySections.map((section) =>
-            section.type === "banner" ? (
-              <BannerCarousel
-                key={`banner-${section.item.id}`}
-                banner={section.item}
-                onPreview={openImagePreview}
-              />
+          {displaySections.map((section) => {
+            const fallback = section.type === "banner" ? (
+              <BannerCarousel banner={section.item} onPreview={() => undefined} isLoading />
             ) : (
               <ShowcaseSection
-                key={`showcase-${section.item.id}`}
                 showcase={section.item}
-                products={section.products}
-                onAddToCart={addToCart}
-                onPreview={openImagePreview}
-                onDragStart={startProductRailDrag}
-                onDragMove={moveProductRailDrag}
-                onDragStop={stopProductRailDrag}
-                formatPrice={formatPrice}
-                getFinalPrice={getFinalPrice}
-                getDiscountPercent={getDiscountPercent}
+                products={loadingProductsFor(section.item)}
+                onAddToCart={() => undefined}
+                onPreview={() => undefined}
+                onDragStart={() => undefined}
+                onDragMove={() => undefined}
+                onDragStop={() => undefined}
+                formatPrice={(value) => value || ""}
+                getFinalPrice={(product) => product.discountPrice || product.price}
+                getDiscountPercent={(product) => Number(product.discountPercent) || 0}
                 hideShowcaseLink={mode === "products"}
+                isLoading
               />
-            )
-          )}
+            );
+
+            return (
+              <LazyViewportSection key={`${section.type}-${section.item.id}`} fallback={fallback}>
+                {section.type === "banner" ? (
+                  <BannerCarousel
+                    banner={section.item}
+                    onPreview={openImagePreview}
+                  />
+                ) : (
+                  <LazyShowcaseSection
+                    showcase={section.item}
+                    products={section.products}
+                    onAddToCart={addToCart}
+                    onPreview={openImagePreview}
+                    onDragStart={startProductRailDrag}
+                    onDragMove={moveProductRailDrag}
+                    onDragStop={stopProductRailDrag}
+                    hideShowcaseLink={mode === "products"}
+                  />
+                )}
+              </LazyViewportSection>
+            );
+          })}
         </div>
         ) : null}
 

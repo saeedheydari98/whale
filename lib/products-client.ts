@@ -9,6 +9,7 @@ const CATALOG_STRUCTURE_URL_ALL = "/api/catalog/structure?all=1";
 const HOME_PAGE_STRUCTURE_URL = "/api/home/structure";
 const CATEGORIES_PAGE_STRUCTURE_URL = "/api/categories/structure";
 const PRODUCTS_PAGE_STRUCTURE_URL = "/api/products/structure";
+const PAGE_STRUCTURE_CACHE_PREFIX = "catalog-page-structure:";
 export const PRODUCTS_CATALOG_UPDATED_EVENT = "products-catalog-updated";
 
 export type ProductRecord = {
@@ -845,9 +846,36 @@ export async function getCatalogStructure(options?: boolean | GetProductsOptions
 async function getPageStructure(url: string, options?: Pick<GetProductsOptions, "force">): Promise<ProductsCache> {
   try {
     const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force });
-    return withResolvedTree(parseApiPayload(json?.data));
+    const page = withResolvedTree(parseApiPayload(json?.data));
+    writeCachedPageStructure(url, page);
+    return page;
   } catch {
-    return emptyProductsCache();
+    return readCachedPageStructure(url) ?? emptyProductsCache();
+  }
+}
+
+function pageStructureCacheKey(url: string) {
+  return `${PAGE_STRUCTURE_CACHE_PREFIX}${url}`;
+}
+
+function readCachedPageStructure(url: string): ProductsCache | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(pageStructureCacheKey(url));
+    if (!raw) return null;
+    return withResolvedTree(parseApiPayload(JSON.parse(raw)));
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedPageStructure(url: string, page: ProductsCache) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(pageStructureCacheKey(url), JSON.stringify(page));
+  } catch {
   }
 }
 
@@ -855,12 +883,24 @@ export function getHomePageStructure(options?: Pick<GetProductsOptions, "force">
   return getPageStructure(HOME_PAGE_STRUCTURE_URL, options);
 }
 
+export function readCachedHomePageStructure() {
+  return readCachedPageStructure(HOME_PAGE_STRUCTURE_URL);
+}
+
 export function getCategoriesPageStructure(options?: Pick<GetProductsOptions, "force">) {
   return getPageStructure(CATEGORIES_PAGE_STRUCTURE_URL, options);
 }
 
+export function readCachedCategoriesPageStructure() {
+  return readCachedPageStructure(CATEGORIES_PAGE_STRUCTURE_URL);
+}
+
 export function getProductsPageStructure(options?: Pick<GetProductsOptions, "force">) {
   return getPageStructure(PRODUCTS_PAGE_STRUCTURE_URL, options);
+}
+
+export function readCachedProductsPageStructure() {
+  return readCachedPageStructure(PRODUCTS_PAGE_STRUCTURE_URL);
 }
 
 export function getCategoryPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {

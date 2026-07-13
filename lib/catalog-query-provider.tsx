@@ -25,8 +25,8 @@ export function CatalogQueryProvider({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30000,
-            gcTime: 5 * 60 * 1000,
+            staleTime: Infinity,
+            gcTime: Infinity,
             refetchOnWindowFocus: false,
           },
         },
@@ -40,4 +40,3 @@ export function CatalogQueryProvider({ children }: { children: ReactNode }) {
     </QueryClientProvider>
   );
 }
-
