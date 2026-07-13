@@ -59,19 +59,26 @@ export default function CategoriesPage() {
 
         {loading ? (
           <div className="flex flex-col gap-4">
-            <Loading loading="skeleton-item" isLoading>
-              <div className="h-[24vh] w-full rounded-xl border border-primary-border bg-primary-media" />
-            </Loading>
-            <Loading loading="skeleton-item" isLoading>
-              <div className="text-xl font-bold">دسته بندی ها</div>
-            </Loading>
-            <div className="flex flex-wrap gap-4">
-              {[0, 1, 2, 3].map((item) => (
-                <Loading key={item} loading="skeleton-item" isLoading>
-                  <CategoryOption label="دسته بندی" imageUrl="" size="lg" />
+            {(displaySections.length > 0 ? displaySections : [{ type: "banner" as const, item: null, sortOrder: 0 }, { type: "categoryGroup" as const, title: "دسته بندی ها", item: [], sortOrder: 1 }]).map((section, index) => (
+              section.type === "banner" ? (
+                <Loading key={`loading-category-banner-${index}`} loading="skeleton-item" isLoading className="w-full">
+                  <div className="h-[24vh] w-full rounded-xl border border-primary-border bg-primary-media" />
                 </Loading>
-              ))}
-            </div>
+              ) : (
+                <div key={`loading-category-group-${section.title}-${index}`} className="flex flex-col gap-3">
+                  <Loading loading="skeleton-item" isLoading>
+                    <div className="text-xl font-bold">{section.title}</div>
+                  </Loading>
+                  <div className="flex flex-wrap gap-4">
+                    {[0, 1, 2, 3].map((item) => (
+                      <Loading key={item} loading="skeleton-item" isLoading>
+                        <CategoryOption label="دسته بندی" imageUrl="" size="lg" />
+                      </Loading>
+                    ))}
+                  </div>
+                </div>
+              )
+            ))}
           </div>
         ) : null}
 

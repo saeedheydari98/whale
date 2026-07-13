@@ -2,8 +2,7 @@
 
 import React from "react";
 import { IoEyeOffOutline, IoEyeOutline } from "react-icons/io5";
-import { useTheme } from "../../theme/provider";
-import { resolveVariantColors, UICommonVariant } from "../../variants/ui.variant";
+import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cx, interactionStates, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
@@ -48,12 +47,10 @@ export function CustomInput({
   type,
   ...rest
 }: CustomInputProps) {
-  const { theme } = useTheme();
   const inputId = React.useId();
   const [showPassword, setShowPassword] = React.useState(false);
   const [numberDraft, setNumberDraft] = React.useState<string | null>(null);
-  const colorStyle = resolveVariantColors(variant, theme);
-  const controlBackground = `color-mix(in srgb, ${colorStyle.backgroundColor} 10%, var(--bg-surface))`;
+  const colorStyle = resolveControlCssVars(variant);
   const isDisabled = disabled || isLoading;
   const isPassword = type === "password";
   const isNumber = type === "number";
@@ -113,7 +110,7 @@ export function CustomInput({
           className
         )}
         style={{
-          backgroundColor: controlBackground,
+          backgroundColor: colorStyle.backgroundColor,
           borderColor: invalid ? "var(--danger-border-nomode)" : colorStyle.borderColor,
           ...style,
         }}

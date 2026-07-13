@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "../../theme/provider";
-import { resolveVariantColors, UICommonVariant } from "../../variants/ui.variant";
+import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cx, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
@@ -34,9 +33,7 @@ export function CustomSelect({
   style,
   ...rest
 }: CustomSelectProps) {
-  const { theme } = useTheme();
-  const colorStyle = resolveVariantColors(variant, theme);
-  const controlBackground = `color-mix(in srgb, ${colorStyle.backgroundColor} 10%, var(--bg-surface))`;
+  const colorStyle = resolveControlCssVars(variant);
   const isDisabled = disabled || isLoading;
 
   return (
@@ -57,7 +54,7 @@ export function CustomSelect({
           className
         )}
         style={{
-          backgroundColor: controlBackground,
+          backgroundColor: colorStyle.backgroundColor,
           borderColor: colorStyle.borderColor,
           ...style,
         }}

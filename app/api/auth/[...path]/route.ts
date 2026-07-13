@@ -6,10 +6,16 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { parseJsonBody } from "@/lib/api/validation";
 import {
   authLoginSchema,
+  authOtpRequestSchema,
+  authOtpVerifySchema,
   authRegisterSchema,
   resetPasswordSchema,
   resetRequestSchema,
 } from "@/lib/api/schemas";
+import {
+  accountEmailFromPhone,
+  SUPERADMIN_PHONE,
+} from "@/lib/auth-constants";
 import {
   clearAuthCookies,
   createAccessToken,
@@ -28,7 +34,40 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ path?: string[] }> };
-const SUPERADMIN_USERNAME = "saeedheydari98";
+const SUPERADMIN_USERNAME = SUPERADMIN_PHONE;
+
+function phoneUsername(phone: string) {
+  return phone.trim();
+}
+
+function phoneEmail(phone: string) {
+  return accountEmailFromPhone(phone);
+}
+
+function createOtpCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+async function findUserByPhone(phone: string) {
+  return prisma.user.findFirst({
+    where: { OR: [{ username: phone }, { email: phoneEmail(phone) }] },
+    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
+  });
+}
+
+async function findOrCreateOtpUser(phone: string) {
+  const existing = await findUserByPhone(phone);
+  if (existing) return existing;
+
+  return prisma.user.create({
+    data: {
+      email: phoneEmail(phone),
+      username: phone,
+      role: phone === SUPERADMIN_USERNAME ? "superadmin" : "user",
+    },
+    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
+  });
+}
 
 async function authTokens(user: { id: number; email: string; role: string }) {
   const accessToken = createAccessToken(user);
@@ -95,8 +134,9 @@ export async function POST(request: Request, context: Context) {
       const parsed = await parseJsonBody(request, authRegisterSchema);
       if (!parsed.ok) return parsed.response;
 
-      const username = parsed.data.username?.trim().toLowerCase() || null;
-      const email = parsed.data.email || (username ? `${username}@local.user` : "");
+      const phone = parsed.data.phone || parsed.data.profile?.phone || "";
+      const username = parsed.data.username?.trim().toLowerCase() || (phone ? phoneUsername(phone) : null);
+      const email = parsed.data.email || (phone ? phoneEmail(phone) : username ? `${username}@local.user` : "");
       const profile = parsed.data.profile;
       const existing = await prisma.user.findFirst({
         where: { OR: [{ email }, ...(username ? [{ username }] : [])] },
@@ -116,12 +156,14 @@ export async function POST(request: Request, context: Context) {
         });
 
         if (profile) {
+          const nationalId = profile.nationalId || `user-${createdUser.id}`;
           await tx.customerProfile.upsert({
-            where: { nationalId: profile.nationalId },
+            where: { nationalId },
             update: {
               userId: createdUser.id,
               firstName: profile.firstName,
               lastName: profile.lastName,
+              email: profile.email || null,
               birthDate: profile.birthDate,
               phone: profile.phone,
               address: profile.address,
@@ -130,7 +172,8 @@ export async function POST(request: Request, context: Context) {
               userId: createdUser.id,
               firstName: profile.firstName,
               lastName: profile.lastName,
-              nationalId: profile.nationalId,
+              email: profile.email || null,
+              nationalId,
               birthDate: profile.birthDate,
               phone: profile.phone,
               address: profile.address,
@@ -148,15 +191,68 @@ export async function POST(request: Request, context: Context) {
       const parsed = await parseJsonBody(request, authLoginSchema);
       if (!parsed.ok) return parsed.response;
 
-      const identifier = (parsed.data.identifier || parsed.data.username || parsed.data.email || "").trim().toLowerCase();
+      const identifier = (parsed.data.phone || parsed.data.identifier || parsed.data.username || parsed.data.email || "").trim().toLowerCase();
+      const identifierEmail = /^09\d{9}$/.test(identifier) ? phoneEmail(identifier) : identifier;
       const user = await prisma.user.findFirst({
-        where: { OR: [{ email: identifier }, { username: identifier }] },
+        where: { OR: [{ email: identifierEmail }, { username: identifier }] },
         select: { id: true, email: true, username: true, name: true, role: true, passwordHash: true, avatarUrl: true },
       });
       if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
         return apiFail("invalid credentials", 401);
       }
       await normalizeRole(user);
+      const tokens = await authTokens(user);
+      return apiOk({ user: publicUser(user), ...tokens });
+    }
+
+    if (action === "request-otp") {
+      const parsed = await parseJsonBody(request, authOtpRequestSchema);
+      if (!parsed.ok) return parsed.response;
+
+      const code = createOtpCode();
+      await prisma.authOtp.create({
+        data: {
+          phone: parsed.data.phone,
+          purpose: parsed.data.purpose,
+          codeHash: hashToken(code),
+          expiresAt: new Date(Date.now() + 2 * 60 * 1000),
+        },
+      });
+
+      return apiOk({
+        sent: true,
+        developmentCode: process.env.NODE_ENV === "production" ? undefined : code,
+      });
+    }
+
+    if (action === "verify-otp") {
+      const parsed = await parseJsonBody(request, authOtpVerifySchema);
+      if (!parsed.ok) return parsed.response;
+
+      const otp = await prisma.authOtp.findFirst({
+        where: {
+          phone: parsed.data.phone,
+          purpose: parsed.data.purpose,
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      if (!otp || otp.codeHash !== hashToken(parsed.data.code)) {
+        return apiFail("invalid otp", 401);
+      }
+
+      await prisma.authOtp.update({
+        where: { id: otp.id },
+        data: { consumedAt: new Date() },
+      });
+
+      const user = await findOrCreateOtpUser(parsed.data.phone);
+      await normalizeRole(user);
+      if (parsed.data.purpose === "admin" && user.role !== "admin" && user.role !== "superadmin") {
+        return apiFail("forbidden", 403);
+      }
+
       const tokens = await authTokens(user);
       return apiOk({ user: publicUser(user), ...tokens });
     }

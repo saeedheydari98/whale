@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 const removeCodeSchema = z.object({
   currentCode: z.string().trim().optional().default(""),
 });
-const SUPERADMIN_USERNAME = "saeedheydari98";
+const SUPERADMIN_USERNAME = "09176991556";
 
 async function requireSuperadmin(request: Request) {
   const auth = await requireUser(request);

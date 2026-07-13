@@ -12,8 +12,8 @@ function normalizeProfile(value: any) {
     nationalId: String(value?.nationalId ?? "").trim(),
     birthDate: normalizePersianDate(String(value?.birthDate ?? "")),
     phone: String(value?.phone ?? "").trim(),
+    email: String(value?.email ?? "").trim().toLowerCase(),
     address: String(value?.address ?? "").trim(),
-    themeMode: value?.themeMode === "dark" ? "dark" : "light",
   };
 }
 
@@ -22,7 +22,14 @@ function readAdminUnlocked(value: any) {
 }
 
 function isComplete(profile: ReturnType<typeof normalizeProfile>) {
-  return Boolean(profile.firstName && profile.lastName && profile.nationalId && isValidPastPersianDate(profile.birthDate) && profile.phone && profile.address);
+  return Boolean(
+    profile.firstName &&
+    profile.lastName &&
+    (!profile.nationalId || /^\d{10}$/.test(profile.nationalId)) &&
+    (!profile.birthDate || isValidPastPersianDate(profile.birthDate)) &&
+    profile.phone &&
+    profile.address
+  );
 }
 
 export async function GET(request: Request) {
@@ -55,21 +62,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    const nationalId = profile.nationalId || `guest-${profile.phone}`;
     const saved = await prisma.customerProfile.upsert({
-      where: { nationalId: profile.nationalId },
+      where: { nationalId },
       update: {
         firstName: profile.firstName,
         lastName: profile.lastName,
         birthDate: profile.birthDate,
         phone: profile.phone,
+        email: profile.email || null,
         address: profile.address,
-        themeMode: profile.themeMode,
         ...(includesAdminUnlocked
           ? { isAdminUnlocked: readAdminUnlocked(rawProfile) }
           : {}),
       },
       create: {
         ...profile,
+        nationalId,
         isAdminUnlocked: readAdminUnlocked(rawProfile),
       },
     });

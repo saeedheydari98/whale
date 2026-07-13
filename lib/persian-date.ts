@@ -1,6 +1,10 @@
 const PERSIAN_DIGITS = "۰۱۲۳۴۵۶۷۸۹";
 const ARABIC_DIGITS = "٠١٢٣٤٥٦٧٨٩";
 
+export function toPersianDigits(value: string | number) {
+  return String(value).replace(/\d/g, (digit) => PERSIAN_DIGITS[Number(digit)] ?? digit);
+}
+
 export function toEnglishDigits(value: string) {
   return value.replace(/[۰-۹٠-٩]/g, (digit) => {
     const persianIndex = PERSIAN_DIGITS.indexOf(digit);
@@ -17,6 +21,25 @@ export function normalizePersianDate(value: string) {
 
   const [, year, month, day] = match;
   return `${year}/${month.padStart(2, "0")}/${day.padStart(2, "0")}`;
+}
+
+export function formatPersianDateInput(value: string) {
+  const digits = toEnglishDigits(value).replace(/\D/g, "").slice(0, 8);
+  const year = digits.slice(0, 4);
+  const month = digits.slice(4, 6);
+  const day = digits.slice(6, 8);
+  return toPersianDigits([year, month, day].filter(Boolean).join("/"));
+}
+
+export function readPersianDateParts(value: string) {
+  const normalized = normalizePersianDate(value);
+  const match = normalized.match(/^(\d{4})\/(\d{2})\/(\d{2})$/);
+  if (!match) return { year: "", month: "", day: "" };
+  return {
+    year: match[1],
+    month: match[2],
+    day: match[3],
+  };
 }
 
 function div(a: number, b: number) {
@@ -52,6 +75,45 @@ function jalaliToGregorian(jy: number, jm: number, jd: number) {
   }
 
   return { gy, gm, gd: day };
+}
+
+function gregorianToJalali(gy: number, gm: number, gd: number) {
+  const gDaysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const jDaysInMonth = [31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
+  gy -= 1600;
+  gm -= 1;
+  gd -= 1;
+
+  let gDayNo = 365 * gy + div(gy + 3, 4) - div(gy + 99, 100) + div(gy + 399, 400);
+  for (let i = 0; i < gm; ++i) gDayNo += gDaysInMonth[i];
+  if (gm > 1 && ((gy + 1600) % 4 === 0 && ((gy + 1600) % 100 !== 0 || (gy + 1600) % 400 === 0))) {
+    gDayNo++;
+  }
+  gDayNo += gd;
+
+  let jDayNo = gDayNo - 79;
+  const jNp = div(jDayNo, 12053);
+  jDayNo %= 12053;
+
+  let jy = 979 + 33 * jNp + 4 * div(jDayNo, 1461);
+  jDayNo %= 1461;
+
+  if (jDayNo >= 366) {
+    jy += div(jDayNo - 1, 365);
+    jDayNo = (jDayNo - 1) % 365;
+  }
+
+  let jm = 0;
+  for (jm = 0; jm < 11 && jDayNo >= jDaysInMonth[jm]; ++jm) {
+    jDayNo -= jDaysInMonth[jm];
+  }
+
+  return { jy, jm: jm + 1, jd: jDayNo + 1 };
+}
+
+export function getCurrentPersianYear() {
+  const now = new Date();
+  return gregorianToJalali(now.getFullYear(), now.getMonth() + 1, now.getDate()).jy;
 }
 
 export function persianDateToTime(value: string) {

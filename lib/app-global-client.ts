@@ -9,7 +9,6 @@ import { getCartCount, readLocalCart } from "@/lib/cart-client";
 export const APP_GLOBAL_UPDATED_EVENT = "app-global-updated";
 
 const APP_GLOBAL_CACHE_KEY = "app-global:v1";
-const APP_GLOBAL_CACHE_MAX_AGE_MS = 5 * 60 * 1000;
 
 type AppMenuItem = {
   href: string;
@@ -62,7 +61,11 @@ function emitGlobalUpdated() {
 }
 
 function isFresh(cached: CachedGlobalData | null) {
-  return Boolean(cached && Date.now() - cached.at < APP_GLOBAL_CACHE_MAX_AGE_MS);
+  return Boolean(cached);
+}
+
+function readAnyCachedGlobalData() {
+  return memoryCache?.data ?? readLocalGlobalCache()?.data ?? null;
 }
 
 function normalizeGlobalData(data: Partial<AppGlobalData> | null | undefined): AppGlobalData {
@@ -146,9 +149,9 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
       return data;
     })
     .catch(() => {
-      const cached = readLocalGlobalCache();
-      const data = cached?.data ?? normalizeGlobalData(fallbackGlobalData);
-      memoryCache = { at: Date.now(), data };
+      const data = readAnyCachedGlobalData() ?? normalizeGlobalData(fallbackGlobalData);
+      setCachedAuthUser(data.user, { emit: false });
+      if (!memoryCache) memoryCache = { at: Date.now(), data };
       return data;
     })
     .finally(() => {
@@ -168,4 +171,20 @@ export function clearAppGlobalCache() {
     }
     emitGlobalUpdated();
   }
+}
+
+export function clearCachedGlobalUser() {
+  const cached = readAnyCachedGlobalData();
+  if (!cached) {
+    setCachedAuthUser(null);
+    return;
+  }
+
+  const next = normalizeGlobalData({
+    ...cached,
+    user: null,
+    cart: { count: 0 },
+  });
+  writeGlobalCache(next);
+  emitGlobalUpdated();
 }

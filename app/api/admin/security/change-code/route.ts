@@ -13,7 +13,7 @@ const changeCodeSchema = z.object({
   code: z.string().trim().min(1),
   confirmCode: z.string().trim().min(1),
 });
-const SUPERADMIN_USERNAME = "saeedheydari98";
+const SUPERADMIN_USERNAME = "09176991556";
 
 async function requireSuperadmin(request: Request) {
   const auth = await requireUser(request);

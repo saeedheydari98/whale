@@ -16,6 +16,7 @@ import { AdminAccessPanel } from "@/app/panel/admin/admin-access-panel";
 import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
+import { useAppGlobal } from "@/lib/app-global-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
 
@@ -25,34 +26,45 @@ type AdminPanelUser = {
 };
 
 export default function AdminPanelPage() {
+  const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
   const [hasAdminAccess, setHasAdminAccess] = useState<boolean | null>(null);
   const [authUser, setAuthUser] = useState<AdminPanelUser | null>(null);
   const [activeTab, setActiveTab] = useState<"theme" | "security" | AdminCatalogSection>("products");
 
   useEffect(() => {
-    const syncAccessFromApi = async () => {
-      const user = await fetchCurrentUser();
+    if (!globalData) return;
+    setAuthUser(globalData.user);
+    setHasAdminAccess(hasAdminRole(globalData.user));
+  }, [globalData]);
+
+  useEffect(() => {
+    const syncAccessFromApi = async (force = false) => {
+      const nextGlobal = await refreshGlobal({ force });
+      const user = nextGlobal.user ?? await fetchCurrentUser({ force });
       const access = hasAdminRole(user);
       setAuthUser(user);
       setHasAdminAccess(access);
     };
 
-    void syncAccessFromApi()
-      .catch((error) => {
-        console.error("Admin access profile load error:", error);
-        setHasAdminAccess((current) => current ?? false);
-      });
+    if (!globalData) {
+      void syncAccessFromApi()
+        .catch((error) => {
+          console.error("Admin access profile load error:", error);
+          setHasAdminAccess((current) => current ?? false);
+        });
+    }
 
     const unsubscribeAdminAccess = subscribeAdminAccess(() => {
-      void syncAccessFromApi().catch((error) => {
+      void syncAccessFromApi(true).catch((error) => {
         console.error("Admin access profile refresh error:", error);
         setHasAdminAccess((current) => current ?? false);
       });
     });
     const unsubscribeAuthUser = subscribeAuthUser(() => {
-      void fetchCurrentUser({ force: true }).then((user) => {
-        setAuthUser(user);
-        setHasAdminAccess(user?.role === "admin" || user?.role === "superadmin");
+      void syncAccessFromApi(true)
+      .catch((error) => {
+        console.error("Admin access profile refresh error:", error);
+        setHasAdminAccess((current) => current ?? false);
       });
     });
 
@@ -60,7 +72,7 @@ export default function AdminPanelPage() {
       unsubscribeAdminAccess();
       unsubscribeAuthUser();
     };
-  }, []);
+  }, [globalData, refreshGlobal]);
 
   useEffect(() => {
     if (authUser?.role !== "superadmin" && activeTab === "security") {
@@ -68,7 +80,7 @@ export default function AdminPanelPage() {
     }
   }, [activeTab, authUser?.role]);
 
-  const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === "saeedheydari98";
+  const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === "09176991556";
   const tabs = [
     { id: "theme", label: "ظاهر", icon: <IoColorPaletteOutline /> },
     ...(isSuperadmin ? [{ id: "security", label: "امنیت", icon: <IoShieldCheckmarkOutline /> }] : []),

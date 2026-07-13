@@ -1,5 +1,4 @@
 import localFont from "next/font/local";
-import Script from "next/script";
 import { ThemeProvider } from "./design-system/theme/provider";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
@@ -40,7 +39,7 @@ const initialThemeVariables = generateCSSVariables(
   )
 );
 
-const initialThemeScript = `!function(){try{var raw=localStorage.getItem(${JSON.stringify(THEME_CSS_VARS_STORAGE_KEY)});if(raw){var vars=JSON.parse(raw);for(var key in vars){if(Object.prototype.hasOwnProperty.call(vars,key)){document.documentElement.style.setProperty(key,String(vars[key]));}}}var profile=JSON.parse(localStorage.getItem("user-profile")||"null");var legacy=localStorage.getItem("theme-mode");var mode=profile&&profile.themeMode==="dark"?"dark":profile&&profile.themeMode==="light"?"light":legacy==="dark"?"dark":legacy==="light"?"light":"";if(mode){document.documentElement.classList.toggle("dark",mode==="dark");}}catch(error){}}();`;
+const initialThemeScript = `!function(){try{var raw=localStorage.getItem(${JSON.stringify(THEME_CSS_VARS_STORAGE_KEY)});if(raw){var vars=JSON.parse(raw);for(var key in vars){if(Object.prototype.hasOwnProperty.call(vars,key)){document.documentElement.style.setProperty(key,String(vars[key]));}}}var legacy=localStorage.getItem("theme-mode");var mode=legacy==="dark"?"dark":legacy==="light"?"light":"";if(mode){document.documentElement.classList.toggle("dark",mode==="dark");}}catch(error){}}();`;
 
 export default function RootLayout({
   children,
@@ -49,12 +48,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" className={storeFont.variable} style={initialThemeVariables} suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen text-right" dir="rtl">
-        <Script
+      <head>
+        <script
           id="initial-theme"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: initialThemeScript }}
         />
+      </head>
+      <body className="flex flex-col min-h-screen text-right" dir="rtl">
         <ThemeProvider>
           <AppNotificationProvider>
             <CatalogQueryProvider>

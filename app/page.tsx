@@ -65,21 +65,26 @@ export default function Home() {
 
         {loading ? (
           <div className="flex flex-col gap-8">
-            <Loading loading="skeleton-item" isLoading>
-              <div className="h-[28vh] w-full rounded-xl border border-primary-border bg-primary-media" />
-            </Loading>
-            <div className="flex flex-col gap-3">
-              <Loading loading="skeleton-item" isLoading>
-                <div className="text-xl font-bold">برندهای منتخب</div>
-              </Loading>
-              <div className="flex flex-wrap gap-4">
-                {[0, 1, 2, 3].map((item) => (
-                  <Loading key={item} loading="skeleton-item" isLoading>
-                    <CategoryOption label="برند" imageUrl="" size="lg" />
+            {(displaySections.length > 0 ? displaySections : [{ type: "banner" as const, item: null, sortOrder: 0 }, { type: "brandGroup" as const, title: "برندهای منتخب", item: [], sortOrder: 1 }]).map((section, index) => (
+              section.type === "banner" ? (
+                <Loading key={`loading-home-banner-${index}`} loading="skeleton-item" isLoading className="w-full">
+                  <div className="h-[28vh] w-full rounded-xl border border-primary-border bg-primary-media" />
+                </Loading>
+              ) : (
+                <div key={`loading-home-brand-${section.title}-${index}`} className="flex flex-col gap-3">
+                  <Loading loading="skeleton-item" isLoading>
+                    <div className="text-xl font-bold">{section.title}</div>
                   </Loading>
-                ))}
-              </div>
-            </div>
+                  <div className="flex flex-wrap gap-4">
+                    {[0, 1, 2, 3].map((item) => (
+                      <Loading key={item} loading="skeleton-item" isLoading>
+                        <CategoryOption label="برند" imageUrl="" size="lg" />
+                      </Loading>
+                    ))}
+                  </div>
+                </div>
+              )
+            ))}
           </div>
         ) : null}
 

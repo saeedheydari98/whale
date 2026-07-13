@@ -4,7 +4,7 @@ import React from "react";
 
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
-import { resolveTokenTextColor, resolveVariantColors, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
+import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cursorVariants, cx, interactionStates, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
@@ -59,7 +59,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   ...rest
 }) => {
   const { theme } = useTheme();
-  const variantStyle = resolveVariantColors(variant, theme);
+  const variantStyle = resolveVariantCssVars(variant);
   const isDisabled = disabled || isLoading;
 
   const tokenStyle: React.CSSProperties = {};

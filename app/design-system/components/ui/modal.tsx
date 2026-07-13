@@ -4,8 +4,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { CustomButton } from "./button";
 import { CustomCard } from "./card";
-import { resolveVariantColors, UICommonVariant } from "../../variants/ui.variant";
-import { useTheme } from "../../theme/provider";
+import { UICommonVariant } from "../../variants/ui.variant";
 import { LoadingVariant } from "../loading/loading";
 import { borderVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import { HiMiniXMark } from "react-icons/hi2";
@@ -27,14 +26,6 @@ type CustomModalProps = {
   loadingText?: string;
 };
 
-function withAlpha(color: string, alpha: number) {
-  const match = color.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i);
-  if (!match) return color;
-
-  const [red, green, blue] = match.slice(1).map((value) => Number.parseInt(value, 16));
-  return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-}
-
 export function CustomModal({
   open,
   onClose,
@@ -51,9 +42,8 @@ export function CustomModal({
   isLoading = false,
   loadingText,
 }: CustomModalProps) {
-  const { theme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
-  const overlayColor = withAlpha(resolveVariantColors("primary", theme).backgroundColor, 0.08);
+  const overlayColor = "color-mix(in srgb, var(--primary) 4%, transparent)";
 
   React.useEffect(() => {
     setMounted(true);
@@ -74,7 +64,11 @@ export function CustomModal({
         size={size}
         rounded={rounded}
         border={border}
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto bg-primary-card/95"
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto text-primary-text"
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--primary-card) 82%, var(--bg-surface))",
+          color: "var(--primary-text)",
+        }}
         shadow={shadow}
         hover="none"
         onClick={(event) => event.stopPropagation()}

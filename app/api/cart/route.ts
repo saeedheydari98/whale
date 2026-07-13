@@ -15,6 +15,7 @@ type ProfilePayload = {
   nationalId?: string;
   birthDate?: string;
   phone?: string;
+  email?: string;
   address?: string;
   isAdminUnlocked?: boolean;
 };
@@ -60,13 +61,21 @@ function normalizeProfile(value: ProfilePayload) {
     nationalId: String(value.nationalId ?? "").trim(),
     birthDate: normalizePersianDate(String(value.birthDate ?? "")),
     phone: String(value.phone ?? "").trim(),
+    email: String(value.email ?? "").trim().toLowerCase(),
     address: String(value.address ?? "").trim(),
     isAdminUnlocked: value.isAdminUnlocked === true,
   };
 }
 
 function isProfileComplete(profile: ReturnType<typeof normalizeProfile>) {
-  return Boolean(profile.firstName && profile.lastName && profile.nationalId && isValidPastPersianDate(profile.birthDate) && profile.phone && profile.address);
+  return Boolean(
+    profile.firstName &&
+    profile.lastName &&
+    (!profile.nationalId || /^\d{10}$/.test(profile.nationalId)) &&
+    (!profile.birthDate || isValidPastPersianDate(profile.birthDate)) &&
+    profile.phone &&
+    profile.address
+  );
 }
 
 function normalizeCartItem(value: CartItemPayload) {
@@ -151,14 +160,16 @@ async function findLegacyProfile(request: Request, bodyProfile?: ProfilePayload)
 
 async function upsertLegacyProfile(request: Request, profile: ReturnType<typeof normalizeProfile>) {
   const authUser = await getAuthUser(request);
+  const nationalId = profile.nationalId || (authUser ? `user-${authUser.id}` : `guest-${profile.phone}`);
   return prisma.customerProfile.upsert({
-    where: { nationalId: profile.nationalId },
+    where: { nationalId },
     update: {
       ...(authUser ? { userId: authUser.id } : {}),
       firstName: profile.firstName,
       lastName: profile.lastName,
       birthDate: profile.birthDate,
       phone: profile.phone,
+      email: profile.email || null,
       address: profile.address,
       isAdminUnlocked: profile.isAdminUnlocked,
     },
@@ -166,9 +177,10 @@ async function upsertLegacyProfile(request: Request, profile: ReturnType<typeof 
       userId: authUser?.id ?? null,
       firstName: profile.firstName,
       lastName: profile.lastName,
-      nationalId: profile.nationalId,
+      nationalId,
       birthDate: profile.birthDate,
       phone: profile.phone,
+      email: profile.email || null,
       address: profile.address,
       isAdminUnlocked: profile.isAdminUnlocked,
     },

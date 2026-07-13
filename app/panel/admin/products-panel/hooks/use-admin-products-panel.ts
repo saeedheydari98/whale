@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { clearProductsCache, getCatalogStructure, getProducts } from "@/lib/products-client";
+import { clearProductsCache, getProducts } from "@/lib/products-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { useFileDataUrl } from "@/hooks/useFileDataUrl";
 import { createBanner, createBrand, createCatalogLinkGroup, createCategory, createProduct, createShowcase } from "../factories";
@@ -38,6 +38,7 @@ import {
 } from "../utils";
 
 export function useAdminProductsPanel(activeSection: AdminCatalogSection = "products") {
+  void activeSection;
   const [products, setProducts] = useState<ProductForm[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseForm[]>([]);
   const [categories, setCategories] = useState<CategoryForm[]>([
@@ -108,16 +109,24 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   useEffect(() => {
     let cancelled = false;
 
+    const hasCatalogData = (catalog: Awaited<ReturnType<typeof getProducts>>) => (
+      catalog.products.length > 0 ||
+      catalog.showcases.length > 0 ||
+      catalog.categories.length > 0 ||
+      catalog.categoryGroups.length > 0 ||
+      catalog.brands.length > 0 ||
+      catalog.brandGroups.length > 0 ||
+      catalog.banners.length > 0
+    );
+
     const loadProducts = async () => {
       const startedAt = Date.now();
       try {
-        const needsProducts = activeSection === "products"
-          || activeSection === "showcases"
-          || activeSection === "categories"
-          || activeSection === "brands";
-        const catalog = needsProducts
-          ? await getProducts({ all: true, full: true })
-          : await getCatalogStructure({ all: true });
+        let catalog = await getProducts({ all: true, full: true });
+        if (!hasCatalogData(catalog)) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250));
+          catalog = await getProducts({ all: true, full: true, force: true });
+        }
         if (cancelled) return;
 
         const apiProducts = dedupeProducts(
@@ -211,13 +220,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         await waitForMinimumLoading(startedAt);
       } catch {
         if (cancelled) return;
-        setProducts([]);
-        setShowcases([]);
-        setCategories([]);
-        setCategoryGroups([]);
-        setBrands([]);
-        setBrandGroups([]);
-        setBanners([]);
         setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
         await waitForMinimumLoading(startedAt);
       } finally {
@@ -230,7 +232,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     return () => {
       cancelled = true;
     };
-  }, [activeSection]);
+  }, []);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.sortOrder - b.sortOrder), [products]);
   const sortedShowcases = useMemo(() => ensureShowcases(products, showcases), [products, showcases]);

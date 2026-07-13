@@ -2,6 +2,7 @@ import { createHmac, randomBytes, timingSafeEqual, pbkdf2Sync } from "crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { apiFail } from "@/lib/api/response";
+import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
 
 export type AuthUser = {
   id: number;
@@ -16,7 +17,7 @@ const ACCESS_COOKIE = "accessToken";
 const REFRESH_COOKIE = "refreshToken";
 const ACCESS_TTL_SECONDS = 60 * 15;
 const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 30;
-const SUPERADMIN_USERNAME = "saeedheydari98";
+const SUPERADMIN_USERNAME = SUPERADMIN_PHONE;
 
 function secret() {
   return process.env.JWT_SECRET || process.env.AUTH_SECRET || "development-jwt-secret-change-me";

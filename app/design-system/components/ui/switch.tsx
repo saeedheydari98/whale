@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "../../theme/provider";
-import { resolveVariantColors, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
+import { resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cx, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
@@ -37,8 +36,7 @@ export function CustomSwitch({
   isLoading = false,
   loadingText,
 }: CustomSwitchProps) {
-  const { theme } = useTheme();
-  const colorStyle = resolveVariantColors(variant, theme);
+  const colorStyle = resolveVariantCssVars(variant);
   const switchColor = customColor ?? colorStyle.backgroundColor;
   const borderColor = customColor ? strengthenBorderColor(customColor) : colorStyle.borderColor;
   const isDisabled = disabled || isLoading;

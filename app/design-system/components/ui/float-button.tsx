@@ -48,10 +48,10 @@ export function FloatButton({
   className,
 }: FloatButtonProps) {
   const positionClass =
-    position === "bottom-left" ? "left-6 bottom-6" : "right-6 bottom-6";
+    position === "bottom-left" ? "left-4 bottom-20 md:left-6 md:bottom-6" : "right-4 bottom-20 md:right-6 md:bottom-6";
 
   return (
-    <div className={`fixed z-40 ${positionClass} ${className || ""}`}>
+    <div className={`fixed z-[60] ${positionClass} ${className || ""}`}>
       <CustomButton
         variant={variant}
         size={size}

@@ -33,8 +33,14 @@ import {
   setCachedAuthUser,
   subscribeAuthUser,
 } from "@/lib/auth-client";
-import { clearAppGlobalCache } from "@/lib/app-global-client";
+import { clearCachedGlobalUser } from "@/lib/app-global-client";
 import { useAppGlobal } from "@/lib/app-global-context";
+import {
+  clearUserProfile,
+  readUserProfile,
+  USER_PROFILE_UPDATED_EVENT,
+  type UserProfile,
+} from "@/lib/user-profile";
 import { GiSpermWhale } from "react-icons/gi";
 
 type HeaderUser = {
@@ -43,6 +49,14 @@ type HeaderUser = {
   email?: string | null;
   name?: string | null;
   role?: string | null;
+  profile?: unknown;
+};
+
+type HeaderProfile = {
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  email?: string | null;
 };
 
 const legacyNavItems = [
@@ -79,22 +93,36 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
   );
 }
 
-function AccountButton({ user, onOpen }: { user: HeaderUser | null; onOpen: () => void }) {
-  const className = "inline-flex h-8 w-8 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-xl text-primary-text transition-colors hover:bg-primary-soft hover:text-primary";
-
-  if (user) {
-    return (
-      <Link href="/panel/user" className={className} aria-label="Account">
-        <IoPersonCircleOutline />
-      </Link>
-    );
-  }
+function AccountButton({ user, profile, onOpen }: { user: HeaderUser | null; profile: UserProfile | null; onOpen: () => void }) {
+  const label = getUserFullName(user, profile) || getUserPhone(user, profile) || "";
+  const initial = label.trim().charAt(0).toUpperCase();
+  const className = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-base font-bold text-primary-text transition-colors hover:bg-primary-soft hover:text-primary";
 
   return (
     <button type="button" className={className} aria-label="Account" onClick={onOpen}>
-      <IoPersonCircleOutline />
+      {user && initial ? <span>{initial}</span> : <IoPersonCircleOutline />}
     </button>
   );
+}
+
+function getUserProfile(user: HeaderUser | null | undefined): HeaderProfile | null {
+  return user?.profile && typeof user.profile === "object"
+    ? user.profile as HeaderProfile
+    : null;
+}
+
+function getUserFullName(user: HeaderUser | null | undefined, preferredProfile?: HeaderProfile | null) {
+  const profile = preferredProfile ?? getUserProfile(user);
+  const profileName = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim();
+  return profileName;
+}
+
+function getUserPhone(user: HeaderUser | null | undefined, preferredProfile?: HeaderProfile | null) {
+  return String((preferredProfile ?? getUserProfile(user))?.phone || "").trim();
+}
+
+function getUserMarketingEmail(user: HeaderUser | null | undefined, preferredProfile?: HeaderProfile | null) {
+  return String((preferredProfile ?? getUserProfile(user))?.email || "").trim();
 }
 
 function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount: number) {
@@ -112,19 +140,33 @@ export function AppHeader() {
   const [cartCount, setCartCount] = useState(0);
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [authUser, setAuthUser] = useState<HeaderUser | null>(null);
+  const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"choice" | "login">("choice");
-  const [authUsername, setAuthUsername] = useState("");
+  const [authLoginMethod, setAuthLoginMethod] = useState<"password" | "otp">("password");
+  const [authPhone, setAuthPhone] = useState("");
   const [authPassword, setAuthPassword] = useState("");
+  const [authOtpCode, setAuthOtpCode] = useState("");
+  const [authOtpSent, setAuthOtpSent] = useState(false);
   const [authStatus, setAuthStatus] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const showMobileBack = isMobile && pathname !== "/";
+  const accountLabel = getUserFullName(authUser, accountProfile) || getUserPhone(authUser, accountProfile);
+  const accountInitial = accountLabel.trim().charAt(0).toUpperCase() || "?";
+  const accountPhone = getUserPhone(authUser, accountProfile);
+  const accountEmail = getUserMarketingEmail(authUser, accountProfile);
+  const authModalTitle = authUser
+    ? "حساب کاربری"
+    : authMode === "choice"
+      ? "حساب کاربری"
+      : "ورود به حساب";
 
   useEffect(() => {
     if (!globalData) return;
     setAuthUser(globalData.user);
+    setAccountProfile(readUserProfile() ?? (getUserProfile(globalData.user) as UserProfile | null));
     setCartCount(getVisibleCartCount(globalData.user, globalData.cart.count));
     setHasAdminAccess(globalData.user?.role === "admin" || globalData.user?.role === "superadmin");
   }, [globalData]);
@@ -132,6 +174,9 @@ export function AppHeader() {
   useEffect(() => {
     const syncCartCount = () => {
       setCartCount(getVisibleCartCount(undefined, 0));
+    };
+    const syncProfile = () => {
+      setAccountProfile(readUserProfile());
     };
     const syncGlobalFromApi = async (force = false) => {
       const next = await refreshGlobal({ force });
@@ -141,11 +186,11 @@ export function AppHeader() {
     };
     const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
 
-    void syncGlobalFromApi().then(() => {
-      syncAdminAccess();
-      syncCartCount();
-    });
+    syncAdminAccess();
+    syncCartCount();
+    syncProfile();
     window.addEventListener("storage", syncCartCount);
+    window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
     window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
     const unsubscribeAdminAccess = subscribeAdminAccess(() => {
       syncAdminAccess();
@@ -157,6 +202,7 @@ export function AppHeader() {
 
     return () => {
       window.removeEventListener("storage", syncCartCount);
+      window.removeEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
       window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
       unsubscribeAdminAccess();
       unsubscribeAuthUser();
@@ -168,8 +214,8 @@ export function AppHeader() {
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || hasAdminAccess);
 
   const submitAuth = async () => {
-    if (!authUsername.trim() || !authPassword.trim()) {
-      setAuthStatus("نام کاربری و رمز عبور الزامی است.");
+    if (!authPhone.trim() || !authPassword.trim()) {
+      setAuthStatus("شماره موبایل و رمز عبور الزامی است.");
       return;
     }
 
@@ -179,12 +225,12 @@ export function AppHeader() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: authUsername.trim().toLowerCase(), password: authPassword }),
+        body: JSON.stringify({ phone: authPhone.trim(), password: authPassword }),
       });
       const data = await res.json();
       if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "ورود ناموفق بود.");
       const user = data?.data?.user ?? null;
-      setCachedAuthUser(user);
+      setCachedAuthUser(user, { emit: false });
       setAuthUser(user);
       setAuthOpen(false);
       setAuthPassword("");
@@ -201,16 +247,78 @@ export function AppHeader() {
     }
   };
 
+  const requestOtp = async () => {
+    if (!authPhone.trim()) {
+      setAuthStatus("شماره موبایل الزامی است.");
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthStatus("");
+    try {
+      const res = await fetch("/api/auth/request-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: authPhone.trim(), purpose: "login" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "ارسال کد ناموفق بود.");
+      setAuthOtpSent(true);
+      setAuthStatus(data?.data?.developmentCode ? `کد توسعه: ${data.data.developmentCode}` : "کد ورود ارسال شد.");
+    } catch (error) {
+      setAuthStatus(error instanceof Error ? error.message : "ارسال کد ناموفق بود.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const submitOtp = async () => {
+    if (!authPhone.trim() || !authOtpCode.trim()) {
+      setAuthStatus("شماره موبایل و کد پیامک الزامی است.");
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthStatus("");
+    try {
+      const res = await fetch("/api/auth/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: authPhone.trim(), code: authOtpCode.trim(), purpose: "login" }),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "ورود پیامکی ناموفق بود.");
+      const user = data?.data?.user ?? null;
+      setCachedAuthUser(user, { emit: false });
+      setAuthUser(user);
+      setAuthOpen(false);
+      setAuthPassword("");
+      setAuthOtpCode("");
+      setAuthOtpSent(false);
+      const nextGlobal = await refreshGlobal({ force: true });
+      const accountCart = await getCart();
+      setHasAdminAccess(nextGlobal.user?.role === "admin" || nextGlobal.user?.role === "superadmin");
+      setCartCount(getCartCount(accountCart.items));
+      router.refresh();
+    } catch (error) {
+      setAuthStatus(error instanceof Error ? error.message : "ورود پیامکی ناموفق بود.");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const logout = async () => {
     const currentUser = authUser;
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     clearLocalCartSnapshot(currentUser);
     clearLocalCartSnapshot(null);
-    clearAppGlobalCache();
-    clearCachedAuthUser();
+    clearUserProfile(currentUser);
+    clearCachedAuthUser({ emit: false });
+    clearCachedGlobalUser();
     setAuthUser(null);
     setHasAdminAccess(false);
     setCartCount(0);
+    setAuthOpen(false);
     void refreshGlobal({ force: true }).then((nextGlobal) => {
       setCartCount(nextGlobal.cart.count);
     });
@@ -263,34 +371,15 @@ export function AppHeader() {
 
         {/* Right: cart and mobile menu */}
         <div className="flex shrink-0 items-center gap-3">
-          {isMobile ? (
-            <AccountButton
-              user={authUser}
-              onOpen={() => {
-                setAuthMode("choice");
-                setAuthStatus("");
-                setAuthOpen(true);
-              }}
-            />
-          ) : authUser ? (
-            <div className="flex items-center gap-2">
-              <span className="hidden text-xs font-semibold text-primary-text sm:inline">{authUser.username || authUser.name || "حساب کاربری"}</span>
-              <CustomButton size="sm" variant="danger" onClick={logout}>
-                خروج
-              </CustomButton>
-            </div>
-          ) : (
-            <CustomButton
-              size="sm"
-              onClick={() => {
-                setAuthMode("choice");
-                setAuthStatus("");
-                setAuthOpen(true);
-              }}
-            >
-              حساب کاربری
-            </CustomButton>
-          )}
+          <AccountButton
+            user={authUser}
+            profile={accountProfile}
+            onOpen={() => {
+              setAuthMode("choice");
+              setAuthStatus("");
+              setAuthOpen(true);
+            }}
+          />
           <CartLink count={cartCount} />
           {false && isMobile && (
             <button
@@ -371,12 +460,57 @@ export function AppHeader() {
       <CustomModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}
-        title={authMode === "choice" ? "حساب کاربری" : "ورود به حساب"}
+        title={authModalTitle}
         rounded="lg"
         shadow="lg"
       >
         <div className="flex flex-col gap-3">
-          {authMode === "choice" ? (
+          {authUser ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-lg font-bold text-primary-text">
+                  <span>{accountInitial}</span>
+                </div>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="truncate text-sm font-bold text-primary-text">
+                    <span>{accountLabel || "حساب کاربری"}</span>
+                  </div>
+                  <div className="truncate text-xs font-semibold text-secondary-text">
+                    <span>{accountPhone || "شماره ثبت نشده"}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-bg p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-secondary-text">شماره موبایل</span>
+                  <span className="min-w-0 truncate text-sm font-bold text-primary-text">{accountPhone || "-"}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-secondary-text">ایمیل</span>
+                  <span className="min-w-0 truncate text-sm font-bold text-primary-text">{accountEmail || "-"}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold text-secondary-text">نام</span>
+                  <span className="min-w-0 truncate text-sm font-bold text-primary-text">{accountLabel || "-"}</span>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <CustomButton
+                  variant="neutral"
+                  fullWidth
+                  onClick={() => {
+                    setAuthOpen(false);
+                    router.push("/panel/user");
+                  }}
+                >
+                  <span>پنل کاربری</span>
+                </CustomButton>
+                <CustomButton variant="danger" fullWidth onClick={() => void logout()}>
+                  <span>خروج از حساب</span>
+                </CustomButton>
+              </div>
+            </div>
+          ) : authMode === "choice" ? (
             <div className="flex flex-col gap-2">
               <CustomButton
                 fullWidth
@@ -385,7 +519,7 @@ export function AppHeader() {
                   setAuthStatus("");
                 }}
               >
-                ورود به حساب
+                <span>ورود به حساب</span>
               </CustomButton>
               <CustomButton
                 variant="neutral"
@@ -395,40 +529,96 @@ export function AppHeader() {
                   router.push("/panel/user?auth=register");
                 }}
               >
-                ساخت حساب کاربری
+                <span>ساخت حساب کاربری</span>
               </CustomButton>
             </div>
           ) : (
             <>
+              <div className="flex gap-2 rounded-md border border-primary-border bg-primary-bg p-1">
+                <button
+                  type="button"
+                  className={`flex h-9 flex-1 items-center justify-center rounded-md text-sm font-semibold ${authLoginMethod === "password" ? "bg-primary text-primary-contrast" : "text-primary-text"}`}
+                  onClick={() => {
+                    setAuthLoginMethod("password");
+                    setAuthStatus("");
+                  }}
+                >
+                  <span>ورود با رمز</span>
+                </button>
+                <button
+                  type="button"
+                  className={`flex h-9 flex-1 items-center justify-center rounded-md text-sm font-semibold ${authLoginMethod === "otp" ? "bg-primary text-primary-contrast" : "text-primary-text"}`}
+                  onClick={() => {
+                    setAuthLoginMethod("otp");
+                    setAuthStatus("");
+                  }}
+                >
+                  <span>ورود با پیامک</span>
+                </button>
+              </div>
               <CustomInput
-                name="login-username"
-                value={authUsername}
-                placeholder="نام کاربری"
-                autoComplete="username"
-                aria-label="نام کاربری"
-                onChange={(event) => setAuthUsername(event.target.value)}
-              />
-              <CustomInput
-                name="login-password"
-                value={authPassword}
-                type="password"
-                placeholder="رمز عبور"
-                autoComplete="current-password"
-                aria-label="رمز عبور"
-                onChange={(event) => setAuthPassword(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") void submitAuth();
+                name="login-phone"
+                value={authPhone}
+                placeholder="شماره موبایل"
+                autoComplete="tel"
+                inputMode="tel"
+                maxLength={11}
+                pattern="09\d{9}"
+                aria-label="شماره موبایل"
+                onChange={(event) => {
+                  setAuthPhone(event.target.value);
+                  setAuthOtpSent(false);
+                  setAuthOtpCode("");
                 }}
               />
+              {authLoginMethod === "password" ? (
+                <CustomInput
+                  name="login-password"
+                  value={authPassword}
+                  type="password"
+                  placeholder="رمز عبور"
+                  autoComplete="current-password"
+                  aria-label="رمز عبور"
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void submitAuth();
+                  }}
+                />
+              ) : (
+                <CustomInput
+                  name="login-otp"
+                  value={authOtpCode}
+                  placeholder="کد پیامک"
+                  inputMode="numeric"
+                  maxLength={6}
+                  pattern="\d{6}"
+                  aria-label="کد پیامک"
+                  disabled={!authOtpSent}
+                  onChange={(event) => setAuthOtpCode(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && authOtpSent) void submitOtp();
+                  }}
+                />
+              )}
               {authStatus ? (
                 <div className="rounded-md border border-primary-border bg-primary-bg px-3 py-2 text-sm font-semibold text-primary-text">{authStatus}</div>
               ) : null}
               <div className="flex gap-2">
-                <CustomButton fullWidth isLoading={authLoading} onClick={submitAuth}>
-                  ورود
-                </CustomButton>
+                {authLoginMethod === "password" ? (
+                  <CustomButton fullWidth isLoading={authLoading} onClick={submitAuth}>
+                    <span>ورود</span>
+                  </CustomButton>
+                ) : authOtpSent ? (
+                  <CustomButton fullWidth isLoading={authLoading} onClick={submitOtp}>
+                    <span>تایید کد</span>
+                  </CustomButton>
+                ) : (
+                  <CustomButton fullWidth isLoading={authLoading} onClick={requestOtp}>
+                    <span>ارسال کد</span>
+                  </CustomButton>
+                )}
                 <CustomButton variant="neutral" fullWidth onClick={() => setAuthMode("choice")}>
-                  بازگشت
+                  <span>بازگشت</span>
                 </CustomButton> 
               </div>
             </>

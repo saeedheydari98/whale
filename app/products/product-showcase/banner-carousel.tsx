@@ -37,7 +37,7 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
   if (isLoading) {
     return (
       <section className="flex flex-col gap-2">
-        <Loading loading="skeleton-item" isLoading>
+        <Loading loading="skeleton-item" isLoading className="w-full">
           <div className="flex w-full items-center justify-center overflow-hidden rounded-xl border border-border-default bg-primary-media" style={{ height: bannerHeight }} />
         </Loading>
         <div className="flex justify-center gap-2">

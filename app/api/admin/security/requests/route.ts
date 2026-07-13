@@ -16,7 +16,7 @@ const reviewSchema = z.object({
 async function requireSuperadmin(request: Request) {
   const auth = await requireUser(request);
   if (!auth.ok) return auth;
-  if (auth.user.username !== "saeedheydari98" || auth.user.role !== "superadmin") {
+  if (auth.user.username !== "09176991556" || auth.user.role !== "superadmin") {
     return { ok: false as const, response: apiFail("superadmin required", 403) };
   }
   return auth;

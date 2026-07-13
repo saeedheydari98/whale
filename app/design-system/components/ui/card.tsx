@@ -1,9 +1,8 @@
 "use client";
 
 import React from "react";
-import { resolveVariantColors, UICommonVariant } from "../../variants/ui.variant";
+import { resolveVariantCssVars, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cx, interactionStates, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
-import { useTheme } from "../../theme/provider";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomCardProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -34,10 +33,10 @@ export function CustomCard({
   loading = "spinner",
   isLoading = false,
   loadingText,
+  style,
   ...rest
 }: CustomCardProps) {
-  const { theme } = useTheme();
-  const colorStyle = resolveVariantColors(variant, theme);
+  const colorStyle = resolveVariantCssVars(variant);
 
   return (
     <article
@@ -50,7 +49,7 @@ export function CustomCard({
         hover !== "none" && interactionStates.hover[hover],
         className
       )}
-      style={{ borderColor: colorStyle.borderColor }}
+      style={{ borderColor: colorStyle.borderColor, ...style }}
     >
       <div>
         {title && <div className="mb-2 text-lg font-semibold">{title}</div>}

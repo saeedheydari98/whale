@@ -23,7 +23,7 @@ const mobileNavItems = [
 ];
 
 export function AppFooter() {
-  const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
+  const { data: globalData } = useAppGlobal();
   const isMobile = useIsMobile();
   const pathname = usePathname();
   const [hasAdminAccess, setHasAdminAccess] = useState(false);
@@ -35,19 +35,14 @@ export function AppFooter() {
 
   useEffect(() => {
     const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
-    const syncAdminAccessFromApi = async () => {
-      const next = await refreshGlobal();
-      setHasAdminAccess(next.user?.role === "admin" || next.user?.role === "superadmin");
-    };
 
     syncAdminAccess();
-    void syncAdminAccessFromApi();
     const unsubscribeAdminAccess = subscribeAdminAccess(syncAdminAccess);
 
     return () => {
       unsubscribeAdminAccess();
     };
-  }, [refreshGlobal]);
+  }, []);
 
   const visibleNavItems = mobileNavItems.filter((item) => !item.adminOnly || hasAdminAccess);
   const isActiveLink = (href: string) => href === "/"

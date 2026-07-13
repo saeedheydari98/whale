@@ -45,7 +45,13 @@ export async function GET(request: Request) {
     const profilePromise = authUser
       ? prisma.customerProfile.findFirst({
           where: { userId: authUser.id },
-          select: { themeMode: true, isAdminUnlocked: true },
+          select: {
+            firstName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            isAdminUnlocked: true,
+          },
         })
       : Promise.resolve(null);
     const cartPromise = authUser
@@ -76,7 +82,10 @@ export async function GET(request: Request) {
             ...authUser,
             profile: profile
               ? {
-                  themeMode: profile.themeMode,
+                  firstName: profile.firstName,
+                  lastName: profile.lastName,
+                  phone: profile.phone,
+                  email: profile.email,
                   isAdminUnlocked: profile.isAdminUnlocked,
                 }
               : null,

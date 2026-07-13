@@ -1,8 +1,6 @@
 import {
   readUserProfile,
   writeUserProfile,
-  USER_PROFILE_UPDATED_EVENT,
-  USER_PROFILE_STORAGE_KEY,
 } from "@/lib/user-profile";
 import { fetchCurrentUser, hasAdminRole, readCachedAuthUser } from "@/lib/auth-client";
 
@@ -151,16 +149,8 @@ export function subscribeAdminAccess(listener: () => void) {
   if (typeof window === "undefined") return () => undefined;
 
   window.addEventListener(ADMIN_ACCESS_UPDATED_EVENT, listener);
-  window.addEventListener(USER_PROFILE_UPDATED_EVENT, listener);
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === USER_PROFILE_STORAGE_KEY) listener();
-  };
-
-  window.addEventListener("storage", onStorage);
 
   return () => {
     window.removeEventListener(ADMIN_ACCESS_UPDATED_EVENT, listener);
-    window.removeEventListener(USER_PROFILE_UPDATED_EVENT, listener);
-    window.removeEventListener("storage", onStorage);
   };
 }

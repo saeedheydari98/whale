@@ -27,7 +27,7 @@ const unlockSchema = z.object({
     phone: z.string().trim().min(1),
   }).optional(),
 });
-const SUPERADMIN_USERNAME = "saeedheydari98";
+const SUPERADMIN_USERNAME = "09176991556";
 
 async function requireSuperadmin(request: Request) {
   const auth = await requireUser(request);

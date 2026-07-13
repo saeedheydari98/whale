@@ -4,7 +4,7 @@ import React from "react";
 
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
-import { resolveTokenTextColor, resolveVariantColors, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
+import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cx, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 
 type BaseProps = React.HTMLAttributes<HTMLSpanElement>;
@@ -43,7 +43,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
   ...rest
 }) => {
   const { theme } = useTheme();
-  const variantStyle = resolveVariantColors(variant, theme);
+  const variantStyle = resolveVariantCssVars(variant);
 
   const tokenStyle: React.CSSProperties = {};
 

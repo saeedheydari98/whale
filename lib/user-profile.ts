@@ -1,3 +1,9 @@
+"use client";
+
+import {
+  readCachedAuthUser,
+  type AuthClientUser,
+} from "@/lib/auth-client";
 import { isValidPastPersianDate, normalizePersianDate } from "@/lib/persian-date";
 
 export type UserProfile = {
@@ -6,13 +12,14 @@ export type UserProfile = {
   nationalId: string;
   birthDate: string;
   phone: string;
+  email: string;
   address: string;
-  themeMode: "light" | "dark";
   isAdminUnlocked: boolean;
 };
 
 export const USER_PROFILE_STORAGE_KEY = "user-profile";
 export const USER_PROFILE_UPDATED_EVENT = "user-profile-updated";
+const GUEST_USER_PROFILE_STORAGE_KEY = `${USER_PROFILE_STORAGE_KEY}:guest`;
 
 export const EMPTY_USER_PROFILE: UserProfile = {
   firstName: "",
@@ -20,8 +27,8 @@ export const EMPTY_USER_PROFILE: UserProfile = {
   nationalId: "",
   birthDate: "",
   phone: "",
+  email: "",
   address: "",
-  themeMode: "light",
   isAdminUnlocked: false,
 };
 
@@ -41,23 +48,54 @@ function areProfilesEqual(first: UserProfile | null, second: UserProfile | null)
     first.nationalId === second.nationalId &&
     first.birthDate === second.birthDate &&
     first.phone === second.phone &&
+    first.email === second.email &&
     first.address === second.address &&
-    first.themeMode === second.themeMode &&
     first.isAdminUnlocked === second.isAdminUnlocked
   );
 }
 
+function getProfileStorageKey(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
+  const userId = user?.id == null ? "" : String(user.id).trim();
+  if (userId) return `${USER_PROFILE_STORAGE_KEY}:user:${userId}`;
+
+  const username = String(user?.username ?? "").trim().toLowerCase();
+  if (username) return `${USER_PROFILE_STORAGE_KEY}:username:${username}`;
+
+  const email = String(user?.email ?? "").trim().toLowerCase();
+  if (email) return `${USER_PROFILE_STORAGE_KEY}:email:${email}`;
+
+  return GUEST_USER_PROFILE_STORAGE_KEY;
+}
+
+function readRawStoredProfile(storageKey: string) {
+  const parsed = JSON.parse(localStorage.getItem(storageKey) || "null");
+  return parsed && typeof parsed === "object"
+    ? normalizeUserProfile(parsed as Partial<UserProfile>)
+    : null;
+}
+
+function migrateLegacyGuestProfile(targetKey: string) {
+  if (typeof window === "undefined" || targetKey !== GUEST_USER_PROFILE_STORAGE_KEY) return;
+  if (localStorage.getItem(targetKey) !== null) return;
+
+  const legacyProfile = localStorage.getItem(USER_PROFILE_STORAGE_KEY);
+  if (legacyProfile === null) return;
+
+  localStorage.setItem(targetKey, legacyProfile);
+  localStorage.removeItem(USER_PROFILE_STORAGE_KEY);
+}
+
 export function normalizeUserProfile(value: Partial<UserProfile> | null | undefined): UserProfile {
-  const themeMode = value?.themeMode === "dark" ? "dark" : "light";
+  const nationalId = String(value?.nationalId ?? "");
 
   return {
     firstName: String(value?.firstName ?? ""),
     lastName: String(value?.lastName ?? ""),
-    nationalId: String(value?.nationalId ?? ""),
+    nationalId: nationalId.startsWith("user-") || nationalId.startsWith("guest-") ? "" : nationalId,
     birthDate: normalizePersianDate(String(value?.birthDate ?? "")),
     phone: String(value?.phone ?? ""),
+    email: String(value?.email ?? ""),
     address: String(value?.address ?? ""),
-    themeMode,
     isAdminUnlocked: value?.isAdminUnlocked === true,
   };
 }
@@ -68,8 +106,8 @@ export function isUserProfileComplete(profile: Partial<UserProfile> | null | und
   return Boolean(
     normalized.firstName.trim() &&
       normalized.lastName.trim() &&
-      NATIONAL_ID_PATTERN.test(normalized.nationalId.trim()) &&
-      isValidPastPersianDate(normalized.birthDate) &&
+      (!normalized.nationalId.trim() || NATIONAL_ID_PATTERN.test(normalized.nationalId.trim())) &&
+      (!normalized.birthDate.trim() || isValidPastPersianDate(normalized.birthDate)) &&
       PHONE_PATTERN.test(normalized.phone.trim()) &&
       normalized.address.trim().length >= 5
   );
@@ -79,9 +117,9 @@ export function readUserProfile(): UserProfile | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(USER_PROFILE_STORAGE_KEY) || "null");
-    if (!parsed || typeof parsed !== "object") return null;
-    const profile = normalizeUserProfile(parsed as Partial<UserProfile>);
+    const storageKey = getProfileStorageKey();
+    migrateLegacyGuestProfile(storageKey);
+    const profile = readRawStoredProfile(storageKey);
     return isUserProfileComplete(profile) ? profile : null;
   } catch {
     return null;
@@ -95,7 +133,18 @@ export function writeUserProfile(profile: UserProfile, options?: { emit?: boolea
   const currentProfile = readUserProfile();
   if (areProfilesEqual(currentProfile, nextProfile)) return;
 
-  localStorage.setItem(USER_PROFILE_STORAGE_KEY, JSON.stringify(nextProfile));
+  localStorage.setItem(getProfileStorageKey(), JSON.stringify(nextProfile));
+  localStorage.removeItem(USER_PROFILE_STORAGE_KEY);
+  if (options?.emit !== false) {
+    window.dispatchEvent(new Event(USER_PROFILE_UPDATED_EVENT));
+  }
+}
+
+export function clearUserProfile(user?: AuthClientUser | null, options?: { emit?: boolean }) {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem(getProfileStorageKey(user ?? readCachedAuthUser()));
+  localStorage.removeItem(USER_PROFILE_STORAGE_KEY);
   if (options?.emit !== false) {
     window.dispatchEvent(new Event(USER_PROFILE_UPDATED_EVENT));
   }
@@ -103,9 +152,8 @@ export function writeUserProfile(profile: UserProfile, options?: { emit?: boolea
 
 export async function fetchUserProfile(nationalId?: string, options?: { write?: boolean; emit?: boolean }) {
   const id = String(nationalId ?? readUserProfile()?.nationalId ?? "").trim();
-  if (!id) return null;
-
-  const res = await fetch(`/api/user/profile?nationalId=${encodeURIComponent(id)}`, {
+  const query = id ? `?nationalId=${encodeURIComponent(id)}` : "";
+  const res = await fetch(`/api/user/profile${query}`, {
     cache: "no-store",
   });
   const data = await res.json();

@@ -15,9 +15,10 @@ const passwordSchema = z.string()
 const customerProfileSchema = z.object({
   firstName: z.string().trim().regex(NAME_REGEX),
   lastName: z.string().trim().regex(NAME_REGEX),
-  nationalId: z.string().trim().regex(NATIONAL_ID_REGEX),
-  birthDate: z.string().trim().min(1).transform(normalizePersianDate).refine(isValidPastPersianDate, "birth date must be a valid past Jalali date"),
+  nationalId: z.string().trim().optional().default("").refine((value) => !value || NATIONAL_ID_REGEX.test(value), "national id must be 10 digits"),
+  birthDate: z.string().trim().optional().default("").transform(normalizePersianDate).refine((value) => !value || isValidPastPersianDate(value), "birth date must be a valid past Jalali date"),
   phone: z.string().trim().regex(PHONE_REGEX),
+  email: z.email().trim().toLowerCase().optional().or(z.literal("")).default(""),
   address: z.string().trim().min(5).max(200),
 });
 
@@ -28,13 +29,14 @@ export const idParamSchema = z.object({
 export const authRegisterSchema = z.object({
   email: z.email().trim().toLowerCase().optional(),
   username: z.string().trim().toLowerCase().min(3).max(32).regex(USERNAME_REGEX).optional(),
+  phone: z.string().trim().regex(PHONE_REGEX).optional(),
   password: passwordSchema,
   passwordConfirm: passwordSchema.optional(),
   name: z.string().trim().min(1).optional(),
   profile: customerProfileSchema.optional(),
-}).refine((value) => Boolean(value.email || value.username), {
-  message: "email or username is required",
-  path: ["username"],
+}).refine((value) => Boolean(value.phone || value.email || value.username || value.profile?.phone), {
+  message: "phone is required",
+  path: ["phone"],
 }).refine((value) => !value.passwordConfirm || value.password === value.passwordConfirm, {
   message: "password confirmation does not match",
   path: ["passwordConfirm"],
@@ -43,11 +45,21 @@ export const authRegisterSchema = z.object({
 export const authLoginSchema = z.object({
   email: z.email().trim().toLowerCase().optional(),
   username: z.string().trim().toLowerCase().optional(),
+  phone: z.string().trim().regex(PHONE_REGEX).optional(),
   identifier: z.string().trim().toLowerCase().optional(),
   password: z.string().min(1),
-}).refine((value) => Boolean(value.email || value.username || value.identifier), {
-  message: "username or email is required",
-  path: ["username"],
+}).refine((value) => Boolean(value.phone || value.email || value.username || value.identifier), {
+  message: "phone is required",
+  path: ["phone"],
+});
+
+export const authOtpRequestSchema = z.object({
+  phone: z.string().trim().regex(PHONE_REGEX),
+  purpose: z.enum(["login", "admin"]).optional().default("login"),
+});
+
+export const authOtpVerifySchema = authOtpRequestSchema.extend({
+  code: z.string().trim().regex(/^\d{6}$/),
 });
 
 export const resetRequestSchema = z.object({
@@ -66,7 +78,6 @@ export const changePasswordSchema = z.object({
 
 export const profileSchema = customerProfileSchema.extend({
   avatarUrl: z.string().trim().optional().nullable(),
-  themeMode: z.enum(["light", "dark"]).optional(),
   isAdminUnlocked: z.boolean().optional(),
 });
 

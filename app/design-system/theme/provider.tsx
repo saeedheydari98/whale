@@ -13,12 +13,10 @@ import { applyCSSVariables } from "./engine";
 import { generateCSSVariables } from "./css-vars";
 import { createTheme, ThemeStyle, ThemeColorKey } from "./theme";
 import {
-  readUserProfile,
-  saveUserProfile,
-  USER_PROFILE_UPDATED_EVENT,
-  writeUserProfile,
-} from "@/lib/user-profile";
-import { fetchAppGlobal, readCachedAppGlobal } from "@/lib/app-global-client";
+  APP_GLOBAL_UPDATED_EVENT,
+  fetchAppGlobal,
+  readCachedAppGlobal,
+} from "@/lib/app-global-client";
 import { THEME_CSS_VARS_STORAGE_KEY } from "./storage";
 
 type ThemeMode = "light" | "dark";
@@ -69,28 +67,19 @@ function readThemePayload<T>(payload: unknown, fallback: T): T {
     : fallback) as T;
 }
 
-function readProfileThemeMode(user: { profile?: unknown } | null | undefined) {
-  const profile = user?.profile && typeof user.profile === "object"
-    ? user.profile as { themeMode?: unknown }
-    : null;
-  return profile?.themeMode === "dark" || profile?.themeMode === "light"
-    ? profile.themeMode
-    : null;
-}
-
 function readInitialAdminTheme() {
   if (typeof window === "undefined") return defaultAdminTheme;
   return normalizeAdminTheme(readCachedAppGlobal()?.theme, defaultAdminTheme);
 }
 
 function readInitialThemeMode(): ThemeMode {
-  const profileMode = readUserProfile()?.themeMode;
-  if (profileMode === "light" || profileMode === "dark") return profileMode;
   const legacy = localStorage.getItem("theme-mode");
   return legacy === "light" || legacy === "dark" ? legacy : "light";
 }
 
 function readInitialThemeStyle(): ThemeStyle {
+  const cachedStyle = readInitialAdminTheme().style;
+  if (themeStyles.includes(cachedStyle)) return cachedStyle;
   const savedStyle = localStorage.getItem("theme-style");
   return savedStyle === "dark" || savedStyle === "fantasy" ? savedStyle : "light";
 }
@@ -101,9 +90,15 @@ export function ThemeProvider({
   children: React.ReactNode;
 }) {
   const [hasMounted, setHasMounted] = useState(false);
-  const [mode, setModeState] = useState<ThemeMode>("light");
-  const [style, setStyle] = useState<ThemeStyle>("light");
-  const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(defaultAdminTheme);
+  const [mode, setModeState] = useState<ThemeMode>(() =>
+    typeof window === "undefined" ? "light" : readInitialThemeMode()
+  );
+  const [style, setStyle] = useState<ThemeStyle>(() =>
+    typeof window === "undefined" ? "light" : readInitialThemeStyle()
+  );
+  const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(() =>
+    typeof window === "undefined" ? defaultAdminTheme : readInitialAdminTheme()
+  );
 
   const theme = useMemo(
     () =>
@@ -120,9 +115,10 @@ export function ThemeProvider({
   );
 
   useLayoutEffect(() => {
+    const initialAdminTheme = readInitialAdminTheme();
     setModeState(readInitialThemeMode());
-    setStyle(readInitialThemeStyle());
-    setAdminTheme(readInitialAdminTheme());
+    setStyle(initialAdminTheme.style || readInitialThemeStyle());
+    setAdminTheme(initialAdminTheme);
     setHasMounted(true);
   }, []);
 
@@ -155,40 +151,35 @@ export function ThemeProvider({
     if (!hasMounted) return;
     let cancelled = false;
 
-    const loadThemes = async () => {
-      try {
-        const globalData = await fetchAppGlobal();
-        if (cancelled) return;
-        setAdminTheme((current) => ({
-          ...current,
-          ...normalizeAdminTheme(
-            readThemePayload({ data: { theme: globalData.theme } }, defaultAdminTheme),
-            defaultAdminTheme
-          ),
-        }));
-        const profileMode = readProfileThemeMode(globalData.user) ?? readUserProfile()?.themeMode;
-        if (!cancelled && (profileMode === "light" || profileMode === "dark")) {
-          setModeState(profileMode);
-        }
-      } catch (error) {
-        console.error("Failed to load theme API settings:", error);
+    const syncThemes = () => {
+      const globalData = readCachedAppGlobal();
+      if (cancelled) return;
+
+      if (globalData) {
+        const nextAdminTheme = normalizeAdminTheme(
+          readThemePayload({ data: { theme: globalData.theme } }, defaultAdminTheme),
+          defaultAdminTheme
+        );
+        setAdminTheme(nextAdminTheme);
+        setStyle(nextAdminTheme.style);
       }
     };
 
-    void loadThemes();
-    const reloadThemes = () => void loadThemes();
-    window.addEventListener(USER_PROFILE_UPDATED_EVENT, reloadThemes);
+    syncThemes();
+    window.addEventListener(APP_GLOBAL_UPDATED_EVENT, syncThemes);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(USER_PROFILE_UPDATED_EVENT, reloadThemes);
+      window.removeEventListener(APP_GLOBAL_UPDATED_EVENT, syncThemes);
     };
   }, [hasMounted]);
 
   const updateAdminTheme = useCallback(async (next: Partial<AdminThemeConfig>) => {
     const prev = adminTheme;
+    const prevStyle = style;
     const optimistic = { ...prev, ...next };
     setAdminTheme(optimistic);
+    setStyle(optimistic.style);
 
     try {
       const res = await fetch("/api/admin/theme", {
@@ -197,22 +188,16 @@ export function ThemeProvider({
         body: JSON.stringify(optimistic),
       });
       if (!res.ok) throw new Error("Request failed");
+      void fetchAppGlobal({ force: true });
     } catch (error) {
       console.error("Failed to update admin theme:", error);
       setAdminTheme(prev);
+      setStyle(prevStyle);
     }
-  }, [adminTheme]);
+  }, [adminTheme, style]);
 
   const setMode = useCallback((next: ThemeMode) => {
     setModeState(next);
-    const profile = readUserProfile();
-    if (!profile) return;
-
-    const nextProfile = { ...profile, themeMode: next };
-    writeUserProfile(nextProfile);
-    void saveUserProfile(nextProfile).catch((error) => {
-      console.error("Failed to save profile theme mode:", error);
-    });
   }, []);
 
   const contextValue = useMemo(
@@ -229,6 +214,7 @@ export function ThemeProvider({
       mode,
       style,
       setMode,
+      setStyle,
       adminTheme,
       updateAdminTheme,
       theme,

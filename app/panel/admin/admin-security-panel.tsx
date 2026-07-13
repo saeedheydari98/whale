@@ -21,6 +21,28 @@ type AdminRequest = {
   user?: { name?: string | null; email?: string | null; role?: string | null };
 };
 
+let pendingAdminRequests: Promise<AdminRequest[]> | null = null;
+let cachedAdminRequests: AdminRequest[] | null = null;
+
+async function fetchAdminRequests(force = false) {
+  if (!force && cachedAdminRequests) return cachedAdminRequests;
+  if (!force && pendingAdminRequests) return pendingAdminRequests;
+
+  pendingAdminRequests = fetch("/api/admin/security/requests", { cache: "no-store" })
+    .then(async (res) => {
+      const data = await res.json();
+      if (!res.ok || data?.ok === false) throw new Error(data?.error || "بارگذاری درخواست‌های مدیریت ناموفق بود.");
+      const requests = Array.isArray(data?.data?.requests) ? data.data.requests : [];
+      cachedAdminRequests = requests;
+      return requests;
+    })
+    .finally(() => {
+      pendingAdminRequests = null;
+    });
+
+  return pendingAdminRequests;
+}
+
 export function AdminSecurityPanel() {
   const [hasAdminCode, setHasAdminCode] = useState(false);
   const [isPanelLocked, setIsPanelLocked] = useState(false);
@@ -39,11 +61,8 @@ export function AdminSecurityPanel() {
   const [showCodeRequiredErrors, setShowCodeRequiredErrors] = useState(false);
   const codeFormRef = useRef<HTMLDivElement>(null);
 
-  const loadAdminRequests = async () => {
-    const res = await fetch("/api/admin/security/requests", { cache: "no-store" });
-    const data = await res.json();
-    if (!res.ok || data?.ok === false) throw new Error(data?.error || "بارگذاری درخواست‌های مدیریت ناموفق بود.");
-    setAdminRequests(Array.isArray(data?.data?.requests) ? data.data.requests : []);
+  const loadAdminRequests = async (force = false) => {
+    setAdminRequests(await fetchAdminRequests(force));
   };
 
   useEffect(() => {
@@ -57,7 +76,7 @@ export function AdminSecurityPanel() {
       });
     void fetchCurrentUser()
       .then((user) => {
-        const superadmin = user?.username === "saeedheydari98" && user?.role === "superadmin";
+        const superadmin = user?.username === "09176991556" && user?.role === "superadmin";
         setIsSuperadmin(superadmin);
         setCheckedSuperadmin(true);
         if (superadmin) void loadAdminRequests();
@@ -75,7 +94,7 @@ export function AdminSecurityPanel() {
       });
       const data = await res.json();
       if (!res.ok || data?.ok === false) throw new Error(data?.error || "به‌روزرسانی درخواست مدیریت ناموفق بود.");
-      await loadAdminRequests();
+      await loadAdminRequests(true);
       setStatus(approved ? "درخواست مدیریت تایید شد." : "درخواست مدیریت رد شد.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "به‌روزرسانی درخواست مدیریت ناموفق بود.");

@@ -380,7 +380,7 @@ export async function checkoutCart(profile = readUserProfile()) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ profile }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {
     throw new Error(data?.message || data?.error || "Checkout failed");
   }

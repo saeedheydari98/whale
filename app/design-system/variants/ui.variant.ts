@@ -17,6 +17,32 @@ export type VariantColorStyle = {
   borderColor: string;
 };
 
+export function resolveVariantCssVars(variant: UICommonVariant): VariantColorStyle {
+  if (variant === "neutral") {
+    return {
+      backgroundColor: "var(--neutral-bg)",
+      color: "var(--neutral-text)",
+      borderColor: "var(--neutral-border)",
+    };
+  }
+
+  return {
+    backgroundColor: `var(--${variant})`,
+    color: `var(--${variant}-contrast)`,
+    borderColor: `var(--${variant}-border)`,
+  };
+}
+
+export function resolveControlCssVars(variant: UICommonVariant): Pick<VariantColorStyle, "backgroundColor" | "borderColor"> {
+  const baseColor = variant === "neutral" ? "var(--neutral)" : `var(--${variant})`;
+  const borderColor = variant === "neutral" ? "var(--neutral-border)" : `var(--${variant}-border)`;
+
+  return {
+    backgroundColor: `color-mix(in srgb, ${baseColor} 10%, var(--bg-surface))`,
+    borderColor,
+  };
+}
+
 export function strengthenBorderColor(color: string): string {
   const match = color.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i);
 
