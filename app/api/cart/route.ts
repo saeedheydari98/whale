@@ -31,6 +31,7 @@ type CartItemPayload = {
   discountPercent?: number | string | null;
   imageUrl?: string | null;
   selectedColor?: string | null;
+  selectedColors?: Record<string, unknown> | null;
   quantity?: number | string;
 };
 
@@ -53,6 +54,17 @@ type ProductUpdatePlan = {
   quantity: number;
   colorStock: Record<string, number>;
 };
+
+type CartProductSnapshot = {
+  id: number;
+  stockQuantity: number;
+  colorStock: Prisma.JsonValue | null;
+  isAvailable: boolean;
+  active: boolean;
+  isActive: boolean;
+};
+
+const COLOR_SELECTION_PREFIX = "colors:";
 
 function normalizeProfile(value: ProfilePayload) {
   return {
@@ -78,8 +90,55 @@ function isProfileComplete(profile: ReturnType<typeof normalizeProfile>) {
   );
 }
 
+function normalizeColorSelection(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([color, count]) => [
+        color.trim(),
+        Math.max(0, Math.round(Number(count))),
+      ] as const)
+      .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
+  );
+}
+
+function readColorSelection(selectedColor: unknown, quantity: number, selectedColors?: unknown) {
+  const fromObject = normalizeColorSelection(selectedColors);
+  if (Object.keys(fromObject).length > 0) return fromObject;
+
+  const text = String(selectedColor ?? "").trim();
+  if (!text) return {};
+
+  if (text.startsWith(COLOR_SELECTION_PREFIX)) {
+    try {
+      return normalizeColorSelection(JSON.parse(text.slice(COLOR_SELECTION_PREFIX.length)));
+    } catch {
+      return {};
+    }
+  }
+
+  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
+}
+
+function colorSelectionTotal(selection: Record<string, number>) {
+  return Object.values(selection).reduce((sum, count) => sum + Math.max(0, Math.round(Number(count) || 0)), 0);
+}
+
+function serializeColorSelection(selection: Record<string, number>) {
+  const normalized = normalizeColorSelection(selection);
+  const entries = Object.entries(normalized);
+  if (entries.length === 0) return null;
+  if (entries.length === 1) return entries[0][0];
+  return `${COLOR_SELECTION_PREFIX}${JSON.stringify(Object.fromEntries(entries))}`;
+}
+
 function normalizeCartItem(value: CartItemPayload) {
   const productId = Number(value.productId ?? value.id);
+  const quantity = Math.max(1, Math.round(Number(value.quantity ?? 1)));
+  const selectedColors = readColorSelection(value.selectedColor, quantity, value.selectedColors);
+  const selectedTotal = colorSelectionTotal(selectedColors);
+
   return {
     productId: Number.isInteger(productId) && productId > 0 ? productId : null,
     title: String(value.title ?? "").trim(),
@@ -91,15 +150,16 @@ function normalizeCartItem(value: CartItemPayload) {
       ? Math.max(0, Math.round(Number(value.discountPercent)))
       : null,
     imageUrl: value.imageUrl ? String(value.imageUrl) : null,
-    selectedColor: value.selectedColor ? String(value.selectedColor).trim() : null,
-    quantity: Math.max(1, Math.round(Number(value.quantity ?? 1))),
+    selectedColor: serializeColorSelection(selectedColors) ?? (value.selectedColor ? String(value.selectedColor).trim() : null),
+    selectedColors,
+    quantity: selectedTotal > 0 ? selectedTotal : quantity,
   };
 }
 
 function serverCartItemKey(item: ReturnType<typeof normalizeCartItem>) {
   return item.productId
     ? String(item.productId)
-    : `${item.title}|${item.description}|${item.price}|${item.selectedColor ?? ""}`;
+    : `${item.title}|${item.description}|${item.price}`;
 }
 
 function mergeCartItems(items: ReturnType<typeof normalizeCartItem>[]) {
@@ -110,10 +170,18 @@ function mergeCartItems(items: ReturnType<typeof normalizeCartItem>[]) {
     const key = serverCartItemKey(item);
     const existing = byKey.get(key);
     if (existing) {
+      const selectedColors = { ...existing.selectedColors };
+      for (const [color, count] of Object.entries(item.selectedColors)) {
+        selectedColors[color] = (selectedColors[color] ?? 0) + count;
+      }
+      const selectedTotal = colorSelectionTotal(selectedColors);
+
       byKey.set(key, {
         ...existing,
-        selectedColor: existing.selectedColor ?? item.selectedColor,
-        quantity: existing.quantity + item.quantity,
+        ...item,
+        selectedColors,
+        selectedColor: serializeColorSelection(selectedColors) ?? existing.selectedColor ?? item.selectedColor,
+        quantity: selectedTotal > 0 ? selectedTotal : existing.quantity + item.quantity,
       });
       continue;
     }
@@ -229,7 +297,7 @@ export async function POST(request: Request) {
     : [];
   const authUser = await getAuthUser(request);
   const hasCompleteProfile = isProfileComplete(profile);
-  if (!authUser && !hasCompleteProfile) return apiFail("complete profile is required", 400);
+  if (!authUser && !hasCompleteProfile) return apiFail("برای ادامه باید پروفایل را کامل کنید.", 400);
 
   try {
     const cart = hasCompleteProfile
@@ -238,18 +306,50 @@ export async function POST(request: Request) {
     const requestedProductIds = items
       .map((item) => item.productId)
       .filter((id): id is number => typeof id === "number");
-    const products = requestedProductIds.length
+    const products: CartProductSnapshot[] = requestedProductIds.length
       ? await prisma.product.findMany({
           where: { id: { in: Array.from(new Set(requestedProductIds)) } },
-          select: { id: true },
+          select: { id: true, stockQuantity: true, colorStock: true, isAvailable: true, active: true, isActive: true },
         })
       : [];
-    const validProductIds = new Set(products.map((product: { id: number }) => product.id));
+    const productsById = new Map(products.map((product) => [product.id, product]));
     const safeItems = mergeCartItems(
-      items.map((item) => ({
-        ...item,
-        productId: item.productId && validProductIds.has(item.productId) ? item.productId : null,
-      }))
+      items
+        .map((item) => {
+          const product = item.productId ? productsById.get(item.productId) : null;
+          if (!product) return { ...item, productId: null };
+
+          const colorStock = normalizeColorStock(product.colorStock);
+          const hasColorStock = Object.keys(colorStock).length > 0;
+          const productStock = Math.max(0, Math.round(Number(product.stockQuantity) || 0));
+          if (product.active === false || product.isActive === false || product.isAvailable === false || productStock <= 0) return null;
+
+          if (!hasColorStock) {
+            return {
+              ...item,
+              quantity: Math.max(1, Math.min(item.quantity, productStock)),
+            };
+          }
+
+          const selectedColors = Object.fromEntries(
+            Object.entries(item.selectedColors)
+              .map(([color, count]) => [
+                color,
+                Math.min(Math.max(0, Math.round(Number(count) || 0)), colorStock[color] ?? 0),
+              ] as const)
+              .filter(([, count]) => count > 0)
+          );
+          const selectedTotal = colorSelectionTotal(selectedColors);
+          if (selectedTotal <= 0) return null;
+
+          return {
+            ...item,
+            selectedColors,
+            selectedColor: serializeColorSelection(selectedColors),
+            quantity: selectedTotal,
+          };
+        })
+        .filter((item): item is ReturnType<typeof normalizeCartItem> => Boolean(item))
     );
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -290,7 +390,7 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const profile = await findLegacyProfile(request, body.profile ?? {});
-  if (!profile) return apiFail("profile not found", 404);
+  if (!profile) return apiFail("پروفایل پیدا نشد.", 404);
 
   try {
     const cart = await activeCartForProfile(profile.id);
@@ -314,18 +414,25 @@ export async function PATCH(request: Request) {
         | { id: number; stockQuantity: number; colorStock: unknown }
         | undefined;
       if (!product || product.stockQuantity < item.quantity) {
-        throw new Error(`${item.title} is out of stock`);
+        throw new Error(`${item.title} موجودی کافی ندارد.`);
       }
 
       const colorStock = normalizeColorStock(product.colorStock);
       if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
-        throw new Error(`Select a color for ${item.title}`);
+        throw new Error(`برای ${item.title} یک رنگ انتخاب کنید.`);
       }
-      if (item.selectedColor) {
-        if ((colorStock[item.selectedColor] ?? 0) < item.quantity) {
-          throw new Error(`${item.title} ${item.selectedColor} is out of stock`);
+      if (Object.keys(colorStock).length > 0) {
+        const selectedColors = readColorSelection(item.selectedColor, item.quantity);
+        const selectedTotal = colorSelectionTotal(selectedColors);
+        if (selectedTotal !== item.quantity) {
+          throw new Error(`تعداد رنگ‌های انتخاب‌شده برای ${item.title} با تعداد سبد خرید هماهنگ نیست.`);
         }
-        colorStock[item.selectedColor] -= item.quantity;
+        for (const [color, count] of Object.entries(selectedColors)) {
+          if ((colorStock[color] ?? 0) < count) {
+            throw new Error(`${item.title} با رنگ ${color} موجودی کافی ندارد.`);
+          }
+          colorStock[color] -= count;
+        }
       }
 
       productUpdates.push({
@@ -385,7 +492,7 @@ export async function PATCH(request: Request) {
     return apiOk({ user: { profile }, cart: { items: [] } });
   } catch (error) {
     console.error("Cart checkout error:", error);
-    return apiServerError(error instanceof Error ? error.message : "server error");
+    return apiServerError(error instanceof Error ? error.message : "خطای سرور رخ داد.");
   }
 }
 

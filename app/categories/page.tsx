@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import Loading from "@/app/design-system/components/loading/loading";
-import { FullPageLoading } from "@/app/design-system/components/loading/full-page-loading";
 import { LazyViewportSection } from "@/app/design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import { getCategoriesPageStructure, readCachedCategoriesPageStructure, slugifyCatalogValue, type ProductsCache } from "@/lib/products-client";
@@ -66,7 +65,7 @@ export default function CategoriesPage() {
         </div>
 
         {showWhaleLoading ? (
-          <FullPageLoading activeStep={2} title="دریافت ساختار صفحه" />
+          <Loading loading="fullscreen" />
         ) : null}
 
         {false ? (

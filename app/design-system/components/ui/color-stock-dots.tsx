@@ -35,6 +35,7 @@ type ColorStockDotsProps = {
   selectedColor?: string;
   onSelect?: (color: string) => void;
   disabledUnavailable?: boolean;
+  showCount?: boolean;
   size?: "sm" | "md";
   className?: string;
 };
@@ -44,6 +45,7 @@ export function ColorStockDots({
   selectedColor,
   onSelect,
   disabledUnavailable = false,
+  showCount = true,
   size = "sm",
   className,
 }: ColorStockDotsProps) {
@@ -55,6 +57,7 @@ export function ColorStockDots({
       {entries.map(({ color, count }) => {
         const selected = selectedColor === color;
         const disabled = disabledUnavailable && count <= 0;
+        const available = count > 0;
         const label = count > 10 ? "+10" : String(count);
         const dotSize = size === "md" ? "h-9 w-9" : "h-7 w-7";
         const labelSize = size === "md" ? "min-w-6 text-[13px] leading-5" : "min-w-5 text-[11px] leading-4";
@@ -64,8 +67,8 @@ export function ColorStockDots({
             key={color}
             type="button"
             disabled={!onSelect || disabled}
-            aria-label={`${color} stock ${count}`}
-            title={`${color}: ${count}`}
+            aria-label={`رنگ ${color} ${available ? "موجود" : "ناموجود"}`}
+            title={`رنگ ${color} ${available ? "موجود" : "ناموجود"}`}
             onClick={() => onSelect?.(color)}
             className={cx(
               "inline-flex shrink-0 items-center justify-center rounded-full border font-black tabular-nums shadow-sm transition",
@@ -75,12 +78,14 @@ export function ColorStockDots({
             )}
             style={{ backgroundColor: getStockColorValue(color) }}
           >
-            <span className={cx(
-              "inline-flex items-center justify-center rounded-full border border-primary-border bg-primary-base/90 px-1 text-center shadow-sm backdrop-blur-sm",
-              labelSize
-            )}>
-              {label}
-            </span>
+            {showCount ? (
+              <span className={cx(
+                "inline-flex items-center justify-center rounded-full border border-primary-border bg-primary-base/90 px-1 text-center shadow-sm backdrop-blur-sm",
+                labelSize
+              )}>
+                {label}
+              </span>
+            ) : null}
           </button>
         );
       })}

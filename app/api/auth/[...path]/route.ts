@@ -117,7 +117,7 @@ export async function GET(request: Request, context: Context) {
   if (limited) return limited;
 
   const action = (await context.params).path?.join("/") || "";
-  if (action !== "me" && action !== "session") return apiFail("not found", 404);
+  if (action !== "me" && action !== "session") return apiFail("مسیر پیدا نشد.", 404);
 
   const user = await getSessionUser(request);
   return apiOk({ user: user ? publicUser(user) : null });
@@ -141,7 +141,7 @@ export async function POST(request: Request, context: Context) {
       const existing = await prisma.user.findFirst({
         where: { OR: [{ email }, ...(username ? [{ username }] : [])] },
       });
-      if (existing) return apiFail("account already exists", 400);
+      if (existing) return apiFail("این حساب قبلا ثبت شده است.", 400);
 
       const user = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const createdUser = await tx.user.create({
@@ -198,7 +198,7 @@ export async function POST(request: Request, context: Context) {
         select: { id: true, email: true, username: true, name: true, role: true, passwordHash: true, avatarUrl: true },
       });
       if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
-        return apiFail("invalid credentials", 401);
+        return apiFail("شماره موبایل یا رمز عبور اشتباه است.", 401);
       }
       await normalizeRole(user);
       const tokens = await authTokens(user);
@@ -239,7 +239,7 @@ export async function POST(request: Request, context: Context) {
         orderBy: { createdAt: "desc" },
       });
       if (!otp || otp.codeHash !== hashToken(parsed.data.code)) {
-        return apiFail("invalid otp", 401);
+        return apiFail("کد پیامکی معتبر نیست.", 401);
       }
 
       await prisma.authOtp.update({
@@ -249,9 +249,6 @@ export async function POST(request: Request, context: Context) {
 
       const user = await findOrCreateOtpUser(parsed.data.phone);
       await normalizeRole(user);
-      if (parsed.data.purpose === "admin" && user.role !== "admin" && user.role !== "superadmin") {
-        return apiFail("forbidden", 403);
-      }
 
       const tokens = await authTokens(user);
       return apiOk({ user: publicUser(user), ...tokens });
@@ -271,13 +268,13 @@ export async function POST(request: Request, context: Context) {
       const payload = verifyToken(refreshToken);
       const userId = Number(payload?.sub);
       if (!refreshToken || payload?.type !== "refresh" || !Number.isInteger(userId)) {
-        return apiFail("unauthorized", 401);
+        return apiFail("برای ادامه باید وارد حساب شوید.", 401);
       }
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, email: true, username: true, name: true, role: true, refreshTokenHash: true, avatarUrl: true },
       });
-      if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return apiFail("unauthorized", 401);
+      if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return apiFail("برای ادامه باید وارد حساب شوید.", 401);
       await normalizeRole(user);
       const tokens = await authTokens(user);
       return apiOk({ user: publicUser(user), ...tokens });
@@ -306,7 +303,7 @@ export async function POST(request: Request, context: Context) {
           resetTokenExpiresAt: { gt: new Date() },
         },
       });
-      if (!user) return apiFail("invalid reset token", 400);
+      if (!user) return apiFail("لینک بازیابی رمز عبور معتبر نیست.", 400);
       await prisma.user.update({
         where: { id: user.id },
         data: {
@@ -319,7 +316,7 @@ export async function POST(request: Request, context: Context) {
       return apiOk({ reset: true });
     }
 
-    return apiFail("not found", 404);
+    return apiFail("مسیر پیدا نشد.", 404);
   } catch (error) {
     console.error("Auth API error:", error);
     return apiServerError();

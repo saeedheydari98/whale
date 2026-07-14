@@ -936,7 +936,7 @@ export async function getRecommendationProducts(product: ProductRecord | null, s
   });
 }
 
-export async function getProductDetail(identifier: string, searchParams: URLSearchParams, request?: Request) {
+export async function getProductDetail(identifier: string, searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
 
   return withCatalogCache("product-detail", [identifier, includeInactive ? "all" : "active"], getTtl(searchParams, DETAILS_TTL_SECONDS), async () => {
@@ -956,7 +956,6 @@ export async function getProductDetail(identifier: string, searchParams: URLSear
       recommendations: recommendations.products,
       isPurchased: false,
       hasRated: false,
-      requestScoped: Boolean(request),
     };
   });
 }

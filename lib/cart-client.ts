@@ -19,6 +19,9 @@ export const CART_UPDATED_EVENT = "product-cart-updated";
 
 const SILENT_NOTIFICATION_HEADERS = { [NOTIFICATION_SILENT_HEADER]: "true" };
 const GUEST_CART_STORAGE_KEY = `${CART_STORAGE_KEY}:guest`;
+const COLOR_SELECTION_PREFIX = "colors:";
+
+export type CartColorSelection = Record<string, number>;
 
 export type CartItemRecord = {
   id?: number | string;
@@ -31,6 +34,7 @@ export type CartItemRecord = {
   discountPercent?: number | string | null;
   imageUrl?: string | null;
   selectedColor?: string | null;
+  selectedColors?: CartColorSelection;
   isAvailable?: boolean;
   stockQuantity?: number | string;
   colorStock?: unknown;
@@ -102,19 +106,88 @@ function notifyCartError(message: string) {
   notifyApp({ type: "error", message });
 }
 
+export function normalizeCartColorStock(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([color, count]) => [
+        color.trim(),
+        Math.max(0, Math.round(Number(count))),
+      ] as const)
+      .filter(([color, count]) => color && Number.isFinite(count))
+  );
+}
+
+function normalizeColorSelection(value: unknown): CartColorSelection {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([color, count]) => [
+        color.trim(),
+        Math.max(0, Math.round(Number(count))),
+      ] as const)
+      .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
+  );
+}
+
+function parseSerializedColorSelection(value: unknown, quantity: number): CartColorSelection {
+  const text = String(value ?? "").trim();
+  if (!text) return {};
+
+  if (text.startsWith(COLOR_SELECTION_PREFIX)) {
+    try {
+      return normalizeColorSelection(JSON.parse(text.slice(COLOR_SELECTION_PREFIX.length)));
+    } catch {
+      return {};
+    }
+  }
+
+  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
+}
+
+function colorSelectionTotal(selection: CartColorSelection) {
+  return Object.values(selection).reduce((sum, count) => sum + Math.max(0, Math.round(Number(count) || 0)), 0);
+}
+
+function serializeColorSelection(selection: CartColorSelection) {
+  const normalized = normalizeColorSelection(selection);
+  const entries = Object.entries(normalized);
+  if (entries.length === 0) return "";
+  if (entries.length === 1) return entries[0][0];
+  return `${COLOR_SELECTION_PREFIX}${JSON.stringify(Object.fromEntries(entries))}`;
+}
+
+export function getCartItemColorSelection(item: Partial<CartItemRecord>): CartColorSelection {
+  const quantity = Math.max(1, Math.round(Number(item.quantity ?? 1) || 1));
+  const fromObject = normalizeColorSelection(item.selectedColors);
+  if (Object.keys(fromObject).length > 0) return fromObject;
+  return parseSerializedColorSelection(item.selectedColor, quantity);
+}
+
+function getFirstAvailableColor(colorStock: Record<string, number>) {
+  return Object.entries(colorStock).find(([, count]) => count > 0)?.[0] ?? "";
+}
+
 function getItemKey(item: Partial<CartItemRecord>) {
   const base = String(
     item.productId ??
       item.id ??
       `${item.title ?? ""}-${item.description ?? ""}-${item.price ?? ""}`
   );
-  return `${base}|${item.selectedColor ?? ""}`;
+  return base;
 }
 
 function normalizeCartItem(item: Partial<CartItemRecord>, index: number): CartItemRecord {
   const stockQuantity = Number.isFinite(Number(item.stockQuantity))
     ? Math.max(0, Math.round(Number(item.stockQuantity)))
     : undefined;
+  const requestedQuantity = Math.max(1, Math.round(Number(item.quantity ?? index + 1)));
+  const selectedColors = getCartItemColorSelection({ ...item, quantity: requestedQuantity });
+  const selectedColorText = serializeColorSelection(selectedColors);
+  const selectedTotal = colorSelectionTotal(selectedColors);
+
   return {
     id: item.id,
     productId: item.productId ?? item.id ?? null,
@@ -125,11 +198,12 @@ function normalizeCartItem(item: Partial<CartItemRecord>, index: number): CartIt
     discountPrice: item.discountPrice ? String(item.discountPrice) : "",
     discountPercent: item.discountPercent ?? "",
     imageUrl: item.imageUrl ? String(item.imageUrl) : "",
-    selectedColor: item.selectedColor ? String(item.selectedColor) : "",
+    selectedColor: selectedColorText || (item.selectedColor ? String(item.selectedColor) : ""),
+    selectedColors,
     isAvailable: item.isAvailable !== false,
     stockQuantity,
     colorStock: item.colorStock,
-    quantity: Math.max(1, Math.round(Number(item.quantity ?? index + 1))),
+    quantity: selectedTotal > 0 ? selectedTotal : requestedQuantity,
   };
 }
 
@@ -154,13 +228,29 @@ function dedupeCartItems(items: CartItemRecord[]) {
     const key = getItemKey(item);
     const existing = byKey.get(key);
     if (existing) {
+      const mergedSelection = {
+        ...getCartItemColorSelection(existing),
+      };
+      for (const [color, count] of Object.entries(getCartItemColorSelection(item))) {
+        mergedSelection[color] = (mergedSelection[color] ?? 0) + count;
+      }
+      const selectionTotal = colorSelectionTotal(mergedSelection);
+
       byKey.set(key, {
         ...existing,
-        quantity: existing.quantity + item.quantity,
+        ...item,
+        selectedColors: mergedSelection,
+        selectedColor: serializeColorSelection(mergedSelection) || existing.selectedColor || item.selectedColor || "",
+        quantity: selectionTotal > 0 ? selectionTotal : existing.quantity + item.quantity,
       });
       continue;
     }
-    byKey.set(key, item);
+    const selectedColors = getCartItemColorSelection(item);
+    byKey.set(key, {
+      ...item,
+      selectedColors,
+      selectedColor: serializeColorSelection(selectedColors) || item.selectedColor || "",
+    });
   }
 
   return Array.from(byKey.values());
@@ -210,7 +300,7 @@ async function loadCartFromApi(options?: { silent?: boolean }) {
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "Cart load failed");
+    throw new Error(data?.message || data?.error || "بارگذاری سبد خرید ناموفق بود.");
   }
   const apiItems = readCartItemsFromApiData(data);
   return {
@@ -230,7 +320,7 @@ async function saveCartToApi(items: CartItemRecord[], profile?: UserProfile | nu
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "Cart save failed");
+    throw new Error(data?.message || data?.error || "ذخیره سبد خرید ناموفق بود.");
   }
   const apiItems = readCartItemsFromApiData(data);
   return Array.isArray(apiItems)
@@ -249,7 +339,7 @@ async function clearCartFromApi(profile?: UserProfile | null, options?: { silent
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "Cart clear failed");
+    throw new Error(data?.message || data?.error || "پاک کردن سبد خرید ناموفق بود.");
   }
   return [];
 }
@@ -307,19 +397,62 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
   }
 
   const productId = product.id ?? null;
-  const key = `${String(productId ?? `${product.title}-${product.description}-${product.price}`)}|${selectedColor}`;
+  const key = String(productId ?? `${product.title}-${product.description}-${product.price}`);
+  const colorStock = normalizeCartColorStock(product.colorStock);
+  const hasColorStock = Object.keys(colorStock).length > 0;
+  const cartColor = selectedColor || getFirstAvailableColor(colorStock);
+  const requestedQuantity = Math.max(1, Math.round(Number(quantity) || 1));
+
+  if (hasColorStock && !cartColor) {
+    const message = "برای این محصول باید یک رنگ موجود انتخاب کنید.";
+    notifyCartError(message);
+    throw new Error(message);
+  }
+
   const currentCart = readLocalCart();
   const existing = currentCart.find((item) => getItemKey(item) === key);
-  const nextQuantity = clampCartQuantity(product, (existing?.quantity ?? 0) + quantity);
+  const existingSelection = existing ? getCartItemColorSelection(existing) : {};
+  const nextSelection = { ...existingSelection };
+
+  if (hasColorStock && cartColor) {
+    const nextColorQuantity = (nextSelection[cartColor] ?? 0) + requestedQuantity;
+    const colorLimit = colorStock[cartColor] ?? 0;
+    if (nextColorQuantity > colorLimit) {
+      const message = `موجودی رنگ ${cartColor} کافی نیست.`;
+      notifyCartError(message);
+      throw new Error(message);
+    }
+    nextSelection[cartColor] = nextColorQuantity;
+  }
+
+  const nextQuantity = hasColorStock
+    ? colorSelectionTotal(nextSelection)
+    : clampCartQuantity(product, (existing?.quantity ?? 0) + requestedQuantity);
+
   if (nextQuantity <= 0) {
     const message = "محصول ناموجود است.";
     notifyCartError(message);
     throw new Error(message);
   }
+
+  if (nextQuantity > stockLimit) {
+    const message = "موجودی محصول کافی نیست.";
+    notifyCartError(message);
+    throw new Error(message);
+  }
+
   const nextCart = existing
     ? currentCart.map((item) =>
         getItemKey(item) === key
-          ? { ...item, quantity: nextQuantity, stockQuantity: product.stockQuantity, isAvailable: product.isAvailable }
+          ? {
+              ...item,
+              quantity: nextQuantity,
+              selectedColor: serializeColorSelection(nextSelection) || item.selectedColor || "",
+              selectedColors: nextSelection,
+              colorStock: product.colorStock,
+              stockQuantity: product.stockQuantity,
+              isAvailable: product.isAvailable,
+            }
           : item
       )
     : [
@@ -328,7 +461,8 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
           {
             ...product,
             productId,
-            selectedColor,
+            selectedColor: serializeColorSelection(nextSelection) || cartColor,
+            selectedColors: nextSelection,
             quantity: nextQuantity,
           },
           currentCart.length
@@ -358,6 +492,53 @@ export async function updateCartQuantity(target: CartItemRecord, quantity: numbe
   return savedItems;
 }
 
+export async function updateCartColorQuantity(
+  target: CartItemRecord,
+  color: string,
+  quantity: number,
+  options?: { notify?: boolean }
+) {
+  const key = getItemKey(target);
+  const currentCart = readLocalCart();
+  const colorName = String(color ?? "").trim();
+  if (!colorName) return currentCart;
+
+  const nextCart = currentCart.flatMap((item) => {
+    if (getItemKey(item) !== key) return [item];
+
+    const colorStock = normalizeCartColorStock(item.colorStock || target.colorStock);
+    const stockLimit = getStockLimit(item);
+    const currentSelection = getCartItemColorSelection(item);
+    const nextSelection = { ...currentSelection };
+    const totalWithoutColor = colorSelectionTotal(currentSelection) - (currentSelection[colorName] ?? 0);
+    const colorLimit = colorStock[colorName] ?? stockLimit;
+    const totalLimit = Number.isFinite(stockLimit) ? Math.max(0, stockLimit - totalWithoutColor) : Number.POSITIVE_INFINITY;
+    const nextColorQuantity = Math.max(0, Math.min(Math.round(Number(quantity) || 0), colorLimit, totalLimit));
+
+    if (nextColorQuantity > 0) {
+      nextSelection[colorName] = nextColorQuantity;
+    } else {
+      delete nextSelection[colorName];
+    }
+
+    const nextQuantity = colorSelectionTotal(nextSelection);
+    if (nextQuantity <= 0) return [];
+
+    return [{
+      ...item,
+      selectedColors: nextSelection,
+      selectedColor: serializeColorSelection(nextSelection),
+      quantity: nextQuantity,
+    }];
+  });
+
+  const savedItems = await persistCart(nextCart);
+  if (options?.notify !== false) {
+    notifyCartSuccess("سبد خرید به‌روزرسانی شد.");
+  }
+  return savedItems;
+}
+
 export async function removeCartItem(target: CartItemRecord) {
   return updateCartQuantity(target, 0);
 }
@@ -382,7 +563,7 @@ export async function checkoutCart(profile = readUserProfile()) {
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "Checkout failed");
+    throw new Error(data?.message || data?.error || "ثبت سفارش ناموفق بود.");
   }
 
   writeLocalCart([]);

@@ -132,7 +132,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Banners GET error:", error);
     return NextResponse.json(
-      { ok: false, error: "server error", data: { banners: [] } },
+      { ok: false, error: "خطای سرور رخ داد.", data: { banners: [] } },
       { status: 500 }
     );
   }
@@ -190,6 +190,6 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Banners POST error:", error);
-    return NextResponse.json({ ok: false, error: "server error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد." }, { status: 500 });
   }
 }

@@ -41,7 +41,7 @@ export async function fetchCurrentUser(options?: { force?: boolean }) {
 
   pendingUser = fetch("/api/user/profile", { cache: "no-store" })
     .then((res) => {
-      if (!res.ok) throw new Error("profile load failed");
+      if (!res.ok) throw new Error("بارگذاری پروفایل ناموفق بود.");
       return res.json();
     })
     .then((data) => {

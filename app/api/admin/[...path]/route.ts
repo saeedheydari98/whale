@@ -52,7 +52,7 @@ export async function GET(request: Request, context: Context) {
     if (path[0] === "banners") {
       if (path[1]) {
         const banner = await prisma.banner.findUnique({ where: { id: path[1] } });
-        return banner ? apiOk({ banner }) : apiFail("not found", 404);
+        return banner ? apiOk({ banner }) : apiFail("موردی پیدا نشد.", 404);
       }
       const banners = await prisma.banner.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] });
       return apiOk({ banners });
@@ -71,7 +71,7 @@ export async function GET(request: Request, context: Context) {
         where: { id: path[1] },
         include: { products: true, banners: true },
       });
-      return showcase ? apiOk({ showcase }) : apiFail("not found", 404);
+      return showcase ? apiOk({ showcase }) : apiFail("موردی پیدا نشد.", 404);
     }
 
     if (path[0] === "showcases" && path[1] && path[2] === "products") {
@@ -85,7 +85,7 @@ export async function GET(request: Request, context: Context) {
     if (path[0] === "products") {
       if (path[1]) {
         const product = await prisma.product.findUnique({ where: { id: Number(path[1]) } });
-        return product ? apiOk({ product }) : apiFail("not found", 404);
+        return product ? apiOk({ product }) : apiFail("موردی پیدا نشد.", 404);
       }
       const products = await prisma.product.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] });
       return apiOk({ products });
@@ -93,7 +93,7 @@ export async function GET(request: Request, context: Context) {
 
     if (path[0] === "structure") return apiOk({ structure: await readStructure() });
 
-    return apiFail("not found", 404);
+    return apiFail("مسیر پیدا نشد.", 404);
   } catch (error) {
     console.error("Admin GET error:", error);
     return apiServerError();
@@ -126,7 +126,7 @@ export async function POST(request: Request, context: Context) {
     if (path[0] === "showcases" && path[1] && path[2] === "products") {
       const body = await request.json().catch(() => null);
       const productId = Number(body?.productId);
-      if (!Number.isInteger(productId)) return apiFail("productId is required", 422);
+      if (!Number.isInteger(productId)) return apiFail("شناسه محصول الزامی است.", 422);
       const product = await prisma.product.update({ where: { id: productId }, data: { showcaseId: path[1] } });
       return apiOk({ product }, { status: 201 });
     }
@@ -153,7 +153,7 @@ export async function POST(request: Request, context: Context) {
       return apiOk({ product }, { status: 201 });
     }
 
-    return apiFail("not found", 404);
+    return apiFail("مسیر پیدا نشد.", 404);
   } catch (error) {
     console.error("Admin POST error:", error);
     return apiServerError();
@@ -176,11 +176,11 @@ async function updateEntity(request: Request, context: Context, partial: boolean
   try {
     if (path[0] === "structure") {
       const body = await request.json().catch(() => null);
-      if (!body || typeof body !== "object") return apiFail("invalid payload", 422);
+      if (!body || typeof body !== "object") return apiFail("اطلاعات ارسالی معتبر نیست.", 422);
       return apiOk({ structure: body });
     }
 
-    if (!path[1]) return apiFail("not found", 404);
+    if (!path[1]) return apiFail("موردی پیدا نشد.", 404);
 
     if (path[0] === "banners") {
       const body = await request.json().catch(() => null);
@@ -220,9 +220,9 @@ async function updateEntity(request: Request, context: Context, partial: boolean
       return apiOk({ product });
     }
 
-    return apiFail("not found", 404);
+    return apiFail("مسیر پیدا نشد.", 404);
   } catch (error: any) {
-    if (error?.code === "P2025") return apiFail("not found", 404);
+    if (error?.code === "P2025") return apiFail("موردی پیدا نشد.", 404);
     console.error("Admin update error:", error);
     return apiServerError();
   }
@@ -238,14 +238,14 @@ export async function DELETE(request: Request, context: Context) {
       const product = await prisma.product.update({ where: { id: Number(path[3]) }, data: { showcaseId: null } });
       return apiOk({ product });
     }
-    if (!path[1]) return apiFail("not found", 404);
+    if (!path[1]) return apiFail("موردی پیدا نشد.", 404);
     if (path[0] === "banners") await prisma.banner.delete({ where: { id: path[1] } });
     else if (path[0] === "showcases") await prisma.showcase.delete({ where: { id: path[1] } });
     else if (path[0] === "products") await prisma.product.delete({ where: { id: Number(path[1]) } });
-    else return apiFail("not found", 404);
+    else return apiFail("مسیر پیدا نشد.", 404);
     return apiOk({ deleted: true });
   } catch (error: any) {
-    if (error?.code === "P2025") return apiFail("not found", 404);
+    if (error?.code === "P2025") return apiFail("موردی پیدا نشد.", 404);
     console.error("Admin DELETE error:", error);
     return apiServerError();
   }

@@ -816,13 +816,13 @@ function catalogErrorMessage(error: unknown) {
   const code = typeof error === "object" && error && "code" in error
     ? String((error as { code?: unknown }).code)
     : "";
-  if (code === "P1001") return "database unavailable";
-  if (code === "P2021") return "database schema is missing a required table";
-  if (code === "P2002") return "duplicate value";
-  if (code === "P2003") return "invalid related record";
-  if (code === "P2025") return "record not found";
+  if (code === "P1001") return "پایگاه داده در دسترس نیست.";
+  if (code === "P2021") return "ساختار پایگاه داده کامل نیست.";
+  if (code === "P2002") return "مقدار تکراری ثبت شده است.";
+  if (code === "P2003") return "رکورد مرتبط معتبر نیست.";
+  if (code === "P2025") return "رکورد پیدا نشد.";
   if (process.env.NODE_ENV !== "production" && error instanceof Error) return error.message;
-  return "server error";
+  return "خطای سرور رخ داد.";
 }
 
 function splitTreePayload(tree: CatalogTreePayload | null) {
@@ -966,7 +966,7 @@ export async function POST(request: Request) {
 
   const missingCategory = normalized.some((p) => !String(p.categoryId ?? "").trim());
   if (missingCategory) {
-    return NextResponse.json({ ok: false, error: "categoryId is required for every product" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "دسته بندی برای همه محصولات الزامی است." }, { status: 400 });
   }
 
   if (!hasProductModel) {

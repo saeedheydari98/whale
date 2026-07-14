@@ -32,7 +32,7 @@ export async function PUT(request: Request, context: Context) {
     });
     return apiOk({ item: cartItemDto(item) });
   } catch (error: any) {
-    if (error?.code === "P2025") return apiFail("not found", 404);
+    if (error?.code === "P2025") return apiFail("آیتم سبد خرید پیدا نشد.", 404);
     console.error("Cart item PUT error:", error);
     return apiServerError();
   }
@@ -48,7 +48,7 @@ export async function DELETE(request: Request, context: Context) {
     await prisma.cartItem.delete({ where: { cartId_productId: { cartId: cart.id, productId: Number(productId) } } });
     return apiOk({ deleted: true });
   } catch (error: any) {
-    if (error?.code === "P2025") return apiFail("not found", 404);
+    if (error?.code === "P2025") return apiFail("آیتم سبد خرید پیدا نشد.", 404);
     console.error("Cart item DELETE error:", error);
     return apiServerError();
   }

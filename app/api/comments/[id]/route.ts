@@ -14,9 +14,9 @@ async function canEdit(request: Request, commentId: string) {
   const auth = await requireUser(request);
   if (!auth.ok) return auth;
   const comment = await prisma.comment.findUnique({ where: { id: commentId } });
-  if (!comment) return { ok: false as const, response: apiFail("not found", 404) };
+  if (!comment) return { ok: false as const, response: apiFail("دیدگاه پیدا نشد.", 404) };
   if (auth.user.role !== "admin" && comment.userId !== auth.user.id) {
-    return { ok: false as const, response: apiFail("forbidden", 403) };
+    return { ok: false as const, response: apiFail("دسترسی شما برای ویرایش این دیدگاه کافی نیست.", 403) };
   }
   return { ok: true as const, user: auth.user, comment };
 }

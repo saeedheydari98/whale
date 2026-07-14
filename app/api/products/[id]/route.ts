@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { requireAdmin } from "@/lib/api/auth";
+import { getAuthUser, requireAdmin } from "@/lib/api/auth";
 import { productSchema } from "@/lib/api/schemas";
 import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
 import { validationError } from "@/lib/api/validation";
@@ -13,6 +13,37 @@ export const runtime = "nodejs";
 
 type Context = { params: Promise<{ id: string }> };
 
+async function getProductViewerState(productId: number, request: Request) {
+  const authUser = await getAuthUser(request);
+  if (!authUser) return { isPurchased: false, hasRated: false };
+
+  const [purchased, previousRating] = await Promise.all([
+    prisma.orderItem.findFirst({
+      where: {
+        productId,
+        order: {
+          userId: authUser.id,
+          status: "paid",
+        },
+      },
+      select: { id: true },
+    }),
+    prisma.comment.findFirst({
+      where: {
+        productId,
+        userId: authUser.id,
+        rating: { not: null },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  return {
+    isPurchased: Boolean(purchased),
+    hasRated: Boolean(previousRating),
+  };
+}
+
 export async function GET(request: Request, context: Context) {
   const limited = rateLimit(request);
   if (limited) return limited;
@@ -20,8 +51,15 @@ export async function GET(request: Request, context: Context) {
   try {
     const { id } = await context.params;
     const url = new URL(request.url);
-    const detail = await getProductDetail(id, url.searchParams, request);
-    return detail ? apiOk(detail) : apiFail("not found", 404);
+    const detail = await getProductDetail(id, url.searchParams);
+    if (!detail) return apiFail("محصول پیدا نشد.", 404);
+
+    const productId = Number(detail.product?.id);
+    const viewerState = Number.isInteger(productId) && productId > 0
+      ? await getProductViewerState(productId, request)
+      : { isPurchased: false, hasRated: false };
+
+    return apiOk({ ...detail, ...viewerState });
   } catch (error) {
     console.error("Product GET error:", error);
     return apiServerError();
@@ -53,7 +91,7 @@ async function updateProduct(request: Request, context: Context, partial: boolea
 
     return apiOk({ product });
   } catch (error: any) {
-    if (error?.code === "P2025") return apiFail("not found", 404);
+    if (error?.code === "P2025") return apiFail("محصول پیدا نشد.", 404);
     console.error("Product update error:", error);
     return apiServerError();
   }
@@ -77,7 +115,7 @@ export async function DELETE(request: Request, context: Context) {
     await invalidateCatalogCache("products.delete");
     return apiOk({ deleted: true });
   } catch (error: any) {
-    if (error?.code === "P2025") return apiFail("not found", 404);
+    if (error?.code === "P2025") return apiFail("محصول پیدا نشد.", 404);
     console.error("Product DELETE error:", error);
     return apiServerError();
   }

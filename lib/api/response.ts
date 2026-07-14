@@ -28,6 +28,6 @@ export function apiFail(message: string, status = 400, errors: unknown[] = [], d
   );
 }
 
-export function apiServerError(message = "server error") {
+export function apiServerError(message = "خطای سرور رخ داد.") {
   return apiFail(message, 500);
 }

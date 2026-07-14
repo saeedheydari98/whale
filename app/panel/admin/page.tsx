@@ -19,6 +19,7 @@ import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
 import { useAppGlobal } from "@/lib/app-global-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
+import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
 
 type AdminPanelUser = {
   username?: string | null;
@@ -80,10 +81,10 @@ export default function AdminPanelPage() {
     }
   }, [activeTab, authUser?.role]);
 
-  const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === "09176991556";
+  const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === SUPERADMIN_PHONE;
   const tabs = [
     { id: "theme", label: "ظاهر", icon: <IoColorPaletteOutline /> },
-    ...(isSuperadmin ? [{ id: "security", label: "امنیت", icon: <IoShieldCheckmarkOutline /> }] : []),
+    ...(isSuperadmin ? [{ id: "security", label: "دسترسی ها", icon: <IoShieldCheckmarkOutline /> }] : []),
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
     { id: "showcases", label: "ویترین ها", icon: <IoAlbumsOutline /> },

@@ -11,6 +11,17 @@ export const runtime = "nodejs";
 
 type Context = { params: Promise<{ id: string }> };
 
+function commentAuthorName(...values: unknown[]) {
+  for (const value of values) {
+    const text = String(value ?? "").trim();
+    if (!text || text.includes("@")) continue;
+    const firstName = text.split(/\s+/).find(Boolean);
+    if (firstName) return firstName;
+  }
+
+  return "مهمان";
+}
+
 export async function GET(request: Request, context: Context) {
   const limited = rateLimit(request);
   if (limited) return limited;
@@ -67,10 +78,10 @@ export async function POST(request: Request, context: Context) {
   try {
     const { id } = await context.params;
     const product = await prisma.product.findUnique({ where: { id: Number(id) } });
-    if (!product) return apiFail("not found", 404);
+    if (!product) return apiFail("محصول پیدا نشد.", 404);
 
     if (parsed.data.rating) {
-      if (!authUser) return apiFail("login required before rating", 401);
+      if (!authUser) return apiFail("برای ثبت امتیاز ابتدا وارد حساب شوید.", 401);
       const purchased = await prisma.orderItem.findFirst({
         where: {
           productId: product.id,
@@ -80,7 +91,7 @@ export async function POST(request: Request, context: Context) {
           },
         },
       });
-      if (!purchased) return apiFail("purchase required before rating", 403);
+      if (!purchased) return apiFail("فقط خریداران این محصول می توانند امتیاز ثبت کنند.", 403);
 
       const previousRating = await prisma.comment.findFirst({
         where: {
@@ -89,14 +100,14 @@ export async function POST(request: Request, context: Context) {
           rating: { not: null },
         },
       });
-      if (previousRating) return apiFail("rating already submitted", 409);
+      if (previousRating) return apiFail("شما قبلا برای این محصول امتیاز ثبت کرده اید.", 409);
     }
 
     const comment = await prisma.comment.create({
       data: {
         productId: product.id,
         userId: authUser?.id ?? null,
-        author: parsed.data.author || authUser?.name || authUser?.email || "Guest",
+        author: commentAuthorName(parsed.data.author, authUser?.name, authUser?.username),
         content: parsed.data.content,
         rating: parsed.data.rating ?? null,
         active: parsed.data.active ?? true,

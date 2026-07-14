@@ -175,7 +175,7 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
 
 export async function requireUser(request: Request) {
   const user = await getAuthUser(request);
-  if (!user) return { ok: false as const, response: apiFail("unauthorized", 401) };
+  if (!user) return { ok: false as const, response: apiFail("برای ادامه باید وارد حساب شوید.", 401) };
   return { ok: true as const, user };
 }
 
@@ -183,7 +183,7 @@ export async function requireAdmin(request: Request) {
   const auth = await requireUser(request);
   if (!auth.ok) return auth;
   if (auth.user.role !== "admin" && auth.user.role !== "superadmin") {
-    return { ok: false as const, response: apiFail("forbidden", 403) };
+    return { ok: false as const, response: apiFail("دسترسی شما برای این بخش کافی نیست.", 403) };
   }
   return auth;
 }

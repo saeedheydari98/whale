@@ -73,11 +73,13 @@ function readInitialAdminTheme() {
 }
 
 function readInitialThemeMode(): ThemeMode {
+  if (typeof window === "undefined") return "light";
   const legacy = localStorage.getItem("theme-mode");
   return legacy === "light" || legacy === "dark" ? legacy : "light";
 }
 
 function readInitialThemeStyle(): ThemeStyle {
+  if (typeof window === "undefined") return "light";
   const cachedStyle = readInitialAdminTheme().style;
   if (themeStyles.includes(cachedStyle)) return cachedStyle;
   const savedStyle = localStorage.getItem("theme-style");
@@ -90,15 +92,9 @@ export function ThemeProvider({
   children: React.ReactNode;
 }) {
   const [hasMounted, setHasMounted] = useState(false);
-  const [mode, setModeState] = useState<ThemeMode>(() =>
-    typeof window === "undefined" ? "light" : readInitialThemeMode()
-  );
-  const [style, setStyle] = useState<ThemeStyle>(() =>
-    typeof window === "undefined" ? "light" : readInitialThemeStyle()
-  );
-  const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(() =>
-    typeof window === "undefined" ? defaultAdminTheme : readInitialAdminTheme()
-  );
+  const [mode, setModeState] = useState<ThemeMode>("light");
+  const [style, setStyle] = useState<ThemeStyle>("light");
+  const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(defaultAdminTheme);
 
   const theme = useMemo(
     () =>
@@ -187,7 +183,7 @@ export function ThemeProvider({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(optimistic),
       });
-      if (!res.ok) throw new Error("Request failed");
+      if (!res.ok) throw new Error("ذخیره تنظیمات ظاهری ناموفق بود.");
       void fetchAppGlobal({ force: true });
     } catch (error) {
       console.error("Failed to update admin theme:", error);

@@ -15,7 +15,7 @@ import {
   readCachedAppGlobal,
   type AppGlobalData,
 } from "@/lib/app-global-client";
-import { FullPageLoading } from "@/app/design-system/components/loading/full-page-loading";
+import Loading from "@/app/design-system/components/loading/loading";
 
 type AppGlobalContextValue = {
   data: AppGlobalData | null;
@@ -72,7 +72,7 @@ export function AppGlobalProvider({ children }: { children: ReactNode }) {
   return (
     <AppGlobalContext.Provider value={value}>
       {children}
-      {mounted && loading && !data ? <FullPageLoading activeStep={1} title="" /> : null}
+      {mounted && loading && !data ? <Loading loading="fullscreen" /> : null}
     </AppGlobalContext.Provider>
   );
 }

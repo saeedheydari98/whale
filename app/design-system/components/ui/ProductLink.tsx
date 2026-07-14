@@ -1,5 +1,8 @@
+"use client";
+
 import React from "react";
-import { slugifyCatalogValue } from "@/lib/products-client";
+import { useQueryClient } from "@tanstack/react-query";
+import { getProductDetail, slugifyCatalogValue } from "@/lib/products-client";
 import { CustomButton } from "./button";
 import type { UICommonVariant } from "../../variants/ui.variant";
 import {
@@ -40,9 +43,23 @@ export default function ProductLink({
   iconAfter,
   externalHref,
 }: Props) {
+  const queryClient = useQueryClient();
   const slug = slugifyCatalogValue(productTitle || productId);
-  const internalHref = `/products/${slug || productId}`;
+  const productSegment = slug || String(productId);
+  const internalHref = `/products/${productSegment}`;
   const isExternal = Boolean(externalHref && externalHref !== "#");
+  const productQueryKey = ["catalog", "product", productSegment] as const;
+  const prefetchProduct = () => {
+    if (isExternal || !productSegment) return;
+
+    const currentQuery = queryClient.getQueryState(productQueryKey);
+    if (currentQuery?.status === "success" || currentQuery?.fetchStatus === "fetching") return;
+
+    void queryClient.prefetchQuery({
+      queryKey: productQueryKey,
+      queryFn: () => getProductDetail(productSegment),
+    });
+  };
 
   return (
     <CustomButton
@@ -58,6 +75,10 @@ export default function ProductLink({
       iconAfter={iconAfter}
       target={isExternal ? "_blank" : undefined}
       rel={isExternal ? "noreferrer" : undefined}
+      onFocus={prefetchProduct}
+      onMouseEnter={prefetchProduct}
+      onPointerDown={prefetchProduct}
+      onTouchStart={prefetchProduct}
     >
       {children ?? "مشاهده"}
     </CustomButton>

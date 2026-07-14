@@ -20,7 +20,7 @@ export async function parseJsonBody<T>(request: Request, schema: ZodType<T>) {
 
 export function validationError(error: ZodError) {
   return apiFail(
-    "validation failed",
+    "اطلاعات ارسالی معتبر نیست.",
     422,
     error.issues.map((issue) => ({
       path: issue.path.join("."),

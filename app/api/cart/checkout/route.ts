@@ -38,6 +38,40 @@ type ProductUpdatePlan = {
   colorStock: Record<string, number>;
 };
 
+const COLOR_SELECTION_PREFIX = "colors:";
+
+function normalizeColorSelection(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([color, count]) => [
+        color.trim(),
+        Math.max(0, Math.round(Number(count))),
+      ] as const)
+      .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
+  );
+}
+
+function readColorSelection(selectedColor: unknown, quantity: number) {
+  const text = String(selectedColor ?? "").trim();
+  if (!text) return {};
+
+  if (text.startsWith(COLOR_SELECTION_PREFIX)) {
+    try {
+      return normalizeColorSelection(JSON.parse(text.slice(COLOR_SELECTION_PREFIX.length)));
+    } catch {
+      return {};
+    }
+  }
+
+  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
+}
+
+function colorSelectionTotal(selection: Record<string, number>) {
+  return Object.values(selection).reduce((sum, count) => sum + Math.max(0, Math.round(Number(count) || 0)), 0);
+}
+
 export async function POST(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
@@ -46,7 +80,7 @@ export async function POST(request: Request) {
 
   try {
     const cart = await getOrCreateActiveCart(auth.user.id);
-    if (cart.items.length === 0) return apiFail("cart is empty", 400);
+    if (cart.items.length === 0) return apiFail("سبد خرید خالی است.", 400);
     const cartItems = cart.items as CheckoutCartItem[];
     const productIds = cartItems
       .map((item) => item.productId)
@@ -65,12 +99,20 @@ export async function POST(request: Request) {
       const product = productsById.get(item.productId) as
         | { id: number; stockQuantity: number; colorStock: unknown }
         | undefined;
-      if (!product || product.stockQuantity < item.quantity) throw new Error("product is out of stock");
+      if (!product || product.stockQuantity < item.quantity) throw new Error("موجودی محصول کافی نیست.");
 
       const colorStock = normalizeColorStock(product.colorStock);
-      if (item.selectedColor) {
-        if ((colorStock[item.selectedColor] ?? 0) < item.quantity) throw new Error("selected color is out of stock");
-        colorStock[item.selectedColor] -= item.quantity;
+      if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
+        throw new Error("برای محصول رنگ‌دار باید یک رنگ انتخاب شود.");
+      }
+      if (Object.keys(colorStock).length > 0) {
+        const selectedColors = readColorSelection(item.selectedColor, item.quantity);
+        const selectedTotal = colorSelectionTotal(selectedColors);
+        if (selectedTotal !== item.quantity) throw new Error("تعداد رنگ‌های انتخاب‌شده با تعداد سبد خرید هماهنگ نیست.");
+        for (const [color, count] of Object.entries(selectedColors)) {
+          if ((colorStock[color] ?? 0) < count) throw new Error("موجودی رنگ انتخاب‌شده کافی نیست.");
+          colorStock[color] -= count;
+        }
       }
 
       productUpdates.push({
@@ -127,6 +169,6 @@ export async function POST(request: Request) {
     return apiOk({ checkedOut: true });
   } catch (error) {
     console.error("Checkout error:", error);
-    return apiServerError(error instanceof Error ? error.message : "server error");
+    return apiServerError(error instanceof Error ? error.message : "خطای سرور رخ داد.");
   }
 }

@@ -1,17 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
-import { getProductDetail, getProductDetailPageStructure, getStockStatusLabel, isProductAvailable, type ProductRecord } from "@/lib/products-client";
-import { getPageBootstrap } from "@/lib/page-bootstrap-client";
+import { findProductById, getProductDetail, isProductAvailable, type ProductDetailResult, type ProductRecord } from "@/lib/products-client";
 import { addProductToCart } from "@/lib/cart-client";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomTag } from "@/app/design-system/components/ui/tag";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
-import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import Loading from "@/app/design-system/components/loading/loading";
+import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import ColorStockDots from "@/app/design-system/components/ui/color-stock-dots";
 
 const LOADING_PRODUCT: ProductRecord = {
@@ -65,6 +64,18 @@ function formatDate(value?: string | null) {
   });
 }
 
+function formatDimensionValue(value?: number | string | null) {
+  return String(value ?? "").trim();
+}
+
+function formatDimensions(product: ProductRecord) {
+  const dimensions = [product.length, product.width, product.height]
+    .map(formatDimensionValue)
+    .filter(Boolean);
+
+  return dimensions.length > 0 ? dimensions.join(" × ") : "";
+}
+
 function normalizeColorStock(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
 
@@ -78,24 +89,98 @@ function normalizeColorStock(value: unknown) {
   );
 }
 
+function commentDisplayName(comment: any) {
+  const candidates = [
+    comment.user?.firstName,
+    comment.profile?.firstName,
+    comment.firstName,
+    comment.author,
+    comment.user?.name,
+    comment.user?.username,
+  ];
+
+  for (const candidate of candidates) {
+    const text = String(candidate ?? "").trim();
+    if (!text || text.includes("@")) continue;
+    const firstName = text.split(/\s+/).find(Boolean);
+    if (firstName) return firstName;
+  }
+
+  return "مهمان";
+}
+
+function mapReviews(comments: unknown[]): ProductReview[] {
+  return comments.map((comment: any) => ({
+    id: String(comment.id ?? Date.now()),
+    author: commentDisplayName(comment),
+    text: String(comment.content ?? comment.text ?? ""),
+    rating: Number.isFinite(Number(comment.rating)) ? Number(comment.rating) : undefined,
+    createdAt: String(comment.createdAt ?? new Date().toISOString()),
+  }));
+}
+
+function findProductInQueryValue(value: unknown, productId: string, depth = 0): ProductRecord | null {
+  if (!value || depth > 5) return null;
+
+  if (Array.isArray(value)) {
+    const direct = findProductById(value as ProductRecord[], productId);
+    if (direct) return direct;
+
+    for (const item of value) {
+      const found = findProductInQueryValue(item, productId, depth + 1);
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  if (typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+  const product = record.product ? findProductInQueryValue([record.product], productId, depth + 1) : null;
+  if (product) return product;
+
+  for (const key of ["products", "items", "page", "catalog", "tree", "sections", "showcases"]) {
+    const found = findProductInQueryValue(record[key], productId, depth + 1);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+function findCachedProduct(queryClient: QueryClient, productId: string) {
+  for (const [, value] of queryClient.getQueriesData({ queryKey: ["catalog"] })) {
+    const product = findProductInQueryValue(value, productId);
+    if (product) return product;
+  }
+
+  return null;
+}
+
 export default function ProductPage() {
   const params = useParams();
   const rawSlug = params?.slug ?? params?.id ?? "";
   const productId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const queryClient = useQueryClient();
-  const structureQuery = useQuery({
-    queryKey: ["catalog", "page-structure", "product", productId],
-    queryFn: () => getPageBootstrap(() => getProductDetailPageStructure(productId)),
-    enabled: Boolean(productId),
-  });
-  const productQuery = useQuery({
+  const cachedProduct = useMemo(
+    () => (productId ? findCachedProduct(queryClient, productId) : null),
+    [productId, queryClient]
+  );
+  const productQuery = useQuery<ProductDetailResult>({
     queryKey: ["catalog", "product", productId],
     queryFn: () => getProductDetail(productId),
     enabled: Boolean(productId),
+    placeholderData: cachedProduct
+      ? {
+          product: cachedProduct,
+          comments: [],
+          recommendations: [],
+        }
+      : undefined,
   });
   const product = productQuery.data?.product ?? null;
-  const loadingProduct = structureQuery.data?.page.products[0] ?? LOADING_PRODUCT;
-  const catalogLoading = productQuery.isLoading;
+  const loadingProduct = product ?? cachedProduct ?? LOADING_PRODUCT;
+  const catalogLoading = productQuery.isLoading && !product;
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [text, setText] = useState("");
   const [rating, setRating] = useState<number | undefined>(undefined);
@@ -109,35 +194,14 @@ export default function ProductPage() {
   const productApiId = product?.id;
   const productStorageKey = String(productApiId ?? productId);
 
-  const loadReviews = useCallback(async () => {
-    const numericProductId = Number(productApiId);
-    if (!Number.isInteger(numericProductId) || numericProductId <= 0) return;
-
-    try {
-      const response = await fetch(`/api/products/${numericProductId}/comments`, { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok || data?.ok === false) {
-        throw new Error(data?.message || "دیدگاه‌ها بارگذاری نشدند.");
-      }
-      const comments = Array.isArray(data?.data?.comments) ? data.data.comments : [];
-      setReviews(comments.map((comment: any) => ({
-        id: String(comment.id ?? Date.now()),
-        text: String(comment.content ?? comment.text ?? ""),
-        rating: Number.isFinite(Number(comment.rating)) ? Number(comment.rating) : undefined,
-        createdAt: String(comment.createdAt ?? new Date().toISOString()),
-      })));
-      setIsPurchased(Boolean(data?.data?.isPurchased) || localStorage.getItem(`purchased:${productStorageKey}`) === "1");
-      setHasRated(Boolean(data?.data?.hasRated));
-    } catch {
-      setReviews([]);
-      setIsPurchased(localStorage.getItem(`purchased:${productStorageKey}`) === "1");
-      setHasRated(false);
-    }
-  }, [productApiId, productStorageKey]);
-
   useEffect(() => {
-    void loadReviews();
-  }, [loadReviews]);
+    const detail = productQuery.data;
+    if (!detail) return;
+
+    setReviews(mapReviews(Array.isArray(detail.comments) ? detail.comments : []));
+    setIsPurchased(Boolean(detail.isPurchased) || localStorage.getItem(`purchased:${productStorageKey}`) === "1");
+    setHasRated(Boolean(detail.hasRated));
+  }, [productQuery.data, productStorageKey]);
 
   const colorStock = useMemo(() => normalizeColorStock(product?.colorStock), [product]);
   const colorOptions = useMemo(() => Object.entries(colorStock), [colorStock]);
@@ -190,12 +254,30 @@ export default function ProductPage() {
       if (!response.ok || data?.ok === false) {
         throw new Error(data?.message || "دیدگاه ثبت نشد.");
       }
+      const createdComment = data?.data?.comment;
+      const createdReview = createdComment ? mapReviews([createdComment])[0] : null;
       setText("");
       setRating(undefined);
-      await loadReviews();
+
+      if (createdReview) {
+        setReviews((current) => [createdReview, ...current]);
+      }
+
       if (rating) {
         setHasRated(true);
-        await queryClient.invalidateQueries({ queryKey: ["catalog"] });
+      }
+
+      if (createdComment) {
+        queryClient.setQueryData<ProductDetailResult>(
+          ["catalog", "product", productId],
+          (current) => current
+            ? {
+                ...current,
+                comments: [createdComment, ...(Array.isArray(current.comments) ? current.comments : [])],
+                hasRated: rating ? true : current.hasRated,
+              }
+            : current
+        );
       }
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : "دیدگاه ثبت نشد.");
@@ -210,6 +292,12 @@ export default function ProductPage() {
     }
 
     const cartColor = selectedColor || firstAvailableColor;
+    if (colorOptions.length > 0 && !cartColor) {
+      setCartMessage("برای افزودن این محصول باید یک رنگ موجود انتخاب کنید.");
+      window.setTimeout(() => setCartMessage(""), 2000);
+      return;
+    }
+
     if (cartColor && cartColor !== selectedColor) {
       setSelectedColor(cartColor);
     }
@@ -229,101 +317,7 @@ export default function ProductPage() {
   };
 
   if (catalogLoading && !product) {
-    return (
-      <main className="min-h-screen bg-primary-base text-primary-text">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 py-8 px-4">
-          <section className="flex w-full flex-col gap-8 rounded-2xl border border-border-default bg-primary-soft p-6 shadow-sm lg:flex-row lg:items-start">
-            <div className="flex w-full flex-col gap-4 lg:max-w-md lg:shrink-0">
-              <Loading loading="skeleton-item" isLoading>
-                <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-border-default bg-primary-media">
-                  <IoBagHandleOutline className="text-6xl text-primary" aria-hidden="true" />
-                </div>
-              </Loading>
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-5">
-              <Loading loading="skeleton-item" isLoading>
-                <div>
-                  <CustomTag size="xs" rounded="full" >
-                    {loadingProduct.badge}
-                  </CustomTag>
-                </div>
-              </Loading>
-              <Loading loading="skeleton-item" isLoading>
-                <div className="text-3xl font-bold leading-tight text-primary-text">
-                  {loadingProduct.title}
-                </div>
-              </Loading>
-              <div className="flex items-center gap-3">
-                <Loading loading="skeleton-item" isLoading>
-                  <StarRating value={4} size="md" />
-                </Loading>
-                <Loading loading="skeleton-item" isLoading>
-                  <span className="text-sm font-semibold text-primary-text">4.8</span>
-                </Loading>
-                <Loading loading="skeleton-item" isLoading>
-                  <span className="text-sm text-secondary-text">(۱۲۸ دیدگاه)</span>
-                </Loading>
-              </div>
-              <div className="flex flex-col gap-1 rounded-xl border border-border-default bg-primary-card p-4">
-                <Loading loading="skeleton-item" isLoading>
-                  <div className="text-sm text-danger-text-nomode line-through">
-                    {loadingProduct.originalPrice}
-                  </div>
-                </Loading>
-                <Loading loading="skeleton-item" isLoading>
-                  <div className="text-3xl font-bold text-primary">{loadingProduct.price}</div>
-                </Loading>
-              </div>
-              <div className="flex flex-wrap gap-3">
-              <Loading loading="skeleton-item" isLoading>
-                <CustomButton type="button" variant="success" icon={<IoBagAddOutline />}>
-                  افزودن
-                </CustomButton>
-              </Loading>
-            </div>
-            </div>
-          </section>
-
-          <section className="flex w-full flex-col gap-8 rounded-2xl border border-border-default bg-primary-soft p-6 shadow-sm">
-            <div className="flex flex-col gap-2 border-b border-border-default pb-6">
-              <Loading loading="skeleton-item" isLoading>
-              <div className="text-2xl font-bold text-primary-text">دیدگاه‌های خریداران</div>
-              </Loading>
-              <Loading loading="skeleton-item" isLoading>
-                <div className="text-sm text-secondary-text">
-                  نظر خریداران درباره این محصول را بخوانید.
-                </div>
-              </Loading>
-            </div>
-            <div className="flex flex-col gap-10 lg:flex-row lg:gap-12">
-              <div className="flex w-full flex-col gap-5 lg:max-w-xs">
-                <div className="flex flex-col gap-3 rounded-xl border border-border-default bg-primary-card p-5">
-                  <Loading loading="skeleton-item" isLoading>
-                    <div className="text-4xl font-bold">4.8</div>
-                  </Loading>
-                  <Loading loading="skeleton-item" isLoading>
-                    <StarRating value={4} size="lg" />
-                  </Loading>
-                  <Loading loading="skeleton-item" isLoading>
-                    <div className="text-sm text-secondary-text">۱۲۸ دیدگاه امتیازدار</div>
-                  </Loading>
-                </div>
-              </div>
-              <div className="flex flex-1 flex-col gap-4">
-                <div className="flex flex-col gap-4 rounded-xl border border-border-default bg-primary-card p-5">
-                  <Loading loading="skeleton-item" isLoading>
-                    <div className="text-lg font-bold">ثبت دیدگاه</div>
-                  </Loading>
-                  <Loading loading="skeleton-item" isLoading>
-                    <div className="min-h-28 w-full rounded-lg border border-border-default bg-primary-media" />
-                  </Loading>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      </main>
-    );
+    return <Loading loading="product-detail" product={loadingProduct} />;
   }
 
   if (!product) {
@@ -336,21 +330,19 @@ export default function ProductPage() {
   }
 
   const discountPercent = getDiscountPercent(product);
-  const available = isProductAvailable(product);
+  const hasColorOptions = colorOptions.length > 0;
+  const available = isProductAvailable(product) && (!hasColorOptions || Boolean(firstAvailableColor));
   const finalPrice = formatPrice(getFinalPrice(product));
   const originalPrice = formatPrice(product.originalPrice);
+  const dimensions = formatDimensions(product);
   const detailRows = [
     ["برند", product.brand],
     ["فروشنده", product.vendor],
     ["SKU", product.sku],
     ["Barcode", product.barcode],
     ["سال تولید", product.manufactureYear],
-    ["دسته‌بندی", product.categoryId],
-    ["وضعیت موجودی", getStockStatusLabel(product.stockStatus)],
     ["وزن", product.weight],
-    ["طول", product.length],
-    ["عرض", product.width],
-    ["ارتفاع", product.height],
+    ["ابعاد", dimensions],
     ["تاریخ انتشار", formatDate(product.publishedAt)],
   ].filter(([, value]) => String(value ?? "").trim());
   const finalPriceDate = formatDate(product.updatedAt || product.publishedAt || product.createdAt);
@@ -421,6 +413,25 @@ export default function ProductPage() {
               </div>
             </div>
 
+            {hasColorOptions ? (
+              <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-card p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-bold text-primary-text">رنگ‌های موجود</div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${firstAvailableColor ? "bg-success-bg-nomode text-success-text-nomode" : "bg-danger-bg-nomode text-danger-text-nomode"}`}>
+                    {firstAvailableColor ? "موجود" : "ناموجود"}
+                  </span>
+                </div>
+                <ColorStockDots
+                  value={product.colorStock}
+                  selectedColor={selectedColor}
+                  onSelect={setSelectedColor}
+                  disabledUnavailable
+                  showCount={false}
+                  size="md"
+                />
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-3">
               <CustomButton
                 type="button"
@@ -456,17 +467,7 @@ export default function ProductPage() {
                 <div className="flex flex-col gap-2">
                   <div className="text-2xl font-bold text-primary-text">مشخصات محصول</div>
                 </div>
-                <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
-                  <div className="text-sm font-bold text-primary-text">توضیحات محصول</div>
-                  {product.description.trim() ? (
-                    <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">{product.description}</div>
-                  ) : (
-                    <div className="text-sm leading-7 text-secondary-text">
-                      توضیحی برای این محصول ثبت نشده است.
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col gap-3">
                   {detailRows.length > 0 ? detailRows.map(([label, value]) => (
                     <div key={String(label)} className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
                       <span className="text-xs font-semibold text-secondary-text">{label}</span>
@@ -476,18 +477,15 @@ export default function ProductPage() {
                     <div className="text-sm text-secondary-text">اطلاعات تکمیلی برای این محصول ثبت نشده است.</div>
                   )}
                 </div>
-                <div className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-3">
-                  <div className="text-sm font-bold text-primary-text">موجودی رنگ‌ها</div>
-                  <span className="text-sm font-semibold text-secondary-text">
-                    موجودی کل: {Number(product.stockQuantity ?? 0)}
-                  </span>
-                  <ColorStockDots
-                    value={product.colorStock}
-                    selectedColor={selectedColor}
-                    onSelect={setSelectedColor}
-                    disabledUnavailable
-                    size="md"
-                  />
+                <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
+                  <div className="text-sm font-bold text-primary-text">توضیحات محصول</div>
+                  {product.description.trim() ? (
+                    <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">{product.description}</div>
+                  ) : (
+                    <div className="text-sm leading-7 text-secondary-text">
+                      توضیحی برای این محصول ثبت نشده است.
+                    </div>
+                  )}
                 </div>
               </section>
           ) : null}

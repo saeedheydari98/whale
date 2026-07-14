@@ -312,6 +312,33 @@ export async function getOrCreateActiveCart(userId: number) {
   });
 }
 
+const CART_COLOR_SELECTION_PREFIX = "colors:";
+
+function readCartItemColorSelection(value: unknown, quantity: number) {
+  const text = String(value ?? "").trim();
+  if (!text) return {};
+
+  if (text.startsWith(CART_COLOR_SELECTION_PREFIX)) {
+    try {
+      const parsed = JSON.parse(text.slice(CART_COLOR_SELECTION_PREFIX.length));
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+
+      return Object.fromEntries(
+        Object.entries(parsed as Record<string, unknown>)
+          .map(([color, count]) => [
+            color.trim(),
+            Math.max(0, Math.round(Number(count))),
+          ] as const)
+          .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
+      );
+    } catch {
+      return {};
+    }
+  }
+
+  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
+}
+
 export function cartItemDto(item: any) {
   return {
     id: item.id,
@@ -324,6 +351,7 @@ export function cartItemDto(item: any) {
     discountPercent: item.discountPercent,
     imageUrl: item.imageUrl,
     selectedColor: item.selectedColor,
+    selectedColors: readCartItemColorSelection(item.selectedColor, item.quantity),
     quantity: item.quantity,
   };
 }

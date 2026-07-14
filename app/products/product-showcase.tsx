@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { addProductToCart } from "@/lib/cart-client";
 import { getProducts, getProductsPageStructure, getShowcaseProducts, isProductAvailable, readCachedProductsPageStructure, type ProductsCache } from "@/lib/products-client";
 import Loading from "../design-system/components/loading/loading";
-import { FullPageLoading } from "../design-system/components/loading/full-page-loading";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { LazyViewportSection } from "../design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
@@ -512,7 +511,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
         </div>
 
         {showWhaleLoading ? (
-          <FullPageLoading activeStep={2} title="دریافت ساختار صفحه" />
+          <Loading loading="fullscreen" />
         ) : null}
 
         {loading && !showWhaleLoading ? (

@@ -1,17 +1,16 @@
-import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
+import { apiFail } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { requireUser } from "@/lib/api/auth";
-import { toAdminSecurityData, upsertAdminSecurityLock } from "@/lib/api/admin-security-service";
+import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-const SUPERADMIN_USERNAME = "09176991556";
 
 async function requireSuperadmin(request: Request) {
   const auth = await requireUser(request);
   if (!auth.ok) return auth;
-  if (auth.user.username !== SUPERADMIN_USERNAME || auth.user.role !== "superadmin") {
-    return { ok: false as const, response: apiFail("superadmin required", 403) };
+  if (auth.user.username !== SUPERADMIN_PHONE || auth.user.role !== "superadmin") {
+    return { ok: false as const, response: apiFail("فقط مدیر ارشد به این بخش دسترسی دارد.", 403) };
   }
   return auth;
 }
@@ -22,11 +21,5 @@ export async function POST(request: Request) {
   const auth = await requireSuperadmin(request);
   if (!auth.ok) return auth.response;
 
-  try {
-    const security = await upsertAdminSecurityLock(true);
-    return apiOk(toAdminSecurityData(security));
-  } catch (error) {
-    console.error("Admin security lock error:", error);
-    return apiServerError();
-  }
+  return apiFail("قفل پنل با کد امنیتی غیرفعال شده است. دسترسی مدیریت فقط با تایید مدیر ارشد انجام می شود.", 410);
 }

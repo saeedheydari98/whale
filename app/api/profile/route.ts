@@ -47,7 +47,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, data: { user: { profile } } });
   } catch (error) {
     console.error("Profile GET error:", error);
-    return NextResponse.json({ ok: false, error: "server error", data: { user: { profile: null } } }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد.", data: { user: { profile: null } } }, { status: 500 });
   }
 }
 
@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   const includesAdminUnlocked = typeof rawProfile?.isAdminUnlocked === "boolean";
 
   if (!isComplete(profile)) {
-    return NextResponse.json({ ok: false, error: "complete profile is required" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "برای ادامه باید پروفایل را کامل کنید." }, { status: 400 });
   }
 
   try {
@@ -86,6 +86,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, data: { user: { profile: saved } } });
   } catch (error) {
     console.error("Profile POST error:", error);
-    return NextResponse.json({ ok: false, error: "server error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد." }, { status: 500 });
   }
 }

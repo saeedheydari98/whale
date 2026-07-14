@@ -473,13 +473,13 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           continue;
         }
 
-        throw new Error(data?.error || "API save failed");
+        throw new Error(data?.message || data?.error || "ذخیره اطلاعات فروشگاه ناموفق بود.");
       }
 
-      throw new Error("API save failed after retries");
+      throw new Error("ذخیره اطلاعات فروشگاه بعد از چند تلاش ناموفق بود.");
     } catch (error) {
       console.error("Catalog save error:", error);
-      setStatus(error instanceof Error ? error.message : "Database save failed.");
+      setStatus(error instanceof Error ? error.message : "ذخیره اطلاعات فروشگاه ناموفق بود.");
       return false;
     } finally {
       setSaving(false);
@@ -904,7 +904,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
 
   const submitDraftBanner = async () => {
     if (draftBanner.imageUrls.length === 0) {
-      showRequiredErrors(["draftBanner.images"], "Banner needs at least one image.");
+      showRequiredErrors(["draftBanner.images"], "برای بنر حداقل یک تصویر لازم است.");
       return;
     }
     setRequiredErrors([]);
@@ -965,7 +965,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const submitEditingBanner = async () => {
     if (!editingBanner) return;
     if (editingBanner.imageUrls.length === 0) {
-      showRequiredErrors(["editingBanner.images"], "Banner needs at least one image.");
+      showRequiredErrors(["editingBanner.images"], "برای بنر حداقل یک تصویر لازم است.");
       return;
     }
     setRequiredErrors([]);

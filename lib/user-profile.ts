@@ -158,7 +158,7 @@ export async function fetchUserProfile(nationalId?: string, options?: { write?: 
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.error || "Profile load failed");
+    throw new Error(data?.message || data?.error || "بارگذاری پروفایل ناموفق بود.");
   }
 
   const profileData = readProfileFromApiData(data);
@@ -184,7 +184,7 @@ export async function saveUserProfile(profile: UserProfile) {
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.error || "Profile save failed");
+    throw new Error(data?.message || data?.error || "ذخیره پروفایل ناموفق بود.");
   }
 
   const savedProfile = normalizeUserProfile(readProfileFromApiData(data) ?? nextProfile);

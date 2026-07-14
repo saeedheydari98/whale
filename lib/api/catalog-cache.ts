@@ -3,15 +3,19 @@ import { publishCatalogSyncEvent } from "@/lib/api/catalog-sync";
 type CacheEntry = {
   value: unknown;
   expiresAt: number;
+  version: number;
 };
 
 type CatalogCacheState = {
   memory: Map<string, CacheEntry>;
+  inflight: Map<string, Promise<unknown>>;
   version: number;
+  versionCheckedAt: number;
 };
 
 const CATALOG_VERSION_KEY = "catalog:version";
 const CATALOG_CACHE_PREFIX = "catalog";
+const VERSION_REFRESH_INTERVAL_MS = 5_000;
 
 const globalForCatalogCache = globalThis as typeof globalThis & {
   __catalogCacheState?: CatalogCacheState;
@@ -21,9 +25,15 @@ function getCatalogCacheState() {
   if (!globalForCatalogCache.__catalogCacheState) {
     globalForCatalogCache.__catalogCacheState = {
       memory: new Map(),
+      inflight: new Map(),
       version: 0,
+      versionCheckedAt: 0,
     };
   }
+
+  const state = globalForCatalogCache.__catalogCacheState;
+  state.inflight ??= new Map();
+  state.versionCheckedAt ??= 0;
 
   return globalForCatalogCache.__catalogCacheState;
 }
@@ -63,8 +73,15 @@ async function redisCommand<T>(command: string, args: string[]): Promise<T | nul
   }
 }
 
-async function getCatalogVersion() {
+async function getCatalogVersion(options?: { force?: boolean }) {
   const state = getCatalogCacheState();
+  const now = Date.now();
+
+  if (!options?.force && now - state.versionCheckedAt < VERSION_REFRESH_INTERVAL_MS) {
+    return state.version;
+  }
+
+  state.versionCheckedAt = now;
   const redisVersion = await redisCommand<string | number>("GET", [CATALOG_VERSION_KEY]);
   const parsed = Number(redisVersion);
 
@@ -94,8 +111,7 @@ function stableCachePart(value: unknown): string {
   return String(value ?? "");
 }
 
-async function buildCacheKey(scope: string, parts: unknown[]) {
-  const version = await getCatalogVersion();
+function buildCacheKey(version: number, scope: string, parts: unknown[]) {
   const suffix = parts.map(stableCachePart).filter(Boolean).join(":");
   return `${CATALOG_CACHE_PREFIX}:v${version}:${scope}${suffix ? `:${suffix}` : ""}`;
 }
@@ -108,9 +124,25 @@ export async function withCatalogCache<T>(
 ): Promise<T> {
   if (ttlSeconds <= 0) return loader();
 
-  const key = await buildCacheKey(scope, parts);
   const now = Date.now();
   const state = getCatalogCacheState();
+  const localVersion = state.version;
+  const localKey = buildCacheKey(localVersion, scope, parts);
+  const localMemoryEntry = state.memory.get(localKey);
+
+  if (localMemoryEntry && localMemoryEntry.expiresAt > now) {
+    if (now - state.versionCheckedAt < VERSION_REFRESH_INTERVAL_MS) {
+      return localMemoryEntry.value as T;
+    }
+
+    const latestVersion = await getCatalogVersion({ force: true });
+    if (latestVersion === (localMemoryEntry.version ?? localVersion)) {
+      return localMemoryEntry.value as T;
+    }
+  }
+
+  const version = await getCatalogVersion();
+  const key = buildCacheKey(version, scope, parts);
   const memoryEntry = state.memory.get(key);
 
   if (memoryEntry && memoryEntry.expiresAt > now) {
@@ -124,6 +156,7 @@ export async function withCatalogCache<T>(
       state.memory.set(key, {
         value: parsed,
         expiresAt: now + ttlSeconds * 1000,
+        version,
       });
       return parsed;
     } catch {
@@ -131,21 +164,33 @@ export async function withCatalogCache<T>(
     }
   }
 
-  const value = await loader();
-  state.memory.set(key, {
-    value,
-    expiresAt: now + ttlSeconds * 1000,
-  });
-  await redisCommand("SET", [key, JSON.stringify(value), "EX", String(ttlSeconds)]);
+  const pending = state.inflight.get(key);
+  if (pending) return pending as Promise<T>;
 
-  return value;
+  const task = loader()
+    .then(async (value) => {
+      state.memory.set(key, {
+        value,
+        expiresAt: Date.now() + ttlSeconds * 1000,
+        version,
+      });
+      await redisCommand("SET", [key, JSON.stringify(value), "EX", String(ttlSeconds)]);
+      return value;
+    })
+    .finally(() => {
+      state.inflight.delete(key);
+    });
+
+  state.inflight.set(key, task);
+  return task;
 }
 
 export async function invalidateCatalogCache(reason?: string) {
   const state = getCatalogCacheState();
   state.version += 1;
+  state.versionCheckedAt = Date.now();
   state.memory.clear();
+  state.inflight.clear();
   await redisCommand("INCR", [CATALOG_VERSION_KEY]);
   publishCatalogSyncEvent(reason);
 }
-

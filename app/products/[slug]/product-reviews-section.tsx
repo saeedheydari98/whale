@@ -7,6 +7,7 @@ import { StarRating } from "@/app/design-system/components/ui/star-rating";
 
 export type ProductReview = {
   id: string;
+  author?: string;
   text: string;
   rating?: number;
   createdAt: string;
@@ -215,7 +216,7 @@ export function ProductReviewsSection({
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex flex-col gap-2">
-                        <div className="text-sm font-bold text-primary-text">خریدار</div>
+                        <div className="text-sm font-bold text-primary-text">{review.author || "مهمان"}</div>
                         {review.rating ? (
                           <div className="flex flex-wrap items-center gap-2">
                             <StarRating value={review.rating} size="sm" />

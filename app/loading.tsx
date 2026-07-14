@@ -1,7 +1,7 @@
 "use client";
 
-import { FullPageLoading } from "./design-system/components/loading/full-page-loading";
+import Loading from "./design-system/components/loading/loading";
 
 export default function RouteLoading() {
-  return <FullPageLoading activeStep={1} />;
+  return <Loading loading="fullscreen" />;
 }

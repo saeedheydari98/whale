@@ -10,6 +10,7 @@ const HOME_PAGE_STRUCTURE_URL = "/api/home/structure";
 const CATEGORIES_PAGE_STRUCTURE_URL = "/api/categories/structure";
 const PRODUCTS_PAGE_STRUCTURE_URL = "/api/products/structure";
 const PAGE_STRUCTURE_CACHE_PREFIX = "catalog-page-structure:";
+const PAGE_STRUCTURE_LOCAL_TTL_MS = 5 * 60 * 1000;
 export const PRODUCTS_CATALOG_UPDATED_EVENT = "products-catalog-updated";
 
 export type ProductRecord = {
@@ -844,6 +845,9 @@ export async function getCatalogStructure(options?: boolean | GetProductsOptions
 }
 
 async function getPageStructure(url: string, options?: Pick<GetProductsOptions, "force">): Promise<ProductsCache> {
+  const cached = options?.force ? null : readCachedPageStructure(url, { maxAgeMs: PAGE_STRUCTURE_LOCAL_TTL_MS });
+  if (cached) return cached;
+
   try {
     const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force });
     const page = withResolvedTree(parseApiPayload(json?.data));
@@ -858,13 +862,21 @@ function pageStructureCacheKey(url: string) {
   return `${PAGE_STRUCTURE_CACHE_PREFIX}${url}`;
 }
 
-function readCachedPageStructure(url: string): ProductsCache | null {
+function readCachedPageStructure(url: string, options?: { maxAgeMs?: number }): ProductsCache | null {
   if (typeof window === "undefined") return null;
 
   try {
     const raw = window.localStorage.getItem(pageStructureCacheKey(url));
     if (!raw) return null;
-    return withResolvedTree(parseApiPayload(JSON.parse(raw)));
+    const parsed = JSON.parse(raw);
+    const isPayload = parsed
+      && typeof parsed === "object"
+      && !Array.isArray(parsed)
+      && "data" in parsed
+      && "at" in parsed;
+    const at = isPayload ? Number((parsed as { at?: unknown }).at) : 0;
+    if (options?.maxAgeMs && at > 0 && Date.now() - at > options.maxAgeMs) return null;
+    return withResolvedTree(parseApiPayload(isPayload ? (parsed as { data?: unknown }).data : parsed));
   } catch {
     return null;
   }
@@ -874,7 +886,21 @@ function writeCachedPageStructure(url: string, page: ProductsCache) {
   if (typeof window === "undefined") return;
 
   try {
-    window.localStorage.setItem(pageStructureCacheKey(url), JSON.stringify(page));
+    window.localStorage.setItem(pageStructureCacheKey(url), JSON.stringify({ at: Date.now(), data: page }));
+  } catch {
+  }
+}
+
+export function clearCachedPageStructures() {
+  if (typeof window === "undefined") return;
+
+  try {
+    for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.localStorage.key(index);
+      if (key?.startsWith(PAGE_STRUCTURE_CACHE_PREFIX)) {
+        window.localStorage.removeItem(key);
+      }
+    }
   } catch {
   }
 }
@@ -1123,8 +1149,9 @@ export function clearProductsCache() {
   invalidateFetchCache("/api/category");
   invalidateFetchCache("/api/brand");
   if (typeof window !== "undefined") {
+    clearCachedPageStructures();
     window.dispatchEvent(new Event(PRODUCTS_CATALOG_UPDATED_EVENT));
   }
 }
 
-export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache };
+export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };

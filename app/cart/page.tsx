@@ -13,10 +13,12 @@ import {
   CART_UPDATED_EVENT,
   clearCart as clearCartData,
   checkoutCart,
+  getCartItemColorSelection,
   getCart,
   persistCart,
   readLocalCart,
   removeCartItem,
+  updateCartColorQuantity,
   updateCartQuantity,
   type CartItemRecord,
 } from "@/lib/cart-client";
@@ -36,7 +38,7 @@ import {
   isValidPastPersianDate,
   normalizePersianDate,
 } from "@/lib/persian-date";
-import ColorStockDots from "../design-system/components/ui/color-stock-dots";
+import { getStockColorValue, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
 
 function getFinalPrice(item: CartItemRecord) {
   return item.discountPrice || item.price;
@@ -146,12 +148,8 @@ export default function CartPage() {
     setItems(nextItems);
   };
 
-  const updateItemColor = async (targetIndex: number, nextColor: string) => {
-    const nextItems = items.map((item, index) =>
-      index === targetIndex ? { ...item, selectedColor: nextColor } : item
-    );
-    setItems(nextItems);
-    const savedItems = await persistCart(nextItems, readUserProfile());
+  const updateItemColorQuantity = async (target: CartItemRecord, color: string, nextQuantity: number) => {
+    const savedItems = await updateCartColorQuantity(target, color, nextQuantity, { notify: false });
     setItems(savedItems);
   };
 
@@ -304,16 +302,28 @@ export default function CartPage() {
               const stockValue = product?.stockQuantity ?? item.stockQuantity;
               const stockLimit = Number(stockValue);
               const hasStockLimit = Number.isFinite(stockLimit);
+              const normalizedStockLimit = hasStockLimit ? Math.max(0, Math.round(stockLimit)) : Number.POSITIVE_INFINITY;
+              const productColorStock = product?.colorStock ?? item.colorStock;
+              const colorEntries = normalizeStockEntries(productColorStock);
+              const hasColorStock = colorEntries.length > 0;
+              const colorSelection = getCartItemColorSelection({ ...item, colorStock: productColorStock });
+              const colorSelectionText = Object.entries(colorSelection)
+                .map(([color, count]) => `${color} (${count})`)
+                .join("، ");
               const isAvailable = (product?.isAvailable ?? item.isAvailable) !== false
-                && (!hasStockLimit || stockLimit > 0);
+                && normalizedStockLimit > 0;
               const syncedItem = {
                 ...item,
+                selectedColors: colorSelection,
+                selectedColor: item.selectedColor,
+                colorStock: productColorStock,
                 isAvailable,
-                stockQuantity: hasStockLimit ? stockLimit : item.stockQuantity,
+                stockQuantity: hasStockLimit ? normalizedStockLimit : item.stockQuantity,
               };
               const canIncrease = !isCheckoutLoading
                 && isAvailable
-                && (!hasStockLimit || item.quantity < stockLimit);
+                && !hasColorStock
+                && item.quantity < normalizedStockLimit;
               return (
                 <article
                   key={String(item.id ?? `${item.title}-${index}-${item.selectedColor ?? ""}`)}
@@ -335,21 +345,58 @@ export default function CartPage() {
                   <div className="grid gap-2">
                     <div className="text-lg font-bold">{item.title}</div>
                     <div className="text-sm text-secondary-text">{item.description}</div>
-                    {item.selectedColor ? (
+                    {colorSelectionText ? (
                       <span className="text-xs font-semibold text-secondary-text">
-                        رنگ: {item.selectedColor}
+                        رنگ‌ها: {colorSelectionText}
                       </span>
                     ) : null}
-                    {product?.colorStock ? (
-                      <div className="flex flex-col gap-1">
-                        <span className="text-xs font-semibold text-secondary-text">انتخاب رنگ</span>
-                        <ColorStockDots
-                          value={product.colorStock}
-                          selectedColor={item.selectedColor ?? ""}
-                          onSelect={(color) => void updateItemColor(index, color)}
-                          disabledUnavailable
-                          size="sm"
-                        />
+                    {hasColorStock ? (
+                      <div className="flex flex-col gap-2">
+                        <span className="text-xs font-semibold text-secondary-text">انتخاب رنگ‌ها</span>
+                        <div className="flex flex-col gap-2">
+                          {colorEntries.map(({ color, count }) => {
+                            const selectedCount = colorSelection[color] ?? 0;
+                            const totalWithoutColor = item.quantity - selectedCount;
+                            const canAddColor = !isCheckoutLoading
+                              && isAvailable
+                              && count > selectedCount
+                              && totalWithoutColor < normalizedStockLimit;
+
+                            return (
+                              <div key={color} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary-border bg-primary-soft p-2">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="h-5 w-5 rounded-full border border-primary-border shadow-sm"
+                                    style={{ backgroundColor: getStockColorValue(color) }}
+                                  />
+                                  <span className="text-xs font-bold text-primary-text">{color}</span>
+                                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${count > 0 ? "bg-success-bg-nomode text-success-text-nomode" : "bg-danger-bg-nomode text-danger-text-nomode"}`}>
+                                    {count > 0 ? "موجود" : "ناموجود"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <CustomButton
+                                    variant="neutral"
+                                    size="xs"
+                                    disabled={isCheckoutLoading || selectedCount <= 0}
+                                    onClick={() => updateItemColorQuantity(syncedItem, color, selectedCount - 1)}
+                                  >
+                                    -
+                                  </CustomButton>
+                                  <span className="min-w-6 text-center text-xs font-bold">{selectedCount}</span>
+                                  <CustomButton
+                                    variant="neutral"
+                                    size="xs"
+                                    disabled={!canAddColor}
+                                    onClick={() => updateItemColorQuantity(syncedItem, color, selectedCount + 1)}
+                                  >
+                                    +
+                                  </CustomButton>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     ) : null}
                     <div className="text-sm font-semibold text-primary">
@@ -362,25 +409,31 @@ export default function CartPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                      <CustomButton
-                        variant="neutral"
-                        size="sm"
-                        disabled={!canIncrease}
-                        onClick={() => updateQuantity(syncedItem, item.quantity + 1)}
-                      >
-                        +
-                      </CustomButton>
-                      <span className="min-w-8 text-center text-sm font-bold">{item.quantity}</span>
-                      <CustomButton
-                        variant="neutral"
-                        size="sm"
-                        disabled={isCheckoutLoading}
-                        onClick={() => updateQuantity(syncedItem, item.quantity - 1)}
-                      >
-                        -
-                      </CustomButton>
-                    </div>
+                    {hasColorStock ? (
+                      <div className="rounded-md border border-primary-border bg-primary-soft px-3 py-2 text-center text-sm font-bold">
+                        {item.quantity}
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <CustomButton
+                          variant="neutral"
+                          size="sm"
+                          disabled={!canIncrease}
+                          onClick={() => updateQuantity(syncedItem, item.quantity + 1)}
+                        >
+                          +
+                        </CustomButton>
+                        <span className="min-w-8 text-center text-sm font-bold">{item.quantity}</span>
+                        <CustomButton
+                          variant="neutral"
+                          size="sm"
+                          disabled={isCheckoutLoading}
+                          onClick={() => updateQuantity(syncedItem, item.quantity - 1)}
+                        >
+                          -
+                        </CustomButton>
+                      </div>
+                    )}
                     <CustomButton
                       variant="danger"
                       size="sm"

@@ -141,7 +141,7 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
     .then(async (res) => {
       const payload = await res.json();
       if (!res.ok || payload?.ok === false) {
-        throw new Error(payload?.message || payload?.error || "Global data load failed");
+        throw new Error(payload?.message || payload?.error || "بارگذاری اطلاعات کلی سامانه ناموفق بود.");
       }
       const data = normalizeGlobalData(payload?.data);
       writeGlobalCache(data);

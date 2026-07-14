@@ -39,7 +39,7 @@ export async function POST(request: Request) {
       getOrCreateActiveCart(auth.user.id),
       prisma.product.findUnique({ where: { id: parsed.data.productId } }),
     ]);
-    if (!product) return apiServerError("product not found");
+    if (!product) return apiServerError("محصول پیدا نشد.");
 
     const item = await prisma.cartItem.upsert({
       where: { cartId_productId: { cartId: cart.id, productId: product.id } },

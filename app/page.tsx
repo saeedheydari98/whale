@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "./design-system/components/ui/category-option";
 import Loading from "./design-system/components/loading/loading";
-import { FullPageLoading } from "./design-system/components/loading/full-page-loading";
 import { LazyViewportSection } from "./design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./products/product-showcase/banner-carousel";
 import { getHomePageStructure, readCachedHomePageStructure, type ProductsCache } from "@/lib/products-client";
@@ -72,7 +71,7 @@ export default function Home() {
         </div>
 
         {showWhaleLoading ? (
-          <FullPageLoading activeStep={2} title="دریافت ساختار صفحه" />
+          <Loading loading="fullscreen" />
         ) : null}
 
         {false ? (

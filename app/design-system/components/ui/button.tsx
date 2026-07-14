@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React from "react";
 
 import { useTheme } from "../../theme/provider";
@@ -107,23 +108,38 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   );
 
   if (href) {
+    const isExternalHref = /^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(href);
+    const anchorProps = rest as React.AnchorHTMLAttributes<HTMLAnchorElement>;
+    const commonLinkProps = {
+      ...anchorProps,
+      onClick: onClick as any,
+      style: {
+        ...(unstyled
+          ? {}
+          : {
+              backgroundColor: variantStyle.backgroundColor,
+              color: variantStyle.color,
+              borderColor: variantStyle.borderColor,
+            }),
+        ...style,
+        ...tokenStyle,
+      },
+      className: classes,
+    };
+
+    if (!isExternalHref && !anchorProps.target) {
+      return (
+        <Link href={href} {...commonLinkProps}>
+          {content}
+        </Link>
+      );
+    }
+
     return (
       <a
-        {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+        {...anchorProps}
         href={href}
-        onClick={onClick as any}
-        style={{
-          ...(unstyled
-            ? {}
-            : {
-                backgroundColor: variantStyle.backgroundColor,
-                color: variantStyle.color,
-                borderColor: variantStyle.borderColor,
-              }),
-          ...style,
-          ...tokenStyle,
-        }}
-        className={classes}
+        {...commonLinkProps}
       >
         {content}
       </a>

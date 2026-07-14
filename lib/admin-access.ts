@@ -1,40 +1,59 @@
-import {
-  readUserProfile,
-  writeUserProfile,
-} from "@/lib/user-profile";
+"use client";
+
+import { clearAppGlobalCache } from "@/lib/app-global-client";
 import { fetchCurrentUser, hasAdminRole, readCachedAuthUser } from "@/lib/auth-client";
 
 export const ADMIN_ACCESS_UPDATED_EVENT = "admin-access-updated";
 
-export type AdminSecurity = {
-  hasCode: boolean;
-  isPanelLocked: boolean;
+export type AdminAccessRequestStatus = "pending" | "approved" | "rejected" | "revoked" | string;
+
+export type AdminAccessRequestRecord = {
+  id: string;
+  username: string;
+  phone: string;
+  status: AdminAccessRequestStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  user?: {
+    id?: number;
+    name?: string | null;
+    email?: string | null;
+    username?: string | null;
+    role?: string | null;
+    profile?: {
+      firstName?: string | null;
+      lastName?: string | null;
+      phone?: string | null;
+      email?: string | null;
+    } | null;
+  } | null;
 };
 
-const ADMIN_SECURITY_CACHE_MS = 5000;
-const ADMIN_SECURITY_STATUS_ENDPOINT = "/api/admin/security/status";
-let cachedAdminSecurity: { value: AdminSecurity; expiresAt: number } | null = null;
-let pendingAdminSecurity: Promise<AdminSecurity> | null = null;
+const ADMIN_REQUESTS_CACHE_MS = 5000;
+const ADMIN_REQUESTS_ENDPOINT = "/api/admin/security/requests";
+let cachedAdminRequests: { value: AdminAccessRequestRecord[]; expiresAt: number } | null = null;
+let pendingAdminRequests: Promise<AdminAccessRequestRecord[]> | null = null;
 
 function emitAdminAccessUpdated() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(ADMIN_ACCESS_UPDATED_EVENT));
 }
 
-function readNow() {
+function now() {
   return Date.now();
 }
 
-function cacheAdminSecurity(security: AdminSecurity) {
-  cachedAdminSecurity = {
-    value: security,
-    expiresAt: readNow() + ADMIN_SECURITY_CACHE_MS,
-  };
+function invalidateAdminRequestsCache() {
+  cachedAdminRequests = null;
+  pendingAdminRequests = null;
 }
 
-function invalidateAdminSecurityCache() {
-  cachedAdminSecurity = null;
-  pendingAdminSecurity = null;
+async function readApiJson(response: Response, fallbackMessage: string) {
+  const data = await response.json().catch(() => null);
+  if (!response.ok || data?.ok === false) {
+    throw new Error(data?.message || data?.error || fallbackMessage);
+  }
+  return data;
 }
 
 export function isAdminAccessUnlocked() {
@@ -45,104 +64,61 @@ export async function fetchAdminAccess(options?: { force?: boolean }) {
   return hasAdminRole(await fetchCurrentUser(options));
 }
 
-export async function unlockAdminAccessWithCode(code: string, username: string, profile = readUserProfile()) {
-
-  const res = await fetch("/api/admin/security/unlock", {
+export async function requestAdminAccess() {
+  const response = await fetch(ADMIN_REQUESTS_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, username, profile }),
   });
-  const data = await res.json();
-  if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "Admin code was not accepted.");
-  }
-
+  const data = await readApiJson(response, "ثبت درخواست مدیریت ناموفق بود.");
+  invalidateAdminRequestsCache();
   emitAdminAccessUpdated();
-  return data?.data?.access?.isAdminUnlocked === true;
+  return data?.data?.request as AdminAccessRequestRecord | null;
 }
 
-export async function fetchAdminSecurity(options?: { force?: boolean }) {
-  if (!options?.force && cachedAdminSecurity && cachedAdminSecurity.expiresAt > readNow()) {
-    return cachedAdminSecurity.value;
+export async function fetchAdminAccessRequests(options?: { force?: boolean }) {
+  if (!options?.force && cachedAdminRequests && cachedAdminRequests.expiresAt > now()) {
+    return cachedAdminRequests.value;
   }
 
-  if (!options?.force && pendingAdminSecurity) {
-    return pendingAdminSecurity;
+  if (!options?.force && pendingAdminRequests) {
+    return pendingAdminRequests;
   }
 
-  pendingAdminSecurity = fetch(ADMIN_SECURITY_STATUS_ENDPOINT, { cache: "no-store" })
-    .then(async (res) => {
-      const data = await res.json();
-      if (!res.ok || data?.ok === false) {
-        throw new Error(data?.message || data?.error || "Admin security load failed");
-      }
+  if (options?.force) invalidateAdminRequestsCache();
 
-      const security = {
-        hasCode: data?.data?.security?.hasCode === true,
-        isPanelLocked: data?.data?.security?.isPanelLocked === true,
-      } satisfies AdminSecurity;
-      cacheAdminSecurity(security);
-      return security;
+  pendingAdminRequests = fetch(ADMIN_REQUESTS_ENDPOINT, { cache: "no-store" })
+    .then(async (response) => {
+      const data = await readApiJson(response, "بارگذاری درخواست های مدیریت ناموفق بود.");
+      const requests = Array.isArray(data?.data?.requests)
+        ? data.data.requests as AdminAccessRequestRecord[]
+        : [];
+      cachedAdminRequests = {
+        value: requests,
+        expiresAt: now() + ADMIN_REQUESTS_CACHE_MS,
+      };
+      return requests;
     })
     .finally(() => {
-      pendingAdminSecurity = null;
+      pendingAdminRequests = null;
     });
 
-  return pendingAdminSecurity;
+  return pendingAdminRequests;
 }
 
-export async function saveAdminAccessCode(currentCode: string, code: string, confirmCode: string) {
-  const endpoint = currentCode.trim()
-    ? "/api/admin/security/change-code"
-    : "/api/admin/security/set-code";
-  const res = await fetch(endpoint, {
-    method: "POST",
+export async function reviewAdminAccessRequest(
+  id: string,
+  action: "approve" | "reject" | "revoke"
+) {
+  const response = await fetch(ADMIN_REQUESTS_ENDPOINT, {
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ currentCode, code, confirmCode }),
+    body: JSON.stringify({ id, action }),
   });
-  const data = await res.json();
-  if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "Admin security save failed");
-  }
-
-  const savedSecurity = {
-    hasCode: data?.data?.security?.hasCode === true,
-    isPanelLocked: data?.data?.security?.isPanelLocked === true,
-  } satisfies AdminSecurity;
-  cacheAdminSecurity(savedSecurity);
-
-  const profile = readUserProfile();
-  if (profile) {
-    writeUserProfile({
-      ...profile,
-      isAdminUnlocked: false,
-    });
-  }
+  const data = await readApiJson(response, "به روزرسانی درخواست مدیریت ناموفق بود.");
+  invalidateAdminRequestsCache();
+  clearAppGlobalCache();
   emitAdminAccessUpdated();
-
-  return savedSecurity;
-}
-
-export async function saveAdminPanelLock(isPanelLocked: boolean) {
-  invalidateAdminSecurityCache();
-  const res = await fetch(isPanelLocked ? "/api/admin/security/lock" : "/api/admin/security/unlock", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code: "", profile: readUserProfile() ?? undefined }),
-  });
-  const data = await res.json();
-  if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "Admin lock update failed");
-  }
-
-  const savedSecurity = {
-    hasCode: data?.data?.security?.hasCode === true,
-    isPanelLocked: data?.data?.security?.isPanelLocked === true,
-  } satisfies AdminSecurity;
-  cacheAdminSecurity(savedSecurity);
-  emitAdminAccessUpdated();
-
-  return savedSecurity;
+  return data?.data?.request as AdminAccessRequestRecord | null;
 }
 
 export function subscribeAdminAccess(listener: () => void) {

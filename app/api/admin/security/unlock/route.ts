@@ -1,103 +1,60 @@
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { parseJsonBody } from "@/lib/api/validation";
-import {
-  getAuthUser,
-  requireUser,
-} from "@/lib/api/auth";
-import {
-  readAdminSecurity,
-  readFallbackAdminCode,
-  toAdminSecurityData,
-  upsertAdminSecurityLock,
-} from "@/lib/api/admin-security-service";
+import { getAuthUser } from "@/lib/api/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const unlockSchema = z.object({
-  code: z.string().trim().optional().default(""),
-  username: z.string().trim().toLowerCase().optional(),
-  profile: z.object({
-    firstName: z.string().trim().min(1),
-    lastName: z.string().trim().min(1),
-    nationalId: z.string().trim().min(1),
-    phone: z.string().trim().min(1),
-  }).optional(),
-});
-const SUPERADMIN_USERNAME = "09176991556";
-
-async function requireSuperadmin(request: Request) {
-  const auth = await requireUser(request);
-  if (!auth.ok) return auth;
-  if (auth.user.username !== SUPERADMIN_USERNAME || auth.user.role !== "superadmin") {
-    return { ok: false as const, response: apiFail("superadmin required", 403) };
-  }
-  return auth;
-}
 
 export async function POST(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
 
-  const parsed = await parseJsonBody(request, unlockSchema);
-  if (!parsed.ok) return parsed.response;
-
   try {
-    const security = await readAdminSecurity();
-    const adminCode = security.code || readFallbackAdminCode();
     const authUser = await getAuthUser(request);
+    if (!authUser) return apiFail("برای ارسال درخواست مدیریت ابتدا وارد حساب شوید.", 401);
 
-    if (authUser?.role === "superadmin" || authUser?.role === "admin") {
+    if (authUser.role === "superadmin" || authUser.role === "admin") {
       return apiOk({
-        ...toAdminSecurityData(security),
+        security: { hasCode: false, isPanelLocked: false },
         access: { isAdminUnlocked: true },
       });
     }
 
-    if (!parsed.data.code) {
-      const superadmin = await requireSuperadmin(request);
-      if (!superadmin.ok) return superadmin.response;
-      const unlocked = await upsertAdminSecurityLock(false);
-      return apiOk({
-        ...toAdminSecurityData(unlocked),
-        access: { isAdminUnlocked: true },
-      });
-    }
-
-    if (!adminCode || parsed.data.code !== adminCode) {
-      return apiFail("invalid admin code", 401);
-    }
-
-    if (!authUser) return apiFail("sign in is required", 401);
-
-    const username = String(parsed.data.username || authUser.username || "").trim().toLowerCase();
-    if (!username || username !== authUser.username) {
-      return apiFail("signed-in username is required", 400);
-    }
-
-    const requestRecord = await prisma.adminAccessRequest.upsert({
-      where: { id: `${authUser.id}-pending-admin-access` },
-      update: {
-        username,
-        status: "pending",
-      },
-      create: {
-        id: `${authUser.id}-pending-admin-access`,
-        userId: authUser.id,
-        username,
-        status: "pending",
-      },
+    const profile = await prisma.customerProfile.findFirst({
+      where: { userId: authUser.id },
+      orderBy: { updatedAt: "desc" },
+      select: { phone: true },
     });
+    const phone = String(profile?.phone || authUser.username || "").trim();
+
+    if (!phone) {
+      return apiFail("برای ثبت درخواست مدیریت باید شماره موبایل حساب شما ثبت شده باشد.", 400);
+    }
+
+    const existing = await prisma.adminAccessRequest.findFirst({
+      where: { userId: authUser.id },
+      orderBy: { updatedAt: "desc" },
+    });
+    const requestRecord = existing
+      ? await prisma.adminAccessRequest.update({
+          where: { id: existing.id },
+          data: { username: phone, status: existing.status === "approved" ? "approved" : "pending" },
+        })
+      : await prisma.adminAccessRequest.create({
+          data: {
+            userId: authUser.id,
+            username: phone,
+            status: "pending",
+          },
+        });
 
     return apiOk({
-      ...toAdminSecurityData(security),
+      security: { hasCode: false, isPanelLocked: false },
       access: { isAdminUnlocked: false, status: requestRecord.status },
-    });
+    }, { message: "درخواست مدیریت برای مدیر ارشد ارسال شد." });
   } catch (error) {
-    console.error("Admin security unlock error:", error);
+    console.error("Admin access request compatibility error:", error);
     return apiServerError();
   }
 }

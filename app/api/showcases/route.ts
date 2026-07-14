@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: true, data: { showcases } });
   } catch (error) {
     console.error("Showcases GET error:", error);
-    return NextResponse.json({ ok: false, error: "server error", data: { showcases: [] } }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد.", data: { showcases: [] } }, { status: 500 });
   }
 }
 
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   const incoming = body.showcase ?? body;
 
   if (!incoming || !incoming.id && !incoming.title) {
-    return NextResponse.json({ ok: false, error: "invalid payload" }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "اطلاعات ارسالی معتبر نیست." }, { status: 400 });
   }
 
   try {
@@ -158,6 +158,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, data: { showcase: result } });
   } catch (error) {
     console.error("Showcases POST error:", error);
-    return NextResponse.json({ ok: false, error: "server error" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد." }, { status: 500 });
   }
 }

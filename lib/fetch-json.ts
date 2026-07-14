@@ -26,7 +26,7 @@ export async function fetchJsonDeduped<T>(
     cache.delete(url);
   }
 
-  const task = fetch(url, { cache: "no-store" })
+  const task = fetch(url, force ? { cache: "no-store" } : undefined)
     .then((res) => res.json() as Promise<T>)
     .then((data) => {
       cache.set(url, { data, at: Date.now() });

@@ -10,13 +10,13 @@ const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)\S{8,72}$/;
 const passwordSchema = z.string()
   .min(8)
   .max(72)
-  .regex(PASSWORD_REGEX, "password must include at least one letter, one number, and no spaces");
+  .regex(PASSWORD_REGEX, "رمز عبور باید حداقل یک حرف و یک عدد داشته باشد و شامل فاصله نباشد.");
 
 const customerProfileSchema = z.object({
   firstName: z.string().trim().regex(NAME_REGEX),
   lastName: z.string().trim().regex(NAME_REGEX),
-  nationalId: z.string().trim().optional().default("").refine((value) => !value || NATIONAL_ID_REGEX.test(value), "national id must be 10 digits"),
-  birthDate: z.string().trim().optional().default("").transform(normalizePersianDate).refine((value) => !value || isValidPastPersianDate(value), "birth date must be a valid past Jalali date"),
+  nationalId: z.string().trim().optional().default("").refine((value) => !value || NATIONAL_ID_REGEX.test(value), "کد ملی باید ۱۰ رقم باشد."),
+  birthDate: z.string().trim().optional().default("").transform(normalizePersianDate).refine((value) => !value || isValidPastPersianDate(value), "تاریخ تولد باید یک تاریخ شمسی معتبر در گذشته باشد."),
   phone: z.string().trim().regex(PHONE_REGEX),
   email: z.email().trim().toLowerCase().optional().or(z.literal("")).default(""),
   address: z.string().trim().min(5).max(200),
@@ -35,10 +35,10 @@ export const authRegisterSchema = z.object({
   name: z.string().trim().min(1).optional(),
   profile: customerProfileSchema.optional(),
 }).refine((value) => Boolean(value.phone || value.email || value.username || value.profile?.phone), {
-  message: "phone is required",
+  message: "شماره موبایل الزامی است.",
   path: ["phone"],
 }).refine((value) => !value.passwordConfirm || value.password === value.passwordConfirm, {
-  message: "password confirmation does not match",
+  message: "تکرار رمز عبور با رمز عبور یکسان نیست.",
   path: ["passwordConfirm"],
 });
 
@@ -49,7 +49,7 @@ export const authLoginSchema = z.object({
   identifier: z.string().trim().toLowerCase().optional(),
   password: z.string().min(1),
 }).refine((value) => Boolean(value.phone || value.email || value.username || value.identifier), {
-  message: "phone is required",
+  message: "شماره موبایل الزامی است.",
   path: ["phone"],
 });
 
