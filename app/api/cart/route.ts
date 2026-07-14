@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getAuthUser } from "@/lib/api/auth";
-import { isValidPastPersianDate, normalizePersianDate } from "@/lib/persian-date";
 import { cartItemDto, getOrCreateActiveCart } from "@/lib/api/catalog-service";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +11,6 @@ export const runtime = "nodejs";
 type ProfilePayload = {
   firstName?: string;
   lastName?: string;
-  nationalId?: string;
-  birthDate?: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -70,8 +67,6 @@ function normalizeProfile(value: ProfilePayload) {
   return {
     firstName: String(value.firstName ?? "").trim(),
     lastName: String(value.lastName ?? "").trim(),
-    nationalId: String(value.nationalId ?? "").trim(),
-    birthDate: normalizePersianDate(String(value.birthDate ?? "")),
     phone: String(value.phone ?? "").trim(),
     email: String(value.email ?? "").trim().toLowerCase(),
     address: String(value.address ?? "").trim(),
@@ -83,8 +78,6 @@ function isProfileComplete(profile: ReturnType<typeof normalizeProfile>) {
   return Boolean(
     profile.firstName &&
     profile.lastName &&
-    (!profile.nationalId || /^\d{10}$/.test(profile.nationalId)) &&
-    (!profile.birthDate || isValidPastPersianDate(profile.birthDate)) &&
     profile.phone &&
     profile.address
   );
@@ -209,50 +202,50 @@ function readPriceNumber(value?: string | null) {
 async function findLegacyProfile(request: Request, bodyProfile?: ProfilePayload) {
   const authUser = await getAuthUser(request);
   const url = new URL(request.url);
-  const nationalId = String(bodyProfile?.nationalId ?? url.searchParams.get("nationalId") ?? "").trim();
-
-  if (authUser && nationalId) {
-    const profile = await prisma.customerProfile.findFirst({
-      where: {
-        userId: authUser.id,
-        nationalId,
-      },
-    });
-    return profile ?? prisma.customerProfile.findUnique({ where: { nationalId } });
-  }
+  const phone = String(bodyProfile?.phone ?? url.searchParams.get("phone") ?? "").trim();
 
   if (authUser) return prisma.customerProfile.findFirst({ where: { userId: authUser.id } });
-  if (!nationalId) return null;
-  return prisma.customerProfile.findUnique({ where: { nationalId } });
+  if (!phone) return null;
+  return prisma.customerProfile.findFirst({
+    where: { phone },
+    orderBy: { updatedAt: "desc" },
+  });
 }
 
 async function upsertLegacyProfile(request: Request, profile: ReturnType<typeof normalizeProfile>) {
   const authUser = await getAuthUser(request);
-  const nationalId = profile.nationalId || (authUser ? `user-${authUser.id}` : `guest-${profile.phone}`);
-  return prisma.customerProfile.upsert({
-    where: { nationalId },
-    update: {
-      ...(authUser ? { userId: authUser.id } : {}),
+  const existing = authUser
+    ? await prisma.customerProfile.findFirst({ where: { userId: authUser.id } })
+    : await prisma.customerProfile.findFirst({
+      where: { phone: profile.phone, userId: null },
+      orderBy: { updatedAt: "desc" },
+    });
+  const profileData = {
+    ...(authUser ? { userId: authUser.id } : {}),
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    phone: profile.phone,
+    email: profile.email || null,
+    address: profile.address,
+    isAdminUnlocked: profile.isAdminUnlocked,
+  };
+
+  return existing
+    ? prisma.customerProfile.update({
+      where: { id: existing.id },
+      data: profileData,
+    })
+    : prisma.customerProfile.create({
+      data: {
+        userId: authUser?.id ?? null,
       firstName: profile.firstName,
       lastName: profile.lastName,
-      birthDate: profile.birthDate,
       phone: profile.phone,
       email: profile.email || null,
       address: profile.address,
       isAdminUnlocked: profile.isAdminUnlocked,
-    },
-    create: {
-      userId: authUser?.id ?? null,
-      firstName: profile.firstName,
-      lastName: profile.lastName,
-      nationalId,
-      birthDate: profile.birthDate,
-      phone: profile.phone,
-      email: profile.email || null,
-      address: profile.address,
-      isAdminUnlocked: profile.isAdminUnlocked,
-    },
-  });
+      },
+    });
 }
 
 async function activeCartForProfile(profileId: string) {

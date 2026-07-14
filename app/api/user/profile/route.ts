@@ -8,27 +8,15 @@ import { profileSchema } from "@/lib/api/schemas";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-function isUniqueConflict(error: unknown) {
-  return typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "P2002";
-}
-
 export async function GET(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
-
-  const url = new URL(request.url);
-  const nationalId = String(url.searchParams.get("nationalId") ?? "").trim();
 
   try {
     const authUser = await getAuthUser(request);
     const profile = authUser
       ? await prisma.customerProfile.findFirst({ where: { userId: authUser.id } })
-      : nationalId
-        ? await prisma.customerProfile.findUnique({ where: { nationalId } })
-        : null;
+      : null;
 
     return apiOk({
       user: authUser
@@ -72,14 +60,11 @@ async function saveProfile(request: Request) {
     const existingProfile = authUser
       ? await prisma.customerProfile.findFirst({ where: { userId: authUser.id } })
       : null;
-    const requestedNationalId = profile.nationalId.trim();
-    const fallbackNationalId = authUser ? `user-${authUser.id}` : `guest-${profile.phone}`;
     const profileData = {
       firstName: profile.firstName,
       lastName: profile.lastName,
       phone: profile.phone,
       email: profile.email || null,
-      birthDate: profile.birthDate,
       address: profile.address,
       avatarUrl: profile.avatarUrl ?? null,
       ...(profile.isAdminUnlocked !== undefined
@@ -87,68 +72,33 @@ async function saveProfile(request: Request) {
         : {}),
     };
 
-    const nationalOwner = requestedNationalId
-      ? await prisma.customerProfile.findUnique({ where: { nationalId: requestedNationalId } })
-      : null;
-    const canUseRequestedNationalId = existingProfile
-      ? Boolean(requestedNationalId && (!nationalOwner || nationalOwner.id === existingProfile.id))
-      : Boolean(requestedNationalId && (!nationalOwner || !authUser || !nationalOwner.userId || nationalOwner.userId === authUser.id));
-    const nationalId = canUseRequestedNationalId ? requestedNationalId : existingProfile?.nationalId || fallbackNationalId;
-
-    const matchedProfile = existingProfile
+    const phoneOwner = existingProfile
       ? null
-      : canUseRequestedNationalId && nationalOwner
-        ? nationalOwner
-        : await prisma.customerProfile.findUnique({ where: { nationalId } });
-    const saveProfileRecord = async () => existingProfile
-      ? prisma.customerProfile.update({
-        where: { id: existingProfile.id },
+      : await prisma.customerProfile.findFirst({
+        where: {
+          phone: profile.phone,
+          OR: [
+            { userId: null },
+            ...(authUser ? [{ userId: authUser.id }] : []),
+          ],
+        },
+      });
+    const matchedProfile = existingProfile ?? phoneOwner;
+    const saved = matchedProfile
+      ? await prisma.customerProfile.update({
+        where: { id: matchedProfile.id },
         data: {
+          ...(authUser ? { userId: authUser.id } : {}),
           ...profileData,
-          nationalId,
         },
       })
-      : matchedProfile
-          ? prisma.customerProfile.update({
-            where: { id: matchedProfile.id },
-            data: {
-              ...(authUser ? { userId: authUser.id } : {}),
-              ...profileData,
-            },
-          })
-          : prisma.customerProfile.create({
-            data: {
-              userId: authUser?.id ?? null,
-              ...profileData,
-              nationalId,
-              isAdminUnlocked: profile.isAdminUnlocked ?? false,
-            },
-          });
-    let saved: Awaited<ReturnType<typeof saveProfileRecord>>;
-    try {
-      saved = await saveProfileRecord();
-    } catch (error) {
-      if (!isUniqueConflict(error)) throw error;
-      const safeNationalId = existingProfile?.nationalId || fallbackNationalId;
-      saved = existingProfile
-        ? await prisma.customerProfile.update({
-          where: { id: existingProfile.id },
-          data: profileData,
-        })
-        : await prisma.customerProfile.upsert({
-          where: { nationalId: safeNationalId },
-          update: {
-            ...(authUser ? { userId: authUser.id } : {}),
-            ...profileData,
-          },
-          create: {
-            userId: authUser?.id ?? null,
-            ...profileData,
-            nationalId: safeNationalId,
-            isAdminUnlocked: profile.isAdminUnlocked ?? false,
-          },
-        });
-    }
+      : await prisma.customerProfile.create({
+        data: {
+          userId: authUser?.id ?? null,
+          ...profileData,
+          isAdminUnlocked: profile.isAdminUnlocked ?? false,
+        },
+      });
     const fullName = `${saved.firstName} ${saved.lastName}`.trim();
     if (authUser && fullName && authUser.name !== fullName) {
       await prisma.user.update({

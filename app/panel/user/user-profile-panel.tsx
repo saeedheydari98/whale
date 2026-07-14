@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { IoKeyOutline, IoLogInOutline, IoSaveOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
-import { PersianDateInput } from "@/app/design-system/components/ui/persian-date-input";
 import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
 import { persistCart, readLocalCart } from "@/lib/cart-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
@@ -18,10 +17,6 @@ import {
   type UserProfile,
 } from "@/lib/user-profile";
 import { fetchCurrentUser, setCachedAuthUser } from "@/lib/auth-client";
-import {
-  isValidPastPersianDate,
-  normalizePersianDate,
-} from "@/lib/persian-date";
 
 type PanelUser = {
   username?: string | null;
@@ -30,7 +25,6 @@ type PanelUser = {
 };
 
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
-const NATIONAL_ID_PATTERN = /^\d{10}$/;
 const PHONE_PATTERN = /^09\d{9}$/;
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d)[^\s]{8,72}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -86,8 +80,6 @@ export function UserProfilePanel() {
   const cleanProfile = () => ({
     firstName: profileDraft.firstName.trim(),
     lastName: profileDraft.lastName.trim(),
-    nationalId: profileDraft.nationalId.trim(),
-    birthDate: normalizePersianDate(profileDraft.birthDate),
     phone: profileDraft.phone.trim(),
     email: profileDraft.email.trim().toLowerCase(),
     address: profileDraft.address.trim(),
@@ -99,12 +91,10 @@ export function UserProfilePanel() {
       isUserProfileComplete(profileDraft) &&
       NAME_PATTERN.test(profileDraft.firstName.trim()) &&
       NAME_PATTERN.test(profileDraft.lastName.trim()) &&
-      (!profileDraft.nationalId.trim() || NATIONAL_ID_PATTERN.test(profileDraft.nationalId.trim())) &&
       PHONE_PATTERN.test(profileDraft.phone.trim()) &&
       (!profileDraft.email.trim() || EMAIL_PATTERN.test(profileDraft.email.trim())) &&
       profileDraft.address.trim().length >= 5 &&
-      profileDraft.address.trim().length <= 200 &&
-      (!profileDraft.birthDate.trim() || isValidPastPersianDate(profileDraft.birthDate))
+      profileDraft.address.trim().length <= 200
     ) return true;
     setShowRequiredErrors(true);
     setStatus("لطفا اطلاعات پروفایل را به‌درستی وارد کنید.");
@@ -164,7 +154,7 @@ export function UserProfilePanel() {
       const user = data?.data?.user ?? null;
       setCachedAuthUser(user);
       setAuthUser(user);
-      const savedProfile = (await fetchUserProfile(profile.nationalId).catch(() => null)) ?? profile;
+      const savedProfile = (await fetchUserProfile().catch(() => null)) ?? profile;
       setProfileDraft(savedProfile);
       setRegisterDraft(EMPTY_REGISTER);
       setShowRequiredErrors(false);
@@ -298,21 +288,6 @@ export function UserProfilePanel() {
           />
         </div>
         <div className="flex flex-col gap-2">
-          <RequiredLabel className="text-primary-text">کد ملی</RequiredLabel>
-          <CustomInput
-            value={profileDraft.nationalId}
-            variant="primary"
-            placeholder="کد ملی"
-            pattern="\d{10}"
-            maxLength={10}
-            invalid={showRequiredErrors && Boolean(profileDraft.nationalId.trim()) && !NATIONAL_ID_PATTERN.test(profileDraft.nationalId.trim())}
-            showLabel={false}
-            inputMode="numeric"
-            aria-label="کد ملی"
-            onChange={(event) => updateProfileDraft({ nationalId: event.target.value })}
-          />
-        </div>
-        <div className="flex flex-col gap-2">
           <RequiredLabel required className="text-primary-text">شماره تماس</RequiredLabel>
           <CustomInput
             value={profileDraft.phone}
@@ -341,14 +316,6 @@ export function UserProfilePanel() {
             showLabel={false}
             aria-label="ایمیل"
             onChange={(event) => updateProfileDraft({ email: event.target.value })}
-          />
-        </div>
-        <div className="flex flex-col gap-2 md:col-span-2">
-          <RequiredLabel className="text-primary-text">تاریخ تولد</RequiredLabel>
-          <PersianDateInput
-            value={profileDraft.birthDate}
-            invalid={showRequiredErrors && Boolean(profileDraft.birthDate.trim()) && !isValidPastPersianDate(profileDraft.birthDate)}
-            onChange={(birthDate) => updateProfileDraft({ birthDate })}
           />
         </div>
         <div className="flex flex-col gap-2 md:col-span-2">

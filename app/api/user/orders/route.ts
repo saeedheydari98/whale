@@ -10,21 +10,13 @@ export async function GET(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
   const authUser = await getAuthUser(request);
-  const url = new URL(request.url);
-  const nationalId = String(url.searchParams.get("nationalId") ?? "").trim();
 
   try {
-    const profile = nationalId
-      ? await prisma.customerProfile.findUnique({ where: { nationalId } })
-      : null;
-    if (!authUser && !profile) return apiOk({ orders: [] });
+    if (!authUser) return apiOk({ orders: [] });
 
     const orders = await prisma.order.findMany({
       where: {
-        OR: [
-          ...(authUser ? [{ userId: authUser.id }] : []),
-          ...(profile ? [{ profileId: profile.id }] : []),
-        ],
+        userId: authUser.id,
       },
       orderBy: { createdAt: "desc" },
       include: { items: { orderBy: { createdAt: "desc" } } },

@@ -4,13 +4,10 @@ import {
   readCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
-import { isValidPastPersianDate, normalizePersianDate } from "@/lib/persian-date";
 
 export type UserProfile = {
   firstName: string;
   lastName: string;
-  nationalId: string;
-  birthDate: string;
   phone: string;
   email: string;
   address: string;
@@ -24,15 +21,12 @@ const GUEST_USER_PROFILE_STORAGE_KEY = `${USER_PROFILE_STORAGE_KEY}:guest`;
 export const EMPTY_USER_PROFILE: UserProfile = {
   firstName: "",
   lastName: "",
-  nationalId: "",
-  birthDate: "",
   phone: "",
   email: "",
   address: "",
   isAdminUnlocked: false,
 };
 
-const NATIONAL_ID_PATTERN = /^\d{10}$/;
 const PHONE_PATTERN = /^09\d{9}$/;
 
 function readProfileFromApiData(data: any) {
@@ -45,8 +39,6 @@ function areProfilesEqual(first: UserProfile | null, second: UserProfile | null)
   return (
     first.firstName === second.firstName &&
     first.lastName === second.lastName &&
-    first.nationalId === second.nationalId &&
-    first.birthDate === second.birthDate &&
     first.phone === second.phone &&
     first.email === second.email &&
     first.address === second.address &&
@@ -86,13 +78,9 @@ function migrateLegacyGuestProfile(targetKey: string) {
 }
 
 export function normalizeUserProfile(value: Partial<UserProfile> | null | undefined): UserProfile {
-  const nationalId = String(value?.nationalId ?? "");
-
   return {
     firstName: String(value?.firstName ?? ""),
     lastName: String(value?.lastName ?? ""),
-    nationalId: nationalId.startsWith("user-") || nationalId.startsWith("guest-") ? "" : nationalId,
-    birthDate: normalizePersianDate(String(value?.birthDate ?? "")),
     phone: String(value?.phone ?? ""),
     email: String(value?.email ?? ""),
     address: String(value?.address ?? ""),
@@ -106,8 +94,6 @@ export function isUserProfileComplete(profile: Partial<UserProfile> | null | und
   return Boolean(
     normalized.firstName.trim() &&
       normalized.lastName.trim() &&
-      (!normalized.nationalId.trim() || NATIONAL_ID_PATTERN.test(normalized.nationalId.trim())) &&
-      (!normalized.birthDate.trim() || isValidPastPersianDate(normalized.birthDate)) &&
       PHONE_PATTERN.test(normalized.phone.trim()) &&
       normalized.address.trim().length >= 5
   );
@@ -150,10 +136,8 @@ export function clearUserProfile(user?: AuthClientUser | null, options?: { emit?
   }
 }
 
-export async function fetchUserProfile(nationalId?: string, options?: { write?: boolean; emit?: boolean }) {
-  const id = String(nationalId ?? readUserProfile()?.nationalId ?? "").trim();
-  const query = id ? `?nationalId=${encodeURIComponent(id)}` : "";
-  const res = await fetch(`/api/user/profile${query}`, {
+export async function fetchUserProfile(options?: { write?: boolean; emit?: boolean }) {
+  const res = await fetch("/api/user/profile", {
     cache: "no-store",
   });
   const data = await res.json();

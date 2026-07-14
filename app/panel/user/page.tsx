@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { IoCheckmarkCircleOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import { UserProfilePanel } from "./user-profile-panel";
-import { readUserProfile } from "@/lib/user-profile";
 
 type OrderItem = {
   id: string;
@@ -21,9 +20,7 @@ function UserOrdersPanel() {
   const [orders, setOrders] = useState<Array<{ id: string; createdAt: string; items: OrderItem[] }>>([]);
 
   useEffect(() => {
-    const nationalId = readUserProfile()?.nationalId ?? "";
-    const query = nationalId ? `?nationalId=${encodeURIComponent(nationalId)}` : "";
-    void fetch(`/api/user/orders${query}`, { cache: "no-store" })
+    void fetch("/api/user/orders", { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setOrders(Array.isArray(data?.data?.orders) ? data.data.orders : []))
       .catch(() => setOrders([]));

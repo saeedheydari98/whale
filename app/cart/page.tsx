@@ -7,7 +7,6 @@ import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/i
 import { CustomButton } from "../design-system/components/ui/button";
 import { CustomInput } from "../design-system/components/ui/input";
 import { CustomModal } from "../design-system/components/ui/modal";
-import { PersianDateInput } from "../design-system/components/ui/persian-date-input";
 import { RequiredLabel } from "../design-system/components/ui/required-label";
 import {
   CART_UPDATED_EVENT,
@@ -34,10 +33,6 @@ import {
 } from "@/lib/user-profile";
 import { fetchCurrentUser } from "@/lib/auth-client";
 import { getProductDetail } from "@/lib/products-client";
-import {
-  isValidPastPersianDate,
-  normalizePersianDate,
-} from "@/lib/persian-date";
 import { getStockColorValue, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
 
 function getFinalPrice(item: CartItemRecord) {
@@ -67,7 +62,6 @@ function getDiscountPercent(item: CartItemRecord) {
 }
 
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
-const NATIONAL_ID_PATTERN = /^\d{10}$/;
 const PHONE_PATTERN = /^09\d{9}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -173,12 +167,10 @@ export default function CartPage() {
     isUserProfileComplete(profileDraft) &&
     NAME_PATTERN.test(profileDraft.firstName.trim()) &&
     NAME_PATTERN.test(profileDraft.lastName.trim()) &&
-    (!profileDraft.nationalId.trim() || NATIONAL_ID_PATTERN.test(profileDraft.nationalId.trim())) &&
     PHONE_PATTERN.test(profileDraft.phone.trim()) &&
     (!profileDraft.email.trim() || EMAIL_PATTERN.test(profileDraft.email.trim())) &&
     profileDraft.address.trim().length >= 5 &&
-    profileDraft.address.trim().length <= 200 &&
-    (!profileDraft.birthDate.trim() || isValidPastPersianDate(profileDraft.birthDate))
+    profileDraft.address.trim().length <= 200
   );
 
   const saveProfileDraft = () => {
@@ -192,8 +184,6 @@ export default function CartPage() {
     const nextProfile = {
       firstName: profileDraft.firstName.trim(),
       lastName: profileDraft.lastName.trim(),
-      nationalId: profileDraft.nationalId.trim(),
-      birthDate: normalizePersianDate(profileDraft.birthDate),
       phone: profileDraft.phone.trim(),
       email: profileDraft.email.trim().toLowerCase(),
       address: profileDraft.address.trim(),
@@ -507,20 +497,6 @@ export default function CartPage() {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <RequiredLabel className="text-primary-text">کد ملی</RequiredLabel>
-                <CustomInput
-                  value={profileDraft.nationalId}
-                  pattern="\d{10}"
-                  maxLength={10}
-                  placeholder="کد ملی"
-                  invalid={showProfileRequiredErrors && Boolean(profileDraft.nationalId.trim()) && !NATIONAL_ID_PATTERN.test(profileDraft.nationalId.trim())}
-                  showLabel={false}
-                  inputMode="numeric"
-                  aria-label="کد ملی"
-                  onChange={(event) => updateProfileDraft({ nationalId: event.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
                 <RequiredLabel required className="text-primary-text">شماره تماس</RequiredLabel>
                 <CustomInput
                   value={profileDraft.phone}
@@ -546,14 +522,6 @@ export default function CartPage() {
                   showLabel={false}
                   aria-label="ایمیل"
                   onChange={(event) => updateProfileDraft({ email: event.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <RequiredLabel className="text-primary-text">تاریخ تولد</RequiredLabel>
-                <PersianDateInput
-                  value={profileDraft.birthDate}
-                  invalid={showProfileRequiredErrors && Boolean(profileDraft.birthDate.trim()) && !isValidPastPersianDate(profileDraft.birthDate)}
-                  onChange={(birthDate) => updateProfileDraft({ birthDate })}
                 />
               </div>
               <div className="flex flex-col gap-2 md:col-span-2">

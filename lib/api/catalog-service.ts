@@ -298,7 +298,6 @@ export async function getOrCreateActiveCart(userId: number) {
         userId,
         firstName: user?.name || "User",
         lastName: "",
-        nationalId: `user-${userId}`,
         phone: "",
       },
     });

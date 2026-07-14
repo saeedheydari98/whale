@@ -48,8 +48,6 @@ model CustomerProfile {
   userId          Int?
   firstName       String
   lastName        String
-  nationalId      String   @unique
-  birthDate       String   @default("")
   phone           String
   email           String?
   address         String   @default("")
@@ -59,6 +57,9 @@ model CustomerProfile {
   updatedAt       DateTime @updatedAt
   user            User?    @relation(fields: [userId], references: [id])
   carts           Cart[]
+
+  @@index([userId])
+  @@index([phone])
 }
 
 model Product {

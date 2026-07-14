@@ -156,29 +156,41 @@ export async function POST(request: Request, context: Context) {
         });
 
         if (profile) {
-          const nationalId = profile.nationalId || `user-${createdUser.id}`;
-          await tx.customerProfile.upsert({
-            where: { nationalId },
-            update: {
-              userId: createdUser.id,
-              firstName: profile.firstName,
-              lastName: profile.lastName,
-              email: profile.email || null,
-              birthDate: profile.birthDate,
+          const existingProfile = await tx.customerProfile.findFirst({
+            where: {
               phone: profile.phone,
-              address: profile.address,
-            },
-            create: {
-              userId: createdUser.id,
-              firstName: profile.firstName,
-              lastName: profile.lastName,
-              email: profile.email || null,
-              nationalId,
-              birthDate: profile.birthDate,
-              phone: profile.phone,
-              address: profile.address,
+              OR: [
+                { userId: null },
+                { userId: createdUser.id },
+              ],
             },
           });
+          const profileData = {
+            userId: createdUser.id,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
+            email: profile.email || null,
+            phone: profile.phone,
+            address: profile.address,
+          };
+
+          if (existingProfile) {
+            await tx.customerProfile.update({
+              where: { id: existingProfile.id },
+              data: profileData,
+            });
+          } else {
+            await tx.customerProfile.create({
+              data: {
+              userId: createdUser.id,
+              firstName: profile.firstName,
+              lastName: profile.lastName,
+              email: profile.email || null,
+              phone: profile.phone,
+              address: profile.address,
+              },
+            });
+          }
         }
 
         return createdUser;

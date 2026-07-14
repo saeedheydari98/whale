@@ -1,9 +1,7 @@
 import { z } from "zod";
-import { isValidPastPersianDate, normalizePersianDate } from "@/lib/persian-date";
 
 const USERNAME_REGEX = /^[a-z0-9._-]+$/;
 const NAME_REGEX = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
-const NATIONAL_ID_REGEX = /^\d{10}$/;
 const PHONE_REGEX = /^09\d{9}$/;
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)\S{8,72}$/;
 
@@ -15,8 +13,6 @@ const passwordSchema = z.string()
 const customerProfileSchema = z.object({
   firstName: z.string().trim().regex(NAME_REGEX),
   lastName: z.string().trim().regex(NAME_REGEX),
-  nationalId: z.string().trim().optional().default("").refine((value) => !value || NATIONAL_ID_REGEX.test(value), "کد ملی باید ۱۰ رقم باشد."),
-  birthDate: z.string().trim().optional().default("").transform(normalizePersianDate).refine((value) => !value || isValidPastPersianDate(value), "تاریخ تولد باید یک تاریخ شمسی معتبر در گذشته باشد."),
   phone: z.string().trim().regex(PHONE_REGEX),
   email: z.email().trim().toLowerCase().optional().or(z.literal("")).default(""),
   address: z.string().trim().min(5).max(200),
