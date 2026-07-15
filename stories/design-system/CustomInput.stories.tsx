@@ -27,6 +27,8 @@ const meta = {
     loadingText: { control: "text" },
     icon: { control: "boolean" },
     iconAfter: { control: "boolean" },
+    multiline: { control: "boolean" },
+    height: { control: "text" },
   },
   args: {
     placeholder: "Type here...",
@@ -42,6 +44,7 @@ const meta = {
     loadingText: "Loading...",
     icon: true,
     iconAfter: false,
+    multiline: false,
   },
   render: ({ icon, iconAfter, ...args }) => (
     <CustomInput
@@ -56,3 +59,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Playground = {} as Story;
+
+export const Textarea = {
+  args: {
+    placeholder: "Write a longer message...",
+    multiline: true,
+    height: "10rem",
+    icon: false,
+    iconAfter: false,
+  },
+} as Story;

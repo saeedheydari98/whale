@@ -7,6 +7,7 @@ export const variantOptions = [
   "info",
   "neutral",
   "edit",
+  "accent",
 ] as const;
 
 export const sizeOptions = ["xs", "sm", "md", "lg", "xl", "xxl", "xxxl"] as const;

@@ -646,6 +646,16 @@ function parseApiPayload(payload: unknown): ProductsCache {
     : Array.from(new Set(products.flatMap((product) => normalizeStringList(product.categoryIds, [String(product.categoryId ?? "")]))))
         .filter(Boolean)
         .map((categoryId, index) => normalizeCategoryRecord({ id: categoryId, title: categoryId, slug: categoryId }, index + 1));
+  const recordCategoryGroups = Array.isArray(record.categoryGroups)
+    ? record.categoryGroups.map(normalizeLinkGroupRecord)
+    : Array.isArray(record.catalog?.categoryGroups)
+      ? record.catalog.categoryGroups.map(normalizeLinkGroupRecord)
+      : [];
+  const recordBrandGroups = Array.isArray(record.brandGroups)
+    ? record.brandGroups.map(normalizeLinkGroupRecord)
+    : Array.isArray(record.catalog?.brandGroups)
+      ? record.catalog.brandGroups.map(normalizeLinkGroupRecord)
+      : [];
   const categoryGroups = treeCatalog?.categoryGroups && treeCatalog.categoryGroups.length > 0
     ? treeCatalog.categoryGroups
     : Array.isArray(record.categoryGroups)
@@ -660,21 +670,35 @@ function parseApiPayload(payload: unknown): ProductsCache {
       : Array.isArray(record.catalog?.brandGroups)
         ? record.catalog.brandGroups.map(normalizeLinkGroupRecord)
         : [{ id: "default-brands", title: "برندها", active: true, sortOrder: Number(brands[0]?.homeSortOrder ?? 1) }];
+  const resolvedCategoryGroups = categoryGroups.length > 0
+    ? categoryGroups
+    : recordCategoryGroups.length > 0
+      ? recordCategoryGroups
+      : [{ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: Number(fallbackCategories[0]?.pageSortOrder ?? 1) }];
+  const resolvedBrandGroups = brandGroups.length > 0
+    ? brandGroups
+    : recordBrandGroups.length > 0
+      ? recordBrandGroups
+      : [{ id: "default-brands", title: "برندها", active: true, sortOrder: Number(brands[0]?.homeSortOrder ?? 1) }];
+  const categoryGroupIds = new Set(resolvedCategoryGroups.map((group) => group.id));
+  const brandGroupIds = new Set(resolvedBrandGroups.map((group) => group.id));
+  const fallbackCategoryGroupId = resolvedCategoryGroups[0]?.id || "default-categories";
+  const fallbackBrandGroupId = resolvedBrandGroups[0]?.id || "default-brands";
   const categoriesWithGroups = fallbackCategories.map((category) => ({
     ...category,
-    groupId: category.groupId || categoryGroups[0]?.id || "default-categories",
+    groupId: categoryGroupIds.has(String(category.groupId ?? "")) ? category.groupId : fallbackCategoryGroupId,
   }));
   const brandsWithGroups = brands.map((brand) => ({
     ...brand,
-    groupId: brand.groupId || brandGroups[0]?.id || "default-brands",
+    groupId: brandGroupIds.has(String(brand.groupId ?? "")) ? brand.groupId : fallbackBrandGroupId,
   }));
 
   return {
     products: dedupeProducts(products),
     showcases,
-    categoryGroups,
+    categoryGroups: resolvedCategoryGroups,
     categories: categoriesWithGroups,
-    brandGroups,
+    brandGroups: resolvedBrandGroups,
     brands: brandsWithGroups,
     banners,
     tree:
@@ -684,9 +708,9 @@ function parseApiPayload(payload: unknown): ProductsCache {
     catalog: {
       placement: Number(treeCatalog?.placement ?? record.catalog?.placement ?? 0),
       showcases: catalogShowcases,
-      categoryGroups,
+      categoryGroups: resolvedCategoryGroups,
       categories: categoriesWithGroups,
-      brandGroups,
+      brandGroups: resolvedBrandGroups,
       brands: brandsWithGroups,
       banners: catalogBanners,
     },
@@ -846,15 +870,14 @@ export async function getCatalogStructure(options?: boolean | GetProductsOptions
 
 async function getPageStructure(url: string, options?: Pick<GetProductsOptions, "force">): Promise<ProductsCache> {
   const cached = options?.force ? null : readCachedPageStructure(url, { maxAgeMs: PAGE_STRUCTURE_LOCAL_TTL_MS });
-  if (cached) return cached;
 
   try {
-    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force });
+    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force ?? true });
     const page = withResolvedTree(parseApiPayload(json?.data));
     writeCachedPageStructure(url, page);
     return page;
   } catch {
-    return readCachedPageStructure(url) ?? emptyProductsCache();
+    return cached ?? readCachedPageStructure(url) ?? emptyProductsCache();
   }
 }
 

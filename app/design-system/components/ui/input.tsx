@@ -6,7 +6,10 @@ import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.varian
 import { borderVariants, cx, interactionStates, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
-type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> & {
+type CustomInputElement = HTMLInputElement | HTMLTextAreaElement;
+
+type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'height' | 'onChange' | 'onBlur'> &
+  Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size' | 'height' | 'onChange' | 'onBlur'> & {
   variant?: UICommonVariant;
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
@@ -21,6 +24,10 @@ type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'
   invalid?: boolean;
   label?: string;
   showLabel?: boolean;
+  multiline?: boolean;
+  height?: React.CSSProperties["height"];
+  onChange?: React.ChangeEventHandler<CustomInputElement>;
+  onBlur?: React.FocusEventHandler<CustomInputElement>;
 };
 
 export function CustomInput({
@@ -40,6 +47,8 @@ export function CustomInput({
   invalid = false,
   label,
   showLabel = true,
+  multiline = false,
+  height,
   style,
   onChange,
   onBlur,
@@ -52,12 +61,20 @@ export function CustomInput({
   const [numberDraft, setNumberDraft] = React.useState<string | null>(null);
   const colorStyle = resolveControlCssVars(variant);
   const isDisabled = disabled || isLoading;
-  const isPassword = type === "password";
-  const isNumber = type === "number";
+  const isPassword = !multiline && type === "password";
+  const isNumber = !multiline && type === "number";
   const visibleLabel = showLabel ? label || String(rest["aria-label"] || rest.placeholder || "") : "";
   const resolvedId = rest.id || inputId;
   const displayedValue = isNumber && numberDraft !== null ? numberDraft : value;
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const resolvedHeightProp = height === "" ? undefined : height;
+  const resolvedHeight = resolvedHeightProp ?? (multiline ? style?.height ?? "8rem" : undefined);
+  const controlStyle = {
+    backgroundColor: colorStyle.backgroundColor,
+    borderColor: invalid ? "var(--danger-border-nomode)" : colorStyle.borderColor,
+    ...style,
+    ...(resolvedHeight !== undefined ? { height: resolvedHeight } : {}),
+  };
+  const handleChange = (event: React.ChangeEvent<CustomInputElement>) => {
     if (isNumber && event.target.value === "") {
       setNumberDraft("");
       return;
@@ -65,7 +82,7 @@ export function CustomInput({
     if (isNumber) setNumberDraft(null);
     onChange?.(event);
   };
-  const handleBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+  const handleBlur = (event: React.FocusEvent<CustomInputElement>) => {
     if (isNumber && numberDraft !== null) setNumberDraft(null);
     onBlur?.(event);
   };
@@ -80,49 +97,61 @@ export function CustomInput({
       {showPassword ? <IoEyeOffOutline /> : <IoEyeOutline />}
     </button>
   ) : null);
+  const controlClassName = cx(
+    "text-primary-text placeholder:text-secondary-text",
+    invalid ? "focus:outline-none focus:ring-2 focus:ring-danger-border-nomode" : "focus:outline-none focus:ring-2 focus:ring-primary-border",
+    sizeVariants[size],
+    radiusVariants[rounded],
+    borderVariants[border],
+    shadowVariants[shadow],
+    motionVariants.smooth,
+    !isDisabled && interactionStates.hover.none,
+    isDisabled && interactionStates.disabled.base,
+    fullWidth && "w-full",
+    icon !== undefined && "pr-10",
+    resolvedIconAfter !== null && "pl-10",
+    multiline && "resize-y py-3 leading-6",
+    className
+  );
   const control = (
-    <div className={cx("relative inline-flex items-center", fullWidth && "w-full")}>
+    <div className={cx("relative inline-flex", multiline ? "items-start" : "items-center", fullWidth && "w-full")}>
       {!isLoading && icon && (
-        <span className="absolute right-3 text-secondary-text">{icon}</span>
+        <span className={cx("absolute right-3 text-secondary-text", multiline && "top-3")}>{icon}</span>
       )}
-      <input
-        {...rest}
-        id={resolvedId}
-        type={isPassword && showPassword ? "text" : type}
-        value={displayedValue}
-        onChange={handleChange}
-        onBlur={handleBlur}
-        aria-invalid={invalid || rest["aria-invalid"]}
-        disabled={isDisabled}
-        className={cx(
-          "text-primary-text placeholder:text-secondary-text",
-          invalid ? "focus:outline-none focus:ring-2 focus:ring-danger-border-nomode" : "focus:outline-none focus:ring-2 focus:ring-primary-border",
-          sizeVariants[size],
-          radiusVariants[rounded],
-          borderVariants[border],
-          shadowVariants[shadow],
-          motionVariants.smooth,
-          !isDisabled && interactionStates.hover.none,
-          isDisabled && interactionStates.disabled.base,
-          fullWidth && "w-full",
-          icon !== undefined && "pr-10",
-          resolvedIconAfter !== null && "pl-10",
-          className
-        )}
-        style={{
-          backgroundColor: colorStyle.backgroundColor,
-          borderColor: invalid ? "var(--danger-border-nomode)" : colorStyle.borderColor,
-          ...style,
-        }}
-      />
+      {multiline ? (
+        <textarea
+          {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
+          id={resolvedId}
+          value={displayedValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={invalid || rest["aria-invalid"]}
+          disabled={isDisabled}
+          className={controlClassName}
+          style={controlStyle}
+        />
+      ) : (
+        <input
+          {...(rest as React.InputHTMLAttributes<HTMLInputElement>)}
+          id={resolvedId}
+          type={isPassword && showPassword ? "text" : type}
+          value={displayedValue}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={invalid || rest["aria-invalid"]}
+          disabled={isDisabled}
+          className={controlClassName}
+          style={controlStyle}
+        />
+      )}
       {isLoading && (
-        <span className="absolute left-3 flex items-center gap-2 text-secondary-text">
+        <span className={cx("absolute left-3 flex items-center gap-2 text-secondary-text", multiline && "top-3")}>
           <Loading loading={loading} size={size} />
           {loadingText && <span className="text-sm">{loadingText}</span>}
         </span>
       )}
       {!isLoading && resolvedIconAfter && (
-        <span className="absolute left-3 text-primary-text">{resolvedIconAfter}</span>
+        <span className={cx("absolute left-3 text-primary-text", multiline && "top-3")}>{resolvedIconAfter}</span>
       )}
     </div>
   );

@@ -35,8 +35,8 @@
   --primary-media-nomode: color-mix(in srgb, var(--primary) 44%, #ffffff);
   --primary-icon: color-mix(in srgb, var(--primary) 48%, var(--bg-base));
   --primary-icon-nomode: color-mix(in srgb, var(--primary) 48%, #ffffff);
-  --primary-border: var(--primary);
-  --primary-border-nomode: var(--primary);
+  --primary-border: color-mix(in srgb, var(--primary) 72%, #000000);
+  --primary-border-nomode: color-mix(in srgb, var(--primary) 72%, #000000);
 
   --secondary: var(--ui-secondary);
   --secondary-base: #ffffff;
@@ -59,8 +59,8 @@
   --secondary-media-nomode: color-mix(in srgb, var(--secondary) 44%, #ffffff);
   --secondary-icon: color-mix(in srgb, var(--secondary) 48%, var(--bg-base));
   --secondary-icon-nomode: color-mix(in srgb, var(--secondary) 48%, #ffffff);
-  --secondary-border: var(--secondary);
-  --secondary-border-nomode: var(--secondary);
+  --secondary-border: color-mix(in srgb, var(--secondary) 72%, #000000);
+  --secondary-border-nomode: color-mix(in srgb, var(--secondary) 72%, #000000);
 
   /* Background */
   --bg-base: #ffffff;
@@ -81,8 +81,8 @@
   --success-nomode: #77d30f;
   --success-bg: color-mix(in srgb, var(--success) 30%, transparent);
   --success-bg-nomode: color-mix(in srgb, var(--success-nomode) 30%, transparent);
-  --success-border: color-mix(in srgb, var(--success) 50%, transparent);
-  --success-border-nomode: color-mix(in srgb, var(--success-nomode) 50%, transparent);
+  --success-border: color-mix(in srgb, var(--success) 72%, #000000);
+  --success-border-nomode: color-mix(in srgb, var(--success-nomode) 72%, #000000);
   --danger-text: #b10303;
   --danger-base: #fff0f0;
   --danger-text-nomode: #b10303;
@@ -90,8 +90,8 @@
   --danger-nomode: #ff2323;
   --danger-bg: color-mix(in srgb, var(--danger) 30%, transparent);
   --danger-bg-nomode: color-mix(in srgb, var(--danger-nomode) 30%, transparent);
-  --danger-border: color-mix(in srgb, var(--danger) 50%, transparent);
-  --danger-border-nomode: color-mix(in srgb, var(--danger-nomode) 50%, transparent);
+  --danger-border: color-mix(in srgb, var(--danger) 72%, #000000);
+  --danger-border-nomode: color-mix(in srgb, var(--danger-nomode) 72%, #000000);
   --warning-text: #89530a;
   --warning-base: #fffee7;
   --warning-text-nomode: #89530a;
@@ -99,8 +99,8 @@
   --warning-nomode: #ffd90d;
   --warning-bg: color-mix(in srgb, var(--warning) 30%, transparent);
   --warning-bg-nomode: color-mix(in srgb, var(--warning-nomode) 30%, transparent);
-  --warning-border: color-mix(in srgb, var(--warning) 50%, transparent);
-  --warning-border-nomode: color-mix(in srgb, var(--warning-nomode) 50%, transparent);
+  --warning-border: color-mix(in srgb, var(--warning) 72%, #000000);
+  --warning-border-nomode: color-mix(in srgb, var(--warning-nomode) 72%, #000000);
   --info-text: #2666cf;
   --info-base: #f0f8fe;
   --info-text-nomode: #2666cf;
@@ -108,8 +108,8 @@
   --info-nomode: #4498ed;
   --info-bg: color-mix(in srgb, var(--info) 30%, transparent);
   --info-bg-nomode: color-mix(in srgb, var(--info-nomode) 30%, transparent);
-  --info-border: color-mix(in srgb, var(--info) 50%, transparent);
-  --info-border-nomode: color-mix(in srgb, var(--info-nomode) 50%, transparent);
+  --info-border: color-mix(in srgb, var(--info) 72%, #000000);
+  --info-border-nomode: color-mix(in srgb, var(--info-nomode) 72%, #000000);
   --neutral-text: #434343;
   --neutral-base: #f5f7fb;
   --neutral-text-nomode: #434343;
@@ -117,8 +117,8 @@
   --neutral-nomode: #637594;
   --neutral-bg: color-mix(in srgb, var(--neutral) 30%, transparent);
   --neutral-bg-nomode: color-mix(in srgb, var(--neutral-nomode) 30%, transparent);
-  --neutral-border: color-mix(in srgb, var(--neutral) 50%, transparent);
-  --neutral-border-nomode: color-mix(in srgb, var(--neutral-nomode) 50%, transparent);
+  --neutral-border: color-mix(in srgb, var(--neutral) 72%, #000000);
+  --neutral-border-nomode: color-mix(in srgb, var(--neutral-nomode) 72%, #000000);
   --edit-text: #7a2500;
   --edit-base: #fff4ed;
   --edit-text-nomode: #7a2500;
@@ -126,8 +126,8 @@
   --edit-nomode: #ff5722;
   --edit-bg: color-mix(in srgb, var(--edit) 30%, transparent);
   --edit-bg-nomode: color-mix(in srgb, var(--edit-nomode) 30%, transparent);
-  --edit-border: color-mix(in srgb, var(--edit) 50%, transparent);
-  --edit-border-nomode: color-mix(in srgb, var(--edit-nomode) 50%, transparent);
+  --edit-border: color-mix(in srgb, var(--edit) 72%, #000000);
+  --edit-border-nomode: color-mix(in srgb, var(--edit-nomode) 72%, #000000);
   --accent-text: #c600d4;
   --accent-base: #fdf1ff;
   --accent-text-nomode: #c600d4;
@@ -135,8 +135,8 @@
   --accent-nomode: #e61cff;
   --accent-bg: color-mix(in srgb, var(--accent) 30%, transparent);
   --accent-bg-nomode: color-mix(in srgb, var(--accent-nomode) 30%, transparent);
-  --accent-border: color-mix(in srgb, var(--accent) 50%, transparent);
-  --accent-border-nomode: color-mix(in srgb, var(--accent-nomode) 50%, transparent);
+  --accent-border: color-mix(in srgb, var(--accent) 72%, #000000);
+  --accent-border-nomode: color-mix(in srgb, var(--accent-nomode) 72%, #000000);
 }
 
 /* Dark mode */
@@ -153,27 +153,27 @@
     --success-text: #ccd3c3;
     --success: #718161;
     --success-bg: color-mix(in srgb, var(--success) 30%, transparent);
-    --success-border: color-mix(in srgb, var(--success) 50%, transparent);
+    --success-border: color-mix(in srgb, var(--success) 72%, #000000);
     --danger-text: #f2d6d6;
     --danger: #c66d6d;
     --danger-bg: color-mix(in srgb, var(--danger) 30%, transparent);
-    --danger-border: color-mix(in srgb, var(--danger) 50%, transparent);
+    --danger-border: color-mix(in srgb, var(--danger) 72%, #000000);
     --warning-text: #f0ed9b;
     --warning: #cbb823;
     --warning-bg: color-mix(in srgb, var(--warning) 30%, transparent);
-    --warning-border: color-mix(in srgb, var(--warning) 50%, transparent);
+    --warning-border: color-mix(in srgb, var(--warning) 72%, #000000);
     --info-text: #ace8f5;
     --info: #19a7ce;
     --info-bg: color-mix(in srgb, var(--info) 30%, transparent);
-    --info-border: color-mix(in srgb, var(--info) 50%, transparent);
+    --info-border: color-mix(in srgb, var(--info) 72%, #000000);
     --neutral-text: #d4d9e3;
     --neutral: #637594;
     --neutral-bg: color-mix(in srgb, var(--neutral) 30%, transparent);
-    --neutral-border: color-mix(in srgb, var(--neutral) 50%, transparent);
+    --neutral-border: color-mix(in srgb, var(--neutral) 72%, #000000);
     --edit-text: #ffe2d4;
     --edit: #ff7a45;
     --edit-bg: color-mix(in srgb, var(--edit) 30%, transparent);
-    --edit-border: color-mix(in srgb, var(--edit) 50%, transparent);
+    --edit-border: color-mix(in srgb, var(--edit) 72%, #000000);
   }
 }
 

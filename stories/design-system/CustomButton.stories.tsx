@@ -37,7 +37,7 @@ const meta = {
     size: "md",
     hover: "scale",
     rounded: "md",
-    border: "none",
+    border: "borderB",
     shadow: "none",
     cursor: "pointer",
     fullWidth: false,

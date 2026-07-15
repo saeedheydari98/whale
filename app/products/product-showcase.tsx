@@ -245,7 +245,6 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
   const catalogBanners = structure?.banners ?? [];
   const tree = structure?.tree ?? { sections: [] };
   const structureLoading = catalogQuery.isLoading;
-  const [showSkeletonIntro, setShowSkeletonIntro] = useState(false);
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
   const dragRef = useRef({
@@ -443,17 +442,8 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
 
     return [];
   }, [catalogBanners, displaySections, mode, showcaseProductsById, sortedShowcases, tree.sections]);
-  const loading = (loadingSections.length === 0 && structureLoading) || showSkeletonIntro;
+  const loading = loadingSections.length === 0 && structureLoading;
   const showWhaleLoading = loading && loadingSections.length === 0;
-
-  useEffect(() => {
-    if (structureLoading || !catalogQuery.data || loadingSections.length === 0) return;
-    if (cachedStructure || mode === "products") return;
-
-    setShowSkeletonIntro(true);
-    const timer = window.setTimeout(() => setShowSkeletonIntro(false), 1000);
-    return () => window.clearTimeout(timer);
-  }, [cachedStructure, catalogQuery.data, loadingSections.length, mode, structureLoading]);
 
   const startProductRailDrag = (event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button, a")) {

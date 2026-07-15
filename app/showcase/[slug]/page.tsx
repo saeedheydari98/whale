@@ -66,6 +66,7 @@ export default function ShowcasePage() {
     queryKey: ["catalog", "page-structure", "showcase", showcaseId],
     queryFn: () => getPageBootstrap(() => getShowcasePageStructure(showcaseId)),
     enabled: Boolean(showcaseId),
+    placeholderData: (previous) => previous,
   });
   const pageStructure = structureQuery.data?.page;
   const structureShowcase = pageStructure?.showcases[0];
@@ -74,10 +75,11 @@ export default function ShowcasePage() {
     queryKey: ["catalog", "showcase", showcaseId, "products", "page"],
     queryFn: () => getShowcaseProducts(showcaseId, { limit: 100 }),
     enabled: Boolean(showcaseId),
+    placeholderData: (previous) => previous,
   });
   const showcase = showcaseProductsQuery.data?.section ?? structureShowcase;
   const products = showcaseProductsQuery.data?.products ?? [];
-  const loading = structureQuery.isLoading || showcaseProductsQuery.isLoading;
+  const loading = showcaseProductsQuery.isLoading && !showcaseProductsQuery.data;
   const [searchQuery, setSearchQuery] = useState("");
   const [sort, setSort] = useState("newest");
   const [cartMessage, setCartMessage] = useState("");

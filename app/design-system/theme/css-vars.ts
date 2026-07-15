@@ -9,6 +9,21 @@ import {
 
 type VariantName = (typeof variantNames)[number];
 
+function darkenHexColor(color: string): string {
+  const match = color.match(/^#([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i);
+
+  if (!match) {
+    return color;
+  }
+
+  const darken = (value: string) => {
+    const next = Math.round(Number.parseInt(value, 16) * 0.72);
+    return next.toString(16).padStart(2, "0");
+  };
+
+  return `#${darken(match[1])}${darken(match[2])}${darken(match[3])}`;
+}
+
 export function generateCSSVariables(theme: Theme) {
   const adminColorKey = theme.admin?.primary ?? "gray";
   const adminStyle = theme.admin?.style ?? theme.state.style;
@@ -37,7 +52,7 @@ export function generateCSSVariables(theme: Theme) {
     const bg = resolveColor(colorKey, adminStyle, elementTones.bg[modeKey]);
     const card = resolveColor(colorKey, adminStyle, elementTones.card[modeKey]);
     const media = resolveColor(colorKey, adminStyle, elementTones.media[modeKey]);
-    const border = resolveColor(colorKey, adminStyle, elementTones.border);
+    const border = darkenHexColor(action);
 
     return {
       action,
