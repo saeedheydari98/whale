@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { clearProductsCache, getProducts } from "@/lib/products-client";
+import { clearProductsCache, getCatalogStructure, getProductPage, getProducts, type ProductsCache } from "@/lib/products-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { useFileDataUrl } from "@/hooks/useFileDataUrl";
 import { createBanner, createBrand, createCatalogLinkGroup, createCategory, createProduct, createShowcase } from "../factories";
@@ -37,8 +37,125 @@ import {
   waitForMinimumLoading,
 } from "../utils";
 
+type AdminCatalogSnapshot = {
+  products: ProductForm[];
+  showcases: ShowcaseForm[];
+  categories: CategoryForm[];
+  categoryGroups: CatalogLinkGroupForm[];
+  brands: BrandForm[];
+  brandGroups: CatalogLinkGroupForm[];
+  banners: BannerForm[];
+};
+
+function hasCatalogData(catalog: ProductsCache) {
+  return (
+    catalog.products.length > 0 ||
+    catalog.showcases.length > 0 ||
+    catalog.categories.length > 0 ||
+    catalog.categoryGroups.length > 0 ||
+    catalog.brands.length > 0 ||
+    catalog.brandGroups.length > 0 ||
+    catalog.banners.length > 0
+  );
+}
+
+function normalizeAdminCatalog(catalog: ProductsCache, includeProducts: boolean): AdminCatalogSnapshot {
+  const apiProducts = includeProducts
+    ? dedupeProducts(catalog.products.map((item, index) => normalizeProduct(item as Partial<ProductForm>, index)))
+    : [];
+  const nextShowcases = ensureShowcases(
+    apiProducts,
+    catalog.showcases.map((item, index) => normalizeShowcase({
+      id: String(item.id),
+      title: String(item.title ?? `ویترین ${index + 1}`),
+      active: item.active !== false,
+      mode: item.mode === "auto" ? "auto" : "manual",
+      autoSort: String(item.autoSort ?? "newest"),
+      limit: Number.isFinite(Number(item.limit)) ? Math.max(1, Math.round(Number(item.limit))) : 8,
+      categoryId: String(item.categoryId ?? ""),
+      manualProductIds: Array.isArray(item.manualProductIds) ? item.manualProductIds.map((value) => String(value)) : [],
+      sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+      productCount: Number(item.productCount),
+    }, index))
+  );
+  const nextBanners = catalog.banners.map((item, index) =>
+    normalizeBanner({
+      ...item,
+      showcaseId: String(item.showcaseId ?? ""),
+      homeSortOrder: Number(item.homeSortOrder ?? item.sortOrder),
+      showcaseSortOrder: Number(item.showcaseSortOrder ?? item.sortOrder),
+      categorySortOrder: Number(item.categorySortOrder ?? item.homeSortOrder ?? item.sortOrder),
+      productSortOrder: Number(item.productSortOrder ?? item.showcaseSortOrder ?? item.sortOrder),
+      intervalSeconds: Number(item.intervalSeconds),
+      heightPercent: Number(item.heightPercent),
+    }, index)
+  );
+  const nextCategories = catalog.categories.length > 0
+    ? catalog.categories.map((item, index) => normalizeCategory({
+      id: item.id,
+      groupId: item.groupId ?? "default-categories",
+      title: item.title,
+      slug: item.slug,
+      imageUrl: item.imageUrl ?? "",
+      active: item.active,
+      sortOrder: Number(item.sortOrder),
+      pageSortOrder: Number(item.pageSortOrder ?? 1),
+      productCount: Number(item.productCount),
+    }, index))
+    : [
+      normalizeCategory({
+        id: "general",
+        groupId: "default-categories",
+        title: "عمومی",
+        slug: "general",
+        imageUrl: "",
+        active: true,
+        sortOrder: 1,
+        pageSortOrder: 1,
+      }, 0),
+    ];
+  const nextBrands = Array.isArray(catalog.brands)
+    ? catalog.brands.map((item, index) => normalizeBrand({
+      id: String(item.id),
+      groupId: String(item.groupId ?? "default-brands"),
+      title: String(item.title ?? ""),
+      slug: String(item.slug ?? ""),
+      imageUrl: String(item.imageUrl ?? ""),
+      active: item.active !== false,
+      sortOrder: Number(item.sortOrder),
+      homeSortOrder: Number(item.homeSortOrder ?? 1),
+      productCount: Number(item.productCount),
+    }, index))
+    : [];
+  const nextCategoryGroups = Array.isArray(catalog.categoryGroups) && catalog.categoryGroups.length > 0
+    ? catalog.categoryGroups.map((item, index) => normalizeCatalogLinkGroup({
+      id: String(item.id),
+      title: String(item.title ?? ""),
+      active: item.active !== false,
+      sortOrder: Number(item.sortOrder),
+    }, index, "default-categories", "دسته بندی ها"))
+    : [normalizeCatalogLinkGroup({ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: Number(nextCategories[0]?.pageSortOrder ?? 1) }, 0, "default-categories", "دسته بندی ها")];
+  const nextBrandGroups = Array.isArray(catalog.brandGroups) && catalog.brandGroups.length > 0
+    ? catalog.brandGroups.map((item, index) => normalizeCatalogLinkGroup({
+      id: String(item.id),
+      title: String(item.title ?? ""),
+      active: item.active !== false,
+      sortOrder: Number(item.sortOrder),
+    }, index, "default-brands", "برندها"))
+    : [normalizeCatalogLinkGroup({ id: "default-brands", title: "برندها", active: true, sortOrder: Number(nextBrands[0]?.homeSortOrder ?? 1) }, 0, "default-brands", "برندها")];
+
+  return {
+    products: apiProducts,
+    showcases: nextShowcases,
+    categoryGroups: nextCategoryGroups,
+    categories: nextCategories.map((category) => ({ ...category, groupId: category.groupId || nextCategoryGroups[0]?.id || "default-categories" })),
+    brandGroups: nextBrandGroups,
+    brands: nextBrands.map((brand) => ({ ...brand, groupId: brand.groupId || nextBrandGroups[0]?.id || "default-brands" })),
+    banners: nextBanners,
+  };
+}
+
 export function useAdminProductsPanel(activeSection: AdminCatalogSection = "products") {
-  void activeSection;
   const [products, setProducts] = useState<ProductForm[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseForm[]>([]);
   const [categories, setCategories] = useState<CategoryForm[]>([
@@ -81,6 +198,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [isEditBannerOpen, setIsEditBannerOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [structureLoaded, setStructureLoaded] = useState(false);
+  const [productsLoaded, setProductsLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
@@ -108,115 +227,66 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
 
   useEffect(() => {
     let cancelled = false;
+    const needsProducts = activeSection === "products" || activeSection === "showcases";
+    const hasEverythingNeeded = structureLoaded && (!needsProducts || productsLoaded);
 
-    const hasCatalogData = (catalog: Awaited<ReturnType<typeof getProducts>>) => (
-      catalog.products.length > 0 ||
-      catalog.showcases.length > 0 ||
-      catalog.categories.length > 0 ||
-      catalog.categoryGroups.length > 0 ||
-      catalog.brands.length > 0 ||
-      catalog.brandGroups.length > 0 ||
-      catalog.banners.length > 0
-    );
+    if (hasEverythingNeeded) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
 
-    const loadProducts = async () => {
+    const loadSectionData = async () => {
       const startedAt = Date.now();
+      setLoading(true);
+
       try {
-        let catalog = await getProducts({ all: true, full: true });
+        let catalog: ProductsCache;
+
+        if (needsProducts) {
+          const [structure, productPage] = await Promise.all([
+            structureLoaded ? Promise.resolve(null) : getCatalogStructure({ all: true }),
+            getProductPage({ limit: 500 }, { all: true, full: true }),
+          ]);
+          catalog = {
+            ...(structure ?? {
+              products: [],
+              showcases,
+              categories,
+              categoryGroups,
+              brands,
+              brandGroups,
+              banners,
+              tree: { sections: [] },
+              catalog: { placement: 0, showcases: [], categoryGroups: [], categories: [], brandGroups: [], brands: [], banners: [] },
+            }),
+            products: productPage.products,
+          } as ProductsCache;
+        } else {
+          catalog = await getCatalogStructure({ all: true });
+        }
+
         if (!hasCatalogData(catalog)) {
           await new Promise((resolve) => window.setTimeout(resolve, 250));
-          catalog = await getProducts({ all: true, full: true, force: true });
+          catalog = needsProducts
+            ? await getProducts({ all: true, full: true, force: true })
+            : await getCatalogStructure({ all: true, force: true });
         }
         if (cancelled) return;
 
-        const apiProducts = dedupeProducts(
-          catalog.products.map((item, index) => normalizeProduct(item as Partial<ProductForm>, index))
-        );
-        const nextShowcases = ensureShowcases(
-          apiProducts,
-          catalog.showcases.map((item, index) => normalizeShowcase({
-            id: String(item.id),
-            title: String(item.title ?? `ویترین ${index + 1}`),
-            active: item.active !== false,
-            mode: item.mode === "auto" ? "auto" : "manual",
-            autoSort: String(item.autoSort ?? "newest"),
-            limit: Number.isFinite(Number(item.limit)) ? Math.max(1, Math.round(Number(item.limit))) : 8,
-            categoryId: String(item.categoryId ?? ""),
-            manualProductIds: Array.isArray(item.manualProductIds) ? item.manualProductIds.map((value) => String(value)) : [],
-            sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
-          }, index))
-        );
-        const nextBanners = catalog.banners.map((item, index) =>
-          normalizeBanner({
-            ...item,
-            showcaseId: String(item.showcaseId ?? ""),
-            homeSortOrder: Number(item.homeSortOrder ?? item.sortOrder),
-            showcaseSortOrder: Number(item.showcaseSortOrder ?? item.sortOrder),
-            categorySortOrder: Number(item.categorySortOrder ?? item.homeSortOrder ?? item.sortOrder),
-            productSortOrder: Number(item.productSortOrder ?? item.showcaseSortOrder ?? item.sortOrder),
-            intervalSeconds: Number(item.intervalSeconds),
-            heightPercent: Number(item.heightPercent),
-          }, index)
-        );
-        const nextCategories = catalog.categories.length > 0
-          ? catalog.categories.map((item, index) => normalizeCategory({
-            id: item.id,
-            groupId: item.groupId ?? "default-categories",
-            title: item.title,
-            slug: item.slug,
-            imageUrl: item.imageUrl ?? "",
-            active: item.active,
-            sortOrder: Number(item.sortOrder),
-            pageSortOrder: Number(item.pageSortOrder ?? 1),
-          }, index))
-          : [
-            normalizeCategory({
-              id: "general",
-              groupId: "default-categories",
-              title: "عمومی",
-              slug: "general",
-              imageUrl: "",
-              active: true,
-              sortOrder: 1,
-              pageSortOrder: 1,
-            }, 0),
-          ];
-        const nextBrands = Array.isArray(catalog.brands)
-          ? catalog.brands.map((item, index) => normalizeBrand({
-            id: String(item.id),
-            groupId: String(item.groupId ?? "default-brands"),
-            title: String(item.title ?? ""),
-            slug: String(item.slug ?? ""),
-            imageUrl: String(item.imageUrl ?? ""),
-            active: item.active !== false,
-            sortOrder: Number(item.sortOrder),
-            homeSortOrder: Number(item.homeSortOrder ?? 1),
-          }, index))
-          : [];
-        const nextCategoryGroups = Array.isArray(catalog.categoryGroups) && catalog.categoryGroups.length > 0
-          ? catalog.categoryGroups.map((item, index) => normalizeCatalogLinkGroup({
-            id: String(item.id),
-            title: String(item.title ?? ""),
-            active: item.active !== false,
-            sortOrder: Number(item.sortOrder),
-          }, index, "default-categories", "دسته بندی ها"))
-          : [normalizeCatalogLinkGroup({ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: Number(nextCategories[0]?.pageSortOrder ?? 1) }, 0, "default-categories", "دسته بندی ها")];
-        const nextBrandGroups = Array.isArray(catalog.brandGroups) && catalog.brandGroups.length > 0
-          ? catalog.brandGroups.map((item, index) => normalizeCatalogLinkGroup({
-            id: String(item.id),
-            title: String(item.title ?? ""),
-            active: item.active !== false,
-            sortOrder: Number(item.sortOrder),
-          }, index, "default-brands", "برندها"))
-          : [normalizeCatalogLinkGroup({ id: "default-brands", title: "برندها", active: true, sortOrder: Number(nextBrands[0]?.homeSortOrder ?? 1) }, 0, "default-brands", "برندها")];
-
-        setProducts(apiProducts);
-        setShowcases(nextShowcases);
-        setCategoryGroups(nextCategoryGroups);
-        setCategories(nextCategories.map((category) => ({ ...category, groupId: category.groupId || nextCategoryGroups[0]?.id || "default-categories" })));
-        setBrandGroups(nextBrandGroups);
-        setBrands(nextBrands.map((brand) => ({ ...brand, groupId: brand.groupId || nextBrandGroups[0]?.id || "default-brands" })));
-        setBanners(nextBanners);
+        const snapshot = normalizeAdminCatalog(catalog, needsProducts);
+        if (needsProducts) {
+          setProducts(snapshot.products);
+          setProductsLoaded(true);
+        }
+        setShowcases(snapshot.showcases);
+        setCategoryGroups(snapshot.categoryGroups);
+        setCategories(snapshot.categories);
+        setBrandGroups(snapshot.brandGroups);
+        setBrands(snapshot.brands);
+        setBanners(snapshot.banners);
+        setStructureLoaded(true);
         await waitForMinimumLoading(startedAt);
       } catch {
         if (cancelled) return;
@@ -227,12 +297,12 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       }
     };
 
-    void loadProducts();
+    void loadSectionData();
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [activeSection, banners, brandGroups, brands, categories, categoryGroups, productsLoaded, showcases, structureLoaded]);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.sortOrder - b.sortOrder), [products]);
   const sortedShowcases = useMemo(() => ensureShowcases(products, showcases), [products, showcases]);
@@ -328,20 +398,44 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     nextCategoryGroups = sortedCategoryGroups,
     nextBrandGroups = sortedBrandGroups
   ) => {
-    const validProducts = dedupeProducts(
-      nextProducts.filter((item) => item.title.trim() && item.price.trim())
-    );
-
     setSaving(true);
     setStatus("");
 
     try {
+      let productsToPersist = nextProducts;
+      let showcasesToPersist = nextShowcases;
+      let categoriesToPersist = nextCategories;
+      let categoryGroupsToPersist = nextCategoryGroups;
+      let brandsToPersist = nextBrands;
+      let brandGroupsToPersist = nextBrandGroups;
+      let bannersToPersist = nextBanners;
+
+      if (!productsLoaded) {
+        const catalog = await getProducts({ all: true, full: true, force: true });
+        if (!hasCatalogData(catalog)) throw new Error("دریافت اطلاعات کامل فروشگاه برای ذخیره ممکن نشد.");
+        const snapshot = normalizeAdminCatalog(catalog, true);
+        productsToPersist = snapshot.products;
+        if (!structureLoaded) {
+          showcasesToPersist = snapshot.showcases;
+          categoriesToPersist = snapshot.categories;
+          categoryGroupsToPersist = snapshot.categoryGroups;
+          brandsToPersist = snapshot.brands;
+          brandGroupsToPersist = snapshot.brandGroups;
+          bannersToPersist = snapshot.banners;
+        }
+        setProducts(snapshot.products);
+        setProductsLoaded(true);
+      }
+
+      const validProducts = dedupeProducts(
+        productsToPersist.filter((item) => item.title.trim() && item.price.trim())
+      );
       let attempt = 0;
       let res: Response | null = null;
       const maxAttempts = 3;
       const bodyPayload = JSON.stringify({
         products: validProducts,
-        showcases: nextShowcases.map((showcase) => ({
+        showcases: showcasesToPersist.map((showcase) => ({
           id: showcase.id,
           title: showcase.title,
           active: showcase.active,
@@ -352,7 +446,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           manualProductIds: showcase.manualProductIds,
           sortOrder: showcase.sortOrder,
         })),
-        categories: nextCategories.map((category) => ({
+        categories: categoriesToPersist.map((category) => ({
           id: category.id,
           groupId: category.groupId,
           title: category.title,
@@ -362,13 +456,13 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           sortOrder: category.sortOrder,
           pageSortOrder: category.pageSortOrder,
         })),
-        categoryGroups: nextCategoryGroups.map((group) => ({
+        categoryGroups: categoryGroupsToPersist.map((group) => ({
           id: group.id,
           title: group.title,
           active: group.active,
           sortOrder: group.sortOrder,
         })),
-        brands: nextBrands.map((brand) => ({
+        brands: brandsToPersist.map((brand) => ({
           id: brand.id,
           groupId: brand.groupId,
           title: brand.title,
@@ -378,13 +472,13 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           sortOrder: brand.sortOrder,
           homeSortOrder: brand.homeSortOrder,
         })),
-        brandGroups: nextBrandGroups.map((group) => ({
+        brandGroups: brandGroupsToPersist.map((group) => ({
           id: group.id,
           title: group.title,
           active: group.active,
           sortOrder: group.sortOrder,
         })),
-        banners: nextBanners.map((banner) => {
+        banners: bannersToPersist.map((banner) => {
           const normalizedBanner = normalizeBannerTiming(banner);
           return {
             id: normalizedBanner.id,
@@ -438,22 +532,22 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
             : validProducts;
           const savedShowcases = Array.isArray(data?.data?.showcases)
             ? ensureShowcases(savedProducts, data.data.showcases.map(normalizeShowcase))
-            : nextShowcases;
+            : showcasesToPersist;
           const savedBanners = Array.isArray(data?.data?.banners)
             ? data.data.banners.map(normalizeBanner)
-            : nextBanners;
+            : bannersToPersist;
           const savedCategories = Array.isArray(data?.data?.categories)
             ? data.data.categories.map(normalizeCategory)
-            : nextCategories;
+            : categoriesToPersist;
           const savedCategoryGroups = Array.isArray(data?.data?.categoryGroups)
             ? data.data.categoryGroups.map((group: Partial<CatalogLinkGroupForm>, index: number) => normalizeCatalogLinkGroup(group, index, "default-categories", "دسته بندی ها"))
-            : nextCategoryGroups;
+            : categoryGroupsToPersist;
           const savedBrands = Array.isArray(data?.data?.brands)
             ? data.data.brands.map(normalizeBrand)
-            : nextBrands;
+            : brandsToPersist;
           const savedBrandGroups = Array.isArray(data?.data?.brandGroups)
             ? data.data.brandGroups.map((group: Partial<CatalogLinkGroupForm>, index: number) => normalizeCatalogLinkGroup(group, index, "default-brands", "برندها"))
-            : nextBrandGroups;
+            : brandGroupsToPersist;
 
           setProducts(savedProducts);
           setShowcases(savedShowcases);
@@ -462,6 +556,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           setBrandGroups(savedBrandGroups);
           setBrands(savedBrands);
           setBanners(savedBanners);
+          setProductsLoaded(true);
+          setStructureLoaded(true);
           clearProductsCache();
           if (showSavedStatus) setStatus("Catalog saved to database.");
           return true;

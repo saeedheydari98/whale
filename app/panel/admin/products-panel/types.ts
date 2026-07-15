@@ -66,6 +66,7 @@ export type ShowcaseForm = {
   limit: number;
   categoryId: string;
   manualProductIds: Array<number | string>;
+  productCount?: number;
   sortOrder: number;
 };
 
@@ -76,6 +77,7 @@ export type CategoryForm = {
   slug: string;
   imageUrl: string;
   active: boolean;
+  productCount?: number;
   sortOrder: number;
   pageSortOrder: number;
 };
@@ -87,6 +89,7 @@ export type BrandForm = {
   slug: string;
   imageUrl: string;
   active: boolean;
+  productCount?: number;
   sortOrder: number;
   homeSortOrder: number;
 };

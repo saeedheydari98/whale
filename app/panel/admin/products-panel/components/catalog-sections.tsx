@@ -50,7 +50,9 @@ export function CategoriesSection({ groups, categories, products, onEditGroup, o
                       ویرایش
                     </CustomButton>
                     <div className="flex items-center rounded-md border border-primary-border px-2 text-xs font-semibold text-secondary-text">
-                      {products.filter((product) => product.categoryIds.includes(category.id)).length} محصول
+                      {products.length > 0
+                        ? products.filter((product) => product.categoryIds.includes(category.id)).length
+                        : category.productCount ?? 0} محصول
                     </div>
                   </div>
                 </div>
@@ -108,7 +110,9 @@ export function BrandsSection({ groups, brands, products, onEditGroup, onAddBran
                       ویرایش
                     </CustomButton>
                     <div className="flex items-center rounded-md border border-primary-border px-2 text-xs font-semibold text-secondary-text">
-                      {products.filter((product) => product.brand === brand.id).length} محصول
+                      {products.length > 0
+                        ? products.filter((product) => product.brand === brand.id).length
+                        : brand.productCount ?? 0} محصول
                     </div>
                   </div>
                 </div>

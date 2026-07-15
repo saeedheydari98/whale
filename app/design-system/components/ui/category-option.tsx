@@ -71,7 +71,7 @@ export function CategoryOption({
     <button
       type="button"
       className={cx(
-        "flex flex-col items-center gap-2 rounded-lg border border-transparent p-2 transition hover:bg-primary-soft disabled:opacity-60",
+        "flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-transparent p-2 transition hover:scale-[1.03] hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-60",
         selected ? "border-primary-border bg-primary-soft" : "bg-transparent",
         className
       )}

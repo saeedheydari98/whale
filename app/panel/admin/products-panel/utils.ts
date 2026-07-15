@@ -146,6 +146,7 @@ export function normalizeShowcase(item: Partial<ShowcaseForm>, index: number): S
     limit: Number.isFinite(Number(item.limit)) ? Math.max(1, Math.round(Number(item.limit))) : 8,
     categoryId: String(item.categoryId ?? ""),
     manualProductIds: Array.isArray(item.manualProductIds) ? item.manualProductIds.map((value) => String(value)) : [],
+    productCount: Number.isFinite(Number(item.productCount)) ? Math.max(0, Math.round(Number(item.productCount))) : undefined,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
 }
@@ -171,6 +172,7 @@ export function normalizeCategory(item: Partial<CategoryForm>, index: number): C
     slug,
     imageUrl: String(item.imageUrl ?? "").trim(),
     active: item.active !== false,
+    productCount: Number.isFinite(Number(item.productCount)) ? Math.max(0, Math.round(Number(item.productCount))) : undefined,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
     pageSortOrder: Number.isFinite(Number(item.pageSortOrder)) ? Number(item.pageSortOrder) : 1,
   };
@@ -188,6 +190,7 @@ export function normalizeBrand(item: Partial<BrandForm>, index: number): BrandFo
     slug,
     imageUrl: String(item.imageUrl ?? "").trim(),
     active: item.active !== false,
+    productCount: Number.isFinite(Number(item.productCount)) ? Math.max(0, Math.round(Number(item.productCount))) : undefined,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
     homeSortOrder: Number.isFinite(Number(item.homeSortOrder)) ? Number(item.homeSortOrder) : 1,
   };

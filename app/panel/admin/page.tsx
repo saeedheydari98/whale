@@ -10,11 +10,13 @@ import {
   IoPricetagsOutline,
   IoRibbonOutline,
   IoShieldCheckmarkOutline,
+  IoReceiptOutline,
 } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { AdminAccessPanel } from "@/app/panel/admin/admin-access-panel";
 import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
+import { AdminOrdersPanel } from "@/app/panel/admin/admin-orders-panel";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
 import { useAppGlobal } from "@/lib/app-global-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
@@ -30,7 +32,7 @@ export default function AdminPanelPage() {
   const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
   const [hasAdminAccess, setHasAdminAccess] = useState<boolean | null>(null);
   const [authUser, setAuthUser] = useState<AdminPanelUser | null>(null);
-  const [activeTab, setActiveTab] = useState<"theme" | "security" | AdminCatalogSection>("products");
+  const [activeTab, setActiveTab] = useState<"theme" | "security" | "orders" | AdminCatalogSection>("products");
 
   useEffect(() => {
     if (!globalData) return;
@@ -86,6 +88,7 @@ export default function AdminPanelPage() {
     { id: "theme", label: "ظاهر", icon: <IoColorPaletteOutline /> },
     ...(isSuperadmin ? [{ id: "security", label: "دسترسی ها", icon: <IoShieldCheckmarkOutline /> }] : []),
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
+    { id: "orders", label: "خریدها", icon: <IoReceiptOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
     { id: "showcases", label: "ویترین ها", icon: <IoAlbumsOutline /> },
     { id: "categories", label: "دسته بندی ها", icon: <IoPricetagsOutline /> },
@@ -124,7 +127,8 @@ export default function AdminPanelPage() {
 
           {activeTab === "theme" ? <AdminThemePanel /> : null}
           {activeTab === "security" && isSuperadmin ? <AdminSecurityPanel /> : null}
-          {activeTab !== "theme" && activeTab !== "security" ? (
+          {activeTab === "orders" ? <AdminOrdersPanel /> : null}
+          {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" ? (
             <AdminProductsPanel section={activeTab} />
           ) : null}
         </div>

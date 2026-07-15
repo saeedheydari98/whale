@@ -178,11 +178,14 @@ export default function CategoriesPage() {
       </div>
 
       {previewImage ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/10 p-4 backdrop-blur-sm" onClick={() => setPreviewImage("")}>
-          <div className="flex max-h-[75vh] w-full max-w-3xl items-center justify-center overflow-hidden rounded-lg border border-primary-border bg-primary-card p-2 shadow-xl">
-            <img src={previewImage} alt="پیش نمایش بنر" className="max-h-[72vh] w-full object-contain" onClick={(event) => event.stopPropagation()} />
-          </div>
-        </div>
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-0"
+          onClick={() => setPreviewImage("")}
+          aria-label="بستن تصویر بنر"
+        >
+          <img src={previewImage} alt="تصویر بنر" className="max-h-screen max-w-full object-contain" />
+        </button>
       ) : null}
     </main>
   );

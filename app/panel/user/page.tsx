@@ -16,8 +16,17 @@ type OrderItem = {
   quantity: number;
 };
 
+type UserOrder = {
+  id: string;
+  createdAt: string;
+  fulfillmentStatus?: string | null;
+  trackingCode?: string | null;
+  shippedAt?: string | null;
+  items: OrderItem[];
+};
+
 function UserOrdersPanel() {
-  const [orders, setOrders] = useState<Array<{ id: string; createdAt: string; items: OrderItem[] }>>([]);
+  const [orders, setOrders] = useState<UserOrder[]>([]);
 
   useEffect(() => {
     void fetch("/api/user/orders", { cache: "no-store" })
@@ -68,6 +77,15 @@ function UserOrdersPanel() {
                     <IoCheckmarkCircleOutline aria-hidden="true" />
                     <span>خریداری‌شده</span>
                   </span>
+                  {order.trackingCode ? (
+                    <span className="rounded-full border border-primary-border bg-primary-card px-3 py-1 text-xs font-bold text-primary-text">
+                      کد پیگیری: {order.trackingCode}
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-warning-border bg-warning-bg px-3 py-1 text-xs font-bold text-warning-text">
+                      در انتظار تحویل به پست
+                    </span>
+                  )}
                   {item.productId ? (
                     <ProductLink productId={item.productId} productTitle={item.title} size="sm">
                       مشاهده

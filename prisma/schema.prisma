@@ -249,15 +249,21 @@ model CartItem {
 }
 
 model Order {
-  id        String      @id @default(cuid())
-  userId    Int
-  profileId String?
-  status    String      @default("paid")
-  total     String      @default("0")
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items     OrderItem[]
+  id                String      @id @default(cuid())
+  userId            Int
+  profileId         String?
+  status            String      @default("paid")
+  fulfillmentStatus String      @default("pending")
+  trackingCode      String?
+  shippedAt         DateTime?
+  total             String      @default("0")
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items             OrderItem[]
+
+  @@index([fulfillmentStatus])
+  @@index([createdAt])
 }
 
 model OrderItem {

@@ -308,7 +308,7 @@ export default function Loading({
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  {["برند", "فروشنده", "SKU", "موجودی", "وزن", "سال تولید"].map((item) => (
+                  {["برند", "فروشنده", "SKU (کد کالا)", "موجودی", "وزن", "سال تولید"].map((item) => (
                     <Loading key={item} loading="skeleton-item" isLoading>
                       <div className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
                         <span className="text-xs font-semibold text-secondary-text">{item}</span>

@@ -22,6 +22,54 @@ function images(data: any) {
   return data.images ?? null;
 }
 
+async function readAdminOrders() {
+  const orders = await prisma.order.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          name: true,
+        },
+      },
+      items: {
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
+  const profileIds = orders.map((order: any) => order.profileId).filter((id: unknown): id is string => Boolean(id));
+  const profiles = profileIds.length > 0
+    ? await prisma.customerProfile.findMany({
+        where: { id: { in: Array.from(new Set(profileIds)) } },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          email: true,
+          address: true,
+        },
+      })
+    : [];
+  const profilesById = new Map(profiles.map((profile: any) => [profile.id, profile]));
+
+  return orders.map((order: any) => ({
+    id: order.id,
+    status: order.status,
+    fulfillmentStatus: order.fulfillmentStatus,
+    trackingCode: order.trackingCode,
+    shippedAt: order.shippedAt,
+    total: order.total,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+    user: order.user,
+    profile: order.profileId ? profilesById.get(order.profileId) ?? null : null,
+    items: order.items,
+  }));
+}
+
 async function readStructure() {
   const [banners, showcases, products] = await Promise.all([
     prisma.banner.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
@@ -47,6 +95,10 @@ export async function GET(request: Request, context: Context) {
         prisma.comment.count(),
       ]);
       return apiOk({ dashboard: { products, showcases, banners, users, carts, comments } });
+    }
+
+    if (path[0] === "orders") {
+      return apiOk({ orders: await readAdminOrders() });
     }
 
     if (path[0] === "banners") {
@@ -178,6 +230,31 @@ async function updateEntity(request: Request, context: Context, partial: boolean
       const body = await request.json().catch(() => null);
       if (!body || typeof body !== "object") return apiFail("اطلاعات ارسالی معتبر نیست.", 422);
       return apiOk({ structure: body });
+    }
+
+    if (path[0] === "orders" && path[1]) {
+      const body = await request.json().catch(() => null);
+      const trackingCode = String(body?.trackingCode ?? "").trim();
+      const requestedStatus = String(body?.fulfillmentStatus ?? "").trim();
+      const fulfillmentStatus = requestedStatus === "pending"
+        ? "pending"
+        : requestedStatus === "posted" || trackingCode
+          ? "posted"
+          : "pending";
+      if (fulfillmentStatus === "posted" && !trackingCode) return apiFail("کد پیگیری پست الزامی است.", 422);
+
+      await prisma.order.update({
+        where: { id: path[1] },
+        data: {
+          fulfillmentStatus,
+          trackingCode: fulfillmentStatus === "posted" ? trackingCode || null : null,
+          shippedAt: fulfillmentStatus === "posted" ? new Date() : null,
+        },
+      });
+
+      const orders = await readAdminOrders();
+      const order = orders.find((item: { id: string }) => item.id === path[1]) ?? null;
+      return apiOk({ order });
     }
 
     if (!path[1]) return apiFail("موردی پیدا نشد.", 404);

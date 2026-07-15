@@ -82,6 +82,7 @@ export type ShowcaseRecord = {
   sortOrder?: number;
   placement?: number | string;
   products?: ProductRecord[];
+  productCount?: number | string;
 };
 
 export type CategoryRecord = {
@@ -93,6 +94,7 @@ export type CategoryRecord = {
   active?: boolean;
   sortOrder?: number | string;
   pageSortOrder?: number | string;
+  productCount?: number | string;
 };
 
 export type BrandRecord = {
@@ -104,6 +106,7 @@ export type BrandRecord = {
   active?: boolean;
   sortOrder?: number | string;
   homeSortOrder?: number | string;
+  productCount?: number | string;
 };
 
 export type CatalogLinkGroupRecord = {
@@ -454,6 +457,7 @@ function normalizeShowcaseRecord(showcase: ShowcaseRecord, fallbackOrder: number
     manualProductIds,
     sortOrder: placement,
     placement,
+    productCount: Number.isFinite(Number(showcase.productCount)) ? Number(showcase.productCount) : undefined,
   };
 }
 
@@ -471,6 +475,7 @@ function normalizeCategoryRecord(category: CategoryRecord, fallbackOrder: number
     active: category.active !== false,
     sortOrder: placement,
     pageSortOrder: Number.isFinite(Number(category.pageSortOrder)) ? Number(category.pageSortOrder) : 1,
+    productCount: Number.isFinite(Number(category.productCount)) ? Number(category.productCount) : undefined,
   };
 }
 
@@ -488,6 +493,7 @@ function normalizeBrandRecord(brand: BrandRecord, fallbackOrder: number): BrandR
     active: brand.active !== false,
     sortOrder: placement,
     homeSortOrder: Number.isFinite(Number(brand.homeSortOrder)) ? Number(brand.homeSortOrder) : 1,
+    productCount: Number.isFinite(Number(brand.productCount)) ? Number(brand.productCount) : undefined,
   };
 }
 

@@ -196,6 +196,7 @@ function toClientShowcase(showcase: {
   categoryId?: string | null;
   manualProductIds?: Prisma.JsonValue | null;
   sortOrder: number;
+  productCount?: number;
 }) {
   const manualProductIds = Array.isArray(showcase.manualProductIds)
     ? showcase.manualProductIds.map((item) => String(item)).filter(Boolean)
@@ -215,6 +216,7 @@ function toClientShowcase(showcase: {
     manualProductIds,
     sortOrder: showcase.sortOrder,
     placement: showcase.sortOrder,
+    productCount: Number.isFinite(Number(showcase.productCount)) ? Number(showcase.productCount) : undefined,
   };
 }
 
@@ -227,6 +229,7 @@ function toClientCategory(category: {
   active: boolean;
   sortOrder: number;
   pageSortOrder?: number;
+  productCount?: number;
 }) {
   return {
     id: category.id,
@@ -237,6 +240,7 @@ function toClientCategory(category: {
     active: category.active,
     sortOrder: category.sortOrder,
     pageSortOrder: category.pageSortOrder ?? 1,
+    productCount: Number.isFinite(Number(category.productCount)) ? Number(category.productCount) : undefined,
   };
 }
 
@@ -249,6 +253,7 @@ function toClientBrand(brand: {
   active: boolean;
   sortOrder: number;
   homeSortOrder?: number;
+  productCount?: number;
 }) {
   return {
     id: brand.id,
@@ -259,6 +264,7 @@ function toClientBrand(brand: {
     active: brand.active,
     sortOrder: brand.sortOrder,
     homeSortOrder: brand.homeSortOrder ?? 1,
+    productCount: Number.isFinite(Number(brand.productCount)) ? Number(brand.productCount) : undefined,
   };
 }
 
@@ -463,6 +469,44 @@ async function findPageBanners(includeInactive: boolean) {
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       }) as Promise<BannerRecord[]>
     : Promise.resolve([]);
+}
+
+async function findVisibleProductRelations(includeInactive: boolean): Promise<ProductSummaryRecord[]> {
+  return prisma.product.findMany({
+    where: includeInactive ? {} : { active: true, isActive: true, deletedAt: null },
+    select: productSummarySelect,
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+  });
+}
+
+function countShowcaseProducts(
+  showcase: {
+    id: string;
+    mode?: string | null;
+    limit?: number | null;
+    categoryId?: string | null;
+    manualProductIds?: Prisma.JsonValue | null;
+  },
+  products: ProductSummaryRecord[]
+) {
+  const mode = showcase.mode === "auto" ? "auto" : "manual";
+  const manualIds = Array.isArray(showcase.manualProductIds)
+    ? showcase.manualProductIds.map((item) => String(item))
+    : [];
+  const categoryId = String(showcase.categoryId ?? "");
+
+  if (mode === "auto") {
+    const limit = Number.isFinite(Number(showcase.limit)) ? Math.max(1, Number(showcase.limit)) : 8;
+    const matchedCount = products.filter((product) => !categoryId || productMatchesCategory(product, categoryId)).length;
+    return Math.min(limit, matchedCount);
+  }
+
+  if (manualIds.length > 0) {
+    const productIds = new Set(products.map((product) => String(product.id)));
+    return manualIds.filter((id, index) => manualIds.indexOf(id) === index && productIds.has(id)).length;
+  }
+
+  return products.filter((product) => productMatchesShowcase(product, showcase.id)).length;
 }
 
 export async function getHomePageStructure(searchParams: URLSearchParams) {
@@ -856,9 +900,11 @@ export async function getCategoryPageStructure(identifier: string, searchParams:
     if (!category || (!includeInactive && category.active === false)) {
       return pageStructure("category", { categories: [] });
     }
+    const products = await findVisibleProductRelations(includeInactive);
+    const productCount = products.filter((product) => productMatchesCategory(product, category.id)).length;
 
     return pageStructure("category", {
-      categories: [toClientCategory(category)],
+      categories: [toClientCategory({ ...category, productCount })],
     });
   });
 }
@@ -870,9 +916,11 @@ export async function getBrandPageStructure(identifier: string, searchParams: UR
     if (!brand || (!includeInactive && brand.active === false)) {
       return pageStructure("brand", { brands: [] });
     }
+    const products = await findVisibleProductRelations(includeInactive);
+    const productCount = products.filter((product) => productMatchesBrand(product, brand)).length;
 
     return pageStructure("brand", {
-      brands: [toClientBrand(brand)],
+      brands: [toClientBrand({ ...brand, productCount })],
     });
   });
 }
@@ -880,14 +928,18 @@ export async function getBrandPageStructure(identifier: string, searchParams: UR
 export async function getShowcasePageStructure(identifier: string, searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
   return withCatalogCache("page-structure", ["showcase", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
-    const [showcase, banners] = await Promise.all([
+    const [showcase, banners, products] = await Promise.all([
       findShowcase(identifier),
       findPageBanners(includeInactive),
+      findVisibleProductRelations(includeInactive),
     ]);
     if (!showcase || (!includeInactive && showcase.active === false)) {
       return pageStructure("showcase", { showcases: [], banners: [] });
     }
-    const clientShowcase = toClientShowcase(showcase);
+    const clientShowcase = toClientShowcase({
+      ...showcase,
+      productCount: countShowcaseProducts(showcase, products),
+    });
 
     return pageStructure("showcase", {
       showcases: [clientShowcase],

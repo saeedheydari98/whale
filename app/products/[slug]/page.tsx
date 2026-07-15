@@ -338,7 +338,7 @@ export default function ProductPage() {
   const detailRows = [
     ["برند", product.brand],
     ["فروشنده", product.vendor],
-    ["SKU", product.sku],
+    ["SKU (کد کالا)", product.sku],
     ["Barcode", product.barcode],
     ["سال تولید", product.manufactureYear],
     ["وزن", product.weight],

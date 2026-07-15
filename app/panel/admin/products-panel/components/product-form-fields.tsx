@@ -276,8 +276,16 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
       <CustomInput value={imageListToText(product.images)} placeholder="Gallery image URLs" onChange={(event) => onChange({ images: textToImageList(event.target.value) })} />
       <CustomInput value={product.videoUrl} placeholder="Video URL" onChange={(event) => onChange({ videoUrl: event.target.value })} />
       <div className="flex flex-col gap-2 sm:flex-row">
-        <CustomInput value={product.sku} placeholder="SKU" onChange={(event) => onChange({ sku: event.target.value })} />
+        <CustomInput
+          value={product.sku}
+          label="SKU (کد یکتای کالا)"
+          placeholder="SPK-JBL-001"
+          onChange={(event) => onChange({ sku: event.target.value })}
+        />
       </div>
+      <span className="text-xs font-semibold text-secondary-text">
+        SKU مخفف Stock Keeping Unit است؛ یک کد اختیاری و یکتا برای شناسایی محصول در انبار و سفارش‌ها.
+      </span>
       <div className="flex flex-wrap gap-2">
         <CustomSwitch checked={product.isActive} onChange={(isActive) => onChange({ isActive, active: isActive })} label={product.isActive ? "فعال" : "مخفی"} size="sm" />
         <CustomSwitch checked={product.isFeatured} onChange={(isFeatured) => onChange({ isFeatured })} label={product.isFeatured ? "ویژه" : "عادی"} size="sm" />
