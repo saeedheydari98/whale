@@ -4,6 +4,7 @@ import {
   readCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
+import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
 export type UserProfile = {
   firstName: string;
@@ -28,6 +29,7 @@ export const EMPTY_USER_PROFILE: UserProfile = {
 };
 
 const PHONE_PATTERN = /^09\d{9}$/;
+const USER_PROFILE_API_URL = "/api/user/profile";
 
 function readProfileFromApiData(data: any) {
   return data?.data?.user?.profile ?? data?.data?.profile ?? null;
@@ -136,12 +138,9 @@ export function clearUserProfile(user?: AuthClientUser | null, options?: { emit?
   }
 }
 
-export async function fetchUserProfile(options?: { write?: boolean; emit?: boolean }) {
-  const res = await fetch("/api/user/profile", {
-    cache: "no-store",
-  });
-  const data = await res.json();
-  if (!res.ok || data?.ok === false) {
+export async function fetchUserProfile(options?: { write?: boolean; emit?: boolean; force?: boolean }) {
+  const data = await fetchJsonDeduped<any>(USER_PROFILE_API_URL, { force: options?.force });
+  if (data?.ok === false) {
     throw new Error(data?.message || data?.error || "بارگذاری پروفایل ناموفق بود.");
   }
 
@@ -172,6 +171,7 @@ export async function saveUserProfile(profile: UserProfile) {
   }
 
   const savedProfile = normalizeUserProfile(readProfileFromApiData(data) ?? nextProfile);
+  invalidateFetchCache(USER_PROFILE_API_URL);
   writeUserProfile(savedProfile);
   return savedProfile;
 }

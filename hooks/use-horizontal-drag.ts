@@ -4,12 +4,21 @@ import { useCallback, useRef, useState, type PointerEvent } from "react";
 
 type DragDirection = "previous" | "next";
 
+type DragEndDetails = {
+  deltaX: number;
+  hasDragged: boolean;
+  passedThreshold: boolean;
+  direction: DragDirection | null;
+};
+
 type UseHorizontalDragOptions = {
   disabled?: boolean;
   mode?: "scroll" | "swipe";
+  dragStartThreshold?: number;
   threshold?: number;
   ignoreSelector?: string;
   onSwipe?: (direction: DragDirection) => void;
+  onDragEnd?: (details: DragEndDetails) => void;
 };
 
 type DragState = {
@@ -28,8 +37,10 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
   disabled = false,
   mode = "scroll",
   threshold = 8,
+  dragStartThreshold = threshold,
   ignoreSelector = defaultIgnoreSelector,
   onSwipe,
+  onDragEnd,
 }: UseHorizontalDragOptions = {}) {
   const ref = useRef<T | null>(null);
   const stateRef = useRef<DragState>({
@@ -42,6 +53,7 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     scrollLeft: 0,
   });
   const suppressClickRef = useRef(false);
+  const [isPointerActive, setIsPointerActive] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragDelta, setDragDelta] = useState(0);
 
@@ -54,8 +66,20 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
       event.currentTarget.releasePointerCapture(state.pointerId);
     }
 
-    if (mode === "swipe" && state.hasDragged && Math.abs(deltaX) >= threshold) {
-      onSwipe?.(deltaX < 0 ? "next" : "previous");
+    const passedThreshold = state.hasDragged && Math.abs(deltaX) >= threshold;
+    const direction = passedThreshold ? (deltaX < 0 ? "next" : "previous") : null;
+
+    if (mode === "swipe") {
+      onDragEnd?.({
+        deltaX,
+        hasDragged: state.hasDragged,
+        passedThreshold,
+        direction,
+      });
+
+      if (!onDragEnd && direction) {
+        onSwipe?.(direction);
+      }
     }
 
     suppressClickRef.current = state.hasDragged;
@@ -72,14 +96,16 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
       lastDeltaX: 0,
       scrollLeft: 0,
     };
+    setIsPointerActive(false);
     setIsDragging(false);
     setDragDelta(0);
-  }, [mode, onSwipe, threshold]);
+  }, [mode, onDragEnd, onSwipe, threshold]);
 
   const onPointerDown = useCallback((event: PointerEvent<T>) => {
     if (disabled || event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest(ignoreSelector)) return;
+    event.preventDefault();
 
     stateRef.current = {
       active: true,
@@ -90,6 +116,7 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
       lastDeltaX: 0,
       scrollLeft: event.currentTarget.scrollLeft,
     };
+    setIsPointerActive(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   }, [disabled, ignoreSelector]);
 
@@ -104,8 +131,8 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     const deltaX = event.clientX - state.startX;
     const deltaY = event.clientY - state.startY;
     state.lastDeltaX = deltaX;
-    const passedThreshold = Math.abs(deltaX) > threshold && Math.abs(deltaX) > Math.abs(deltaY);
-    if (passedThreshold) {
+    const passedDragStartThreshold = Math.abs(deltaX) > dragStartThreshold && Math.abs(deltaX) > Math.abs(deltaY);
+    if (passedDragStartThreshold) {
       state.hasDragged = true;
       setIsDragging(true);
     }
@@ -115,10 +142,12 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     event.preventDefault();
     if (mode === "scroll") {
       event.currentTarget.scrollLeft = state.scrollLeft - deltaX;
-    } else {
-      setDragDelta(deltaX);
+      return;
     }
-  }, [mode, stopDrag, threshold]);
+
+    const dragLimit = event.currentTarget.clientWidth;
+    setDragDelta(Math.max(-dragLimit, Math.min(dragLimit, deltaX)));
+  }, [dragStartThreshold, mode, stopDrag]);
 
   const shouldSuppressClick = useCallback(() => {
     if (!suppressClickRef.current) return false;
@@ -128,6 +157,7 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
 
   return {
     ref,
+    isPointerActive,
     isDragging,
     dragDelta,
     shouldSuppressClick,
@@ -136,6 +166,7 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
       onPointerMove,
       onPointerUp: stopDrag,
       onPointerCancel: stopDrag,
+      onLostPointerCapture: stopDrag,
     },
   };
 }

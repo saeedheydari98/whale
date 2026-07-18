@@ -199,8 +199,6 @@
   --color-primary-contrast-nomode: var(--primary-contrast-nomode);
   --color-primary-text: var(--primary-text);
   --color-primary-text-nomode: var(--primary-text-nomode);
-  --color-primary-muted: var(--primary-muted);
-  --color-primary-subtle: var(--primary-subtle);
   --color-primary-bg: var(--primary-bg);
   --color-primary-bg-nomode: var(--primary-bg-nomode);
   --color-primary-panel: var(--primary-panel);
@@ -223,8 +221,6 @@
   --color-secondary-contrast-nomode: var(--secondary-contrast-nomode);
   --color-secondary-text: var(--secondary-text);
   --color-secondary-text-nomode: var(--secondary-text-nomode);
-  --color-secondary-muted: var(--secondary-muted);
-  --color-secondary-subtle: var(--secondary-subtle);
   --color-secondary-bg: var(--secondary-bg);
   --color-secondary-bg-nomode: var(--secondary-bg-nomode);
   --color-secondary-bg-strong: var(--secondary-bg-strong);
@@ -255,8 +251,6 @@
   --color-success-text: var(--success-text);
   --color-success-base: var(--success-base);
   --color-success-text-nomode: var(--success-text-nomode);
-  --color-success-muted: var(--success-muted);
-  --color-success-subtle: var(--success-subtle);
   --color-success: var(--success);
   --color-success-nomode: var(--success-nomode);
   --color-success-bg: var(--success-bg);
@@ -266,8 +260,6 @@
   --color-danger-text: var(--danger-text);
   --color-danger-base: var(--danger-base);
   --color-danger-text-nomode: var(--danger-text-nomode);
-  --color-danger-muted: var(--danger-muted);
-  --color-danger-subtle: var(--danger-subtle);
   --color-danger: var(--danger);
   --color-danger-nomode: var(--danger-nomode);
   --color-danger-bg: var(--danger-bg);
@@ -277,8 +269,6 @@
   --color-warning-text: var(--warning-text);
   --color-warning-base: var(--warning-base);
   --color-warning-text-nomode: var(--warning-text-nomode);
-  --color-warning-muted: var(--warning-muted);
-  --color-warning-subtle: var(--warning-subtle);
   --color-warning: var(--warning);
   --color-warning-nomode: var(--warning-nomode);
   --color-warning-bg: var(--warning-bg);
@@ -288,8 +278,6 @@
   --color-info-text: var(--info-text);
   --color-info-base: var(--info-base);
   --color-info-text-nomode: var(--info-text-nomode);
-  --color-info-muted: var(--info-muted);
-  --color-info-subtle: var(--info-subtle);
   --color-info: var(--info);
   --color-info-nomode: var(--info-nomode);
   --color-info-bg: var(--info-bg);
@@ -299,8 +287,6 @@
   --color-neutral-text: var(--neutral-text);
   --color-neutral-base: var(--neutral-base);
   --color-neutral-text-nomode: var(--neutral-text-nomode);
-  --color-neutral-muted: var(--neutral-muted);
-  --color-neutral-subtle: var(--neutral-subtle);
   --color-neutral: var(--neutral);
   --color-neutral-nomode: var(--neutral-nomode);
   --color-neutral-bg: var(--neutral-bg);
@@ -319,8 +305,6 @@
   --color-accent-text: var(--accent-text);
   --color-accent-base: var(--accent-base);
   --color-accent-text-nomode: var(--accent-text-nomode);
-  --color-accent-muted: var(--accent-muted);
-  --color-accent-subtle: var(--accent-subtle);
   --color-accent: var(--accent);
   --color-accent-nomode: var(--accent-nomode);
   --color-accent-bg: var(--accent-bg);
@@ -352,6 +336,64 @@ select,
 textarea {
   direction: inherit;
   text-align: inherit;
+}
+
+.price-range-input {
+  appearance: none;
+  background: transparent;
+  height: 2.5rem;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+}
+
+.price-range-input:focus {
+  outline: none;
+}
+
+.price-range-input::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 0.25rem;
+}
+
+.price-range-input::-webkit-slider-thumb {
+  appearance: none;
+  background: var(--primary-card);
+  border: 0.1875rem solid var(--primary);
+  border-radius: 9999px;
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--primary-border) 34%, transparent);
+  cursor: grab;
+  height: 1.25rem;
+  margin-top: -0.5rem;
+  pointer-events: auto;
+  width: 1.25rem;
+}
+
+.price-range-input:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.08);
+}
+
+.price-range-input::-moz-range-track {
+  background: transparent;
+  height: 0.25rem;
+}
+
+.price-range-input::-moz-range-thumb {
+  background: var(--primary-card);
+  border: 0.1875rem solid var(--primary);
+  border-radius: 9999px;
+  box-shadow: 0 0.25rem 0.75rem color-mix(in srgb, var(--primary-border) 34%, transparent);
+  cursor: grab;
+  height: 1.25rem;
+  pointer-events: auto;
+  width: 1.25rem;
+}
+
+.price-range-input:active::-moz-range-thumb {
+  cursor: grabbing;
+  transform: scale(1.08);
 }
 
 /* ===== ANIMATIONS FOR TOGGLE COMPONENT ===== */

@@ -345,7 +345,7 @@ async function clearCartFromApi(profile?: UserProfile | null, options?: { silent
 }
 
 export async function getCart(): Promise<CartSnapshot> {
-  const user = await fetchCurrentUser({ force: true }).catch(() => readCachedAuthUser());
+  const user = await fetchCurrentUser().catch(() => readCachedAuthUser());
   const profile = readUserProfile();
 
   if (canUseAccountCart(user)) {

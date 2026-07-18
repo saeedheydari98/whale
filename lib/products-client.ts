@@ -225,12 +225,23 @@ export function slugifyCatalogValue(value: string | number | null | undefined) {
 }
 
 export function decodeCatalogSegment(value: string | number | null | undefined) {
-  const text = String(value ?? "");
-  try {
-    return decodeURIComponent(text);
-  } catch {
-    return text;
+  let text = String(value ?? "");
+
+  for (let index = 0; index < 3; index += 1) {
+    try {
+      const next = decodeURIComponent(text);
+      if (next === text) break;
+      text = next;
+    } catch {
+      break;
+    }
   }
+
+  return text;
+}
+
+export function encodeCatalogSegment(value: string | number | null | undefined) {
+  return encodeURIComponent(decodeCatalogSegment(value));
 }
 
 function catalogMatchCandidates(value: string | number | null | undefined) {
@@ -878,7 +889,7 @@ async function getPageStructure(url: string, options?: Pick<GetProductsOptions, 
   const cached = options?.force ? null : readCachedPageStructure(url, { maxAgeMs: PAGE_STRUCTURE_LOCAL_TTL_MS });
 
   try {
-    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force ?? true });
+    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force ?? false });
     const page = withResolvedTree(parseApiPayload(json?.data));
     writeCachedPageStructure(url, page);
     return page;
@@ -959,19 +970,19 @@ export function readCachedProductsPageStructure() {
 }
 
 export function getCategoryPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
-  return getPageStructure(`/api/category/${encodeURIComponent(String(id))}/structure`, options);
+  return getPageStructure(`/api/category/${encodeCatalogSegment(id)}/structure`, options);
 }
 
 export function getBrandPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
-  return getPageStructure(`/api/brand/${encodeURIComponent(String(id))}/structure`, options);
+  return getPageStructure(`/api/brand/${encodeCatalogSegment(id)}/structure`, options);
 }
 
 export function getShowcasePageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
-  return getPageStructure(`/api/showcase/${encodeURIComponent(String(id))}/structure`, options);
+  return getPageStructure(`/api/showcase/${encodeCatalogSegment(id)}/structure`, options);
 }
 
 export function getProductDetailPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
-  return getPageStructure(`/api/products/${encodeURIComponent(String(id))}/structure`, options);
+  return getPageStructure(`/api/products/${encodeCatalogSegment(id)}/structure`, options);
 }
 
 export async function getProductPage(
@@ -1026,7 +1037,7 @@ export function getShowcaseProducts(
   options?: Pick<GetProductsOptions, "force">
 ) {
   return getSectionProducts<ShowcaseRecord>(
-    withQuery(`/api/showcase/${encodeURIComponent(String(id))}/products`, params),
+    withQuery(`/api/showcase/${encodeCatalogSegment(id)}/products`, params),
     "showcase",
     options?.force
   );
@@ -1038,7 +1049,7 @@ export function getCategoryProducts(
   options?: Pick<GetProductsOptions, "force">
 ) {
   return getSectionProducts<CategoryRecord>(
-    withQuery(`/api/category/${encodeURIComponent(String(id))}/products`, params),
+    withQuery(`/api/category/${encodeCatalogSegment(id)}/products`, params),
     "category",
     options?.force
   );
@@ -1050,7 +1061,7 @@ export function getBrandProducts(
   options?: Pick<GetProductsOptions, "force">
 ) {
   return getSectionProducts<BrandRecord>(
-    withQuery(`/api/brand/${encodeURIComponent(String(id))}/products`, params),
+    withQuery(`/api/brand/${encodeCatalogSegment(id)}/products`, params),
     "brand",
     options?.force
   );
@@ -1062,7 +1073,7 @@ export async function getProductDetail(
 ): Promise<ProductDetailResult> {
   try {
     const json = await fetchJsonDeduped<{ data?: any }>(
-      `/api/products/${encodeURIComponent(String(id))}`,
+      `/api/products/${encodeCatalogSegment(id)}`,
       { force: options?.force }
     );
     const product = json?.data?.product

@@ -5,6 +5,7 @@ import { IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline, IoTimeOutli
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
 type AdminOrderItem = {
   id: string;
@@ -39,6 +40,8 @@ type AdminOrder = {
   } | null;
   items: AdminOrderItem[];
 };
+
+const ADMIN_ORDERS_URL = "/api/admin/orders";
 
 function formatDate(value?: string | null) {
   if (!value) return "";
@@ -197,12 +200,12 @@ export function AdminOrdersPanel() {
 
   const hasFilters = Boolean(searchQuery.trim() || dateFrom || dateTo);
 
-  const loadOrders = async () => {
+  const loadOrders = async (options?: { force?: boolean }) => {
     setLoading(true);
     setStatus("");
     try {
-      const res = await fetch("/api/admin/orders", { cache: "no-store" });
-      const data = await res.json().catch(() => null);
+      const data = await fetchJsonDeduped<any>(ADMIN_ORDERS_URL, { force: options?.force });
+      if (data?.ok === false) throw new Error(data?.message || data?.error || "دریافت سفارش‌ها ممکن نشد.");
       const nextOrders = Array.isArray(data?.data?.orders) ? data.data.orders as AdminOrder[] : [];
       setOrders(nextOrders);
       setTrackingDrafts(Object.fromEntries(nextOrders.map((order) => [order.id, order.trackingCode ?? ""])));
@@ -235,6 +238,7 @@ export function AdminOrdersPanel() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok || data?.ok === false) throw new Error(data?.message || "ثبت وضعیت سفارش ممکن نشد.");
+      invalidateFetchCache(ADMIN_ORDERS_URL);
       const updatedOrder = data?.data?.order as AdminOrder | null;
       if (updatedOrder) {
         setOrders((current) => current.map((order) => order.id === updatedOrder.id ? updatedOrder : order));
@@ -255,7 +259,7 @@ export function AdminOrdersPanel() {
           <div className="text-base font-bold text-primary-text">خریدها</div>
           <span className="text-xs font-semibold text-secondary-text">{orderCards.length} کارت خرید</span>
         </div>
-        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void loadOrders()} isLoading={loading}>
+        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void loadOrders({ force: true })} isLoading={loading}>
           <span>به روزرسانی</span>
         </CustomButton>
       </div>

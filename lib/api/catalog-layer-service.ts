@@ -68,6 +68,22 @@ export function slugifyCatalogValue(value: string | number | null | undefined) {
     .replace(/^-|-$/g, "");
 }
 
+function decodeCatalogIdentifier(value: string | number | null | undefined) {
+  let text = String(value ?? "");
+
+  for (let index = 0; index < 3; index += 1) {
+    try {
+      const next = decodeURIComponent(text);
+      if (next === text) break;
+      text = next;
+    } catch {
+      break;
+    }
+  }
+
+  return text;
+}
+
 function clampWholeNumber(value: unknown, min: number, max: number, fallback: number) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
@@ -695,7 +711,7 @@ export async function getProductList(searchParams: URLSearchParams, extra?: { wh
 }
 
 async function findCategory(identifier: string) {
-  const decoded = decodeURIComponent(identifier);
+  const decoded = decodeCatalogIdentifier(identifier);
   const slug = slugifyCatalogValue(decoded);
   if (!(prisma as any).category?.findMany) return null;
 
@@ -714,7 +730,7 @@ async function findCategory(identifier: string) {
 }
 
 async function findBrand(identifier: string) {
-  const decoded = decodeURIComponent(identifier);
+  const decoded = decodeCatalogIdentifier(identifier);
   const slug = slugifyCatalogValue(decoded);
   if (!(prisma as any).brand?.findMany) return null;
 
@@ -733,7 +749,7 @@ async function findBrand(identifier: string) {
 }
 
 async function findShowcase(identifier: string) {
-  const decoded = decodeURIComponent(identifier);
+  const decoded = decodeCatalogIdentifier(identifier);
   const slug = slugifyCatalogValue(decoded);
   const showcases = await prisma.showcase.findMany({
     where: {
@@ -770,9 +786,11 @@ function productMatchesShowcase(product: Partial<ProductRecord>, showcaseId: str
 }
 
 export async function getCategoryProducts(identifier: string, searchParams: URLSearchParams) {
-  return withCatalogCache("category-products", [identifier, searchParams], getTtl(searchParams), async () => {
-    const category = await findCategory(identifier);
-    const categoryId = String(category?.id ?? decodeURIComponent(identifier));
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("category-products", [normalizedIdentifier, searchParams], getTtl(searchParams), async () => {
+    const category = await findCategory(normalizedIdentifier);
+    const categoryId = String(category?.id ?? normalizedIdentifier);
     const products = await prisma.product.findMany({
       where: getIncludeInactive(searchParams) ? {} : { active: true, isActive: true, deletedAt: null },
       select: productSummarySelect,
@@ -789,9 +807,11 @@ export async function getCategoryProducts(identifier: string, searchParams: URLS
 }
 
 export async function getBrandProducts(identifier: string, searchParams: URLSearchParams) {
-  return withCatalogCache("brand-products", [identifier, searchParams], getTtl(searchParams), async () => {
-    const brand = await findBrand(identifier);
-    const brandKey = brand ?? decodeURIComponent(identifier);
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("brand-products", [normalizedIdentifier, searchParams], getTtl(searchParams), async () => {
+    const brand = await findBrand(normalizedIdentifier);
+    const brandKey = brand ?? normalizedIdentifier;
     const products = await prisma.product.findMany({
       where: getIncludeInactive(searchParams) ? {} : { active: true, isActive: true, deletedAt: null },
       select: productSummarySelect,
@@ -808,9 +828,11 @@ export async function getBrandProducts(identifier: string, searchParams: URLSear
 }
 
 export async function getShowcaseProducts(identifier: string, searchParams: URLSearchParams) {
-  return withCatalogCache("showcase-products", [identifier, searchParams], getTtl(searchParams), async () => {
-    const showcase = await findShowcase(identifier);
-    const showcaseId = String(showcase?.id ?? decodeURIComponent(identifier));
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("showcase-products", [normalizedIdentifier, searchParams], getTtl(searchParams), async () => {
+    const showcase = await findShowcase(normalizedIdentifier);
+    const showcaseId = String(showcase?.id ?? normalizedIdentifier);
     const includeInactive = getIncludeInactive(searchParams);
     const products = await prisma.product.findMany({
       where: includeInactive ? {} : { active: true, isActive: true, deletedAt: null },
@@ -859,7 +881,7 @@ export async function getShowcaseProducts(identifier: string, searchParams: URLS
 }
 
 async function findProductByIdentifier(identifier: string, includeInactive = false) {
-  const decoded = decodeURIComponent(identifier);
+  const decoded = decodeCatalogIdentifier(identifier);
   const maybeId = Number(decoded);
   const activeWhere = includeInactive ? {} : { active: true, isActive: true, deletedAt: null };
 
@@ -895,8 +917,10 @@ async function findProductByIdentifier(identifier: string, includeInactive = fal
 
 export async function getCategoryPageStructure(identifier: string, searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
-  return withCatalogCache("page-structure", ["category", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
-    const category = await findCategory(identifier);
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("page-structure", ["category", normalizedIdentifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const category = await findCategory(normalizedIdentifier);
     if (!category || (!includeInactive && category.active === false)) {
       return pageStructure("category", { categories: [] });
     }
@@ -911,8 +935,10 @@ export async function getCategoryPageStructure(identifier: string, searchParams:
 
 export async function getBrandPageStructure(identifier: string, searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
-  return withCatalogCache("page-structure", ["brand", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
-    const brand = await findBrand(identifier);
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("page-structure", ["brand", normalizedIdentifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const brand = await findBrand(normalizedIdentifier);
     if (!brand || (!includeInactive && brand.active === false)) {
       return pageStructure("brand", { brands: [] });
     }
@@ -927,9 +953,11 @@ export async function getBrandPageStructure(identifier: string, searchParams: UR
 
 export async function getShowcasePageStructure(identifier: string, searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
-  return withCatalogCache("page-structure", ["showcase", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("page-structure", ["showcase", normalizedIdentifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
     const [showcase, banners, products] = await Promise.all([
-      findShowcase(identifier),
+      findShowcase(normalizedIdentifier),
       findPageBanners(includeInactive),
       findVisibleProductRelations(includeInactive),
     ]);
@@ -950,8 +978,10 @@ export async function getShowcasePageStructure(identifier: string, searchParams:
 
 export async function getProductDetailPageStructure(identifier: string, searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
-  return withCatalogCache("page-structure", ["product", identifier, includeInactive ? "all" : "active"], getTtl(searchParams, DETAILS_TTL_SECONDS), async () => {
-    const product = await findProductByIdentifier(identifier, includeInactive);
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("page-structure", ["product", normalizedIdentifier, includeInactive ? "all" : "active"], getTtl(searchParams, DETAILS_TTL_SECONDS), async () => {
+    const product = await findProductByIdentifier(normalizedIdentifier, includeInactive);
 
     return pageStructure("product", {
       products: product ? [toProductSummary(product)] : [],

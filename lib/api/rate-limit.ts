@@ -1,18 +1,24 @@
 import { apiFail } from "@/lib/api/response";
 
 const WINDOW_MS = 60_000;
-const DEFAULT_LIMIT = 100;
+const DEFAULT_READ_LIMIT = 240;
+const DEFAULT_WRITE_LIMIT = 80;
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
 function getClientKey(request: Request) {
-  return (
+  const url = new URL(request.url);
+  const client =
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
-    "local"
-  );
+    "local";
+
+  return `${client}:${request.method}:${url.pathname}`;
 }
 
-export function rateLimit(request: Request, limit = DEFAULT_LIMIT) {
+export function rateLimit(
+  request: Request,
+  limit = request.method === "GET" ? DEFAULT_READ_LIMIT : DEFAULT_WRITE_LIMIT
+) {
   const now = Date.now();
   const key = getClientKey(request);
   const bucket = buckets.get(key);
@@ -23,7 +29,7 @@ export function rateLimit(request: Request, limit = DEFAULT_LIMIT) {
   }
 
   if (bucket.count >= limit) {
-    return apiFail("rate limit exceeded", 403);
+    return apiFail("rate limit exceeded", 429);
   }
 
   bucket.count += 1;

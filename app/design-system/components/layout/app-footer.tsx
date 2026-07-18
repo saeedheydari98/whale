@@ -1,50 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BiCategoryAlt } from "react-icons/bi";
 import { GiSpermWhale } from "react-icons/gi";
-import { MdAdminPanelSettings } from "react-icons/md";
 import { IoHomeOutline, IoPersonCircleOutline, IoStorefrontOutline } from "react-icons/io5";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import {
-  isAdminAccessUnlocked,
-  subscribeAdminAccess,
-} from "@/lib/admin-access";
-import { useAppGlobal } from "@/lib/app-global-context";
 
 const mobileNavItems = [
   { href: "/", label: "خانه", icon: <IoHomeOutline /> },
   { href: "/categories", label: "دسته بندی", icon: <BiCategoryAlt /> },
   { href: "/products", label: "ویترین", icon: <IoStorefrontOutline /> },
-  { href: "/panel/admin", label: "پنل مدیریت", icon: <MdAdminPanelSettings />, adminOnly: true },
   { href: "/panel/user", label: "حساب کاربری", icon: <IoPersonCircleOutline /> },
 ];
 
 export function AppFooter() {
-  const { data: globalData } = useAppGlobal();
   const isMobile = useIsMobile();
   const pathname = usePathname();
-  const [hasAdminAccess, setHasAdminAccess] = useState(false);
-
-  useEffect(() => {
-    if (!globalData) return;
-    setHasAdminAccess(globalData.user?.role === "admin" || globalData.user?.role === "superadmin");
-  }, [globalData]);
-
-  useEffect(() => {
-    const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
-
-    syncAdminAccess();
-    const unsubscribeAdminAccess = subscribeAdminAccess(syncAdminAccess);
-
-    return () => {
-      unsubscribeAdminAccess();
-    };
-  }, []);
-
-  const visibleNavItems = mobileNavItems.filter((item) => !item.adminOnly || hasAdminAccess);
+  const visibleNavItems = mobileNavItems;
   const isActiveLink = (href: string) => href === "/"
     ? pathname === "/" || pathname.startsWith("/brand/")
     : pathname === href || pathname.startsWith(`${href}/`);

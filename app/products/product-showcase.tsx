@@ -459,7 +459,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     <Root className="min-h-screen bg-primary-base text-primary-text">
       <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex flex-col gap-2 border-b border-primary-border pb-4">
-          <div className="text-3xl font-bold">محصولات</div>
+          <div className="text-3xl font-bold">ویترین محصولات فروشگاه وال</div>
         </div>
 
         {showWhaleLoading ? (

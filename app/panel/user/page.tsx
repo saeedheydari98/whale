@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IoCheckmarkCircleOutline } from "react-icons/io5";
+import { useRouter } from "next/navigation";
+import { IoCheckmarkCircleOutline, IoShieldCheckmarkOutline } from "react-icons/io5";
+import { FloatButton } from "@/app/design-system/components/ui/float-button";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
+import { useAppGlobal } from "@/lib/app-global-context";
+import { AUTH_USER_UPDATED_EVENT, hasAdminRole } from "@/lib/auth-client";
 import { UserProfilePanel } from "./user-profile-panel";
 
 type OrderItem = {
@@ -25,14 +29,73 @@ type UserOrder = {
   items: OrderItem[];
 };
 
+let cachedUserOrders: UserOrder[] | null = null;
+let pendingUserOrders: Promise<UserOrder[]> | null = null;
+let userOrdersCacheVersion = 0;
+
+function readOrders(data: unknown) {
+  const orders = (data as { data?: { orders?: unknown } } | null)?.data?.orders;
+  return Array.isArray(orders) ? orders as UserOrder[] : [];
+}
+
+function clearUserOrdersCache() {
+  cachedUserOrders = null;
+  pendingUserOrders = null;
+  userOrdersCacheVersion += 1;
+}
+
+function fetchUserOrdersOnce() {
+  if (cachedUserOrders !== null) return Promise.resolve(cachedUserOrders);
+  if (pendingUserOrders) return pendingUserOrders;
+
+  const cacheVersion = userOrdersCacheVersion;
+  pendingUserOrders = fetch("/api/user/orders", { cache: "no-store" })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      const orders = readOrders(data);
+      if (cacheVersion === userOrdersCacheVersion) {
+        cachedUserOrders = orders;
+      }
+      return orders;
+    })
+    .finally(() => {
+      if (cacheVersion === userOrdersCacheVersion) {
+        pendingUserOrders = null;
+      }
+    });
+
+  return pendingUserOrders;
+}
+
 function UserOrdersPanel() {
-  const [orders, setOrders] = useState<UserOrder[]>([]);
+  const [orders, setOrders] = useState<UserOrder[]>(() => cachedUserOrders ?? []);
 
   useEffect(() => {
-    void fetch("/api/user/orders", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setOrders(Array.isArray(data?.data?.orders) ? data.data.orders : []))
-      .catch(() => setOrders([]));
+    let cancelled = false;
+    let requestId = 0;
+    const loadOrders = () => {
+      const nextRequestId = requestId + 1;
+      requestId = nextRequestId;
+      void fetchUserOrdersOnce()
+        .then((nextOrders) => {
+          if (!cancelled && nextRequestId === requestId) setOrders(nextOrders);
+        })
+        .catch(() => {
+          if (!cancelled && nextRequestId === requestId) setOrders([]);
+        });
+    };
+    const reloadOrders = () => {
+      clearUserOrdersCache();
+      loadOrders();
+    };
+
+    loadOrders();
+    window.addEventListener(AUTH_USER_UPDATED_EVENT, reloadOrders);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AUTH_USER_UPDATED_EVENT, reloadOrders);
+    };
   }, []);
 
   return (
@@ -102,7 +165,10 @@ function UserOrdersPanel() {
 }
 
 export default function UserPanelPage() {
+  const router = useRouter();
+  const { data: globalData } = useAppGlobal();
   const [activeTab, setActiveTab] = useState<"profile" | "orders">("profile");
+  const showAdminButton = hasAdminRole(globalData?.user);
 
   return (
     <main className="min-h-screen bg-primary-base p-6 text-primary-text">
@@ -130,6 +196,15 @@ export default function UserPanelPage() {
         {activeTab === "profile" ? <UserProfilePanel /> : null}
         {activeTab === "orders" ? <UserOrdersPanel /> : null}
       </div>
+      {showAdminButton ? (
+        <FloatButton
+          label="پنل مدیریت"
+          icon={<IoShieldCheckmarkOutline />}
+          position="bottom-right"
+          shadow="lg"
+          onClick={() => router.push("/panel/admin")}
+        />
+      ) : null}
     </main>
   );
 }

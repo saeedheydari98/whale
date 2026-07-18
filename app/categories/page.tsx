@@ -60,8 +60,7 @@ export default function CategoriesPage() {
     <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
-          <div className="text-3xl font-bold">دسته بندی</div>
-          <span className="text-sm text-secondary-text">یک دسته بندی را انتخاب کنید تا محصولات همان گروه را ببینید.</span>
+          <div className="text-3xl font-bold">دسته بندی محصولات فروشگاه وال</div>
         </div>
 
         {showWhaleLoading ? (

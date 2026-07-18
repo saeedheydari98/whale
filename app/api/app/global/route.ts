@@ -15,7 +15,6 @@ const menu = [
   { href: "/", label: "خانه" },
   { href: "/categories", label: "دسته بندی" },
   { href: "/products", label: "ویترین" },
-  { href: "/panel/admin", label: "پنل مدیریت", adminOnly: true },
   { href: "/panel/user", label: "حساب کاربری" },
 ];
 

@@ -11,6 +11,7 @@ import {
   EMPTY_USER_PROFILE,
   fetchUserProfile,
   isUserProfileComplete,
+  normalizeUserProfile,
   readUserProfile,
   saveUserProfile,
   USER_PROFILE_UPDATED_EVENT,
@@ -22,6 +23,7 @@ type PanelUser = {
   username?: string | null;
   email?: string | null;
   name?: string | null;
+  profile?: unknown;
 };
 
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
@@ -40,6 +42,11 @@ const EMPTY_PASSWORD = {
   passwordConfirm: "",
 };
 
+function profileFromUser(user: PanelUser | null) {
+  const profile = normalizeUserProfile(user?.profile as Partial<UserProfile> | null | undefined);
+  return isUserProfileComplete(profile) ? profile : null;
+}
+
 export function UserProfilePanel() {
   const [profileDraft, setProfileDraft] = useState<UserProfile>(EMPTY_USER_PROFILE);
   const [registerDraft, setRegisterDraft] = useState(EMPTY_REGISTER);
@@ -55,19 +62,23 @@ export function UserProfilePanel() {
   const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let cancelled = false;
     const syncProfile = () => {
+      if (cancelled) return;
       setProfileDraft(readUserProfile() ?? EMPTY_USER_PROFILE);
     };
 
     syncProfile();
-    void fetchCurrentUser().then(async (user) => {
+    void fetchCurrentUser().then((user) => {
+      if (cancelled) return;
       setAuthUser(user);
-      const profile = await fetchUserProfile().catch(() => null);
+      const profile = profileFromUser(user);
       setProfileDraft(profile ?? readUserProfile() ?? EMPTY_USER_PROFILE);
     });
     window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
 
     return () => {
+      cancelled = true;
       window.removeEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
     };
   }, []);
@@ -154,7 +165,7 @@ export function UserProfilePanel() {
       const user = data?.data?.user ?? null;
       setCachedAuthUser(user);
       setAuthUser(user);
-      const savedProfile = (await fetchUserProfile().catch(() => null)) ?? profile;
+      const savedProfile = profileFromUser(user) ?? (await fetchUserProfile().catch(() => null)) ?? profile;
       setProfileDraft(savedProfile);
       setRegisterDraft(EMPTY_REGISTER);
       setShowRequiredErrors(false);

@@ -27,9 +27,15 @@ export async function fetchJsonDeduped<T>(
   }
 
   const task = fetch(url, force ? { cache: "no-store" } : undefined)
-    .then((res) => res.json() as Promise<T>)
-    .then((data) => {
-      cache.set(url, { data, at: Date.now() });
+    .then(async (res) => ({
+      ok: res.ok,
+      data: await res.json() as T,
+    }))
+    .then(({ ok, data }) => {
+      const apiOk = !(data && typeof data === "object" && (data as { ok?: unknown }).ok === false);
+      if (ok && apiOk) {
+        cache.set(url, { data, at: Date.now() });
+      }
       return data;
     })
     .finally(() => {

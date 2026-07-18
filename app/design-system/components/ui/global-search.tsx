@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { FiSearch } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import { CustomInput } from "./input";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { APP_GLOBAL_UPDATED_EVENT } from "@/lib/app-global-client";
 import { productSlug, type ProductRecord } from "@/lib/products-client";
 
 type SearchPayload = {
@@ -19,10 +20,44 @@ type SearchPayload = {
 
 const INPUT_ID = "global-search-input";
 
+const persianDigits: Record<string, string> = {
+  "۰": "0",
+  "۱": "1",
+  "۲": "2",
+  "۳": "3",
+  "۴": "4",
+  "۵": "5",
+  "۶": "6",
+  "۷": "7",
+  "۸": "8",
+  "۹": "9",
+  "٠": "0",
+  "١": "1",
+  "٢": "2",
+  "٣": "3",
+  "٤": "4",
+  "٥": "5",
+  "٦": "6",
+  "٧": "7",
+  "٨": "8",
+  "٩": "9",
+};
+
+function toLatinDigits(value: string) {
+  return value.replace(/[۰-۹٠-٩]/g, (digit) => persianDigits[digit] ?? digit);
+}
+
+function isLikelyPhoneAutofill(value: string) {
+  const digits = toLatinDigits(value).replace(/\D/g, "");
+  return /^09\d{9}$/.test(digits) || /^989\d{9}$/.test(digits);
+}
+
 export function GlobalSearch() {
   const router = useRouter();
+  const pathname = usePathname();
   const isMobile = useIsMobile();
   const [value, setValue] = useState("");
+  const [inputResetKey, setInputResetKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [focused, setFocused] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -32,6 +67,23 @@ export function GlobalSearch() {
   const isOpen = !isMobile || expanded;
   const query = value.trim();
   const showPanel = isOpen && focused && (query.length > 0 || loading || hasSearched);
+
+  const clearSearch = useCallback(() => {
+    setValue("");
+    setResults([]);
+    setHasSearched(false);
+    setLoading(false);
+  }, []);
+
+  const clearInjectedPhone = useCallback(() => {
+    if (focused) return;
+    const input = document.getElementById(INPUT_ID) as HTMLInputElement | null;
+    const currentValue = input?.value || value;
+    if (!isLikelyPhoneAutofill(currentValue)) return;
+
+    clearSearch();
+    setInputResetKey((current) => current + 1);
+  }, [clearSearch, focused, value]);
 
   useEffect(() => {
     if (!query) {
@@ -67,6 +119,21 @@ export function GlobalSearch() {
       controller.abort();
     };
   }, [query]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(clearInjectedPhone, 80);
+    return () => window.clearTimeout(timer);
+  }, [pathname, clearInjectedPhone]);
+
+  useEffect(() => {
+    const scheduleClear = () => {
+      window.setTimeout(clearInjectedPhone, 80);
+      window.setTimeout(clearInjectedPhone, 350);
+    };
+
+    window.addEventListener(APP_GLOBAL_UPDATED_EVENT, scheduleClear);
+    return () => window.removeEventListener(APP_GLOBAL_UPDATED_EVENT, scheduleClear);
+  }, [clearInjectedPhone]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -105,28 +172,50 @@ export function GlobalSearch() {
     closeTimerRef.current = window.setTimeout(() => setFocused(false), 120);
   };
 
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const nextValue = event.target.value;
+    if (!focused && isLikelyPhoneAutofill(nextValue)) {
+      clearSearch();
+      setInputResetKey((current) => current + 1);
+      return;
+    }
+
+    setValue(nextValue);
+  };
+
   return (
     <div className="relative min-w-0 flex-1 md:flex-none">
-      <div className="flex min-w-0 items-center">
+      <form
+        className="flex min-w-0 items-center"
+        role="search"
+        autoComplete="off"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (results[0]) goToProduct(results[0]);
+        }}
+      >
         <div
           className={`relative flex items-center transition-all duration-200 ease-out md:static md:h-auto md:w-72 ${
             expanded ? "h-10 w-full min-w-0" : "h-6 w-10 min-w-10 shrink-0 justify-center"
           }`}
         >
           <CustomInput
+            key={inputResetKey}
             id={INPUT_ID}
-            name="site-global-search"
-            type="text"
+            name="product-search-query"
+            type="search"
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={handleSearchChange}
             placeholder="جستجو محصول ..."
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="none"
+            inputMode="search"
+            enterKeyHint="search"
             spellCheck={false}
             data-lpignore="true"
             data-1p-ignore="true"
-            data-form-type="other"
+            data-form-type="search"
             showLabel={false}
             fullWidth={isOpen}
             rounded="full"
@@ -173,7 +262,7 @@ export function GlobalSearch() {
             </button>
           ) : null}
         </div>
-      </div>
+      </form>
 
       {showPanel ? (
         <div className="absolute top-full z-40 mt-2 flex w-full min-w-72 flex-col overflow-hidden rounded-lg border border-primary-border bg-primary-card shadow-lg md:w-72">

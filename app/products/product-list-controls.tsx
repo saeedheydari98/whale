@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { FiSearch } from "react-icons/fi";
 import { IoOptionsOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -69,6 +69,19 @@ function numericFilterValue(value: string) {
   return normalized || undefined;
 }
 
+const DEFAULT_PRICE_RANGE_MAX = 10_000_000;
+const PRICE_RANGE_STEP = 50_000;
+const PRICE_FILTER_COMMIT_DELAY_MS = 450;
+
+function readPriceNumber(value: string, fallback: number) {
+  const parsed = Number(numericFilterValue(value));
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : fallback;
+}
+
+function formatPriceLabel(value: number) {
+  return `${Math.round(value).toLocaleString("fa-IR")} تومان`;
+}
+
 export function productFilterParams(filters: ProductFilterState) {
   return {
     priceMin: numericFilterValue(filters.priceMin),
@@ -108,6 +121,101 @@ type ProductFilterFieldsProps = {
   onClose?: () => void;
 };
 
+function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, "filters" | "onChange">) {
+  const latestFiltersRef = useRef(filters);
+  const latestOnChangeRef = useRef(onChange);
+  const commitTimerRef = useRef<number | null>(null);
+  const [draftRange, setDraftRange] = useState(() => ({
+    min: readPriceNumber(filters.priceMin, 0),
+    max: readPriceNumber(filters.priceMax, DEFAULT_PRICE_RANGE_MAX),
+  }));
+  const rangeMax = Math.max(DEFAULT_PRICE_RANGE_MAX, draftRange.min, draftRange.max);
+  const minValue = Math.min(draftRange.min, rangeMax);
+  const maxValue = Math.max(minValue, Math.min(draftRange.max, rangeMax));
+  const minPercent = (minValue / rangeMax) * 100;
+  const maxPercent = (maxValue / rangeMax) * 100;
+
+  latestFiltersRef.current = filters;
+  latestOnChangeRef.current = onChange;
+
+  useEffect(() => {
+    if (commitTimerRef.current) {
+      window.clearTimeout(commitTimerRef.current);
+      commitTimerRef.current = null;
+    }
+    setDraftRange({
+      min: readPriceNumber(filters.priceMin, 0),
+      max: readPriceNumber(filters.priceMax, DEFAULT_PRICE_RANGE_MAX),
+    });
+  }, [filters.priceMin, filters.priceMax]);
+
+  useEffect(() => () => {
+    if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
+  }, []);
+
+  const commitRange = (nextMin: number, nextMax: number) => {
+    const clampedMin = Math.max(0, Math.min(Math.round(nextMin), rangeMax));
+    const clampedMax = Math.max(clampedMin, Math.min(Math.round(nextMax), rangeMax));
+    setDraftRange({ min: clampedMin, max: clampedMax });
+
+    if (commitTimerRef.current) window.clearTimeout(commitTimerRef.current);
+    commitTimerRef.current = window.setTimeout(() => {
+      latestOnChangeRef.current({
+        ...latestFiltersRef.current,
+        priceMin: clampedMin > 0 ? String(clampedMin) : "",
+        priceMax: clampedMax < rangeMax ? String(clampedMax) : "",
+      });
+      commitTimerRef.current = null;
+    }, PRICE_FILTER_COMMIT_DELAY_MS);
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm font-bold text-primary-text">محدوده قیمت</div>
+        <span className="text-xs font-semibold text-secondary-text">
+          {formatPriceLabel(minValue)} تا {formatPriceLabel(maxValue)}
+        </span>
+      </div>
+      <div
+        className="relative flex h-10 items-center"
+        dir="ltr"
+        style={{
+          "--range-start": `${minPercent}%`,
+          "--range-end": `${maxPercent}%`,
+        } as CSSProperties}
+      >
+        <div className="h-1 w-full rounded-full bg-primary-media" />
+        <div className="absolute h-1 rounded-full bg-primary" style={{ left: "var(--range-start)", right: "calc(100% - var(--range-end))" }} />
+        <input
+          type="range"
+          min={0}
+          max={rangeMax}
+          step={PRICE_RANGE_STEP}
+          value={minValue}
+          aria-label="حداقل قیمت"
+          className="price-range-input"
+          onChange={(event) => commitRange(Number(event.target.value), maxValue)}
+        />
+        <input
+          type="range"
+          min={0}
+          max={rangeMax}
+          step={PRICE_RANGE_STEP}
+          value={maxValue}
+          aria-label="حداکثر قیمت"
+          className="price-range-input"
+          onChange={(event) => commitRange(minValue, Number(event.target.value))}
+        />
+      </div>
+      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-secondary-text">
+        <span>{formatPriceLabel(0)}</span>
+        <span>{formatPriceLabel(rangeMax)}</span>
+      </div>
+    </div>
+  );
+}
+
 function ProductFilterFields({ filters, onChange, onClose }: ProductFilterFieldsProps) {
   const activeCount = productFilterCount(filters);
   const patchFilters = (patch: Partial<ProductFilterState>) => {
@@ -115,13 +223,15 @@ function ProductFilterFields({ filters, onChange, onClose }: ProductFilterFields
   };
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
+    <div className="flex w-full flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-base font-bold text-primary-text">فیلترها</div>
         <span className="text-xs font-semibold text-secondary-text">{activeCount} فیلتر فعال</span>
       </div>
 
       <div className="flex flex-col gap-3">
+        <PriceRangeSlider filters={filters} onChange={onChange} />
+        <div className="hidden">
         <CustomInput
           value={filters.priceMin}
           onChange={(event) => patchFilters({ priceMin: event.target.value })}
@@ -138,6 +248,7 @@ function ProductFilterFields({ filters, onChange, onClose }: ProductFilterFields
           inputMode="numeric"
           rounded="full"
         />
+        </div>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-bold text-secondary-text">حداقل امتیاز</span>
           <CustomSelect
@@ -263,10 +374,10 @@ export function ProductListShell({
       {topContent}
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <div className="hidden w-72 shrink-0 lg:flex">
+        <div className="hidden shrink-0 lg:flex lg:w-1/4">
           <ProductFilterFields filters={filters} onChange={onFiltersChange} />
         </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-4 lg:w-3/4">
           {children}
         </div>
       </div>

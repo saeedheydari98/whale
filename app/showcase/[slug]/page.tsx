@@ -28,8 +28,7 @@ import {
 export default function ShowcasePage() {
   const params = useParams();
   const rawSlug = params?.slug ?? "";
-  const showcaseId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
-  const displayShowcaseId = decodeCatalogSegment(showcaseId);
+  const showcaseId = decodeCatalogSegment(Array.isArray(rawSlug) ? rawSlug[0] : rawSlug);
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedSearchQuery = deferredSearchQuery.trim();
@@ -120,7 +119,7 @@ export default function ShowcasePage() {
     <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="flex w-full flex-col gap-4 p-4">
         <ProductListShell
-          title={showcase?.title || `ویترین: ${displayShowcaseId}`}
+          title={showcase?.title || `ویترین: ${showcaseId}`}
           count={hasKnownTotalProducts ? totalProductCount : products.length}
           headerLoading={headerLoading}
           searchQuery={searchQuery}

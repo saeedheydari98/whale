@@ -11,15 +11,10 @@ import { useScrollHeaderHide } from "@/hooks/useScrollHeaderHide";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { RiShoppingCartFill } from "react-icons/ri";
 import { BiCategoryAlt } from "react-icons/bi";
-import { MdAdminPanelSettings } from "react-icons/md";
 import { CustomButton } from "../ui/button";
 import { CustomInput } from "../ui/input";
 import { CustomModal } from "../ui/modal";
 import HeaderNavLink from "../ui/header-nav-link";
-import {
-  isAdminAccessUnlocked,
-  subscribeAdminAccess,
-} from "@/lib/admin-access";
 import {
   CART_UPDATED_EVENT,
   clearLocalCartSnapshot,
@@ -59,19 +54,10 @@ type HeaderProfile = {
   email?: string | null;
 };
 
-const legacyNavItems = [
-  { href: "/", label: "خانه" },
-  { href: "/categories", label: "دسته بندی" },
-  { href: "/products", label: "ویترین" },
-  { href: "/panel/admin", label: "پنل مدیریت", adminOnly: true },
-  { href: "/panel/user", label: "حساب کاربری" },
-];
-
 const navItems = [
   { href: "/", label: "خانه", icon: <IoHomeOutline /> },
   { href: "/categories", label: "دسته بندی", icon: <BiCategoryAlt /> },
   { href: "/products", label: "ویترین", icon: <IoStorefrontOutline /> },
-  { href: "/panel/admin", label: "پنل مدیریت", icon: <MdAdminPanelSettings />, adminOnly: true },
   { href: "/panel/user", label: "حساب کاربری", icon: <IoPersonCircleOutline /> },
 ];
 
@@ -138,7 +124,6 @@ export function AppHeader() {
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
-  const [hasAdminAccess, setHasAdminAccess] = useState(false);
   const [authUser, setAuthUser] = useState<HeaderUser | null>(null);
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
@@ -168,7 +153,6 @@ export function AppHeader() {
     setAuthUser(globalData.user);
     setAccountProfile(readUserProfile() ?? (getUserProfile(globalData.user) as UserProfile | null));
     setCartCount(getVisibleCartCount(globalData.user, globalData.cart.count));
-    setHasAdminAccess(globalData.user?.role === "admin" || globalData.user?.role === "superadmin");
   }, [globalData]);
 
   useEffect(() => {
@@ -182,20 +166,13 @@ export function AppHeader() {
       const next = await refreshGlobal({ force });
       setAuthUser(next.user);
       setCartCount(getVisibleCartCount(next.user, next.cart.count));
-      setHasAdminAccess(next.user?.role === "admin" || next.user?.role === "superadmin");
     };
-    const syncAdminAccess = () => setHasAdminAccess(isAdminAccessUnlocked());
 
-    syncAdminAccess();
     syncCartCount();
     syncProfile();
     window.addEventListener("storage", syncCartCount);
     window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
     window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
-    const unsubscribeAdminAccess = subscribeAdminAccess(() => {
-      syncAdminAccess();
-      void syncGlobalFromApi(true);
-    });
     const unsubscribeAuthUser = subscribeAuthUser(() => {
       void syncGlobalFromApi(true);
     });
@@ -204,14 +181,13 @@ export function AppHeader() {
       window.removeEventListener("storage", syncCartCount);
       window.removeEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
       window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
-      unsubscribeAdminAccess();
       unsubscribeAuthUser();
     };
   }, [refreshGlobal]);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || hasAdminAccess);
+  const visibleNavItems = navItems;
 
   const submitAuth = async () => {
     if (!authPhone.trim() || !authPassword.trim()) {
@@ -235,9 +211,8 @@ export function AppHeader() {
       setAuthOpen(false);
       setAuthPassword("");
       setAuthStatus("");
-      const nextGlobal = await refreshGlobal({ force: true });
+      await refreshGlobal({ force: true });
       const accountCart = await getCart();
-      setHasAdminAccess(nextGlobal.user?.role === "admin" || nextGlobal.user?.role === "superadmin");
       setCartCount(getCartCount(accountCart.items));
       router.refresh();
     } catch (error) {
@@ -295,9 +270,8 @@ export function AppHeader() {
       setAuthPassword("");
       setAuthOtpCode("");
       setAuthOtpSent(false);
-      const nextGlobal = await refreshGlobal({ force: true });
+      await refreshGlobal({ force: true });
       const accountCart = await getCart();
-      setHasAdminAccess(nextGlobal.user?.role === "admin" || nextGlobal.user?.role === "superadmin");
       setCartCount(getCartCount(accountCart.items));
       router.refresh();
     } catch (error) {
@@ -316,7 +290,6 @@ export function AppHeader() {
     clearCachedAuthUser({ emit: false });
     clearCachedGlobalUser();
     setAuthUser(null);
-    setHasAdminAccess(false);
     setCartCount(0);
     setAuthOpen(false);
     void refreshGlobal({ force: true }).then((nextGlobal) => {
