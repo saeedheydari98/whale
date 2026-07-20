@@ -6,7 +6,7 @@ import { CustomButton } from "./button";
 import { CustomCard } from "./card";
 import { UICommonVariant } from "../../variants/ui.variant";
 import { LoadingVariant } from "../loading/loading";
-import { borderVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, GradientDirection, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import { HiMiniXMark } from "react-icons/hi2";
 
 type CustomModalProps = {
@@ -18,6 +18,7 @@ type CustomModalProps = {
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   closeIcon?: React.ReactNode;
   closeText?: string;
@@ -35,6 +36,7 @@ export function CustomModal({
   size = "md",
   rounded = "lg",
   border = "dashed",
+  gradient = "btu",
   shadow = "lg",
   closeIcon = <HiMiniXMark size={24}/>,
   closeText = "",
@@ -51,6 +53,7 @@ export function CustomModal({
 
   if (!open) return null;
 
+  const cardBackgroundColor = "color-mix(in srgb, var(--primary-card) 82%, var(--bg-surface))";
   const modal = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
@@ -64,9 +67,11 @@ export function CustomModal({
         size={size}
         rounded={rounded}
         border={border}
+        gradient={gradient}
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto text-primary-text"
         style={{
-          backgroundColor: "color-mix(in srgb, var(--primary-card) 82%, var(--bg-surface))",
+          backgroundColor: cardBackgroundColor,
+          ...resolveGradientStyle(cardBackgroundColor, gradient),
           color: "var(--primary-text)",
         }}
         shadow={shadow}

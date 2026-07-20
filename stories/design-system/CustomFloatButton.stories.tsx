@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 import { FaArrowRight, FaPlus } from "react-icons/fa";
 import { fn } from "storybook/test";
 import { FloatButton } from "../../app/design-system/components/ui/float-button";
-import { borderOptions, cursorOptions, hoverOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
+import { borderOptions, cursorOptions, gradientOptions, hoverOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 type StoryArgs = ComponentProps<typeof FloatButton> & {
   icon?: boolean;
@@ -20,6 +20,7 @@ const meta = {
     size: { control: "select", options: sizeOptions },
     rounded: { control: "select", options: roundedOptions },
     border: { control: "select", options: borderOptions },
+    gradient: { control: "select", options: gradientOptions },
     shadow: { control: "select", options: shadowOptions },
     hover: { control: "select", options: hoverOptions },
     cursor: { control: "select", options: cursorOptions },
@@ -38,6 +39,7 @@ const meta = {
     size: "md",
     rounded: "full",
     border: "strong",
+    gradient: "btu",
     shadow: "lg",
     hover: "lift",
     cursor: "pointer",

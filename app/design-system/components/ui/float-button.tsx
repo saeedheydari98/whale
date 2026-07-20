@@ -4,7 +4,7 @@ import React from "react";
 import { CustomButton } from "./button";
 import { UICommonVariant } from "../../variants/ui.variant";
 import { LoadingVariant } from "../loading/loading";
-import { borderVariants, cursorVariants, interactionStates, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cursorVariants, GradientDirection, interactionStates, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 
 type FloatButtonProps = {
   onClick?: () => void;
@@ -15,6 +15,7 @@ type FloatButtonProps = {
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   hover?: keyof typeof interactionStates.hover;
   cursor?: keyof typeof cursorVariants;
@@ -36,6 +37,7 @@ export function FloatButton({
   size = "md",
   rounded = "full",
   border = "strong",
+  gradient = "btu",
   shadow = "lg",
   hover = "lift",
   cursor = "pointer",
@@ -57,6 +59,7 @@ export function FloatButton({
         size={size}
         rounded={rounded}
         border={border}
+        gradient={gradient}
         shadow={shadow}
         hover={hover}
         cursor={cursor}

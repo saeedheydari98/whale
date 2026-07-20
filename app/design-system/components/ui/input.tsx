@@ -3,7 +3,7 @@
 import React from "react";
 import { IoEyeOffOutline, IoEyeOutline } from "react-icons/io5";
 import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, interactionStates, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomInputElement = HTMLInputElement | HTMLTextAreaElement;
@@ -14,6 +14,7 @@ type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   fullWidth?: boolean;
   loading?: LoadingVariant;
@@ -35,6 +36,7 @@ export function CustomInput({
   size = "md",
   rounded = "md",
   border = "borderB",
+  gradient = "btu",
   shadow = "none",
   fullWidth = true,
   className,
@@ -70,6 +72,7 @@ export function CustomInput({
   const resolvedHeight = resolvedHeightProp ?? (multiline ? style?.height ?? "8rem" : undefined);
   const controlStyle = {
     backgroundColor: colorStyle.backgroundColor,
+    ...resolveGradientStyle(colorStyle.backgroundColor, gradient),
     borderColor: invalid ? "var(--danger-border-nomode)" : colorStyle.borderColor,
     ...style,
     ...(resolvedHeight !== undefined ? { height: resolvedHeight } : {}),

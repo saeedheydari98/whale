@@ -25,6 +25,8 @@ export const borderOptions = [
   "dotted",
 ] as const;
 
+export const gradientOptions = ["ltr", "rtl", "utb", "btu"] as const;
+
 export const shadowOptions = ["none", "sm", "md", "lg", "xl"] as const;
 
 export const hoverOptions = [

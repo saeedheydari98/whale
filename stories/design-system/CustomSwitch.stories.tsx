@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import React from "react";
 import { CustomSwitch } from "../../app/design-system/components/ui/switch";
-import { borderOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
+import { borderOptions, gradientOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 const meta = {
   title: "Design System/CustomSwitch",
@@ -15,6 +15,7 @@ const meta = {
     size: { control: "select", options: sizeOptions },
     rounded: { control: "select", options: roundedOptions },
     border: { control: "select", options: borderOptions },
+    gradient: { control: "select", options: gradientOptions },
     shadow: { control: "select", options: shadowOptions },
     loading: { control: "select", options: loadingOptions },
     isLoading: { control: "boolean" },
@@ -28,6 +29,7 @@ const meta = {
     size: "md",
     rounded: "full",
     border: "base",
+    gradient: "btu",
     shadow: "none",
     disabled: false,
     customColor: "",

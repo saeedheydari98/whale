@@ -2,7 +2,7 @@
 
 import React from "react";
 import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, GradientDirection, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> & {
@@ -10,6 +10,7 @@ type CustomSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'si
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   fullWidth?: boolean;
   loading?: LoadingVariant;
@@ -22,6 +23,7 @@ export function CustomSelect({
   size = "md",
   rounded = "md",
   border = "borderB",
+  gradient = "btu",
   shadow = "none",
   fullWidth = true,
   className,
@@ -55,6 +57,7 @@ export function CustomSelect({
         )}
         style={{
           backgroundColor: colorStyle.backgroundColor,
+          ...resolveGradientStyle(colorStyle.backgroundColor, gradient),
           borderColor: colorStyle.borderColor,
           ...style,
         }}

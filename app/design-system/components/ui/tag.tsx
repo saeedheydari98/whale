@@ -5,7 +5,7 @@ import React from "react";
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
 import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, GradientDirection, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 
 type BaseProps = React.HTMLAttributes<HTMLSpanElement>;
 
@@ -16,6 +16,7 @@ type CustomTagProps = BaseProps & {
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
 
   fullWidth?: boolean;
@@ -33,6 +34,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
   size = "md",
   rounded = "md",
   border = "base",
+  gradient = "btu",
   shadow = "none",
   fullWidth = false,
   icon,
@@ -56,6 +58,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
 
     if (token.startsWith("bg-")) {
       tokenStyle.backgroundColor = resolvedColor;
+      Object.assign(tokenStyle, resolveGradientStyle(resolvedColor, gradient));
       tokenStyle.borderColor = strengthenBorderColor(resolvedColor);
       tokenStyle.color = resolveTokenTextColor(theme, token, 50);
     }
@@ -70,6 +73,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
       {...rest}
       style={{
         backgroundColor: variantStyle.backgroundColor,
+        ...resolveGradientStyle(variantStyle.backgroundColor, gradient),
         color: variantStyle.color,
         borderColor: variantStyle.borderColor,
         ...style,

@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 import { FaRegStar } from "react-icons/fa";
 import { fn } from "storybook/test";
 import { CustomButton } from "../../app/design-system/components/ui/button";
-import { borderOptions, cursorOptions, hoverOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
+import { borderOptions, cursorOptions, gradientOptions, hoverOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 type StoryArgs = ComponentProps<typeof CustomButton> & {
   icon?: boolean;
@@ -20,6 +20,7 @@ const meta = {
     hover: { control: "select", options: hoverOptions },
     rounded: { control: "select", options: roundedOptions },
     border: { control: "select", options: borderOptions },
+    gradient: { control: "select", options: gradientOptions },
     shadow: { control: "select", options: shadowOptions },
     cursor: { control: "select", options: cursorOptions },
     fullWidth: { control: "boolean" },
@@ -38,6 +39,7 @@ const meta = {
     hover: "scale",
     rounded: "md",
     border: "borderB",
+    gradient: "btu",
     shadow: "none",
     cursor: "pointer",
     fullWidth: false,

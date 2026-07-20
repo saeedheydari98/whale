@@ -7,6 +7,7 @@ import { CustomButton } from "./button";
 import type { UICommonVariant } from "../../variants/ui.variant";
 import {
   borderVariants,
+  GradientDirection,
   radiusVariants,
   shadowVariants,
   sizeVariants,
@@ -20,6 +21,7 @@ type Props = {
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   fullWidth?: boolean;
   icon?: React.ReactNode;
@@ -36,6 +38,7 @@ export default function ProductLink({
   size = "sm",
   rounded = "md",
   border,
+  gradient,
   shadow,
   fullWidth,
   className,
@@ -68,6 +71,7 @@ export default function ProductLink({
       size={size}
       rounded={rounded}
       border={border}
+      gradient={gradient}
       shadow={shadow}
       fullWidth={fullWidth}
       className={className}

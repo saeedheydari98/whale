@@ -2,7 +2,7 @@
 
 import React from "react";
 import { resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, GradientDirection, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomSwitchProps = {
@@ -13,6 +13,7 @@ type CustomSwitchProps = {
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   customColor?: string;
   label?: string;
@@ -29,6 +30,7 @@ export function CustomSwitch({
   size = "md",
   rounded = "full",
   border = "base",
+  gradient = "btu",
   shadow = "none",
   customColor,
   label,
@@ -37,8 +39,10 @@ export function CustomSwitch({
   loadingText,
 }: CustomSwitchProps) {
   const colorStyle = resolveVariantCssVars(variant);
-  const switchColor = customColor ?? colorStyle.backgroundColor;
-  const borderColor = customColor ? strengthenBorderColor(customColor) : colorStyle.borderColor;
+  const resolvedCustomColor = customColor || undefined;
+  const switchColor = resolvedCustomColor ?? colorStyle.backgroundColor;
+  const switchBackgroundColor = checked ? switchColor : "#9ca3af";
+  const borderColor = resolvedCustomColor ? strengthenBorderColor(resolvedCustomColor) : colorStyle.borderColor;
   const isDisabled = disabled || isLoading;
 
   return (
@@ -57,7 +61,8 @@ export function CustomSwitch({
           isDisabled && "opacity-50 cursor-not-allowed"
         )}
         style={{
-          backgroundColor: checked ? switchColor : "#9ca3af",
+          backgroundColor: switchBackgroundColor,
+          ...resolveGradientStyle(switchBackgroundColor, gradient),
           borderColor,
         }}
       >

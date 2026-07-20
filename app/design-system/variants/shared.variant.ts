@@ -127,6 +127,26 @@ export const cursorVariants = {
   notAllowed: "cursor-not-allowed",
 };
 
+export const gradientDirections = {
+  ltr: "to right",
+  rtl: "to left",
+  utb: "to bottom",
+  btu: "to top",
+} as const;
+
+export type GradientDirection = keyof typeof gradientDirections;
+
+export function resolveGradientStyle(
+  backgroundColor: string,
+  gradient: GradientDirection = "btu"
+) {
+  const fadedColor = `color-mix(in srgb, ${backgroundColor} 82%, var(--bg-surface))`;
+
+  return {
+    backgroundImage: `linear-gradient(${gradientDirections[gradient]}, ${backgroundColor} 0%, ${fadedColor} 100%)`,
+  };
+}
+
 /**
  * =========================
  * Utility: Class Combiner

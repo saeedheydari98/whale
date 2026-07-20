@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import type { ComponentProps } from "react";
 import { FaRegStar } from "react-icons/fa";
 import { CustomInput } from "../../app/design-system/components/ui/input";
-import { borderOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
+import { borderOptions, gradientOptions, loadingOptions, roundedOptions, shadowOptions, sizeOptions, variantOptions } from "./story-options";
 
 type StoryArgs = ComponentProps<typeof CustomInput> & {
   icon?: boolean;
@@ -19,6 +19,7 @@ const meta = {
     size: { control: "select", options: sizeOptions },
     rounded: { control: "select", options: roundedOptions },
     border: { control: "select", options: borderOptions },
+    gradient: { control: "select", options: gradientOptions },
     shadow: { control: "select", options: shadowOptions },
     fullWidth: { control: "boolean" },
     disabled: { control: "boolean" },
@@ -36,6 +37,7 @@ const meta = {
     size: "md",
     border: "base",
     rounded: "md",
+    gradient: "btu",
     shadow: "none",
     fullWidth: true,
     disabled: false,

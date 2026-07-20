@@ -6,7 +6,7 @@ import React from "react";
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
 import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cursorVariants, cx, interactionStates, motionVariants, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cursorVariants, cx, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 
@@ -19,6 +19,7 @@ type CustomButtonProps = BaseProps & {
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   cursor?: keyof typeof cursorVariants;
   fullWidth?: boolean;
@@ -41,6 +42,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   size = "md",
   rounded = "md",
   border = "borderB",
+  gradient = "btu",
   shadow = "none",
   cursor = "pointer",
   fullWidth = false,
@@ -74,6 +76,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
 
     if (token.startsWith("bg-")) {
       tokenStyle.backgroundColor = resolvedColor;
+      Object.assign(tokenStyle, resolveGradientStyle(resolvedColor, gradient));
       tokenStyle.borderColor = strengthenBorderColor(resolvedColor);
       tokenStyle.color = resolveTokenTextColor(theme, token, 50);
     }
@@ -118,6 +121,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           ? {}
           : {
               backgroundColor: variantStyle.backgroundColor,
+              ...resolveGradientStyle(variantStyle.backgroundColor, gradient),
               color: variantStyle.color,
               borderColor: variantStyle.borderColor,
             }),
@@ -156,6 +160,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           ? {}
           : {
               backgroundColor: variantStyle.backgroundColor,
+              ...resolveGradientStyle(variantStyle.backgroundColor, gradient),
               color: variantStyle.color,
               borderColor: variantStyle.borderColor,
             }),

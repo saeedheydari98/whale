@@ -2,7 +2,7 @@
 
 import React from "react";
 import { resolveVariantCssVars, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, interactionStates, radiusVariants, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, GradientDirection, interactionStates, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomCardProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -12,6 +12,7 @@ type CustomCardProps = React.HTMLAttributes<HTMLDivElement> & {
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
   border?: keyof typeof borderVariants;
+  gradient?: GradientDirection;
   shadow?: keyof typeof shadowVariants;
   hover?: keyof typeof interactionStates.hover;
   className?: string;
@@ -27,6 +28,7 @@ export function CustomCard({
   size = "md",
   rounded = "lg",
   border = "base",
+  gradient = "btu",
   shadow = "sm",
   className,
   hover = "lift",
@@ -37,6 +39,7 @@ export function CustomCard({
   ...rest
 }: CustomCardProps) {
   const colorStyle = resolveVariantCssVars(variant);
+  const backgroundColor = "var(--secondary-card)";
 
   return (
     <article
@@ -49,7 +52,12 @@ export function CustomCard({
         hover !== "none" && interactionStates.hover[hover],
         className
       )}
-      style={{ borderColor: colorStyle.borderColor, ...style }}
+      style={{
+        backgroundColor,
+        ...resolveGradientStyle(backgroundColor, gradient),
+        borderColor: colorStyle.borderColor,
+        ...style,
+      }}
     >
       <div>
         {title && <div className="mb-2 text-lg font-semibold">{title}</div>}
