@@ -128,12 +128,13 @@ export function readCachedAppGlobal() {
 }
 
 export async function fetchAppGlobal(options?: { force?: boolean }) {
-  if (!options?.force) {
+  if (options?.force) {
+    memoryCache = null;
+    if (pendingGlobal) return pendingGlobal;
+  } else {
     const cached = readCachedAppGlobal();
     if (cached) return cached;
     if (pendingGlobal) return pendingGlobal;
-  } else {
-    memoryCache = null;
   }
 
   pendingGlobal = fetch("/api/app/global", { cache: "no-store" })

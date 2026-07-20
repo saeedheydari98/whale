@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { IoCreateOutline, IoSearchOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
-import type { BrandForm, ProductForm, ProductRelationMode } from "../types";
+import type { BrandForm, ProductForm } from "../types";
 import { formatPrice } from "../utils";
 
 type ProductsSectionProps = {
@@ -13,7 +13,6 @@ type ProductsSectionProps = {
   draggingProductId: number | string | null;
   setDraggingProductId: (id: number | string | null) => void;
   onEditProduct: (product: ProductForm) => void;
-  onOpenRelations: (product: ProductForm, mode: ProductRelationMode) => void;
   onReorderProducts: (sourceId: number | string, targetId: number | string) => void;
 };
 
@@ -23,7 +22,6 @@ export function ProductsSection({
   draggingProductId,
   setDraggingProductId,
   onEditProduct,
-  onOpenRelations,
   onReorderProducts,
 }: ProductsSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,12 +115,12 @@ export function ProductsSection({
                 setDraggingProductId(null);
               }}
               onDragEnd={() => setDraggingProductId(null)}
-              className={`flex w-full max-w-80 cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing ${
+              className={`flex w-full max-w-80 cursor-grab flex-col gap-2 rounded-lg border bg-primary-card p-2.5 active:cursor-grabbing ${
                 draggingProductId === product.id ? "border-primary opacity-70" : "border-primary-border"
               }`}
             >
               <button type="button" className="flex gap-3 text-right" onClick={() => onEditProduct(product)}>
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
                   {product.imageUrl ? (
                     <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
                   ) : (
@@ -133,18 +131,11 @@ export function ProductsSection({
                   <div className="line-clamp-1 text-sm font-bold text-primary-text">{product.title || "محصول بدون عنوان"}</div>
                   <span className="text-xs text-secondary-text">{formatPrice(product.discountPrice || product.price) || "بدون قیمت"}</span>
                   <span className="text-xs text-secondary-text">{productBrandTitle || "بدون برند"}</span>
-                  <span className="text-xs text-secondary-text">{product.categoryIds.length} دسته‌بندی / {product.showcaseIds.length} ویترین</span>
                 </div>
               </button>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex justify-end">
                 <CustomButton size="sm" rounded="full" variant="edit" icon={<IoCreateOutline />} onClick={() => onEditProduct(product)}>
                   <span>ویرایش</span>
-                </CustomButton>
-                <CustomButton size="sm" rounded="full" variant="neutral" onClick={() => onOpenRelations(product, "category")}>
-                  <span>دسته‌بندی</span>
-                </CustomButton>
-                <CustomButton size="sm" rounded="full" variant="neutral" onClick={() => onOpenRelations(product, "showcase")}>
-                  <span>ویترین</span>
                 </CustomButton>
               </div>
             </div>

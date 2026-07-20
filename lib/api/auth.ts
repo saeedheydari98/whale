@@ -152,12 +152,7 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
 
     const normalizedUser = await normalizeRole(user);
     const accessToken = createAccessToken(normalizedUser);
-    const nextRefreshToken = createRefreshToken(normalizedUser);
-    await prisma.user.update({
-      where: { id: normalizedUser.id },
-      data: { refreshTokenHash: hashToken(nextRefreshToken) },
-    });
-    await setAuthCookies(accessToken, nextRefreshToken);
+    await setAccessCookie(accessToken);
 
     return {
       id: normalizedUser.id,
@@ -203,6 +198,17 @@ export async function setAuthCookies(accessToken: string, refreshToken: string) 
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: REFRESH_TTL_SECONDS,
+  });
+}
+
+export async function setAccessCookie(accessToken: string) {
+  const store = await cookies();
+  store.set(ACCESS_COOKIE, accessToken, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: ACCESS_TTL_SECONDS,
   });
 }
 

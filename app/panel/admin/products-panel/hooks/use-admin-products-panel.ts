@@ -12,7 +12,6 @@ import type {
   CatalogLinkGroupForm,
   CategoryForm,
   ProductForm,
-  ProductRelationMode,
   StorefrontDisplayEntry,
   StorefrontLayoutTab,
   ShowcaseForm,
@@ -204,10 +203,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [status, setStatus] = useState("");
   const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState("");
-  const [relationProduct, setRelationProduct] = useState<ProductForm | null>(null);
-  const [relationMode, setRelationMode] = useState<ProductRelationMode>("category");
-  const [relationCategoryIds, setRelationCategoryIds] = useState<string[]>([]);
-  const [relationShowcaseIds, setRelationShowcaseIds] = useState<string[]>([]);
   const [draggingProductId, setDraggingProductId] = useState<number | string | null>(null);
   const [draggingStorefrontKey, setDraggingStorefrontKey] = useState<string | null>(null);
   const [storefrontLayoutTab, setStorefrontLayoutTab] = useState<StorefrontLayoutTab>("home");
@@ -612,15 +607,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setShowcases(nextShowcases);
     await persistProducts(products, nextShowcases, sortedBanners, sortedCategories, sortedBrands, false);
     setStatus("ترتیب محصولات ویترین ذخیره شد.");
-  };
-
-  const openProductRelations = (product: ProductForm, mode: ProductRelationMode) => {
-    const categoryIds = product.categoryIds.length > 0 ? product.categoryIds : [product.categoryId || sortedCategories[0]?.id || "general"];
-    const showcaseIds = product.showcaseIds.length > 0 ? product.showcaseIds : product.showcaseId ? [product.showcaseId] : [];
-    setRelationProduct(product);
-    setRelationMode(mode);
-    setRelationCategoryIds(categoryIds.filter(Boolean));
-    setRelationShowcaseIds(showcaseIds.filter(Boolean));
   };
 
   const openImagePreview = (imageUrl?: string) => {
@@ -1159,45 +1145,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     await persistProducts(nextProducts);
   };
 
-  const updateProductAssignment = async (
-    product: ProductForm,
-    patch: Pick<Partial<ProductForm>, "brand" | "categoryId" | "showcaseId" | "categoryIds" | "showcaseIds">
-  ) => {
-    const nextProducts = products.map((item) => item.id === product.id ? { ...item, ...patch } : item);
-    const nextProduct = nextProducts.find((item) => item.id === product.id) ?? null;
-    setProducts(nextProducts);
-    setRelationProduct((current) => current?.id === product.id ? nextProduct : current);
-    await persistProducts(nextProducts, sortedShowcases, sortedBanners, sortedCategories, sortedBrands, false);
-  };
-
-  const toggleRelationCategory = (categoryId: string) => {
-    setRelationCategoryIds((current) => {
-      if (current.includes(categoryId)) {
-        return current.length <= 1 ? current : current.filter((id) => id !== categoryId);
-      }
-      return [...current, categoryId];
-    });
-  };
-
-  const toggleRelationShowcase = (showcaseId: string) => {
-    setRelationShowcaseIds((current) =>
-      current.includes(showcaseId)
-        ? current.filter((id) => id !== showcaseId)
-        : [...current, showcaseId]
-    );
-  };
-
-  const submitRelationSelection = async () => {
-    if (!relationProduct) return;
-    if (relationMode === "category") {
-      const normalized = relationCategoryIds.length > 0 ? relationCategoryIds : [sortedCategories[0]?.id ?? "general"];
-      await updateProductAssignment(relationProduct, { categoryId: normalized[0], categoryIds: normalized });
-    } else {
-      await updateProductAssignment(relationProduct, { showcaseId: relationShowcaseIds[0] ?? "", showcaseIds: relationShowcaseIds });
-    }
-    setRelationProduct(null);
-  };
-
   const updateBannerPlacement = (banner: BannerForm, sortOrder: number) => {
     setBanners((current) =>
       current.map((item) => {
@@ -1306,10 +1253,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     isEditBannerOpen,
     isEditOpen,
     previewImage,
-    relationProduct,
-    relationMode,
-    relationCategoryIds,
-    relationShowcaseIds,
     draggingProductId,
     draggingStorefrontKey,
     storefrontLayoutTab,
@@ -1339,7 +1282,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setEditingBanner,
     setEditingProduct,
     setPreviewImage,
-    setRelationProduct,
     setStorefrontLayoutTab,
     setDraftBannerImageUrl,
     setEditingBannerImageUrl,
@@ -1350,7 +1292,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setDraggingProductId,
     setDraggingStorefrontKey,
     hasRequiredError,
-    openProductRelations,
     openImagePreview,
     openCreateModal,
     openShowcaseModal,
@@ -1405,9 +1346,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     deleteShowcase,
     submitEditingProduct,
     deleteEditingProduct,
-    toggleRelationCategory,
-    toggleRelationShowcase,
-    submitRelationSelection,
     updateBannerPlacement,
     updateShowcasePlacement,
     updateCategoryGroupPlacement,

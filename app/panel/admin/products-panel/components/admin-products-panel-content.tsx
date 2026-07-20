@@ -12,7 +12,6 @@ import { CategoryBrandModals } from "./category-brand-modals";
 import { FloatingActions } from "./floating-actions";
 import { ImagePreviewModal } from "./image-preview-modal";
 import { ProductModals } from "./product-modals";
-import { ProductRelationModal } from "./product-relation-modal";
 import { ProductsSection } from "./products-section";
 import { ShowcaseModals } from "./showcase-modals";
 import { StorefrontSection } from "./storefront-section";
@@ -42,7 +41,6 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           draggingProductId={panel.draggingProductId}
           setDraggingProductId={panel.setDraggingProductId}
           onEditProduct={panel.openEditModal}
-          onOpenRelations={panel.openProductRelations}
           onReorderProducts={panel.reorderProducts}
         />
       ) : null}
@@ -268,19 +266,6 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         onSubmitDraft={panel.submitDraftProduct}
         onSubmitEdit={panel.submitEditingProduct}
         onDeleteEdit={panel.deleteEditingProduct}
-      />
-
-      <ProductRelationModal
-        product={panel.relationProduct}
-        mode={panel.relationMode}
-        categories={panel.sortedCategories}
-        showcases={panel.sortedShowcases}
-        categoryIds={panel.relationCategoryIds}
-        showcaseIds={panel.relationShowcaseIds}
-        onClose={() => panel.setRelationProduct(null)}
-        onToggleCategory={panel.toggleRelationCategory}
-        onToggleShowcase={panel.toggleRelationShowcase}
-        onSubmit={panel.submitRelationSelection}
       />
 
       <ImagePreviewModal imageUrl={panel.previewImage} onClose={() => panel.setPreviewImage("")} />

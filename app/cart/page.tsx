@@ -24,14 +24,14 @@ import {
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import {
   EMPTY_USER_PROFILE,
-  fetchUserProfile,
   isUserProfileComplete,
   readUserProfile,
   saveUserProfile,
   writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
-import { fetchCurrentUser } from "@/lib/auth-client";
+import { useAppGlobal } from "@/lib/app-global-context";
+import { readCachedAuthUser } from "@/lib/auth-client";
 import { getProductDetail } from "@/lib/products-client";
 import { getStockColorValue, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
 
@@ -79,6 +79,17 @@ export default function CartPage() {
   const [authUser, setAuthUser] = useState<any>(null);
   const profileFormRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { data: globalData } = useAppGlobal();
+  const globalUser = globalData?.user ?? null;
+  const globalUserKey = useMemo(
+    () => [
+      globalUser?.id ?? "",
+      globalUser?.username ?? "",
+      globalUser?.email ?? "",
+      globalUser?.role ?? "",
+    ].join("|"),
+    [globalUser?.email, globalUser?.id, globalUser?.role, globalUser?.username]
+  );
   const productQueries = useQueries({
     queries: items.map((item) => {
       const productId = item.productId ?? item.id;
@@ -100,10 +111,14 @@ export default function CartPage() {
     let cancelled = false;
 
     void (async () => {
-      const snapshot = await getCart();
-      const savedProfile = await fetchUserProfile().catch(() => snapshot.profile);
-      const user = await fetchCurrentUser();
+      const user = globalUser ?? readCachedAuthUser();
+      const localProfile = readUserProfile();
+      setAuthUser(user);
+      setItems(readLocalCart(user));
+      const snapshot = await getCart(user);
+      const savedProfile = localProfile ?? snapshot.profile;
       if (cancelled) return;
+      if (snapshot.profile) writeUserProfile(snapshot.profile, { emit: false });
       setItems(snapshot.items);
       setProfile(savedProfile);
       setProfileDraft(savedProfile ?? snapshot.profile ?? EMPTY_USER_PROFILE);
@@ -113,7 +128,7 @@ export default function CartPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [globalUserKey]);
 
   useEffect(() => {
     const syncLocalCart = () => setItems(readLocalCart());
@@ -210,7 +225,7 @@ export default function CartPage() {
       return;
     }
 
-    const savedProfile = readUserProfile();
+    const savedProfile = readUserProfile() ?? profile;
 
     if (!savedProfile) {
       setProfileDraft(profile ?? EMPTY_USER_PROFILE);

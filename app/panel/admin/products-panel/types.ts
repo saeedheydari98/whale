@@ -1,7 +1,5 @@
 export type AdminCatalogSection = "products" | "banners" | "showcases" | "categories" | "brands" | "storefront";
 
-export type ProductRelationMode = "category" | "showcase";
-
 export type StorefrontLayoutTab = "home" | "categories" | "products";
 
 export type ProductForm = {

@@ -9,7 +9,6 @@ import {
 import { NOTIFICATION_SILENT_HEADER, notifyApp } from "@/lib/app-notifications";
 import type { ProductRecord } from "@/lib/products-client";
 import {
-  fetchCurrentUser,
   readCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
@@ -45,6 +44,14 @@ export type CartSnapshot = {
   items: CartItemRecord[];
   profile: UserProfile | null;
 };
+
+let pendingCartLoad: Promise<CartSnapshot> | null = null;
+let pendingCartLoadKey = "";
+
+function clearPendingCartLoad() {
+  pendingCartLoad = null;
+  pendingCartLoadKey = "";
+}
 
 function readCartItemsFromApiData(data: any) {
   return data?.data?.cart?.items ?? data?.data?.items ?? [];
@@ -286,6 +293,7 @@ export function writeLocalCart(items: CartItemRecord[], user: AuthClientUser | n
 
 export function clearLocalCartSnapshot(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
   if (typeof window === "undefined") return;
+  clearPendingCartLoad();
   localStorage.removeItem(getCartStorageKey(user));
   localStorage.removeItem(CART_STORAGE_KEY);
   emitCartUpdated();
@@ -344,25 +352,35 @@ async function clearCartFromApi(profile?: UserProfile | null, options?: { silent
   return [];
 }
 
-export async function getCart(): Promise<CartSnapshot> {
-  const user = await fetchCurrentUser().catch(() => readCachedAuthUser());
+export async function getCart(user: AuthClientUser | null | undefined = readCachedAuthUser()): Promise<CartSnapshot> {
   const profile = readUserProfile();
 
   if (canUseAccountCart(user)) {
-    try {
-      const apiCart = await loadCartFromApi({ silent: true });
-      writeLocalCart(apiCart.items, user);
-      return { items: apiCart.items, profile: apiCart.profile ?? profile };
-    } catch {
-      console.warn("Cart API load failed; using account local cart.");
-      return { items: readLocalCart(), profile };
-    }
+    const loadKey = getCartStorageKey(user);
+    if (pendingCartLoad && pendingCartLoadKey === loadKey) return pendingCartLoad;
+
+    pendingCartLoadKey = loadKey;
+    pendingCartLoad = loadCartFromApi({ silent: true })
+      .then((apiCart) => {
+        writeLocalCart(apiCart.items, user);
+        return { items: apiCart.items, profile: apiCart.profile ?? profile };
+      })
+      .catch(() => {
+        console.warn("Cart API load failed; using account local cart.");
+        return { items: readLocalCart(user), profile };
+      })
+      .finally(() => {
+        if (pendingCartLoadKey === loadKey) clearPendingCartLoad();
+      });
+
+    return pendingCartLoad;
   }
 
-  return { items: readLocalCart(), profile };
+  return { items: readLocalCart(user), profile };
 }
 
 export async function persistCart(items: CartItemRecord[], profile = readUserProfile()) {
+  clearPendingCartLoad();
   const user = readCachedAuthUser();
   const nextItems = dedupeCartItems(items);
   writeLocalCart(nextItems, user);
@@ -550,6 +568,7 @@ export async function clearCart() {
 }
 
 export async function checkoutCart(profile = readUserProfile()) {
+  clearPendingCartLoad();
   if (!profile || !isUserProfileComplete(profile)) {
     const message = "برای این عملیات اطلاعات پروفایل باید کامل باشد.";
     notifyCartError(message);
