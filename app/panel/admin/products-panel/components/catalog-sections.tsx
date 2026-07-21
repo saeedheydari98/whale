@@ -9,12 +9,27 @@ type CategoriesSectionProps = {
   groups: CatalogLinkGroupForm[];
   categories: CategoryForm[];
   products: ProductForm[];
+  draggingCategoryId: string | null;
+  setDraggingCategoryId: (id: string | null) => void;
   onEditGroup: (group: CatalogLinkGroupForm) => void;
   onAddCategory: (groupId?: string) => void;
   onEditCategory: (category: CategoryForm) => void;
+  onPreview: (imageUrl?: string) => void;
+  onReorderCategories: (sourceId: string, targetId: string) => void;
 };
 
-export function CategoriesSection({ groups, categories, products, onEditGroup, onAddCategory, onEditCategory }: CategoriesSectionProps) {
+export function CategoriesSection({
+  groups,
+  categories,
+  products,
+  draggingCategoryId,
+  setDraggingCategoryId,
+  onEditGroup,
+  onAddCategory,
+  onEditCategory,
+  onPreview,
+  onReorderCategories,
+}: CategoriesSectionProps) {
   return (
     <div className="flex flex-col gap-4">
       {groups.map((group) => {
@@ -43,8 +58,30 @@ export function CategoriesSection({ groups, categories, products, onEditGroup, o
                 </div>
               ) : null}
               {groupCategories.map((category) => (
-                <div key={category.id} className="flex min-w-44 shrink-0 flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-2 shadow-sm">
-                  <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" />
+                <div
+                  key={category.id}
+                  draggable
+                  onDragStart={(event) => {
+                    setDraggingCategoryId(category.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", category.id);
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const sourceId = event.dataTransfer.getData("text/plain") || draggingCategoryId;
+                    if (sourceId) void onReorderCategories(sourceId, category.id);
+                    setDraggingCategoryId(null);
+                  }}
+                  onDragEnd={() => setDraggingCategoryId(null)}
+                  className={`flex min-w-44 shrink-0 cursor-grab flex-col gap-2 rounded-lg border bg-primary-card p-2 shadow-sm active:cursor-grabbing ${
+                    draggingCategoryId === category.id ? "border-primary opacity-70" : "border-primary-border"
+                  }`}
+                >
+                  <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" onImageClick={() => onPreview(category.imageUrl)} />
                   <div className="flex gap-2">
                     <CustomButton size="sm" variant="edit" onClick={() => onEditCategory(category)}>
                       ویرایش
@@ -69,12 +106,27 @@ type BrandsSectionProps = {
   groups: CatalogLinkGroupForm[];
   brands: BrandForm[];
   products: ProductForm[];
+  draggingBrandId: string | null;
+  setDraggingBrandId: (id: string | null) => void;
   onEditGroup: (group: CatalogLinkGroupForm) => void;
   onAddBrand: (groupId?: string) => void;
   onEditBrand: (brand: BrandForm) => void;
+  onPreview: (imageUrl?: string) => void;
+  onReorderBrands: (sourceId: string, targetId: string) => void;
 };
 
-export function BrandsSection({ groups, brands, products, onEditGroup, onAddBrand, onEditBrand }: BrandsSectionProps) {
+export function BrandsSection({
+  groups,
+  brands,
+  products,
+  draggingBrandId,
+  setDraggingBrandId,
+  onEditGroup,
+  onAddBrand,
+  onEditBrand,
+  onPreview,
+  onReorderBrands,
+}: BrandsSectionProps) {
   return (
     <div className="flex flex-col gap-4">
       {groups.map((group) => {
@@ -103,8 +155,30 @@ export function BrandsSection({ groups, brands, products, onEditGroup, onAddBran
                 </div>
               ) : null}
               {groupBrands.map((brand) => (
-                <div key={brand.id} className="flex min-w-44 shrink-0 flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-2 shadow-sm">
-                  <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" />
+                <div
+                  key={brand.id}
+                  draggable
+                  onDragStart={(event) => {
+                    setDraggingBrandId(brand.id);
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", brand.id);
+                  }}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const sourceId = event.dataTransfer.getData("text/plain") || draggingBrandId;
+                    if (sourceId) void onReorderBrands(sourceId, brand.id);
+                    setDraggingBrandId(null);
+                  }}
+                  onDragEnd={() => setDraggingBrandId(null)}
+                  className={`flex min-w-44 shrink-0 cursor-grab flex-col gap-2 rounded-lg border bg-primary-card p-2 shadow-sm active:cursor-grabbing ${
+                    draggingBrandId === brand.id ? "border-primary opacity-70" : "border-primary-border"
+                  }`}
+                >
+                  <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" onImageClick={() => onPreview(brand.imageUrl)} />
                   <div className="flex gap-2">
                     <CustomButton size="sm" variant="edit" onClick={() => onEditBrand(brand)}>
                       ویرایش

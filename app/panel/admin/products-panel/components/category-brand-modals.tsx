@@ -32,6 +32,7 @@ type CategoryBrandModalsProps = {
   updateEditingBrand: (patch: Partial<BrandForm>) => void;
   onCategoryImageUpload: (file: File | null, mode: "draft" | "edit") => void;
   onBrandImageUpload: (file: File | null, mode: "draft" | "edit") => void;
+  onPreview: (imageUrl?: string) => void;
   onSubmitCategory: () => void;
   onSubmitBrand: () => void;
   onSubmitEditCategory: () => void;
@@ -59,6 +60,7 @@ export function CategoryBrandModals(props: CategoryBrandModalsProps) {
         submitLabel="ثبت دسته‌بندی"
         onPatch={props.updateDraftCategory}
         onImageUpload={(file) => props.onCategoryImageUpload(file, "draft")}
+        onPreview={props.onPreview}
         onSubmit={props.onSubmitCategory}
         hasRequiredError={props.hasRequiredError}
       />
@@ -79,6 +81,7 @@ export function CategoryBrandModals(props: CategoryBrandModalsProps) {
         deleteLabel="حذف"
         onPatch={props.updateEditingCategory}
         onImageUpload={(file) => props.onCategoryImageUpload(file, "edit")}
+        onPreview={props.onPreview}
         onSubmit={props.onSubmitEditCategory}
         onDelete={props.onDeleteCategory}
         hasRequiredError={props.hasRequiredError}
@@ -99,6 +102,7 @@ export function CategoryBrandModals(props: CategoryBrandModalsProps) {
         submitLabel="ذخیره برند"
         onPatch={props.updateDraftBrand}
         onImageUpload={(file) => props.onBrandImageUpload(file, "draft")}
+        onPreview={props.onPreview}
         onSubmit={props.onSubmitBrand}
         hasRequiredError={props.hasRequiredError}
       />
@@ -119,6 +123,7 @@ export function CategoryBrandModals(props: CategoryBrandModalsProps) {
         deleteLabel="حذف برند"
         onPatch={props.updateEditingBrand}
         onImageUpload={(file) => props.onBrandImageUpload(file, "edit")}
+        onPreview={props.onPreview}
         onSubmit={props.onSubmitEditBrand}
         onDelete={props.onDeleteBrand}
         hasRequiredError={props.hasRequiredError}
@@ -147,6 +152,7 @@ type TaxonomyModalProps<TItem extends TaxonomyItem> = {
   hasRequiredError: (key: string) => boolean;
   onPatch: (patch: Partial<TItem>) => void;
   onImageUpload: (file: File | null) => void;
+  onPreview: (imageUrl?: string) => void;
   onSubmit: () => void;
   onDelete?: () => void;
 };
@@ -169,6 +175,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
   hasRequiredError,
   onPatch,
   onImageUpload,
+  onPreview,
   onSubmit,
   onDelete,
 }: TaxonomyModalProps<TItem>) {
@@ -197,7 +204,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
             <span className="text-sm font-semibold">{uploadLabel}</span>
             <input type="file" accept="image/*" className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
           </label>
-          <CategoryOption label={item.title || previewFallback} imageUrl={item.imageUrl} />
+          <CategoryOption label={item.title || previewFallback} imageUrl={item.imageUrl} onImageClick={() => onPreview(item.imageUrl)} />
           <CustomInput type="number" value={item.sortOrder} placeholder={sortPlaceholder} onChange={(event) => onPatch({ sortOrder: Number(event.target.value) } as Partial<TItem>)} />
           <CustomSwitch checked={item.active} onChange={(active) => onPatch({ active } as Partial<TItem>)} label={item.active ? "فعال" : "مخفی"} size="sm" />
           <div className="flex flex-col gap-2 sm:flex-row">

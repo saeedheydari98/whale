@@ -958,6 +958,7 @@ export async function POST(request: Request) {
     : Array.isArray(body.banners)
       ? (body.banners as BannerPayload[])
       : [];
+  const preserveProducts = body.preserveProducts === true;
   const normalized = dedupeProducts(
     products
       .map((item: Partial<ProductPayload>, index: number) => normalizeProduct(item, index))
@@ -1026,11 +1027,11 @@ export async function POST(request: Request) {
       await (prisma as any).banner.deleteMany();
     }
 
-    const existingProductIds = normalized
-      .map(getExistingProductId)
-      .filter((id): id is number => id !== null);
+    if (!preserveProducts) {
+      const existingProductIds = normalized
+        .map(getExistingProductId)
+        .filter((id): id is number => id !== null);
 
-    if (hasProductModel) {
       await prisma.product.deleteMany({
         where: existingProductIds.length > 0
           ? { id: { notIn: existingProductIds } }
@@ -1164,37 +1165,39 @@ export async function POST(request: Request) {
       }
     }
 
-    // Upsert products sequentially to avoid a long-running interactive transaction
-    for (const item of sortProducts(normalized)) {
-      const itemShowcaseId = String(item.showcaseId ?? "").trim();
-      const itemShowcaseIds = Array.isArray(item.showcaseIds)
-        ? item.showcaseIds.map((id) => String(id).trim()).filter((id) => id && validShowcaseIds.has(id))
-        : [];
-      const productData = {
-        ...normalizeProductData({
-          ...item,
+    if (!preserveProducts) {
+      // Upsert products sequentially to avoid a long-running interactive transaction
+      for (const item of sortProducts(normalized)) {
+        const itemShowcaseId = String(item.showcaseId ?? "").trim();
+        const itemShowcaseIds = Array.isArray(item.showcaseIds)
+          ? item.showcaseIds.map((id) => String(id).trim()).filter((id) => id && validShowcaseIds.has(id))
+          : [];
+        const productData = {
+          ...normalizeProductData({
+            ...item,
+            showcaseId: validShowcaseIds.has(itemShowcaseId) ? itemShowcaseId : null,
+            showcaseIds: itemShowcaseIds,
+            colorStock: Object.keys(normalizeColorStock(item.colorStock)).length > 0
+              ? normalizeColorStock(item.colorStock)
+              : Prisma.JsonNull,
+            stockStatus: item.stockStatus || (Number(item.stockQuantity) > 0 ? "in_stock" : "out_of_stock"),
+          }),
           showcaseId: validShowcaseIds.has(itemShowcaseId) ? itemShowcaseId : null,
-          showcaseIds: itemShowcaseIds,
-          colorStock: Object.keys(normalizeColorStock(item.colorStock)).length > 0
-            ? normalizeColorStock(item.colorStock)
-            : Prisma.JsonNull,
-          stockStatus: item.stockStatus || (Number(item.stockQuantity) > 0 ? "in_stock" : "out_of_stock"),
-        }),
-        showcaseId: validShowcaseIds.has(itemShowcaseId) ? itemShowcaseId : null,
-        showcaseIds: itemShowcaseIds.length > 0 ? itemShowcaseIds : Prisma.JsonNull,
-        categoryIds: item.categoryIds,
-      };
-      const existingProductId = getExistingProductId(item);
+          showcaseIds: itemShowcaseIds.length > 0 ? itemShowcaseIds : Prisma.JsonNull,
+          categoryIds: item.categoryIds,
+        };
+        const existingProductId = getExistingProductId(item);
 
-      if (existingProductId) {
-        await prisma.product.update({
-          where: { id: existingProductId },
-          data: productData,
-        });
-      } else {
-        await prisma.product.create({
-          data: productData,
-        });
+        if (existingProductId) {
+          await prisma.product.update({
+            where: { id: existingProductId },
+            data: productData,
+          });
+        } else {
+          await prisma.product.create({
+            data: productData,
+          });
+        }
       }
     }
 

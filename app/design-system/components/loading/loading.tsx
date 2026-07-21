@@ -156,10 +156,21 @@ export default function Loading({
     );
   }
 
-  if (loading === "page") {
+  if (loading === "page" || loading === "fullscreen") {
     if (!isLoading) return <>{children}</>;
     return (
-      <div className={cx("flex h-full w-full flex-col items-center justify-center", className)}>
+      <div
+        aria-busy="true"
+        aria-live="polite"
+        className={cx(
+          "fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col items-center justify-center text-primary-text",
+          loading === "fullscreen" ? "backdrop-blur-sm" : "",
+          className
+        )}
+        style={{
+          backgroundColor: "color-mix(in srgb, var(--primary-base) 88%, var(--bg-base))",
+        }}
+      >
         <GiSpermWhale
           aria-label="وال"
           className="mb-4 h-24 w-24"
@@ -179,22 +190,6 @@ export default function Loading({
               transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.12 }}
             />
           ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (loading === "fullscreen") {
-    if (!isLoading) return <>{children}</>;
-    return (
-      <div
-        className={cx("fixed inset-0 z-[9999] flex items-center justify-center backdrop-blur-sm", className)}
-        style={{
-          backgroundColor: "color-mix(in srgb, var(--primary-base) 88%, var(--bg-base))",
-        }}
-      >
-        <div className="flex w-full max-w-xs flex-col items-center justify-center gap-4 px-6">
-          <Loading loading="page" size={size} isLoading />
         </div>
       </div>
     );

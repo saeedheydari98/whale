@@ -41,7 +41,9 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           draggingProductId={panel.draggingProductId}
           setDraggingProductId={panel.setDraggingProductId}
           onEditProduct={panel.openEditModal}
+          onPreview={panel.openImagePreview}
           onReorderProducts={panel.reorderProducts}
+          isLoading={panel.loading}
         />
       ) : null}
 
@@ -78,9 +80,13 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           groups={panel.sortedCategoryGroups}
           categories={panel.sortedCategories}
           products={panel.sortedProducts}
+          draggingCategoryId={panel.draggingCategoryId}
+          setDraggingCategoryId={panel.setDraggingCategoryId}
           onEditGroup={panel.openEditCategoryGroupModal}
           onAddCategory={panel.openCategoryModal}
           onEditCategory={panel.openEditCategoryModal}
+          onPreview={panel.openImagePreview}
+          onReorderCategories={panel.reorderCategories}
         />
       ) : null}
 
@@ -89,9 +95,13 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           groups={panel.sortedBrandGroups}
           brands={panel.sortedBrands}
           products={panel.sortedProducts}
+          draggingBrandId={panel.draggingBrandId}
+          setDraggingBrandId={panel.setDraggingBrandId}
           onEditGroup={panel.openEditBrandGroupModal}
           onAddBrand={panel.openBrandModal}
           onEditBrand={panel.openEditBrandModal}
+          onPreview={panel.openImagePreview}
+          onReorderBrands={panel.reorderBrands}
         />
       ) : null}
 
@@ -186,6 +196,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         updateEditingBrand={panel.updateEditingBrand}
         onCategoryImageUpload={panel.handleCategoryImageUpload}
         onBrandImageUpload={panel.handleBrandImageUpload}
+        onPreview={panel.openImagePreview}
         onSubmitCategory={panel.submitDraftCategory}
         onSubmitBrand={panel.submitDraftBrand}
         onSubmitEditCategory={panel.submitEditingCategory}

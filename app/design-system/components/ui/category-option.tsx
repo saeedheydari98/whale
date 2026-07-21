@@ -12,6 +12,7 @@ type CategoryOptionProps = {
   size?: "sm" | "md" | "lg";
   className?: string;
   onClick?: () => void;
+  onImageClick?: () => void;
 };
 
 const sizeClasses = {
@@ -37,22 +38,30 @@ export function CategoryOption({
   size = "md",
   className,
   onClick,
+  onImageClick,
 }: CategoryOptionProps) {
+  const imageContent = (
+    <span
+      className={cx(
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-full border bg-primary-media text-primary transition",
+        selected ? "border-primary bg-primary-soft ring-2 ring-primary-border" : "border-primary-border grayscale opacity-75",
+        sizeClasses[size].image
+      )}
+    >
+      {imageUrl ? (
+        <img src={imageUrl} alt={label} className="h-full w-full object-cover" />
+      ) : (
+        <GiSpermWhale className="text-3xl" aria-hidden="true" />
+      )}
+    </span>
+  );
   const content = (
     <>
-      <span
-        className={cx(
-          "flex shrink-0 items-center justify-center overflow-hidden rounded-full border bg-primary-media text-primary transition",
-          selected ? "border-primary bg-primary-soft ring-2 ring-primary-border" : "border-primary-border grayscale opacity-75",
-          sizeClasses[size].image
-        )}
-      >
-        {imageUrl ? (
-          <img src={imageUrl} alt={label} className="h-full w-full object-cover" />
-        ) : (
-          <GiSpermWhale className="text-3xl" aria-hidden="true" />
-        )}
-      </span>
+      {onImageClick && !onClick && imageUrl ? (
+        <button type="button" className="rounded-full" onClick={onImageClick} aria-label="باز کردن تصویر">
+          {imageContent}
+        </button>
+      ) : imageContent}
       <span className={cx("max-w-24 text-center font-bold text-primary-text", sizeClasses[size].text)}>
         {label}
       </span>

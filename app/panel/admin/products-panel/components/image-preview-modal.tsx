@@ -1,6 +1,7 @@
 "use client";
 
-import { CustomModal } from "@/app/design-system/components/ui/modal";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type ImagePreviewModalProps = {
   imageUrl: string;
@@ -8,17 +9,41 @@ type ImagePreviewModalProps = {
 };
 
 export function ImagePreviewModal({ imageUrl, onClose }: ImagePreviewModalProps) {
-  return (
-    <CustomModal open={Boolean(imageUrl)} onClose={onClose} title="تصویر محصول" rounded="lg" shadow="lg">
-      <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-primary-base">
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt="پیش‌نمایش تصویر محصول"
-            className="max-h-[75vh] w-full object-contain"
-          />
-        ) : null}
-      </div>
-    </CustomModal>
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!imageUrl) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [imageUrl, onClose]);
+
+  if (!imageUrl) return null;
+
+  const modal = (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="پیش‌نمایش تصویر"
+    >
+      <img
+        src={imageUrl}
+        alt=""
+        className="max-h-[100vh] max-w-[100vw] object-contain"
+        onClick={(event) => event.stopPropagation()}
+      />
+    </div>
   );
+
+  return mounted ? createPortal(modal, document.body) : modal;
 }

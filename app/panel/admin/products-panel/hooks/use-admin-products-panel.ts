@@ -204,6 +204,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState("");
   const [draggingProductId, setDraggingProductId] = useState<number | string | null>(null);
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [draggingBrandId, setDraggingBrandId] = useState<string | null>(null);
   const [draggingStorefrontKey, setDraggingStorefrontKey] = useState<string | null>(null);
   const [storefrontLayoutTab, setStorefrontLayoutTab] = useState<StorefrontLayoutTab>("home");
   const [draftBannerImageUrl, setDraftBannerImageUrl] = useState("");
@@ -404,22 +406,26 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       let brandsToPersist = nextBrands;
       let brandGroupsToPersist = nextBrandGroups;
       let bannersToPersist = nextBanners;
+      let preserveExistingProducts = false;
 
       if (!productsLoaded) {
         const catalog = await getProducts({ all: true, full: true, force: true });
-        if (!hasCatalogData(catalog)) throw new Error("دریافت اطلاعات کامل فروشگاه برای ذخیره ممکن نشد.");
-        const snapshot = normalizeAdminCatalog(catalog, true);
-        productsToPersist = snapshot.products;
-        if (!structureLoaded) {
-          showcasesToPersist = snapshot.showcases;
-          categoriesToPersist = snapshot.categories;
-          categoryGroupsToPersist = snapshot.categoryGroups;
-          brandsToPersist = snapshot.brands;
-          brandGroupsToPersist = snapshot.brandGroups;
-          bannersToPersist = snapshot.banners;
+        if (hasCatalogData(catalog)) {
+          const snapshot = normalizeAdminCatalog(catalog, true);
+          productsToPersist = snapshot.products;
+          if (!structureLoaded) {
+            showcasesToPersist = snapshot.showcases;
+            categoriesToPersist = snapshot.categories;
+            categoryGroupsToPersist = snapshot.categoryGroups;
+            brandsToPersist = snapshot.brands;
+            brandGroupsToPersist = snapshot.brandGroups;
+            bannersToPersist = snapshot.banners;
+          }
+          setProducts(snapshot.products);
+          setProductsLoaded(true);
+        } else {
+          preserveExistingProducts = true;
         }
-        setProducts(snapshot.products);
-        setProductsLoaded(true);
       }
 
       const validProducts = dedupeProducts(
@@ -429,7 +435,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       let res: Response | null = null;
       const maxAttempts = 3;
       const bodyPayload = JSON.stringify({
-        products: validProducts,
+        preserveProducts: preserveExistingProducts,
+        products: preserveExistingProducts ? [] : validProducts,
         showcases: showcasesToPersist.map((showcase) => ({
           id: showcase.id,
           title: showcase.title,
@@ -589,6 +596,36 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setProducts(reordered);
     await persistProducts(reordered, sortedShowcases, sortedBanners, sortedCategories, sortedBrands, false);
     setStatus("ترتیب محصولات ذخیره شد.");
+  };
+
+  const reorderCategories = async (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const ordered = [...sortedCategories];
+    const sourceIndex = ordered.findIndex((category) => category.id === sourceId);
+    const targetIndex = ordered.findIndex((category) => category.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const targetGroupId = ordered[targetIndex].groupId;
+    const [moved] = ordered.splice(sourceIndex, 1);
+    ordered.splice(targetIndex, 0, { ...moved, groupId: targetGroupId });
+    const reordered = ordered.map((category, index) => ({ ...category, sortOrder: index + 1 }));
+    setCategories(reordered);
+    await persistProducts(products, sortedShowcases, sortedBanners, reordered, sortedBrands, false);
+    setStatus("ترتیب دسته‌بندی‌ها ذخیره شد.");
+  };
+
+  const reorderBrands = async (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const ordered = [...sortedBrands];
+    const sourceIndex = ordered.findIndex((brand) => brand.id === sourceId);
+    const targetIndex = ordered.findIndex((brand) => brand.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const targetGroupId = ordered[targetIndex].groupId;
+    const [moved] = ordered.splice(sourceIndex, 1);
+    ordered.splice(targetIndex, 0, { ...moved, groupId: targetGroupId });
+    const reordered = ordered.map((brand, index) => ({ ...brand, sortOrder: index + 1 }));
+    setBrands(reordered);
+    await persistProducts(products, sortedShowcases, sortedBanners, sortedCategories, reordered, false);
+    setStatus("ترتیب برندها ذخیره شد.");
   };
 
   const reorderShowcaseProducts = async (showcase: ShowcaseForm, sourceProductId: number | string, targetProductId: number | string) => {
@@ -1254,6 +1291,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     isEditOpen,
     previewImage,
     draggingProductId,
+    draggingCategoryId,
+    draggingBrandId,
     draggingStorefrontKey,
     storefrontLayoutTab,
     draftBannerImageUrl,
@@ -1290,6 +1329,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setDraftCategoryGroup,
     setDraftBrandGroup,
     setDraggingProductId,
+    setDraggingCategoryId,
+    setDraggingBrandId,
     setDraggingStorefrontKey,
     hasRequiredError,
     openImagePreview,
@@ -1352,6 +1393,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     updateBrandGroupPlacement,
     saveStorefrontPlacement,
     reorderProducts,
+    reorderCategories,
+    reorderBrands,
     reorderShowcaseProducts,
     reorderStorefrontSections,
     formatPrice,

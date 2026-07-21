@@ -279,7 +279,7 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
         <CustomInput
           value={product.sku}
           label="SKU (کد یکتای کالا)"
-          placeholder="SPK-JBL-001"
+          placeholder="Sku"
           onChange={(event) => onChange({ sku: event.target.value })}
         />
       </div>
