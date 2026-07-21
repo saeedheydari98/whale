@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { IoCheckmarkCircleOutline, IoShieldCheckmarkOutline } from "react-icons/io5";
-import { FloatButton } from "@/app/design-system/components/ui/float-button";
+import { IoCheckmarkCircleOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
-import { useAppGlobal } from "@/lib/app-global-context";
-import { AUTH_USER_UPDATED_EVENT, hasAdminRole } from "@/lib/auth-client";
+import { AUTH_USER_UPDATED_EVENT } from "@/lib/auth-client";
 import { UserProfilePanel } from "./user-profile-panel";
 
 type OrderItem = {
@@ -165,10 +162,7 @@ function UserOrdersPanel() {
 }
 
 export default function UserPanelPage() {
-  const router = useRouter();
-  const { data: globalData } = useAppGlobal();
   const [activeTab, setActiveTab] = useState<"profile" | "orders">("profile");
-  const showAdminButton = hasAdminRole(globalData?.user);
 
   return (
     <main className="min-h-screen bg-primary-base p-6 text-primary-text">
@@ -196,15 +190,6 @@ export default function UserPanelPage() {
         {activeTab === "profile" ? <UserProfilePanel /> : null}
         {activeTab === "orders" ? <UserOrdersPanel /> : null}
       </div>
-      {showAdminButton ? (
-        <FloatButton
-          label="پنل مدیریت"
-          icon={<IoShieldCheckmarkOutline />}
-          position="bottom-right"
-          shadow="lg"
-          onClick={() => router.push("/panel/admin")}
-        />
-      ) : null}
     </main>
   );
 }

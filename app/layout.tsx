@@ -3,6 +3,7 @@ import { ThemeProvider } from "./design-system/theme/provider";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
 import { AppFooter } from "./design-system/components/layout/app-footer";
+import { AdminPanelFloatButton } from "./design-system/components/layout/admin-panel-float-button";
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppGlobalProvider } from "@/lib/app-global-context";
@@ -85,6 +86,7 @@ export default function RootLayout({
                     {children}
                   </main>
                   <AppFooter />
+                  <AdminPanelFloatButton />
                 </ProductsCatalogProvider>
               </AppGlobalProvider>
             </CatalogQueryProvider>
