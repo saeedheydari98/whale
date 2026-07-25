@@ -66,7 +66,7 @@ export function ProductsSection({
       return searchText.includes(normalizedSearch);
     });
   }, [brandTitleById, products, searchQuery]);
-  const shouldShowSkeletonCards = isLoading && visibleProducts.length === 0;
+  const loadingSkeletonCount = isLoading ? Math.max(visibleProducts.length, 4) : 0;
 
   return (
     <div className="flex flex-col gap-3">
@@ -101,8 +101,8 @@ export function ProductsSection({
       ) : null}
 
       <div className="flex flex-wrap gap-2.5">
-        {shouldShowSkeletonCards ? (
-          [0, 1, 2, 3, 4, 5].map((item) => (
+        {loadingSkeletonCount > 0 ? (
+          Array.from({ length: loadingSkeletonCount }, (_, item) => (
             <Loading key={item} loading="skeleton-card" isLoading className="h-16 w-full max-w-64">
               <div className="h-16 w-full max-w-64 rounded-lg border border-primary-border bg-primary-card" />
             </Loading>

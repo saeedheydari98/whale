@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { clearProductsCache, getCatalogStructure, getProductPage, getProducts, type ProductsCache } from "@/lib/products-client";
+import { clearProductsCache, getCatalogStructure, getProducts, type ProductsCache } from "@/lib/products-client";
+import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { useFileDataUrl } from "@/hooks/useFileDataUrl";
 import { createBanner, createBrand, createCatalogLinkGroup, createCategory, createProduct, createShowcase } from "../factories";
@@ -46,6 +47,32 @@ type AdminCatalogSnapshot = {
   banners: BannerForm[];
 };
 
+type AdminCatalogLoadSection = AdminCatalogSection | "all" | "product-form";
+type LoadedAdminCatalogSections = Record<AdminCatalogSection, boolean>;
+
+const ADMIN_CATALOG_SECTION_URL = "/api/admin/catalog";
+const ADMIN_CATALOG_SECTIONS: AdminCatalogSection[] = ["products", "banners", "showcases", "categories", "brands", "storefront"];
+const EMPTY_CATALOG: ProductsCache = {
+  products: [],
+  showcases: [],
+  categories: [],
+  categoryGroups: [],
+  brands: [],
+  brandGroups: [],
+  banners: [],
+  tree: { sections: [] },
+  catalog: { placement: 0, showcases: [], categoryGroups: [], categories: [], brandGroups: [], brands: [], banners: [] },
+};
+
+const initialLoadedSections: LoadedAdminCatalogSections = {
+  products: false,
+  banners: false,
+  showcases: false,
+  categories: false,
+  brands: false,
+  storefront: false,
+};
+
 function hasCatalogData(catalog: ProductsCache) {
   return (
     catalog.products.length > 0 ||
@@ -56,6 +83,39 @@ function hasCatalogData(catalog: ProductsCache) {
     catalog.brandGroups.length > 0 ||
     catalog.banners.length > 0
   );
+}
+
+function toProductsCache(value: unknown): ProductsCache {
+  const record = value && typeof value === "object" ? value as Partial<ProductsCache> : {};
+
+  return {
+    ...EMPTY_CATALOG,
+    products: Array.isArray(record.products) ? record.products : [],
+    showcases: Array.isArray(record.showcases) ? record.showcases : [],
+    categories: Array.isArray(record.categories) ? record.categories : [],
+    categoryGroups: Array.isArray(record.categoryGroups) ? record.categoryGroups : [],
+    brands: Array.isArray(record.brands) ? record.brands : [],
+    brandGroups: Array.isArray(record.brandGroups) ? record.brandGroups : [],
+    banners: Array.isArray(record.banners) ? record.banners : [],
+  };
+}
+
+async function getAdminCatalogSection(section: AdminCatalogLoadSection, options?: { force?: boolean }) {
+  const json = await fetchJsonDeduped<{
+    ok?: boolean;
+    data?: { catalog?: unknown };
+    message?: string;
+    error?: string;
+  }>(`${ADMIN_CATALOG_SECTION_URL}/${section}`, { force: options?.force });
+
+  if (json?.ok === false) throw new Error(json.message || json.error || "دریافت اطلاعات فروشگاه ممکن نشد.");
+  return toProductsCache(json?.data?.catalog);
+}
+
+function markCatalogSectionsLoaded(current: LoadedAdminCatalogSections, sections: AdminCatalogSection[]) {
+  const next = { ...current };
+  for (const section of sections) next[section] = true;
+  return next;
 }
 
 function normalizeAdminCatalog(catalog: ProductsCache, includeProducts: boolean): AdminCatalogSnapshot {
@@ -199,6 +259,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [loading, setLoading] = useState(true);
   const [structureLoaded, setStructureLoaded] = useState(false);
   const [productsLoaded, setProductsLoaded] = useState(false);
+  const [loadedSections, setLoadedSections] = useState<LoadedAdminCatalogSections>(initialLoadedSections);
+  const [productFormReferencesLoaded, setProductFormReferencesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
@@ -213,6 +275,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [categoryGroupLinkIds, setCategoryGroupLinkIds] = useState<string[]>([]);
   const [brandGroupLinkIds, setBrandGroupLinkIds] = useState<string[]>([]);
   const { readFileAsDataUrl, readFilesAsDataUrls } = useFileDataUrl();
+  const activeSectionReady = loadedSections[activeSection];
 
   const hasRequiredError = (key: string) => requiredErrors.includes(key);
 
@@ -222,12 +285,102 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     window.setTimeout(() => scrollToFirstInvalidField(document), 0);
   };
 
+  const applyCatalogSectionSnapshot = (section: AdminCatalogLoadSection, catalog: ProductsCache) => {
+    const hasProducts = catalog.products.length > 0;
+    const snapshot = normalizeAdminCatalog(catalog, hasProducts || section === "products" || section === "showcases" || section === "all");
+
+    if (section === "products") {
+      setProducts(snapshot.products);
+      setProductsLoaded(true);
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["products"]));
+      return;
+    }
+
+    if (section === "banners") {
+      setBanners(snapshot.banners);
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["banners"]));
+      return;
+    }
+
+    if (section === "showcases") {
+      setShowcases(snapshot.showcases);
+      if (hasProducts) {
+        setProducts(snapshot.products);
+        setProductsLoaded(true);
+      }
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, hasProducts ? ["showcases", "products"] : ["showcases"]));
+      return;
+    }
+
+    if (section === "categories") {
+      setCategoryGroups(snapshot.categoryGroups);
+      setCategories(snapshot.categories);
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["categories"]));
+      return;
+    }
+
+    if (section === "brands") {
+      setBrandGroups(snapshot.brandGroups);
+      setBrands(snapshot.brands);
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["brands"]));
+      return;
+    }
+
+    if (section === "product-form") {
+      setShowcases(snapshot.showcases);
+      setCategoryGroups(snapshot.categoryGroups);
+      setCategories(snapshot.categories);
+      setBrandGroups(snapshot.brandGroups);
+      setBrands(snapshot.brands);
+      setProductFormReferencesLoaded(true);
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["categories", "brands"]));
+      return;
+    }
+
+    if (section === "storefront") {
+      setShowcases(snapshot.showcases);
+      setCategoryGroups(snapshot.categoryGroups);
+      setCategories(snapshot.categories);
+      setBrandGroups(snapshot.brandGroups);
+      setBrands(snapshot.brands);
+      setBanners(snapshot.banners);
+      setStructureLoaded(true);
+      setProductFormReferencesLoaded(true);
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["banners", "categories", "brands", "storefront"]));
+      return;
+    }
+
+    setProducts(snapshot.products);
+    setShowcases(snapshot.showcases);
+    setCategoryGroups(snapshot.categoryGroups);
+    setCategories(snapshot.categories);
+    setBrandGroups(snapshot.brandGroups);
+    setBrands(snapshot.brands);
+    setBanners(snapshot.banners);
+    setProductsLoaded(true);
+    setStructureLoaded(true);
+    setProductFormReferencesLoaded(true);
+    setLoadedSections(() => markCatalogSectionsLoaded(initialLoadedSections, ADMIN_CATALOG_SECTIONS));
+  };
+
+  const ensureProductFormReferences = async () => {
+    if (productFormReferencesLoaded) return null;
+
+    try {
+      const catalog = await getAdminCatalogSection("product-form");
+      const snapshot = normalizeAdminCatalog(catalog, false);
+      applyCatalogSectionSnapshot("product-form", catalog);
+      return snapshot;
+    } catch {
+      setStatus("دریافت اطلاعات فرم محصول ممکن نشد.");
+      return null;
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
-    const needsProducts = activeSection === "products" || activeSection === "showcases";
-    const hasEverythingNeeded = structureLoaded && (!needsProducts || productsLoaded);
 
-    if (hasEverythingNeeded) {
+    if (activeSectionReady) {
       setLoading(false);
       return () => {
         cancelled = true;
@@ -239,51 +392,15 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       setLoading(true);
 
       try {
-        let catalog: ProductsCache;
-
-        if (needsProducts) {
-          const [structure, productPage] = await Promise.all([
-            structureLoaded ? Promise.resolve(null) : getCatalogStructure({ all: true }),
-            getProductPage({ limit: 500 }, { all: true, full: true }),
-          ]);
-          catalog = {
-            ...(structure ?? {
-              products: [],
-              showcases,
-              categories,
-              categoryGroups,
-              brands,
-              brandGroups,
-              banners,
-              tree: { sections: [] },
-              catalog: { placement: 0, showcases: [], categoryGroups: [], categories: [], brandGroups: [], brands: [], banners: [] },
-            }),
-            products: productPage.products,
-          } as ProductsCache;
-        } else {
-          catalog = await getCatalogStructure({ all: true });
-        }
+        let catalog = await getAdminCatalogSection(activeSection);
 
         if (!hasCatalogData(catalog)) {
           await new Promise((resolve) => window.setTimeout(resolve, 250));
-          catalog = needsProducts
-            ? await getProducts({ all: true, full: true, force: true })
-            : await getCatalogStructure({ all: true, force: true });
+          catalog = await getAdminCatalogSection(activeSection, { force: true });
         }
         if (cancelled) return;
 
-        const snapshot = normalizeAdminCatalog(catalog, needsProducts);
-        if (needsProducts) {
-          setProducts(snapshot.products);
-          setProductsLoaded(true);
-        }
-        setShowcases(snapshot.showcases);
-        setCategoryGroups(snapshot.categoryGroups);
-        setCategories(snapshot.categories);
-        setBrandGroups(snapshot.brandGroups);
-        setBrands(snapshot.brands);
-        setBanners(snapshot.banners);
-        setStructureLoaded(true);
+        applyCatalogSectionSnapshot(activeSection, catalog);
         await waitForMinimumLoading(startedAt);
       } catch {
         if (cancelled) return;
@@ -299,7 +416,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     return () => {
       cancelled = true;
     };
-  }, [activeSection, banners, brandGroups, brands, categories, categoryGroups, productsLoaded, showcases, structureLoaded]);
+  }, [activeSection, activeSectionReady]);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.sortOrder - b.sortOrder), [products]);
   const sortedShowcases = useMemo(() => ensureShowcases(products, showcases), [products, showcases]);
@@ -406,23 +523,70 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       let brandsToPersist = nextBrands;
       let brandGroupsToPersist = nextBrandGroups;
       let bannersToPersist = nextBanners;
+      let hasLoadedProducts = productsLoaded;
+      let hasLoadedStructure = structureLoaded;
       let preserveExistingProducts = false;
 
-      if (!productsLoaded) {
+      if (!hasLoadedStructure) {
+        const catalog = await getAdminCatalogSection("all", { force: true });
+        if (hasCatalogData(catalog)) {
+          const snapshot = normalizeAdminCatalog(catalog, true);
+          if (!loadedSections.products) productsToPersist = snapshot.products;
+          if (!loadedSections.showcases) showcasesToPersist = snapshot.showcases;
+          if (!loadedSections.categories) {
+            categoriesToPersist = snapshot.categories;
+            categoryGroupsToPersist = snapshot.categoryGroups;
+          }
+          if (!loadedSections.brands) {
+            brandsToPersist = snapshot.brands;
+            brandGroupsToPersist = snapshot.brandGroups;
+          }
+          if (!loadedSections.banners) bannersToPersist = snapshot.banners;
+
+          if (!loadedSections.products) setProducts(snapshot.products);
+          if (!loadedSections.showcases) setShowcases(snapshot.showcases);
+          if (!loadedSections.categories) {
+            setCategories(snapshot.categories);
+            setCategoryGroups(snapshot.categoryGroups);
+          }
+          if (!loadedSections.brands) {
+            setBrands(snapshot.brands);
+            setBrandGroups(snapshot.brandGroups);
+          }
+          if (!loadedSections.banners) setBanners(snapshot.banners);
+          setProductsLoaded(true);
+          setStructureLoaded(true);
+          setProductFormReferencesLoaded(true);
+          setLoadedSections(() => markCatalogSectionsLoaded(initialLoadedSections, ADMIN_CATALOG_SECTIONS));
+          hasLoadedProducts = true;
+          hasLoadedStructure = true;
+        }
+      }
+
+      if (!hasLoadedProducts) {
         const catalog = await getProducts({ all: true, full: true, force: true });
         if (hasCatalogData(catalog)) {
           const snapshot = normalizeAdminCatalog(catalog, true);
           productsToPersist = snapshot.products;
-          if (!structureLoaded) {
+          if (!hasLoadedStructure) {
             showcasesToPersist = snapshot.showcases;
             categoriesToPersist = snapshot.categories;
             categoryGroupsToPersist = snapshot.categoryGroups;
             brandsToPersist = snapshot.brands;
             brandGroupsToPersist = snapshot.brandGroups;
             bannersToPersist = snapshot.banners;
+            setShowcases(snapshot.showcases);
+            setCategories(snapshot.categories);
+            setCategoryGroups(snapshot.categoryGroups);
+            setBrands(snapshot.brands);
+            setBrandGroups(snapshot.brandGroups);
+            setBanners(snapshot.banners);
+            setStructureLoaded(true);
+            setProductFormReferencesLoaded(true);
           }
           setProducts(snapshot.products);
           setProductsLoaded(true);
+          setLoadedSections(() => markCatalogSectionsLoaded(initialLoadedSections, hasLoadedStructure ? ["products"] : ADMIN_CATALOG_SECTIONS));
         } else {
           preserveExistingProducts = true;
         }
@@ -560,7 +724,10 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           setBanners(savedBanners);
           setProductsLoaded(true);
           setStructureLoaded(true);
+          setProductFormReferencesLoaded(true);
+          setLoadedSections(() => markCatalogSectionsLoaded(initialLoadedSections, ADMIN_CATALOG_SECTIONS));
           clearProductsCache();
+          invalidateFetchCache(ADMIN_CATALOG_SECTION_URL);
           if (showSavedStatus) setStatus("Catalog saved to database.");
           return true;
         }
@@ -651,23 +818,30 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openCreateModal = () => {
-    const firstCategory = sortedCategories[0]?.id ?? "general";
-    setRequiredErrors([]);
-    setDraftProduct({
-      ...createProduct(),
-      showcaseId: "",
-      showcaseIds: [],
-      categoryId: firstCategory,
-      categoryIds: [firstCategory],
-      sortOrder: products.length + 1,
-    });
-    setIsCreateOpen(true);
+    void (async () => {
+      const references = await ensureProductFormReferences();
+      const referenceCategories = references?.categories ?? sortedCategories;
+      const firstCategory = referenceCategories[0]?.id ?? "general";
+      setRequiredErrors([]);
+      setDraftProduct({
+        ...createProduct(),
+        showcaseId: "",
+        showcaseIds: [],
+        categoryId: firstCategory,
+        categoryIds: [firstCategory],
+        sortOrder: products.length + 1,
+      });
+      setIsCreateOpen(true);
+    })();
   };
 
   const openShowcaseModal = () => {
-    setRequiredErrors([]);
-    setDraftShowcase({ ...createShowcase(), sortOrder: nextDisplayOrder });
-    setIsShowcaseOpen(true);
+    void (async () => {
+      await ensureProductFormReferences();
+      setRequiredErrors([]);
+      setDraftShowcase({ ...createShowcase(), sortOrder: nextDisplayOrder });
+      setIsShowcaseOpen(true);
+    })();
   };
 
   const openCategoryModal = (groupId?: string) => {
@@ -718,9 +892,12 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openEditShowcaseModal = (showcase: ShowcaseForm) => {
-    setRequiredErrors([]);
-    setEditingShowcase(showcase);
-    setIsEditShowcaseOpen(true);
+    void (async () => {
+      await ensureProductFormReferences();
+      setRequiredErrors([]);
+      setEditingShowcase(showcase);
+      setIsEditShowcaseOpen(true);
+    })();
   };
 
   const openEditCategoryModal = (category: CategoryForm) => {
@@ -743,10 +920,14 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openEditModal = (product: ProductForm) => {
-    const selectedBrand = sortedBrands.find((brand) => product.brand === brand.id || product.brand === brand.title);
-    setRequiredErrors([]);
-    setEditingProduct(product.brand ? { ...product, brand: selectedBrand?.id ?? "" } : product);
-    setIsEditOpen(true);
+    void (async () => {
+      const references = await ensureProductFormReferences();
+      const referenceBrands = references?.brands ?? sortedBrands;
+      const selectedBrand = referenceBrands.find((brand) => product.brand === brand.id || product.brand === brand.title);
+      setRequiredErrors([]);
+      setEditingProduct(product.brand ? { ...product, brand: selectedBrand?.id ?? "" } : product);
+      setIsEditOpen(true);
+    })();
   };
 
   const updateDraftProduct = (patch: Partial<ProductForm>) => setDraftProduct((current) => updateProductPatch(current, patch));
@@ -1259,6 +1440,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     sortedBanners,
     displaySections,
     loading,
+    sectionReady: activeSectionReady,
     saving,
     status,
     draftProduct,

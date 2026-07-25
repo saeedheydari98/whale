@@ -47,7 +47,7 @@ export function AppGlobalProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
 
-    void fetchAppGlobal().then((next) => {
+    void fetchAppGlobal({ force: Boolean(cached) }).then((next) => {
       if (cancelled) return;
       setData(next);
       setLoading(false);

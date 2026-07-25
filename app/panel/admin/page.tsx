@@ -32,50 +32,58 @@ export default function AdminPanelPage() {
   const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
   const [hasAdminAccess, setHasAdminAccess] = useState<boolean | null>(null);
   const [authUser, setAuthUser] = useState<AdminPanelUser | null>(null);
-  const [activeTab, setActiveTab] = useState<"theme" | "security" | "orders" | AdminCatalogSection>("products");
+  const [activeTab, setActiveTab] = useState<"theme" | "security" | "orders" | AdminCatalogSection>("theme");
 
   useEffect(() => {
     if (!globalData) return;
     setAuthUser(globalData.user);
-    setHasAdminAccess(hasAdminRole(globalData.user));
   }, [globalData]);
 
   useEffect(() => {
-    const syncAccessFromApi = async (force = false) => {
-      const nextGlobal = await refreshGlobal({ force });
-      const user = nextGlobal.user ?? await fetchCurrentUser({ force });
+    let cancelled = false;
+
+    const syncAccessFromApi = async () => {
+      setHasAdminAccess(null);
+      await refreshGlobal({ force: true });
+      const user = await fetchCurrentUser({ force: true, allowStaleOnError: false });
+      if (cancelled) return;
       const access = hasAdminRole(user);
       setAuthUser(user);
       setHasAdminAccess(access);
     };
 
-    if (!globalData) {
-      void syncAccessFromApi()
-        .catch((error) => {
-          console.error("Admin access profile load error:", error);
-          setHasAdminAccess((current) => current ?? false);
-        });
-    }
+    void syncAccessFromApi()
+      .catch((error) => {
+        if (cancelled) return;
+        console.error("Admin access profile load error:", error);
+        setAuthUser(null);
+        setHasAdminAccess(false);
+      });
 
     const unsubscribeAdminAccess = subscribeAdminAccess(() => {
-      void syncAccessFromApi(true).catch((error) => {
+      void syncAccessFromApi().catch((error) => {
+        if (cancelled) return;
         console.error("Admin access profile refresh error:", error);
-        setHasAdminAccess((current) => current ?? false);
+        setAuthUser(null);
+        setHasAdminAccess(false);
       });
     });
     const unsubscribeAuthUser = subscribeAuthUser(() => {
-      void syncAccessFromApi(true)
+      void syncAccessFromApi()
       .catch((error) => {
+        if (cancelled) return;
         console.error("Admin access profile refresh error:", error);
-        setHasAdminAccess((current) => current ?? false);
+        setAuthUser(null);
+        setHasAdminAccess(false);
       });
     });
 
     return () => {
+      cancelled = true;
       unsubscribeAdminAccess();
       unsubscribeAuthUser();
     };
-  }, [globalData, refreshGlobal]);
+  }, [refreshGlobal]);
 
   useEffect(() => {
     if (authUser?.role !== "superadmin" && activeTab === "security") {

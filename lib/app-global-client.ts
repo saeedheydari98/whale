@@ -9,6 +9,7 @@ import { getCartCount, readLocalCart } from "@/lib/cart-client";
 export const APP_GLOBAL_UPDATED_EVENT = "app-global-updated";
 
 const APP_GLOBAL_CACHE_KEY = "app-global:v1";
+const APP_GLOBAL_CACHE_MS = 30_000;
 
 type AppMenuItem = {
   href: string;
@@ -60,7 +61,7 @@ function emitGlobalUpdated() {
 }
 
 function isFresh(cached: CachedGlobalData | null) {
-  return Boolean(cached);
+  return Boolean(cached && Date.now() - cached.at < APP_GLOBAL_CACHE_MS);
 }
 
 function readAnyCachedGlobalData() {
@@ -116,7 +117,7 @@ function writeGlobalCache(data: AppGlobalData) {
   }
 }
 
-export function readCachedAppGlobal() {
+export function readCachedAppGlobal(options?: { allowStale?: boolean }) {
   if (isFresh(memoryCache)) return memoryCache?.data ?? fallbackGlobalData;
   const cached = readLocalGlobalCache();
   if (isFresh(cached)) {
@@ -124,6 +125,7 @@ export function readCachedAppGlobal() {
     setCachedAuthUser(cached?.data.user ?? null, { emit: false });
     return cached?.data ?? fallbackGlobalData;
   }
+  if (options?.allowStale) return cached?.data ?? memoryCache?.data ?? null;
   return null;
 }
 
@@ -137,7 +139,7 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
     if (pendingGlobal) return pendingGlobal;
   }
 
-  pendingGlobal = fetch("/api/app/global", { cache: "no-store" })
+  pendingGlobal = fetch("/api/app/global", { cache: "no-store", credentials: "same-origin" })
     .then(async (res) => {
       const payload = await res.json();
       if (!res.ok || payload?.ok === false) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Loading from "@/app/design-system/components/loading/loading";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { addProductToCart } from "@/lib/cart-client";
 import { normalizeColorStock, type ProductRecord } from "@/lib/products-client";
@@ -18,6 +19,7 @@ type ProductListingPageProps = {
   title: string;
   emptyText: string;
   loading: boolean;
+  initialPageLoading?: boolean;
   headerLoading?: boolean;
   products: ProductRecord[];
   totalProducts?: number;
@@ -38,6 +40,7 @@ export function ProductListingPage({
   title,
   emptyText,
   loading,
+  initialPageLoading = false,
   headerLoading,
   products,
   totalProducts,
@@ -81,6 +84,10 @@ export function ProductListingPage({
     }
     window.setTimeout(() => setCartMessage(""), 1800);
   };
+
+  if (initialPageLoading) {
+    return <Loading loading="page" size="xl" />;
+  }
 
   return (
     <main className="min-h-screen bg-primary-base text-primary-text">

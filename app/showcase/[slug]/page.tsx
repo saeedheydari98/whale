@@ -3,6 +3,7 @@
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
+import Loading from "@/app/design-system/components/loading/loading";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import {
   EMPTY_PRODUCT_FILTERS,
@@ -59,6 +60,7 @@ export default function ShowcasePage() {
     }),
     enabled: Boolean(showcaseId),
     initialPageParam: 1,
+    placeholderData: (previous) => previous,
     getNextPageParam: (lastPage) => {
       const pagination = lastPage.pagination;
       return pagination.page < pagination.totalPages ? pagination.page + 1 : undefined;
@@ -74,6 +76,7 @@ export default function ShowcasePage() {
   const lastPage = pages[pages.length - 1];
   const showcase = firstPage?.section ?? structureShowcase;
   const loading = showcaseProductsQuery.isLoading && !showcaseProductsQuery.data;
+  const initialPageLoading = structureQuery.isLoading && !showcase && !showcaseProductsQuery.data;
   const headerLoading = (structureQuery.isLoading && !showcase) || loading;
   const showcaseProductCount = Number(showcase?.productCount);
   const totalProducts = lastPage?.pagination.total
@@ -114,6 +117,10 @@ export default function ShowcasePage() {
     }
     window.setTimeout(() => setCartMessage(""), 1800);
   };
+
+  if (initialPageLoading) {
+    return <Loading loading="page" size="xl" />;
+  }
 
   return (
     <main className="min-h-screen bg-primary-base text-primary-text">

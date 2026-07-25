@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 import { PiStarFourFill } from "react-icons/pi";
 
 interface ToggleProps {
@@ -17,19 +17,32 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
     }
   }, [checked]);
 
-  useEffect(() => {
-  }, [dark]);
-
   const handleToggle = () => {
     const newValue = !dark;
     setDark(newValue);
     onChange?.(newValue);
   };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    handleToggle();
+  };
+
   return (
-    <div className="w-15 h-8.5 relative cursor-pointer" onClick={handleToggle}>
+    <div
+      role="switch"
+      aria-checked={dark}
+      aria-label="تغییر حالت روز و شب"
+      tabIndex={0}
+      className="relative h-8.5 w-15 cursor-pointer select-none outline-none [-webkit-tap-highlight-color:transparent] focus:outline-none focus-visible:outline-none"
+      onClick={handleToggle}
+      onKeyDown={handleKeyDown}
+      onMouseDown={(event) => event.preventDefault()}
+    >
       <div
         className={`
-          w-full h-full rounded-full relative overflow-hidden 
+          relative h-full w-full overflow-hidden rounded-full
           transition-all duration-700 ease-out
           ${dark 
             ? "bg-linear-to-b from-[#0b1020] to-[#0f172a]" 

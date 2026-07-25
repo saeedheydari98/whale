@@ -16,6 +16,7 @@ type CategoriesSectionProps = {
   onEditCategory: (category: CategoryForm) => void;
   onPreview: (imageUrl?: string) => void;
   onReorderCategories: (sourceId: string, targetId: string) => void;
+  isLoading?: boolean;
 };
 
 export function CategoriesSection({
@@ -113,6 +114,7 @@ type BrandsSectionProps = {
   onEditBrand: (brand: BrandForm) => void;
   onPreview: (imageUrl?: string) => void;
   onReorderBrands: (sourceId: string, targetId: string) => void;
+  isLoading?: boolean;
 };
 
 export function BrandsSection({

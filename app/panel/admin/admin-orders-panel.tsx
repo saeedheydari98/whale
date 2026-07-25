@@ -199,6 +199,9 @@ export function AdminOrdersPanel() {
   }, [dateFrom, dateTo, orders, searchQuery]);
 
   const hasFilters = Boolean(searchQuery.trim() || dateFrom || dateTo);
+  const loadingCardCount = loading
+    ? Math.min(6, Math.max(3, orderCards.length))
+    : 0;
 
   const loadOrders = async (options?: { force?: boolean }) => {
     setLoading(true);
@@ -334,11 +337,11 @@ export function AdminOrdersPanel() {
         </div>
       ) : null}
 
-      {loading ? (
+      {loadingCardCount > 0 ? (
         <div className="flex flex-wrap gap-3">
-          {[0, 1, 2].map((item) => (
-            <Loading key={item} loading="skeleton-card" isLoading className="h-48 w-full max-w-sm">
-              <div className="h-48 w-full max-w-sm rounded-lg border border-primary-border bg-primary-card" />
+          {Array.from({ length: loadingCardCount }, (_, item) => (
+            <Loading key={item} loading="skeleton-card" isLoading className="h-32 w-full max-w-80">
+              <div className="h-32 w-full max-w-80 rounded-lg border border-primary-border bg-primary-card" />
             </Loading>
           ))}
         </div>
@@ -357,32 +360,33 @@ export function AdminOrdersPanel() {
             const cardKey = `${order.id}-${item.id}`;
 
             return (
-              <div key={cardKey} className="flex w-full max-w-sm flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3 shadow-sm">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+              <div key={cardKey} className="flex w-full max-w-80 flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-2.5 shadow-sm">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
                     ) : (
-                      <span className="text-xs text-secondary-text">بدون تصویر</span>
+                      <span className="text-[10px] text-secondary-text">بدون تصویر</span>
                     )}
                   </div>
-                  <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <div className="line-clamp-1 text-sm font-bold text-primary-text">{item.title}</div>
-                    <span className="text-xs text-secondary-text">تعداد: {item.quantity}</span>
-                    {item.selectedColor ? <span className="text-xs text-secondary-text">رنگ: {item.selectedColor}</span> : null}
-                    <span className="text-sm font-bold text-primary">{item.discountPrice || item.price || "بدون قیمت"}</span>
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-secondary-text">
+                      <span>تعداد: {item.quantity}</span>
+                      {item.selectedColor ? <span>رنگ: {item.selectedColor}</span> : null}
+                    </div>
+                    <span className="text-xs font-bold text-primary">{item.discountPrice || item.price || "بدون قیمت"}</span>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1 rounded-md border border-primary-border bg-primary-base p-2 text-xs text-primary-text">
-                  <span className="font-bold">اطلاعات کاربر</span>
-                  <span>{customerName(order)}</span>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-secondary-text">
+                  <span className="max-w-full truncate font-semibold text-primary-text">{customerName(order)}</span>
                   <span>{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
-                  {order.profile?.address ? <span className="line-clamp-2">{order.profile.address}</span> : null}
-                  <span>تاریخ خرید: {formatDate(order.createdAt)}</span>
+                  <span>{formatDate(order.createdAt)}</span>
                 </div>
+                {order.profile?.address ? <span className="line-clamp-1 text-xs text-secondary-text">{order.profile.address}</span> : null}
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${
                     posted
                       ? "border-success-border bg-success-bg text-success-text"
@@ -393,7 +397,7 @@ export function AdminOrdersPanel() {
                   </span>
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+                <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
                   <CustomInput
                     value={trackingDrafts[order.id] ?? ""}
                     onChange={(event) => setTrackingDrafts((current) => ({ ...current, [order.id]: event.target.value }))}
@@ -403,7 +407,7 @@ export function AdminOrdersPanel() {
                     size="sm"
                     rounded="md"
                   />
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     <CustomButton
                       size="sm"
                       variant="success"

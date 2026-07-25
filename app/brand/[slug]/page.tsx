@@ -42,6 +42,7 @@ export default function BrandProductsPage() {
     }),
     enabled: Boolean(slug),
     initialPageParam: 1,
+    placeholderData: (previous) => previous,
     getNextPageParam: (lastPage) => {
       const pagination = lastPage.pagination;
       return pagination.page < pagination.totalPages ? pagination.page + 1 : undefined;
@@ -58,6 +59,7 @@ export default function BrandProductsPage() {
   const brand = structureQuery.data?.page.brands[0] ?? firstPage?.section;
   const brandProductCount = Number(brand?.productCount);
   const productLoading = brandProductsQuery.isLoading && !brandProductsQuery.data;
+  const initialPageLoading = structureQuery.isLoading && !brand && !brandProductsQuery.data;
 
   const loadMore = useCallback(() => {
     if (!brandProductsQuery.hasNextPage || brandProductsQuery.isFetchingNextPage) return;
@@ -69,6 +71,7 @@ export default function BrandProductsPage() {
       title={brand?.title || slug}
       emptyText="محصولی برای این برند پیدا نشد."
       loading={productLoading}
+      initialPageLoading={initialPageLoading}
       headerLoading={structureQuery.isLoading && !brand}
       products={brandProducts}
       totalProducts={lastPage?.pagination.total ?? firstPage?.pagination.total ?? (!normalizedSearchQuery && !filtersActive && Number.isFinite(brandProductCount) ? brandProductCount : undefined)}

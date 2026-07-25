@@ -733,9 +733,6 @@ function buildCatalogTree(
       .map(toClientBrand)
       .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
     banners: allBannerSections,
-    children: [...bannerSections, ...showcaseSections].sort(
-      (a, b) => Number(a.placement ?? 0) - Number(b.placement ?? 0)
-    ),
   };
 }
 
@@ -869,7 +866,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
 
   if (!hasProductModel) {
-    return NextResponse.json({ ok: true, data: { type: "root", placement: 0, children: [] } });
+    return NextResponse.json({ ok: true, data: { type: "root", placement: 0 } });
   }
 
   try {
@@ -893,7 +890,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Products GET error:", error);
     return NextResponse.json(
-      { ok: false, error: catalogErrorMessage(error), data: { type: "root", placement: 0, children: [] } },
+      { ok: false, error: catalogErrorMessage(error), data: { type: "root", placement: 0 } },
       { status: 500 }
     );
   }

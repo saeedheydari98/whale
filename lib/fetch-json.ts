@@ -15,18 +15,20 @@ export async function fetchJsonDeduped<T>(
   options?: { force?: boolean }
 ): Promise<T> {
   const force = options?.force ?? false;
+  const pending = inflight.get(url);
+  if (pending) return pending as Promise<T>;
 
   if (!force) {
     const cached = cache.get(url);
     if (cached) return cached.data as T;
-
-    const pending = inflight.get(url);
-    if (pending) return pending as Promise<T>;
   } else {
     cache.delete(url);
   }
 
-  const task = fetch(url, force ? { cache: "no-store" } : undefined)
+  const task = fetch(url, {
+    ...(force ? { cache: "no-store" as const } : {}),
+    credentials: "same-origin",
+  })
     .then(async (res) => ({
       ok: res.ok,
       data: await res.json() as T,

@@ -1,5 +1,6 @@
 "use client";
 
+import Loading from "@/app/design-system/components/loading/loading";
 import { AdminBannerList } from "./admin-banner-list";
 import { AdminShowcaseList } from "./admin-showcase-list";
 import { SECTION_COUNT_LABELS, SECTION_TITLES } from "../constants";
@@ -23,18 +24,23 @@ type AdminProductsPanelContentProps = {
 
 export function AdminProductsPanelContent({ section, panel }: AdminProductsPanelContentProps) {
   const sectionCount = getSectionCount(section, panel);
+  const sectionLoading = panel.loading && !panel.sectionReady;
 
   return (
     <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-base font-bold text-primary-text">{SECTION_TITLES[section]}</div>
         <div className="hidden text-base font-bold text-primary-text">{SECTION_TITLES[section]}</div>
-        <span className="text-xs font-semibold text-primary-text">
-          {sectionCount} {SECTION_COUNT_LABELS[section]}
-        </span>
+        <Loading loading="skeleton-item" isLoading={panel.loading}>
+          <span className="text-xs font-semibold text-primary-text">
+            {sectionCount} {SECTION_COUNT_LABELS[section]}
+          </span>
+        </Loading>
       </div>
 
-      {section === "products" ? (
+      {sectionLoading ? <AdminCatalogSectionSkeleton section={section} panel={panel} /> : null}
+
+      {!sectionLoading && section === "products" ? (
         <ProductsSection
           products={panel.sortedProducts}
           brands={panel.sortedBrands}
@@ -47,7 +53,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         />
       ) : null}
 
-      {section === "banners" ? (
+      {!sectionLoading && section === "banners" ? (
         <div className="flex flex-col gap-5">
           {panel.sortedBanners.map((banner) => (
             <AdminBannerList key={`banner-${banner.id}`} banner={banner} onEdit={panel.openEditBannerModal} onPreview={panel.openImagePreview} isLoading={panel.loading} />
@@ -55,7 +61,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         </div>
       ) : null}
 
-      {section === "showcases" ? (
+      {!sectionLoading && section === "showcases" ? (
         <div className="flex flex-col gap-5">
           {panel.sortedShowcases.map((showcase) => (
             <AdminShowcaseList
@@ -75,7 +81,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         </div>
       ) : null}
 
-      {section === "categories" ? (
+      {!sectionLoading && section === "categories" ? (
         <CategoriesSection
           groups={panel.sortedCategoryGroups}
           categories={panel.sortedCategories}
@@ -87,10 +93,11 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onEditCategory={panel.openEditCategoryModal}
           onPreview={panel.openImagePreview}
           onReorderCategories={panel.reorderCategories}
+          isLoading={panel.loading}
         />
       ) : null}
 
-      {section === "brands" ? (
+      {!sectionLoading && section === "brands" ? (
         <BrandsSection
           groups={panel.sortedBrandGroups}
           brands={panel.sortedBrands}
@@ -102,10 +109,11 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onEditBrand={panel.openEditBrandModal}
           onPreview={panel.openImagePreview}
           onReorderBrands={panel.reorderBrands}
+          isLoading={panel.loading}
         />
       ) : null}
 
-      {section === "storefront" ? (
+      {!sectionLoading && section === "storefront" ? (
         <StorefrontSection
           displaySections={panel.displaySections}
           tab={panel.storefrontLayoutTab}
@@ -118,17 +126,20 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onUpdateCategoryGroupPlacement={panel.updateCategoryGroupPlacement}
           onUpdateBrandGroupPlacement={panel.updateBrandGroupPlacement}
           onSave={panel.saveStorefrontPlacement}
+          isLoading={panel.loading}
         />
       ) : null}
 
-      <FloatingActions
-        section={section}
-        onCreateProduct={panel.openCreateModal}
-        onCreateShowcase={panel.openShowcaseModal}
-        onCreateCategoryGroup={panel.openCategoryGroupModal}
-        onCreateBrandGroup={panel.openBrandGroupModal}
-        onCreateBanner={panel.openBannerModal}
-      />
+      {!sectionLoading ? (
+        <FloatingActions
+          section={section}
+          onCreateProduct={panel.openCreateModal}
+          onCreateShowcase={panel.openShowcaseModal}
+          onCreateCategoryGroup={panel.openCategoryGroupModal}
+          onCreateBrandGroup={panel.openBrandGroupModal}
+          onCreateBanner={panel.openBannerModal}
+        />
+      ) : null}
 
       <CatalogGroupModals
         categories={panel.sortedCategories}
@@ -282,6 +293,62 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
       <ImagePreviewModal imageUrl={panel.previewImage} onClose={() => panel.setPreviewImage("")} />
     </section>
   );
+}
+
+function AdminCatalogSectionSkeleton({ section, panel }: AdminProductsPanelContentProps) {
+  if (section === "categories" || section === "brands") {
+    const groupCount = Math.max(1, section === "categories" ? panel.sortedCategoryGroups.length : panel.sortedBrandGroups.length);
+    const itemCount = Math.max(3, Math.min(6, section === "categories" ? panel.sortedCategories.length : panel.sortedBrands.length));
+
+    return (
+      <div className="flex flex-col gap-4">
+        {Array.from({ length: groupCount }, (_, groupIndex) => (
+          <Loading key={`${section}-group-skeleton-${groupIndex}`} loading="skeleton-card" isLoading className="min-h-36 w-full">
+            <div className="flex min-h-36 w-full flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="h-5 w-32 rounded-md bg-primary-card">بخش</span>
+                <span className="h-8 w-28 rounded-full bg-primary-card">افزودن</span>
+              </div>
+              <div className="flex gap-3 overflow-hidden">
+                {Array.from({ length: itemCount }, (_, itemIndex) => (
+                  <span key={`${section}-item-skeleton-${itemIndex}`} className="h-20 min-w-44 rounded-lg bg-primary-card">آیتم</span>
+                ))}
+              </div>
+            </div>
+          </Loading>
+        ))}
+      </div>
+    );
+  }
+
+  const count = getSkeletonCount(section, panel);
+  const cardClassName = section === "products"
+    ? "h-16 w-full max-w-64"
+    : section === "banners"
+      ? "h-56 w-full"
+      : section === "storefront"
+        ? "h-20 w-full"
+        : "h-44 w-full";
+
+  return (
+    <div className={section === "products" ? "flex flex-wrap gap-2.5" : "flex flex-col gap-4"}>
+      {Array.from({ length: count }, (_, index) => (
+        <Loading key={`${section}-skeleton-${index}`} loading="skeleton-card" isLoading className={cardClassName}>
+          <div className={`${cardClassName} rounded-lg border border-primary-border bg-primary-card`}>
+            <span>{SECTION_TITLES[section]}</span>
+          </div>
+        </Loading>
+      ))}
+    </div>
+  );
+}
+
+function getSkeletonCount(section: AdminCatalogSection, panel: AdminProductsPanelState) {
+  const count = getSectionCount(section, panel);
+  if (count > 0) return Math.min(8, count);
+  if (section === "banners" || section === "showcases") return 2;
+  if (section === "storefront") return 3;
+  return 4;
 }
 
 function getSectionCount(section: AdminCatalogSection, panel: AdminProductsPanelState) {

@@ -16,7 +16,7 @@ export type AuthClientUser = {
 
 let cachedUser: AuthClientUser | null = null;
 let hasLoadedUser = false;
-let pendingUser: Promise<AuthClientUser | null> | null = null;
+let pendingUserRequest: Promise<any> | null = null;
 
 function authUserCacheKey(user: AuthClientUser | null | undefined) {
   return [
@@ -41,7 +41,7 @@ export function setCachedAuthUser(user: AuthClientUser | null, options?: { emit?
   const nextKey = authUserCacheKey(user);
   cachedUser = user;
   hasLoadedUser = true;
-  pendingUser = null;
+  pendingUserRequest = null;
   if (previousKey !== nextKey) invalidateFetchCache(USER_PROFILE_API_URL);
   if (options?.emit !== false) emitAuthUserUpdated();
 }
@@ -50,27 +50,32 @@ export function clearCachedAuthUser(options?: { emit?: boolean }) {
   setCachedAuthUser(null, options);
 }
 
-export async function fetchCurrentUser(options?: { force?: boolean }) {
-  if (!options?.force && hasLoadedUser) return cachedUser;
-  if (!options?.force && pendingUser) return pendingUser;
+export async function fetchCurrentUser(options?: { force?: boolean; allowStaleOnError?: boolean }) {
+  const force = options?.force ?? false;
+  if (!force && hasLoadedUser) return cachedUser;
 
-  pendingUser = fetchJsonDeduped<any>(USER_PROFILE_API_URL, { force: options?.force })
-    .then((data) => {
-      if (data?.ok === false) {
-        throw new Error(data?.message || data?.error || "Profile load failed.");
-      }
-      const user = data?.data?.user?.role ? data.data.user as AuthClientUser : null;
-      setCachedAuthUser(user, { emit: false });
-      return user;
-    })
-    .catch(() => {
-      return cachedUser;
-    })
-    .finally(() => {
-      pendingUser = null;
-    });
+  if (!pendingUserRequest) {
+    pendingUserRequest = fetchJsonDeduped<any>(USER_PROFILE_API_URL, { force })
+      .finally(() => {
+        pendingUserRequest = null;
+      });
+  }
 
-  return pendingUser;
+  try {
+    const data = await pendingUserRequest;
+    if (data?.ok === false) {
+      throw new Error(data?.message || data?.error || "Profile load failed.");
+    }
+    const user = data?.data?.user?.role ? data.data.user as AuthClientUser : null;
+    setCachedAuthUser(user, { emit: false });
+    return user;
+  } catch {
+    if (options?.allowStaleOnError === false) {
+      setCachedAuthUser(null, { emit: false });
+      return null;
+    }
+    return cachedUser;
+  }
 }
 
 export function hasAdminRole(user: AuthClientUser | null | undefined) {

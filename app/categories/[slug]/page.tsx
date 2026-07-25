@@ -46,6 +46,7 @@ export default function CategoryProductsPage() {
     }),
     enabled: Boolean(slug),
     initialPageParam: 1,
+    placeholderData: (previous) => previous,
     getNextPageParam: (lastPage) => {
       const pagination = lastPage.pagination;
       return pagination.page < pagination.totalPages ? pagination.page + 1 : undefined;
@@ -62,6 +63,7 @@ export default function CategoryProductsPage() {
   const category = structureQuery.data?.page.categories[0] ?? firstPage?.section;
   const categoryProductCount = Number(category?.productCount);
   const productLoading = categoryProductsQuery.isLoading && !categoryProductsQuery.data;
+  const initialPageLoading = structureQuery.isLoading && !category && !categoryProductsQuery.data;
 
   const loadMore = useCallback(() => {
     if (!categoryProductsQuery.hasNextPage || categoryProductsQuery.isFetchingNextPage) return;
@@ -73,6 +75,7 @@ export default function CategoryProductsPage() {
       title={category?.title || "محصولات دسته بندی"}
       emptyText="محصولی برای این دسته بندی پیدا نشد."
       loading={productLoading}
+      initialPageLoading={initialPageLoading}
       headerLoading={structureQuery.isLoading && !category}
       products={categoryProducts}
       totalProducts={lastPage?.pagination.total ?? firstPage?.pagination.total ?? (!normalizedSearchQuery && !filtersActive && Number.isFinite(categoryProductCount) ? categoryProductCount : undefined)}

@@ -19,6 +19,7 @@ type StorefrontSectionProps = {
   onUpdateCategoryGroupPlacement: (groupId: string, sortOrder: number) => void;
   onUpdateBrandGroupPlacement: (groupId: string, sortOrder: number) => void;
   onSave: () => void;
+  isLoading?: boolean;
 };
 
 export function StorefrontSection({
@@ -33,6 +34,7 @@ export function StorefrontSection({
   onUpdateCategoryGroupPlacement,
   onUpdateBrandGroupPlacement,
   onSave,
+  isLoading = false,
 }: StorefrontSectionProps) {
   return (
     <div className="flex flex-col gap-4">
@@ -41,6 +43,7 @@ export function StorefrontSection({
           <button
             key={item.id}
             type="button"
+            disabled={isLoading}
             onClick={() => setTab(item.id)}
             className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors hover:bg-primary-soft ${
               tab === item.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
@@ -58,17 +61,20 @@ export function StorefrontSection({
         return (
           <div
             key={key}
-            draggable
+            draggable={!isLoading}
             onDragStart={(event) => {
+              if (isLoading) return;
               setDraggingKey(key);
               event.dataTransfer.effectAllowed = "move";
               event.dataTransfer.setData("text/plain", key);
             }}
             onDragOver={(event) => {
+              if (isLoading) return;
               event.preventDefault();
               event.dataTransfer.dropEffect = "move";
             }}
             onDrop={(event) => {
+              if (isLoading) return;
               event.preventDefault();
               const sourceKey = event.dataTransfer.getData("text/plain") || draggingKey;
               if (sourceKey) void onReorder(sourceKey, key);
@@ -86,8 +92,10 @@ export function StorefrontSection({
             <CustomInput
               type="number"
               value={entrySortOrder}
+              disabled={isLoading}
               placeholder="ترتیب"
               onChange={(event) => {
+                if (isLoading) return;
                 const sortOrder = Number(event.target.value);
                 if (entry.type === "banner") onUpdateBannerPlacement(entry.item, sortOrder);
                 else if (entry.type === "brandGroup") onUpdateBrandGroupPlacement(entry.item.id, sortOrder);
@@ -99,7 +107,7 @@ export function StorefrontSection({
         );
       })}
 
-      <CustomButton icon={<IoSaveOutline />} onClick={() => void onSave()}>
+      <CustomButton icon={<IoSaveOutline />} disabled={isLoading} onClick={() => void onSave()}>
         ذخیره چیدمان
       </CustomButton>
     </div>

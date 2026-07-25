@@ -320,6 +320,14 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
         );
     }
 
+    const bannerSections = catalogBanners
+      .map((banner, index): BannerSection => ({
+        type: "banner",
+        item: normalizeBanner(banner, index + 1),
+        sortOrder: Number(banner.homeSortOrder ?? banner.sortOrder ?? banner.placement ?? index + 1),
+      }))
+      .filter((section) => section.item.active !== false && section.item.showOnHome !== false);
+
     const showcaseSections = sortedShowcases
       .map((showcase) => ({
           type: "showcase" as const,
@@ -328,7 +336,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           sortOrder: showcase.sortOrder,
         }));
 
-    return showcaseSections.sort((a, b) => a.sortOrder - b.sortOrder);
+    return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [catalogBanners, mode, showcaseProductsById, sortedProducts, sortedShowcases, tree]);
 
   

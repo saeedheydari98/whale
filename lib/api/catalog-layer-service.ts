@@ -448,23 +448,96 @@ function getTtl(searchParams: URLSearchParams, fallback = LIST_TTL_SECONDS) {
   return getIncludeInactive(searchParams) ? ADMIN_TTL_SECONDS : fallback;
 }
 
-const EMPTY_PAGE_STRUCTURE = {
-  products: [],
-  showcases: [],
-  categoryGroups: [],
-  categories: [],
-  brandGroups: [],
-  brands: [],
-  banners: [],
-};
-
 function pageStructure<T extends Record<string, unknown>>(type: string, data: T) {
   return {
     type,
     placement: 0,
-    ...EMPTY_PAGE_STRUCTURE,
     ...data,
   };
+}
+
+function sortBySortOrder<T extends { sortOrder?: number | string | null }>(items: T[]) {
+  return [...items].sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0));
+}
+
+function groupCategoriesForPage(categories: Array<{
+  id: string;
+  groupId?: string | null;
+  title: string;
+  slug: string;
+  imageUrl?: string | null;
+  active: boolean;
+  sortOrder: number;
+  pageSortOrder?: number;
+}>, categoryGroups: Array<{
+  id: string;
+  title: string;
+  active: boolean;
+  sortOrder: number;
+}>) {
+  const clientCategories = sortBySortOrder(categories.map(toClientCategory));
+  const clientGroups = sortBySortOrder(
+    categoryGroups.length > 0
+      ? categoryGroups.map(toClientLinkGroup)
+      : clientCategories.length > 0
+        ? [{ id: "default-categories", title: "دسته بندی ها", active: true, sortOrder: Number(clientCategories[0]?.pageSortOrder ?? 1) }]
+        : []
+  );
+  const groupIds = new Set(clientGroups.map((group) => group.id));
+  const fallbackGroupId = clientGroups[0]?.id ?? "default-categories";
+  const categoriesWithGroups = clientCategories.map((category) => ({
+    ...category,
+    groupId: groupIds.has(String(category.groupId ?? "")) ? category.groupId : fallbackGroupId,
+  }));
+
+  return clientGroups
+    .map((group) => ({
+      type: "categoryGroup" as const,
+      ...group,
+      placement: Number(group.sortOrder ?? 0),
+      items: categoriesWithGroups.filter((category) => (category.groupId || fallbackGroupId) === group.id),
+    }))
+    .filter((group) => group.items.length > 0);
+}
+
+function groupBrandsForPage(brands: Array<{
+  id: string;
+  groupId?: string | null;
+  title: string;
+  slug: string;
+  imageUrl?: string | null;
+  active: boolean;
+  sortOrder: number;
+  homeSortOrder?: number;
+}>, brandGroups: Array<{
+  id: string;
+  title: string;
+  active: boolean;
+  sortOrder: number;
+}>) {
+  const clientBrands = sortBySortOrder(brands.map(toClientBrand));
+  const clientGroups = sortBySortOrder(
+    brandGroups.length > 0
+      ? brandGroups.map(toClientLinkGroup)
+      : clientBrands.length > 0
+        ? [{ id: "default-brands", title: "برندها", active: true, sortOrder: Number(clientBrands[0]?.homeSortOrder ?? 1) }]
+        : []
+  );
+  const groupIds = new Set(clientGroups.map((group) => group.id));
+  const fallbackGroupId = clientGroups[0]?.id ?? "default-brands";
+  const brandsWithGroups = clientBrands.map((brand) => ({
+    ...brand,
+    groupId: groupIds.has(String(brand.groupId ?? "")) ? brand.groupId : fallbackGroupId,
+  }));
+
+  return clientGroups
+    .map((group) => ({
+      type: "brandGroup" as const,
+      ...group,
+      placement: Number(group.sortOrder ?? 0),
+      items: brandsWithGroups.filter((brand) => (brand.groupId || fallbackGroupId) === group.id),
+    }))
+    .filter((group) => group.items.length > 0);
 }
 
 function visibleBanners(banners: BannerRecord[], target: "home" | "categories" | "products" | "showcase", showcaseId = "") {
@@ -544,10 +617,12 @@ export async function getHomePageStructure(searchParams: URLSearchParams) {
       findPageBanners(includeInactive),
     ]);
 
+    const clientBanners = visibleBanners(banners, "home");
+    const brandSections = groupBrandsForPage(brands, brandGroups);
+
     return pageStructure("home", {
-      brands: brands.map(toClientBrand).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
-      brandGroups: brandGroups.map(toClientLinkGroup).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
-      banners: visibleBanners(banners, "home"),
+      brands: brandSections,
+      banners: clientBanners,
     });
   });
 }
@@ -571,10 +646,12 @@ export async function getCategoriesPageStructure(searchParams: URLSearchParams) 
       findPageBanners(includeInactive),
     ]);
 
+    const clientBanners = visibleBanners(banners, "categories");
+    const categorySections = groupCategoriesForPage(categories, categoryGroups);
+
     return pageStructure("categories", {
-      categories: categories.map(toClientCategory).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
-      categoryGroups: categoryGroups.map(toClientLinkGroup).sort((a: any, b: any) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
-      banners: visibleBanners(banners, "categories"),
+      categories: categorySections,
+      banners: clientBanners,
     });
   });
 }
@@ -595,7 +672,6 @@ export async function getProductsPageStructure(searchParams: URLSearchParams) {
     return pageStructure("products", {
       showcases: clientShowcases,
       banners: clientBanners,
-      children: [...clientBanners, ...clientShowcases].sort((a, b) => Number(a.placement ?? 0) - Number(b.placement ?? 0)),
     });
   });
 }
@@ -662,10 +738,6 @@ async function getStructureData(includeInactive: boolean) {
     brandGroups: clientBrandGroups,
     brands: clientBrands,
     banners: clientBanners,
-    children: [
-      ...clientBanners.filter((banner) => banner.showOnHome !== false),
-      ...clientShowcases,
-    ].sort((a, b) => Number(a.placement ?? 0) - Number(b.placement ?? 0)),
   };
 }
 

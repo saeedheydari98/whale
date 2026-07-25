@@ -7,6 +7,7 @@ import { IoClose } from "react-icons/io5";
 import { CustomInput } from "./input";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { APP_GLOBAL_UPDATED_EVENT } from "@/lib/app-global-client";
+import { fetchJsonDeduped } from "@/lib/fetch-json";
 import { productSlug, type ProductRecord } from "@/lib/products-client";
 
 type SearchPayload = {
@@ -93,30 +94,29 @@ export function GlobalSearch() {
       return;
     }
 
-    const controller = new AbortController();
+    let cancelled = false;
     const timer = window.setTimeout(() => {
       setLoading(true);
-      void fetch(`/api/products/search?q=${encodeURIComponent(query)}&limit=8`, {
-        cache: "no-store",
-        signal: controller.signal,
-      })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((payload: SearchPayload | null) => {
+      void fetchJsonDeduped<SearchPayload>(`/api/products/search?q=${encodeURIComponent(query)}&limit=8`)
+        .then((payload) => {
+          if (cancelled) return;
           const items = payload?.data?.products?.items;
           setResults(Array.isArray(items) ? items : []);
           setHasSearched(true);
         })
-        .catch((error) => {
-          if (error instanceof DOMException && error.name === "AbortError") return;
+        .catch(() => {
+          if (cancelled) return;
           setResults([]);
           setHasSearched(true);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
     }, 220);
 
     return () => {
+      cancelled = true;
       window.clearTimeout(timer);
-      controller.abort();
     };
   }, [query]);
 

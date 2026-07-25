@@ -37,7 +37,7 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
   useEffect(() => {
     let cancelled = false;
 
-    void fetchCurrentUser({ force: true })
+    void fetchCurrentUser()
       .then((user) => {
         if (cancelled) return;
         setAuthUser(user);

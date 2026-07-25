@@ -67,7 +67,7 @@ export function AdminSecurityPanel() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetchCurrentUser()
+    void fetchCurrentUser({ allowStaleOnError: false })
       .then((user) => {
         if (cancelled) return;
         const superadmin = user?.username === SUPERADMIN_PHONE && user?.role === "superadmin";

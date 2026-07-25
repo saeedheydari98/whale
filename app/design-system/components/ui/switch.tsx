@@ -52,8 +52,9 @@ export function CustomSwitch({
         aria-pressed={checked}
         disabled={isDisabled}
         onClick={() => onChange(!checked)}
+        onMouseDown={(event) => event.preventDefault()}
         className={cx(
-          "relative h-7 w-12",
+          "relative h-7 w-12 select-none outline-none [-webkit-tap-highlight-color:transparent] focus:outline-none focus-visible:outline-none",
           radiusVariants[rounded],
           borderVariants[border],
           shadowVariants[shadow],

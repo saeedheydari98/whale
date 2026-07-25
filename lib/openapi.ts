@@ -732,12 +732,6 @@ export const openApiDocument = {
           brandGroups: { type: "array", items: ref("LinkGroup") },
           brands: { type: "array", items: ref("Brand") },
           banners: { type: "array", items: ref("Banner") },
-          children: {
-            type: "array",
-            items: {
-              oneOf: [ref("Banner"), ref("Showcase")],
-            },
-          },
         },
       },
       CatalogSyncEvent: {

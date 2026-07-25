@@ -9,7 +9,7 @@ import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppGlobalProvider } from "@/lib/app-global-context";
 import { createTheme } from "./design-system/theme/theme";
 import { generateCSSVariables } from "./design-system/theme/css-vars";
-import { THEME_CSS_VARS_STORAGE_KEY } from "./design-system/theme/storage";
+import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./design-system/theme/storage";
 import { AppNotificationProvider } from "./design-system/components/feedback/notification-provider";
 
 const storeFont = localFont({
@@ -50,7 +50,9 @@ const initialThemeScript = `
         root.style.setProperty(key, String(vars[key]));
       });
     }
-    root.classList.toggle("dark", localStorage.getItem("theme-mode") === "dark");
+    var state = JSON.parse(localStorage.getItem("${THEME_STATE_STORAGE_KEY}") || "{}");
+    var mode = state && state.mode ? state.mode : localStorage.getItem("theme-mode");
+    root.classList.toggle("dark", mode === "dark");
   } catch (error) {}
 })();
 `;
@@ -58,7 +60,7 @@ const initialThemeScript = `
 function InlineThemeScript() {
   return (
     <script
-      type={typeof window === "undefined" ? "text/javascript" : "text/plain"}
+      type="text/javascript"
       suppressHydrationWarning
       dangerouslySetInnerHTML={{ __html: initialThemeScript }}
     />
