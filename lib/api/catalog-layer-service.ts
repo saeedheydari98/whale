@@ -10,6 +10,7 @@ const LIST_TTL_SECONDS = 30;
 const ADMIN_TTL_SECONDS = 10;
 
 type ProductRecord = Prisma.ProductGetPayload<Record<string, never>>;
+type ShowcaseRecord = Prisma.ShowcaseGetPayload<Record<string, never>>;
 
 type BannerRecord = {
   id: string;
@@ -58,6 +59,15 @@ const productSummarySelect = {
 
 type ProductSummaryRecord = Prisma.ProductGetPayload<{ select: typeof productSummarySelect }>;
 
+type ShowcaseMatchRecord = {
+  id: string;
+  mode?: string | null;
+  autoSort?: string | null;
+  limit?: number | null;
+  categoryId?: string | null;
+  manualProductIds?: Prisma.JsonValue | null;
+};
+
 export function slugifyCatalogValue(value: string | number | null | undefined) {
   return String(value ?? "")
     .trim()
@@ -94,6 +104,12 @@ function normalizeStringList(value: unknown, fallback: string[] = []) {
   return Array.isArray(value)
     ? value.map((item) => String(item).trim()).filter(Boolean)
     : fallback;
+}
+
+function normalizeManualProductIds(value: unknown) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : [];
 }
 
 function normalizeColorStock(value: unknown) {
@@ -569,20 +585,12 @@ async function findVisibleProductRelations(includeInactive: boolean): Promise<Pr
 }
 
 function countShowcaseProducts(
-  showcase: {
-    id: string;
-    mode?: string | null;
-    limit?: number | null;
-    categoryId?: string | null;
-    manualProductIds?: Prisma.JsonValue | null;
-  },
+  showcase: ShowcaseMatchRecord,
   products: ProductSummaryRecord[]
 ) {
   const mode = showcase.mode === "auto" ? "auto" : "manual";
-  const manualIds = Array.isArray(showcase.manualProductIds)
-    ? showcase.manualProductIds.map((item) => String(item))
-    : [];
-  const categoryId = String(showcase.categoryId ?? "");
+  const manualIds = normalizeManualProductIds(showcase.manualProductIds);
+  const categoryId = String(showcase.categoryId ?? "").trim();
 
   if (mode === "auto") {
     const limit = Number.isFinite(Number(showcase.limit)) ? Math.max(1, Number(showcase.limit)) : 8;
@@ -595,7 +603,7 @@ function countShowcaseProducts(
     return manualIds.filter((id, index) => manualIds.indexOf(id) === index && productIds.has(id)).length;
   }
 
-  return products.filter((product) => productMatchesShowcase(product, showcase.id)).length;
+  return resolveShowcaseProductCandidates(showcase, showcase.id, products).length;
 }
 
 export async function getHomePageStructure(searchParams: URLSearchParams) {
@@ -659,14 +667,23 @@ export async function getCategoriesPageStructure(searchParams: URLSearchParams) 
 export async function getProductsPageStructure(searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
   return withCatalogCache("page-structure", ["products", includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
-    const [showcases, banners] = await Promise.all([
+    const [showcases, banners, products] = await Promise.all([
       prisma.showcase.findMany({
         where: includeInactive ? undefined : { active: true },
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       }),
       findPageBanners(includeInactive),
+      findVisibleProductRelations(includeInactive),
     ]);
-    const clientShowcases = showcases.map(toClientShowcase);
+    const clientShowcases = (showcases as ShowcaseRecord[])
+      .map((showcase) => ({
+        ...toClientShowcase({
+          ...showcase,
+          productCount: countShowcaseProducts(showcase, products),
+        }),
+        products: resolveShowcaseProductCandidates(showcase, showcase.id, products).map(toProductSummary),
+      }))
+      .filter((showcase) => includeInactive || showcase.products.length > 0);
     const clientBanners = visibleBanners(banners, "products");
 
     return pageStructure("products", {
@@ -857,6 +874,33 @@ function productMatchesShowcase(product: Partial<ProductRecord>, showcaseId: str
   return showcaseIds.includes(showcaseId);
 }
 
+function resolveShowcaseProductCandidates<TProduct extends Partial<ProductRecord>>(
+  showcase: ShowcaseMatchRecord | null,
+  showcaseId: string,
+  products: TProduct[]
+) {
+  const mode = showcase?.mode === "auto" ? "auto" : "manual";
+  const manualIds = normalizeManualProductIds(showcase?.manualProductIds);
+  const categoryId = String(showcase?.categoryId ?? "").trim();
+
+  if (mode === "auto") {
+    const limit = Number.isFinite(Number(showcase?.limit)) ? Math.max(1, Number(showcase?.limit)) : 8;
+    return sortProductsBy(
+      products.filter((product) => !categoryId || productMatchesCategory(product, categoryId)),
+      showcase?.autoSort ?? "newest"
+    ).slice(0, limit) as TProduct[];
+  }
+
+  if (manualIds.length > 0) {
+    const productsById = new Map(products.map((product) => [String(product.id), product]));
+    return manualIds
+      .map((id) => productsById.get(id))
+      .filter((product): product is TProduct => Boolean(product));
+  }
+
+  return products.filter((product) => productMatchesShowcase(product, showcaseId));
+}
+
 export async function getCategoryProducts(identifier: string, searchParams: URLSearchParams) {
   const normalizedIdentifier = decodeCatalogIdentifier(identifier);
 
@@ -911,24 +955,10 @@ export async function getShowcaseProducts(identifier: string, searchParams: URLS
       select: productSummarySelect,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
-    const mode = showcase?.mode === "auto" ? "auto" : "manual";
-    const manualIds = Array.isArray(showcase?.manualProductIds)
-      ? showcase.manualProductIds.map((item: unknown) => String(item))
-      : [];
-    const categoryId = String(showcase?.categoryId ?? "");
-    const limit = Number.isFinite(Number(showcase?.limit)) ? Math.max(1, Number(showcase?.limit)) : 8;
-    const baseProducts = mode === "auto"
-      ? sortProductsBy(
-          products.filter((product: ProductSummaryRecord) => !categoryId || productMatchesCategory(product, categoryId)),
-          showcase?.autoSort ?? "newest"
-        ).slice(0, limit)
-      : manualIds.length > 0
-        ? manualIds
-            .map((id: string) => products.find((product: ProductSummaryRecord) => String(product.id) === id))
-            .filter(Boolean) as typeof products
-        : products.filter((product: ProductSummaryRecord) => productMatchesShowcase(product, showcaseId));
+    const baseProducts = resolveShowcaseProductCandidates(showcase, showcaseId, products);
     const filtered = filterProducts(baseProducts, searchParams);
-    const sorted = sortProductsBy(filtered, String(searchParams.get("sort") ?? "sortOrder"));
+    const explicitSort = searchParams.get("sort");
+    const sorted = explicitSort ? sortProductsBy(filtered, explicitSort) : filtered;
     const clientShowcase = showcase ? toClientShowcase(showcase) : {
       type: "showcase" as const,
       id: showcaseId,

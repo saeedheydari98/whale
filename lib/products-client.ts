@@ -181,6 +181,7 @@ export type CatalogObject = {
 type CatalogApiTree = {
   type?: "root";
   placement?: number | string;
+  showcases?: ShowcaseRecord[];
   categories?: Array<CategoryRecord | GroupedCategoryRecord>;
   categoryGroups?: CatalogLinkGroupRecord[];
   brands?: Array<BrandRecord | GroupedBrandRecord>;
@@ -628,10 +629,20 @@ function readTreePayload(payload: unknown): CatalogObject | null {
   const tree = payload as CatalogApiTree;
   const children = Array.isArray(tree.children) ? tree.children : [];
   const bannerSource = Array.isArray(tree.banners) ? tree.banners : children.filter((item) => item.type === "banner");
-  if (!Array.isArray(tree.children) && !Array.isArray(tree.banners) && !Array.isArray(tree.categories) && !Array.isArray(tree.brands) && !Array.isArray(tree.categoryGroups) && !Array.isArray(tree.brandGroups)) return null;
+  const showcaseSource = Array.isArray(tree.showcases)
+    ? tree.showcases
+    : children.filter((item) => item.type === "showcase");
+  if (
+    !Array.isArray(tree.children)
+    && !Array.isArray(tree.showcases)
+    && !Array.isArray(tree.banners)
+    && !Array.isArray(tree.categories)
+    && !Array.isArray(tree.brands)
+    && !Array.isArray(tree.categoryGroups)
+    && !Array.isArray(tree.brandGroups)
+  ) return null;
 
-  const showcases = children
-    .filter((item) => item.type === "showcase")
+  const showcases = showcaseSource
     .map((showcase, showcaseIndex) => ({
       ...normalizeShowcaseRecord(showcase as ShowcaseRecord, showcaseIndex + 1),
       products: Array.isArray((showcase as ShowcaseRecord).products)

@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  readCachedAuthUser,
   setCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
 import { getCartCount, readLocalCart } from "@/lib/cart-client";
+import { THEME_STATE_STORAGE_KEY } from "@/app/design-system/theme/storage";
 
 export const APP_GLOBAL_UPDATED_EVENT = "app-global-updated";
 
@@ -55,6 +57,42 @@ const fallbackGlobalData: AppGlobalData = {
   theme: { primary: "gray", style: "light" },
 };
 
+function normalizeTheme(
+  theme: Partial<AppGlobalData["theme"]> | null | undefined,
+  fallback: AppGlobalData["theme"] = fallbackGlobalData.theme
+) {
+  return {
+    ...fallback,
+    ...(theme ?? {}),
+  };
+}
+
+function readStoredThemeFallback(): AppGlobalData["theme"] | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(THEME_STATE_STORAGE_KEY) || "null") as {
+      style?: unknown;
+      adminTheme?: {
+        primary?: unknown;
+        style?: unknown;
+      };
+    } | null;
+    if (!parsed || typeof parsed !== "object") return null;
+
+    return normalizeTheme({
+      primary: typeof parsed.adminTheme?.primary === "string" ? parsed.adminTheme.primary : undefined,
+      style: typeof parsed.adminTheme?.style === "string"
+        ? parsed.adminTheme.style
+        : typeof parsed.style === "string"
+          ? parsed.style
+          : undefined,
+    });
+  } catch {
+    return null;
+  }
+}
+
 function emitGlobalUpdated() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(APP_GLOBAL_UPDATED_EVENT));
@@ -65,10 +103,15 @@ function isFresh(cached: CachedGlobalData | null) {
 }
 
 function readAnyCachedGlobalData() {
-  return memoryCache?.data ?? readLocalGlobalCache()?.data ?? null;
+  return (memoryCache?.data ? withCurrentAuthUserFallback(memoryCache.data) : null)
+    ?? readLocalGlobalCache()?.data
+    ?? null;
 }
 
-function normalizeGlobalData(data: Partial<AppGlobalData> | null | undefined): AppGlobalData {
+function normalizeGlobalData(
+  data: Partial<AppGlobalData> | null | undefined,
+  options?: { themeFallback?: AppGlobalData["theme"] }
+): AppGlobalData {
   const user = data?.user ?? null;
   const serverCartCount = Number(data?.cart?.count);
   const localCartCount = getCartCount(readLocalCart(null));
@@ -83,10 +126,7 @@ function normalizeGlobalData(data: Partial<AppGlobalData> | null | undefined): A
     cart: {
       count: user && Number.isFinite(serverCartCount) ? serverCartCount : localCartCount,
     },
-    theme: {
-      ...fallbackGlobalData.theme,
-      ...(data?.theme ?? {}),
-    },
+    theme: normalizeTheme(data?.theme, options?.themeFallback),
   };
 }
 
@@ -96,13 +136,30 @@ function readLocalGlobalCache() {
   try {
     const parsed = JSON.parse(localStorage.getItem(APP_GLOBAL_CACHE_KEY) || "null") as CachedGlobalData | null;
     if (!parsed || typeof parsed !== "object") return null;
+    const currentUser = readCachedAuthUser();
+    const parsedData = parsed.data ?? fallbackGlobalData;
     return {
       at: Number(parsed.at) || 0,
-      data: normalizeGlobalData(parsed.data),
+      data: normalizeGlobalData({
+        ...parsedData,
+        user: parsedData.user ?? currentUser ?? null,
+      }, {
+        themeFallback: readStoredThemeFallback() ?? fallbackGlobalData.theme,
+      }),
     };
   } catch {
     return null;
   }
+}
+
+function withCurrentAuthUserFallback(data: AppGlobalData) {
+  const currentUser = readCachedAuthUser();
+  if (!currentUser || data.user) return data;
+
+  return normalizeGlobalData({
+    ...data,
+    user: currentUser,
+  }, { themeFallback: data.theme });
 }
 
 function writeGlobalCache(data: AppGlobalData) {
@@ -117,15 +174,21 @@ function writeGlobalCache(data: AppGlobalData) {
   }
 }
 
+function syncCachedAuthUserFromLocalGlobal(user: AuthClientUser | null) {
+  if (user || !readCachedAuthUser()) {
+    setCachedAuthUser(user, { emit: false });
+  }
+}
+
 export function readCachedAppGlobal(options?: { allowStale?: boolean }) {
-  if (isFresh(memoryCache)) return memoryCache?.data ?? fallbackGlobalData;
+  if (isFresh(memoryCache)) return memoryCache?.data ? withCurrentAuthUserFallback(memoryCache.data) : fallbackGlobalData;
   const cached = readLocalGlobalCache();
   if (isFresh(cached)) {
     memoryCache = cached;
-    setCachedAuthUser(cached?.data.user ?? null, { emit: false });
+    syncCachedAuthUserFromLocalGlobal(cached?.data.user ?? null);
     return cached?.data ?? fallbackGlobalData;
   }
-  if (options?.allowStale) return cached?.data ?? memoryCache?.data ?? null;
+  if (options?.allowStale) return cached?.data ?? (memoryCache?.data ? withCurrentAuthUserFallback(memoryCache.data) : null);
   return null;
 }
 
@@ -151,8 +214,14 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
       return data;
     })
     .catch(() => {
-      const data = readAnyCachedGlobalData() ?? normalizeGlobalData(fallbackGlobalData);
-      setCachedAuthUser(data.user, { emit: false });
+      const cached = readAnyCachedGlobalData();
+      const currentUser = readCachedAuthUser();
+      const themeFallback = cached?.theme ?? readStoredThemeFallback() ?? fallbackGlobalData.theme;
+      const data = normalizeGlobalData({
+        ...(cached ?? fallbackGlobalData),
+        user: currentUser ?? cached?.user ?? null,
+        theme: themeFallback,
+      }, { themeFallback });
       if (!memoryCache) memoryCache = { at: Date.now(), data };
       return data;
     })

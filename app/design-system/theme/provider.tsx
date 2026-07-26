@@ -15,7 +15,6 @@ import { createTheme, ThemeStyle, ThemeColorKey } from "./theme";
 import {
   APP_GLOBAL_UPDATED_EVENT,
   fetchAppGlobal,
-  readCachedAppGlobal,
 } from "@/lib/app-global-client";
 import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./storage";
 
@@ -108,13 +107,9 @@ function readInitialThemeSnapshot(): ThemeSnapshot {
   }
 
   const stored = readStoredThemeSnapshot();
-  const cachedAdminTheme = normalizeAdminTheme(
-    readCachedAppGlobal({ allowStale: true })?.theme,
-    defaultAdminTheme
-  );
   const storedAdminTheme = stored?.adminTheme
-    ? normalizeAdminTheme(stored.adminTheme, cachedAdminTheme)
-    : cachedAdminTheme;
+    ? normalizeAdminTheme(stored.adminTheme, defaultAdminTheme)
+    : defaultAdminTheme;
   const legacyMode = localStorage.getItem("theme-mode");
   const legacyStyle = localStorage.getItem("theme-style");
   const mode = stored?.mode ?? (isThemeMode(legacyMode) ? legacyMode : "light");
@@ -143,6 +138,24 @@ function persistThemeSnapshot(snapshot: ThemeSnapshot, vars: React.CSSProperties
     localStorage.setItem(THEME_STATE_STORAGE_KEY, JSON.stringify(snapshot));
     localStorage.setItem(THEME_CSS_VARS_STORAGE_KEY, JSON.stringify(vars));
   } catch {
+  }
+}
+
+async function fetchPersistedAdminTheme() {
+  try {
+    const res = await fetch("/api/theme/admin", {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    const payload = await res.json().catch(() => null);
+    if (!res.ok || payload?.ok === false) return null;
+
+    return normalizeAdminTheme(
+      readThemePayload<AdminThemeConfig>(payload, defaultAdminTheme),
+      defaultAdminTheme
+    );
+  } catch {
+    return null;
   }
 }
 
@@ -200,29 +213,59 @@ export function ThemeProvider({
 
   useEffect(() => {
     let cancelled = false;
+    let requestId = 0;
+
+    const applyAdminTheme = (nextAdminTheme: AdminThemeConfig) => {
+      if (cancelled) return;
+      setAdminTheme(nextAdminTheme);
+      setStyle(nextAdminTheme.style);
+    };
+
+    const syncStoredTheme = () => {
+      const stored = readStoredThemeSnapshot();
+      if (!stored?.adminTheme) return;
+
+      applyAdminTheme(normalizeAdminTheme({
+        ...stored.adminTheme,
+        style: stored.style ?? stored.adminTheme.style,
+      }, defaultAdminTheme));
+    };
+
+    const syncPersistedTheme = () => {
+      requestId += 1;
+      const currentRequestId = requestId;
+
+      void fetchPersistedAdminTheme().then((nextAdminTheme) => {
+        if (!nextAdminTheme || cancelled || currentRequestId !== requestId) return;
+        applyAdminTheme(nextAdminTheme);
+      });
+    };
 
     const syncThemes = () => {
-      const globalData = readCachedAppGlobal();
-      if (cancelled) return;
+      syncStoredTheme();
+      syncPersistedTheme();
+    };
 
-      if (globalData) {
-        const nextAdminTheme = normalizeAdminTheme(
-          readThemePayload({ data: { theme: globalData.theme } }, defaultAdminTheme),
-          defaultAdminTheme
-        );
-        setAdminTheme(nextAdminTheme);
-        setStyle(nextAdminTheme.style);
+    const handleStorage = (event: StorageEvent) => {
+      if (
+        event.key
+        && event.key !== THEME_STATE_STORAGE_KEY
+        && event.key !== "theme-style"
+        && event.key !== "theme-mode"
+      ) {
+        return;
       }
+      syncThemes();
     };
 
     syncThemes();
-    window.addEventListener(APP_GLOBAL_UPDATED_EVENT, syncThemes);
-    window.addEventListener("storage", syncThemes);
+    window.addEventListener(APP_GLOBAL_UPDATED_EVENT, syncPersistedTheme);
+    window.addEventListener("storage", handleStorage);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(APP_GLOBAL_UPDATED_EVENT, syncThemes);
-      window.removeEventListener("storage", syncThemes);
+      window.removeEventListener(APP_GLOBAL_UPDATED_EVENT, syncPersistedTheme);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 

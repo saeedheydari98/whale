@@ -719,7 +719,7 @@ function buildCatalogTree(
     type: "root" as const,
     placement: 0,
     products: visibleProducts.map(toClientProduct),
-    showcases: visibleShowcases.map(toClientShowcase),
+    showcases: showcaseSections,
     categoryGroups: fallbackCategoryGroups
       .map(toClientLinkGroup)
       .sort((a, b) => Number(a.sortOrder ?? 0) - Number(b.sortOrder ?? 0)),
@@ -913,18 +913,17 @@ export async function POST(request: Request) {
   const catalogShowcases = treeParts.showcases;
   const catalogBanners = treeParts.banners;
   const bodyProducts = Array.isArray(body.products) ? body.products : [];
-  const products = catalogShowcases.length > 0
-    ? catalogShowcases.flatMap((showcase) =>
-        Array.isArray(showcase.products)
-          ? showcase.products.map((product, productIndex) => ({
-              ...product,
-              showcaseId: String(product.showcaseId ?? showcase.id ?? "").trim(),
-              sortOrder: getPlacement(product, productIndex + 1),
-              placement: getPlacement(product, productIndex + 1),
-            }))
-          : []
-      )
-    : bodyProducts;
+  const showcaseProducts = catalogShowcases.flatMap((showcase) =>
+    Array.isArray(showcase.products)
+      ? showcase.products.map((product, productIndex) => ({
+          ...product,
+          showcaseId: String(product.showcaseId ?? showcase.id ?? "").trim(),
+          sortOrder: getPlacement(product, productIndex + 1),
+          placement: getPlacement(product, productIndex + 1),
+        }))
+      : []
+  );
+  const products = showcaseProducts.length > 0 ? showcaseProducts : bodyProducts;
   const showcases = catalogShowcases.length > 0
     ? catalogShowcases
     : Array.isArray(body.showcases)
