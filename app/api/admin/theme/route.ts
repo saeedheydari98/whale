@@ -1,7 +1,7 @@
 import {
   GET as getAdminTheme,
   POST as saveAdminTheme,
-} from "@/app/api/theme/admin/route";
+} from "@/app/api/theme/route";
 import { rateLimit } from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ function guard(request: Request) {
 export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
-  return getAdminTheme();
+  return getAdminTheme(request);
 }
 
 export async function PUT(request: Request) {

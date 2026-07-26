@@ -61,6 +61,7 @@ function hasSilentHeader(input: RequestInfo | URL, init?: RequestInit) {
 }
 
 function getSuccessMessage(method: string, url: string) {
+  if (url.includes("/api/theme")) return "ظاهر فروشگاه با موفقیت ذخیره شد.";
   if (url.includes("/api/auth/login")) return "ورود با موفقیت انجام شد.";
   if (url.includes("/api/auth/logout")) return "خروج با موفقیت انجام شد.";
   if (url.includes("/comments")) {

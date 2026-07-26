@@ -2094,19 +2094,43 @@ export const openApiDocument = {
         },
       }),
     },
-    "/api/theme/admin": {
+    "/api/theme": {
       get: operation({
         tags: ["Theme"],
-        summary: "Get admin theme",
-        operationId: "getThemeAdmin",
+        summary: "Get theme",
+        operationId: "getTheme",
+        data: singleData("theme", "ThemeConfig"),
+      }),
+      put: operation({
+        tags: ["Theme"],
+        summary: "Save theme",
+        operationId: "saveTheme",
+        body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
       }),
       post: operation({
         tags: ["Theme"],
-        summary: "Save admin theme",
+        summary: "Save theme",
+        operationId: "postTheme",
+        body: ref("ThemeInput"),
+        data: singleData("theme", "ThemeConfig"),
+      }),
+    },
+    "/api/theme/admin": {
+      get: operation({
+        tags: ["Theme"],
+        summary: "Get theme compatibility route",
+        operationId: "getThemeAdmin",
+        data: singleData("theme", "ThemeConfig"),
+        deprecated: true,
+      }),
+      post: operation({
+        tags: ["Theme"],
+        summary: "Save theme compatibility route",
         operationId: "saveThemeAdmin",
         body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
+        deprecated: true,
       }),
     },
     "/api/admin/theme": {
@@ -2115,6 +2139,7 @@ export const openApiDocument = {
         summary: "Get admin theme compatibility route",
         operationId: "getAdminTheme",
         data: singleData("theme", "ThemeConfig"),
+        deprecated: true,
       }),
       put: operation({
         tags: ["Theme"],
@@ -2122,6 +2147,7 @@ export const openApiDocument = {
         operationId: "putAdminTheme",
         body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
+        deprecated: true,
       }),
     },
   },

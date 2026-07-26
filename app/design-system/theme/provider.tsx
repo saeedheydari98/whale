@@ -12,10 +12,6 @@ import React, {
 import { applyCSSVariables } from "./engine";
 import { generateCSSVariables } from "./css-vars";
 import { createTheme, ThemeStyle, ThemeColorKey } from "./theme";
-import {
-  APP_GLOBAL_UPDATED_EVENT,
-  fetchAppGlobal,
-} from "@/lib/app-global-client";
 import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./storage";
 
 type ThemeMode = "light" | "dark";
@@ -50,6 +46,11 @@ const defaultAdminTheme: AdminThemeConfig = {
 
 const themeColors: readonly ThemeColorKey[] = ["green", "red", "blue", "yellow", "gray", "orange", "purple"];
 const themeStyles: readonly ThemeStyle[] = ["light", "dark", "fantasy"];
+const THEME_API_URL = "/api/theme";
+const THEME_FETCH_CACHE_MS = 30_000;
+
+let persistedThemeCache: { at: number; theme: AdminThemeConfig } | null = null;
+let pendingPersistedTheme: Promise<AdminThemeConfig | null> | null = null;
 
 function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark";
@@ -141,22 +142,63 @@ function persistThemeSnapshot(snapshot: ThemeSnapshot, vars: React.CSSProperties
   }
 }
 
-async function fetchPersistedAdminTheme() {
-  try {
-    const res = await fetch("/api/theme/admin", {
-      cache: "no-store",
-      credentials: "same-origin",
-    });
-    const payload = await res.json().catch(() => null);
-    if (!res.ok || payload?.ok === false) return null;
+function rememberPersistedAdminTheme(theme: AdminThemeConfig) {
+  persistedThemeCache = {
+    at: Date.now(),
+    theme,
+  };
+}
 
-    return normalizeAdminTheme(
-      readThemePayload<AdminThemeConfig>(payload, defaultAdminTheme),
-      defaultAdminTheme
-    );
-  } catch {
-    return null;
+async function fetchPersistedAdminTheme(options?: { force?: boolean }) {
+  if (!options?.force && persistedThemeCache && Date.now() - persistedThemeCache.at < THEME_FETCH_CACHE_MS) {
+    return persistedThemeCache.theme;
   }
+
+  if (pendingPersistedTheme) return pendingPersistedTheme;
+
+  pendingPersistedTheme = (async () => {
+    try {
+      const res = await fetch(THEME_API_URL, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || payload?.ok === false) return null;
+
+      const nextTheme = normalizeAdminTheme(
+        readThemePayload<AdminThemeConfig>(payload, defaultAdminTheme),
+        defaultAdminTheme
+      );
+      rememberPersistedAdminTheme(nextTheme);
+      return nextTheme;
+    } catch {
+      return null;
+    } finally {
+      pendingPersistedTheme = null;
+    }
+  })();
+
+  return pendingPersistedTheme;
+}
+
+async function savePersistedAdminTheme(theme: AdminThemeConfig) {
+  const res = await fetch(THEME_API_URL, {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(theme),
+  });
+  const payload = await res.json().catch(() => null);
+  if (!res.ok || payload?.ok === false) {
+    throw new Error(payload?.message || payload?.error || "Theme save failed.");
+  }
+
+  const nextTheme = normalizeAdminTheme(
+    readThemePayload<AdminThemeConfig>(payload, theme),
+    theme
+  );
+  rememberPersistedAdminTheme(nextTheme);
+  return nextTheme;
 }
 
 export function ThemeProvider({
@@ -231,11 +273,11 @@ export function ThemeProvider({
       }, defaultAdminTheme));
     };
 
-    const syncPersistedTheme = () => {
+    const syncPersistedTheme = (options?: { force?: boolean }) => {
       requestId += 1;
       const currentRequestId = requestId;
 
-      void fetchPersistedAdminTheme().then((nextAdminTheme) => {
+      void fetchPersistedAdminTheme(options).then((nextAdminTheme) => {
         if (!nextAdminTheme || cancelled || currentRequestId !== requestId) return;
         applyAdminTheme(nextAdminTheme);
       });
@@ -255,16 +297,14 @@ export function ThemeProvider({
       ) {
         return;
       }
-      syncThemes();
+      syncStoredTheme();
     };
 
     syncThemes();
-    window.addEventListener(APP_GLOBAL_UPDATED_EVENT, syncPersistedTheme);
     window.addEventListener("storage", handleStorage);
 
     return () => {
       cancelled = true;
-      window.removeEventListener(APP_GLOBAL_UPDATED_EVENT, syncPersistedTheme);
       window.removeEventListener("storage", handleStorage);
     };
   }, []);
@@ -277,13 +317,9 @@ export function ThemeProvider({
     setStyle(optimistic.style);
 
     try {
-      const res = await fetch("/api/admin/theme", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(optimistic),
-      });
-      if (!res.ok) throw new Error("ذخیره تنظیمات ظاهری ناموفق بود.");
-      void fetchAppGlobal({ force: true });
+      const saved = await savePersistedAdminTheme(optimistic);
+      setAdminTheme(saved);
+      setStyle(saved.style);
     } catch (error) {
       console.error("Failed to update admin theme:", error);
       setAdminTheme(prev);
