@@ -21,5 +21,5 @@ export async function POST(request: Request) {
   const auth = await requireSuperadmin(request);
   if (!auth.ok) return auth.response;
 
-  return apiFail("کد امنیتی مدیریت غیرفعال شده است. دسترسی ادمین فقط با درخواست کاربر و تایید مدیر ارشد انجام می شود.", 410);
+  return apiFail("کد امنیتی مدیریت غیرفعال است. دسترسی با تایید مدیر ارشد فعال می‌شود.", 410);
 }

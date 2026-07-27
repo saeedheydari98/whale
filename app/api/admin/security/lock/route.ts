@@ -21,5 +21,5 @@ export async function POST(request: Request) {
   const auth = await requireSuperadmin(request);
   if (!auth.ok) return auth.response;
 
-  return apiFail("قفل پنل با کد امنیتی غیرفعال شده است. دسترسی مدیریت فقط با تایید مدیر ارشد انجام می شود.", 410);
+  return apiFail("قفل کد امنیتی غیرفعال است. دسترسی با تایید مدیر ارشد فعال می‌شود.", 410);
 }

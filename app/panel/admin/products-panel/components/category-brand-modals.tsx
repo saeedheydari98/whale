@@ -197,7 +197,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
             invalid={hasRequiredError(requiredErrorKey) && !item.title.trim()}
             onChange={(event) => onPatch({ title: event.target.value } as Partial<TItem>)}
           />
-          <CustomInput value={item.slug} placeholder="Slug" onChange={(event) => onPatch({ slug: event.target.value } as Partial<TItem>)} />
+          <CustomInput value={item.slug} placeholder="نامک" onChange={(event) => onPatch({ slug: event.target.value } as Partial<TItem>)} />
           <CustomInput value={item.imageUrl} placeholder={imagePlaceholder} onChange={(event) => onPatch({ imageUrl: event.target.value } as Partial<TItem>)} />
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-3 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
             <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
@@ -209,11 +209,11 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
           <CustomSwitch checked={item.active} onChange={(active) => onPatch({ active } as Partial<TItem>)} label={item.active ? "فعال" : "مخفی"} size="sm" />
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
-              {submitLabel}
+              <span>{submitLabel}</span>
             </CustomButton>
             {onDelete ? (
               <CustomButton variant="danger" fullWidth icon={<IoTrashOutline />} onClick={onDelete}>
-                {deleteLabel}
+                <span>{deleteLabel}</span>
               </CustomButton>
             ) : null}
           </div>

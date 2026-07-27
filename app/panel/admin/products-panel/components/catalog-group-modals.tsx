@@ -182,7 +182,7 @@ function CatalogGroupModal({
             </div>
           </div>
           <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
-            ذخیره بخش
+            <span>ذخیره بخش</span>
           </CustomButton>
         </div>
       ) : null}

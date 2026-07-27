@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { FiSearch } from "react-icons/fi";
 import { IoOptionsOutline } from "react-icons/io5";
+import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
@@ -325,15 +326,19 @@ export function ProductListShell({
       <div className="flex flex-col gap-3 border-b border-primary-border pb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-col gap-1">
-            <div className="text-2xl font-bold">{headerLoading ? "..." : title}</div>
-            <span className="text-xs font-semibold text-secondary-text">{count} محصول</span>
+            <Loading loading="skeleton-item" isLoading={headerLoading}>
+              <div className="text-2xl font-bold">{title || "محصولات"}</div>
+            </Loading>
+            <Loading loading="skeleton-item" isLoading={headerLoading}>
+              <span className="text-xs font-semibold text-secondary-text">{count} محصول</span>
+            </Loading>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <CustomInput
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="جستجو محصول ..."
-              aria-label="جستجو محصول"
+              placeholder="جست‌وجوی محصول…"
+              aria-label="جست‌وجوی محصول"
               showLabel={false}
               fullWidth={false}
               size="sm"

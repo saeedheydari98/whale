@@ -94,12 +94,12 @@ export default function AdminPanelPage() {
   const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === SUPERADMIN_PHONE;
   const tabs = [
     { id: "theme", label: "ظاهر", icon: <IoColorPaletteOutline /> },
-    ...(isSuperadmin ? [{ id: "security", label: "دسترسی ها", icon: <IoShieldCheckmarkOutline /> }] : []),
+    ...(isSuperadmin ? [{ id: "security", label: "دسترسی‌ها", icon: <IoShieldCheckmarkOutline /> }] : []),
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
     { id: "orders", label: "خریدها", icon: <IoReceiptOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
-    { id: "showcases", label: "ویترین ها", icon: <IoAlbumsOutline /> },
-    { id: "categories", label: "دسته بندی ها", icon: <IoPricetagsOutline /> },
+    { id: "showcases", label: "ویترین‌ها", icon: <IoAlbumsOutline /> },
+    { id: "categories", label: "دسته‌بندی‌ها", icon: <IoPricetagsOutline /> },
     { id: "brands", label: "برندها", icon: <IoRibbonOutline /> },
     { id: "storefront", label: "چیدمان", icon: <IoLayersOutline /> },
   ];

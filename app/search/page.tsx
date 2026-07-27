@@ -1,26 +1,28 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { IoBagAddOutline } from "react-icons/io5";
-import { CustomButton } from "@/app/design-system/components/ui/button";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
 import { addProductToCart } from "@/lib/cart-client";
 import { isProductAvailable, normalizeColorStock, type ProductRecord } from "@/lib/products-client";
-import ProductLink from "@/app/design-system/components/ui/ProductLink";
-import ProductRatingSummary from "@/app/design-system/components/ui/product-rating-summary";
+import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import { ProductListGrid } from "@/app/products/product-list-grid";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const q = (searchParams?.get("q") || "").trim();
-  const [results, setResults] = useState<any[] | null>(null);
+  const [results, setResults] = useState<ProductRecord[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [cartMessage, setCartMessage] = useState("");
+  const viewportProductCount = useLoadingViewportCount("product-grid");
+  const resolvedResults = Array.isArray(results) ? results : [];
+  const loadingCount = loading ? resolveLoadingItemCount(resolvedResults.length || undefined, viewportProductCount) : 0;
 
   useEffect(() => {
     let cancelled = false;
     if (!q) {
       setResults(null);
+      setLoading(false);
       return;
     }
 
@@ -65,60 +67,24 @@ export default function SearchPage() {
           <div className="text-2xl font-bold">نتایج جست‌وجو برای «{q}»</div>
         </div>
 
-        {loading && <div className="text-sm text-secondary-text">در حال جست‌وجو...</div>}
-
-        {!loading && results && results.length === 0 && (
-          <div className="text-sm text-secondary-text">نتیجه‌ای پیدا نشد.</div>
-        )}
-
         {cartMessage ? (
           <div className="mb-4 rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary">
             {cartMessage}
           </div>
         ) : null}
 
-        {!loading && results && results.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((product) => {
-              const available = isProductAvailable(product);
-              return (
-              <div key={product.id} className="rounded-md border border-primary-border p-3 bg-primary-card">
-                <div className="flex flex-col gap-2">
-                  <div className="flex gap-3">
-                    <div className="w-24 h-24 shrink-0 overflow-hidden rounded bg-primary-media">
-                      {product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="w-full h-full object-cover" /> : <div className="p-2 text-sm">بدون تصویر</div>}
-                    </div>
-                    <div className="flex-1 flex flex-col">
-                      <div className="text-sm font-bold">{product.title}</div>
-                      <div className="text-primary text-sm font-bold">{product.price}$</div>
-                      <div className="text-xs text-secondary-text line-clamp-2">{product.description}</div>
-                      <ProductRatingSummary
-                        average={product.ratingAverage}
-                        count={product.ratingCount}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2 border-t border-primary-border pt-2">
-                    <CustomButton
-                      type="button"
-                      variant="success"
-                      size="sm"
-                      fullWidth
-                      className="flex-1"
-                      icon={<IoBagAddOutline />}
-                      disabled={!available}
-                      onClick={() => void addToCart(product)}
-                    >
-                      {available ? "افزودن" : "ناموجود"}
-                    </CustomButton>
-                    <ProductLink productId={product.id} productTitle={product.title} className="flex-1">مشاهده</ProductLink>
-                  </div>
-                </div>
-              </div>
-              );
-            })}
-          </div>
-        )}
+        {q ? (
+          <ProductListGrid
+            products={resolvedResults}
+            loading={loading}
+            loadingCount={loadingCount}
+            onAddToCart={(product) => void addToCart(product)}
+          />
+        ) : null}
+
+        {!loading && results && results.length === 0 ? (
+          <div className="text-sm text-secondary-text">نتیجه‌ای پیدا نشد.</div>
+        ) : null}
       </section>
     </main>
   );

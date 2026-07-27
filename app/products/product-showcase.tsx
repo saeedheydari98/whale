@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { addProductToCart } from "@/lib/cart-client";
 import { getProducts, getProductsPageStructure, getShowcaseProducts, isProductAvailable, readCachedProductsPageStructure, type ProductsCache } from "@/lib/products-client";
+import { resolveLoadingItemCount, useLoadingViewportCount } from "../design-system/components/loading/loading-count";
 import Loading from "../design-system/components/loading/loading";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { LazyViewportSection } from "../design-system/components/ui/lazy-viewport-section";
@@ -113,29 +114,6 @@ function ensureShowcases(products: Product[], savedShowcases: Showcase[]) {
   return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-const DEFAULT_PRODUCT_CARD_COUNT = 4;
-
-const LOADING_BANNER: Banner = {
-  id: "loading-banner",
-  title: "بنر",
-  imageUrls: ["loading-banner"],
-  active: true,
-  showOnHome: true,
-  showOnShowcase: true,
-  showOnProducts: true,
-  intervalSeconds: 5,
-  heightPercent: 28,
-  sortOrder: 1,
-};
-
-const LOADING_SHOWCASE: Showcase = {
-  id: "loading-showcase",
-  title: "ویترین",
-  active: true,
-  limit: 4,
-  sortOrder: 2,
-};
-
 type BannerSection = {
   type: "banner";
   item: Banner;
@@ -167,6 +145,7 @@ function LazyShowcaseSection({
   onPreview,
   hideShowcaseLink = false,
 }: LazyShowcaseSectionProps) {
+  const viewportProductCount = useLoadingViewportCount("product-rail");
   const hasInitialProducts = products.length > 0;
   const showcaseProductsQuery = useQuery({
     queryKey: ["catalog", "showcase", showcase.id, "products", "lazy"],
@@ -180,9 +159,7 @@ function LazyShowcaseSection({
     : (showcaseProductsQuery.data?.products as Product[] | undefined) ?? [];
   const isLoading = !hasInitialProducts && showcaseProductsQuery.isLoading;
   const requestedProductCount = Number(showcase.limit);
-  const loadingCount = Number.isFinite(requestedProductCount)
-    ? Math.max(1, Math.min(DEFAULT_PRODUCT_CARD_COUNT, Math.round(requestedProductCount)))
-    : DEFAULT_PRODUCT_CARD_COUNT;
+  const loadingCount = resolveLoadingItemCount(Number.isFinite(requestedProductCount) ? requestedProductCount : undefined, viewportProductCount);
 
   if (!isLoading && loadedProducts.length === 0) return null;
 
@@ -208,6 +185,7 @@ type ProductShowcaseProps = {
 };
 
 export function ProductShowcase({ mode = "storefront", root = "main" }: ProductShowcaseProps) {
+  const viewportProductCount = useLoadingViewportCount("product-rail");
   // header search is handled on the separate `/search` route
   const catalogQuery = useQuery({
     queryKey: ["catalog", mode === "products" ? "products-page-full" : "products-page-structure", mode],
@@ -345,15 +323,13 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     const withShowcaseProducts = (showcase: Showcase): ShowcaseDisplaySection => {
       const products = showcaseProductsById.get(showcase.id) ?? [];
       const requestedProductCount = Number(showcase.limit);
-      const productCardCount = Number.isFinite(requestedProductCount)
-        ? Math.max(1, Math.min(DEFAULT_PRODUCT_CARD_COUNT, Math.round(requestedProductCount)))
-        : DEFAULT_PRODUCT_CARD_COUNT;
+      const productCardCount = resolveLoadingItemCount(Number.isFinite(requestedProductCount) ? requestedProductCount : undefined, viewportProductCount);
 
       return {
         type: "showcase",
         item: showcase,
         products,
-        loadingCount: products.length > 0 ? Math.min(DEFAULT_PRODUCT_CARD_COUNT, products.length) : productCardCount,
+        loadingCount: products.length > 0 ? resolveLoadingItemCount(products.length, viewportProductCount) : productCardCount,
         sortOrder: showcase.sortOrder,
       };
     };
@@ -365,10 +341,10 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           : {
               ...section,
               loadingCount: section.products.length > 0
-                ? Math.min(DEFAULT_PRODUCT_CARD_COUNT, section.products.length)
+                ? resolveLoadingItemCount(section.products.length, viewportProductCount)
                 : Number.isFinite(Number(section.item.limit))
-                  ? Math.max(1, Math.min(DEFAULT_PRODUCT_CARD_COUNT, Math.round(Number(section.item.limit))))
-                  : DEFAULT_PRODUCT_CARD_COUNT,
+                  ? resolveLoadingItemCount(Number(section.item.limit), viewportProductCount)
+                  : viewportProductCount,
             }
       );
     }
@@ -380,11 +356,11 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           id: "all-products",
           title: "محصولات",
           active: true,
-          limit: 4,
+          limit: viewportProductCount,
           sortOrder: 1,
         },
         products: [],
-        loadingCount: DEFAULT_PRODUCT_CARD_COUNT,
+        loadingCount: viewportProductCount,
         sortOrder: 1,
       }];
     }
@@ -430,7 +406,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     if (dynamicSections.length > 0) return dynamicSections;
 
     return [];
-  }, [catalogBanners, displaySections, mode, showcaseProductsById, sortedShowcases, tree.sections]);
+  }, [catalogBanners, displaySections, mode, showcaseProductsById, sortedShowcases, tree.sections, viewportProductCount]);
   const loading = loadingSections.length === 0 && structureLoading;
   const showWhaleLoading = loading && loadingSections.length === 0;
 
@@ -522,10 +498,10 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
             const requestedProductCount = section.type === "showcase" ? Number(section.item.limit) : 0;
             const fallbackProductCount = section.type === "showcase"
               ? section.products.length > 0
-                ? Math.min(DEFAULT_PRODUCT_CARD_COUNT, section.products.length)
+                ? resolveLoadingItemCount(section.products.length, viewportProductCount)
                 : Number.isFinite(requestedProductCount)
-                  ? Math.max(1, Math.min(DEFAULT_PRODUCT_CARD_COUNT, Math.round(requestedProductCount)))
-                  : DEFAULT_PRODUCT_CARD_COUNT
+                  ? resolveLoadingItemCount(requestedProductCount, viewportProductCount)
+                  : viewportProductCount
               : 0;
             const fallback = section.type === "banner" ? (
               <BannerCarousel banner={section.item} onPreview={() => undefined} isLoading />

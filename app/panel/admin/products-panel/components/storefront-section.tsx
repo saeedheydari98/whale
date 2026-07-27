@@ -1,6 +1,8 @@
 "use client";
 
 import { IoSaveOutline } from "react-icons/io5";
+import Loading from "@/app/design-system/components/loading/loading";
+import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { STOREFRONT_TABS } from "../constants";
@@ -22,6 +24,81 @@ type StorefrontSectionProps = {
   isLoading?: boolean;
 };
 
+function createLoadingStorefrontEntries(count: number): StorefrontDisplayEntry[] {
+  const entries: StorefrontDisplayEntry[] = [
+    {
+      type: "banner",
+      sortOrder: 1,
+      item: {
+        id: "loading-storefront-banner",
+        title: "بنر",
+        showcaseId: "",
+        imageUrls: [""],
+        active: true,
+        showOnHome: true,
+        showOnShowcase: false,
+        showOnCategories: false,
+        showOnProducts: false,
+        intervalSeconds: 5,
+        heightPercent: 28,
+        homeSortOrder: 1,
+        showcaseSortOrder: 1,
+        categorySortOrder: 1,
+        productSortOrder: 1,
+        sortOrder: 1,
+      },
+    },
+    {
+      type: "showcase",
+      sortOrder: 2,
+      item: {
+        id: "loading-storefront-showcase",
+        title: "ویترین",
+        active: true,
+        mode: "manual",
+        autoSort: "newest",
+        limit: 8,
+        categoryId: "",
+        manualProductIds: [],
+        sortOrder: 2,
+      },
+    },
+    {
+      type: "categoryGroup",
+      sortOrder: 3,
+      item: {
+        id: "loading-storefront-category-group",
+        title: "دسته‌بندی",
+        sortOrder: 3,
+      },
+    },
+    {
+      type: "brandGroup",
+      sortOrder: 4,
+      item: {
+        id: "loading-storefront-brand-group",
+        title: "برند",
+        sortOrder: 4,
+      },
+    },
+  ];
+
+  return Array.from({ length: count }, (_, index) => {
+    const entry = entries[index % entries.length];
+    const sortOrder = index + 1;
+
+    return {
+      ...entry,
+      sortOrder,
+      item: {
+        ...entry.item,
+        id: `${entry.item.id}-${sortOrder}`,
+        sortOrder,
+      },
+    } as StorefrontDisplayEntry;
+  });
+}
+
 export function StorefrontSection({
   displaySections,
   tab,
@@ -36,6 +113,14 @@ export function StorefrontSection({
   onSave,
   isLoading = false,
 }: StorefrontSectionProps) {
+  const viewportRowCount = useLoadingViewportCount("storefront-row");
+  const loadingRowCount = resolveLoadingItemCount(displaySections.length || undefined, viewportRowCount);
+  const visibleDisplaySections = isLoading && displaySections.length === 0
+    ? createLoadingStorefrontEntries(loadingRowCount)
+    : isLoading
+      ? displaySections.slice(0, loadingRowCount)
+      : displaySections;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2 border-b border-primary-border">
@@ -54,7 +139,7 @@ export function StorefrontSection({
         ))}
       </div>
 
-      {displaySections.map((entry) => {
+      {visibleDisplaySections.map((entry) => {
         const key = storefrontKey(entry);
         const entrySortOrder = getEntrySortOrder(entry, tab);
 
@@ -81,35 +166,47 @@ export function StorefrontSection({
               setDraggingKey(null);
             }}
             onDragEnd={() => setDraggingKey(null)}
-            className={`flex cursor-grab flex-col gap-3 rounded-lg border bg-primary-card p-3 active:cursor-grabbing sm:flex-row sm:items-center sm:justify-between ${
-              draggingKey === key ? "border-primary opacity-70" : "border-primary-border"
+            className={`flex flex-col gap-3 rounded-lg border bg-primary-card p-3 sm:flex-row sm:items-center sm:justify-between ${
+              isLoading
+                ? "cursor-default border-border-default"
+                : draggingKey === key
+                  ? "cursor-grab border-primary opacity-70 active:cursor-grabbing"
+                  : "cursor-grab border-primary-border active:cursor-grabbing"
             }`}
           >
             <div className="flex flex-col gap-1">
-              <div className="text-sm font-bold text-primary-text">{entry.item?.title || entryFallbackTitle(entry.type)}</div>
-              <span className="text-xs text-secondary-text">{entryFallbackTitle(entry.type)}</span>
+              <Loading loading="skeleton-item" isLoading={isLoading}>
+                <div className="text-sm font-bold text-primary-text">{entry.item?.title || entryFallbackTitle(entry.type)}</div>
+              </Loading>
+              <Loading loading="skeleton-item" isLoading={isLoading}>
+                <span className="text-xs text-secondary-text">{entryFallbackTitle(entry.type)}</span>
+              </Loading>
             </div>
-            <CustomInput
-              type="number"
-              value={entrySortOrder}
-              disabled={isLoading}
-              placeholder="ترتیب"
-              onChange={(event) => {
-                if (isLoading) return;
-                const sortOrder = Number(event.target.value);
-                if (entry.type === "banner") onUpdateBannerPlacement(entry.item, sortOrder);
-                else if (entry.type === "brandGroup") onUpdateBrandGroupPlacement(entry.item.id, sortOrder);
-                else if (entry.type === "categoryGroup") onUpdateCategoryGroupPlacement(entry.item.id, sortOrder);
-                else if (entry.type === "showcase") onUpdateShowcasePlacement(entry.item, sortOrder);
-              }}
-            />
+            <Loading loading="skeleton-item" isLoading={isLoading} className="w-full sm:w-auto">
+              <CustomInput
+                type="number"
+                value={entrySortOrder}
+                disabled={isLoading}
+                placeholder="ترتیب"
+                onChange={(event) => {
+                  if (isLoading) return;
+                  const sortOrder = Number(event.target.value);
+                  if (entry.type === "banner") onUpdateBannerPlacement(entry.item, sortOrder);
+                  else if (entry.type === "brandGroup") onUpdateBrandGroupPlacement(entry.item.id, sortOrder);
+                  else if (entry.type === "categoryGroup") onUpdateCategoryGroupPlacement(entry.item.id, sortOrder);
+                  else if (entry.type === "showcase") onUpdateShowcasePlacement(entry.item, sortOrder);
+                }}
+              />
+            </Loading>
           </div>
         );
       })}
 
-      <CustomButton icon={<IoSaveOutline />} disabled={isLoading} onClick={() => void onSave()}>
-        ذخیره چیدمان
-      </CustomButton>
+      <Loading loading="skeleton-item" isLoading={isLoading}>
+        <CustomButton icon={<IoSaveOutline />} disabled={isLoading} onClick={() => void onSave()}>
+          <span>ذخیره چیدمان</span>
+        </CustomButton>
+      </Loading>
     </div>
   );
 }

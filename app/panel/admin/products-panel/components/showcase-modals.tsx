@@ -34,7 +34,7 @@ export function ShowcaseModals(props: ShowcaseModalsProps) {
       <ShowcaseModal
         open={props.isShowcaseOpen}
         onClose={props.onCloseShowcase}
-        title="Register showcase"
+        title="ثبت ویترین"
         showcase={props.draftShowcase}
         products={props.products}
         categories={props.categories}
@@ -42,7 +42,7 @@ export function ShowcaseModals(props: ShowcaseModalsProps) {
         hasRequiredError={props.hasRequiredError}
         onPatch={props.updateDraftShowcase}
         onSubmit={props.onSubmitShowcase}
-        submitLabel="Register showcase"
+        submitLabel="ثبت ویترین"
       />
       <ShowcaseModal
         open={props.isEditShowcaseOpen}
@@ -104,8 +104,8 @@ function ShowcaseModal({
           />
           <CustomInput type="number" value={showcase.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
           <CustomSelect value={showcase.mode} aria-label="حالت ویترین" onChange={(event) => onPatch({ mode: event.target.value === "auto" ? "auto" : "manual" })}>
-            <option value="manual">Manual product selection</option>
-            <option value="auto">Automatic by rule</option>
+            <option value="manual">انتخاب دستی محصول</option>
+            <option value="auto">خودکار بر اساس قانون</option>
           </CustomSelect>
           {showcase.mode === "auto" ? (
             <AutoShowcaseFields showcase={showcase} categories={categories} onPatch={onPatch} />
@@ -116,11 +116,11 @@ function ShowcaseModal({
           <div className="flex flex-col gap-2 sm:flex-row">
             {onDelete ? (
               <CustomButton variant="danger" fullWidth icon={<IoTrashOutline />} onClick={onDelete}>
-                حذف
+                <span>حذف</span>
               </CustomButton>
             ) : null}
             <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
-              {submitLabel}
+              <span>{submitLabel}</span>
             </CustomButton>
           </div>
         </div>
@@ -137,14 +137,14 @@ type ShowcaseFieldsProps = {
 function AutoShowcaseFields({ showcase, categories, onPatch }: ShowcaseFieldsProps & { categories: CategoryForm[] }) {
   return (
     <div className="flex flex-col gap-3">
-      <CustomSelect value={showcase.autoSort} aria-label="Automatic showcase sort" onChange={(event) => onPatch({ autoSort: event.target.value })}>
+      <CustomSelect value={showcase.autoSort} aria-label="مرتب‌سازی خودکار ویترین" onChange={(event) => onPatch({ autoSort: event.target.value })}>
         {SHOWCASE_SORT_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
       </CustomSelect>
-      <CustomSelect value={showcase.categoryId} aria-label="Automatic showcase category" onChange={(event) => onPatch({ categoryId: event.target.value })}>
+      <CustomSelect value={showcase.categoryId} aria-label="دسته‌بندی ویترین خودکار" onChange={(event) => onPatch({ categoryId: event.target.value })}>
         <option value="">همه دسته‌بندی‌ها</option>
         {categories.map((category) => (
           <option key={category.id} value={category.id}>
@@ -169,7 +169,7 @@ function ManualShowcaseProducts({ showcase, products, onPatch }: ShowcaseFieldsP
             size="sm"
             onClick={() => onPatch({ manualProductIds: toggleProductId(showcase.manualProductIds, product.id) })}
           >
-            {product.title}
+            <span>{product.title}</span>
           </CustomButton>
         ))}
       </div>

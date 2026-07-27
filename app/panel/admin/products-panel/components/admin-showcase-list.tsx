@@ -3,6 +3,8 @@
 import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import Loading from "@/app/design-system/components/loading/loading";
+import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import { createProduct, createShowcase } from "../factories";
 import type { ProductForm, ShowcaseForm } from "../types";
 import { getShowcaseProductsForAdmin } from "../utils";
 
@@ -17,6 +19,27 @@ type AdminShowcaseListProps = {
   isLoading?: boolean;
 };
 
+function createLoadingShowcases(count: number): ShowcaseForm[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...createShowcase(),
+    id: `loading-showcase-${index + 1}`,
+    title: `ویترین ${index + 1}`,
+    limit: 1,
+    sortOrder: index + 1,
+  }));
+}
+
+function createLoadingShowcaseProducts(count: number): ProductForm[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...createProduct(),
+    id: `loading-showcase-product-${index + 1}`,
+    title: `محصول ${index + 1}`,
+    price: "1000000",
+    discountPrice: "900000",
+    sortOrder: index + 1,
+  }));
+}
+
 export function AdminShowcaseList({
   products,
   showcases,
@@ -27,10 +50,25 @@ export function AdminShowcaseList({
   formatPrice,
   isLoading = false,
 }: AdminShowcaseListProps) {
+  const showcaseViewportCount = useLoadingViewportCount("admin-showcase-card");
+  const productViewportCount = useLoadingViewportCount("product-rail");
+  const showcaseLoadingCount = resolveLoadingItemCount(showcases.length || undefined, showcaseViewportCount);
+  const displayShowcases = isLoading
+    ? showcases.length > 0
+      ? showcases.slice(0, showcaseLoadingCount)
+      : createLoadingShowcases(showcaseLoadingCount)
+    : showcases;
+
   return (
     <div className="flex flex-col gap-5">
-      {showcases.map((showcase) => {
+      {displayShowcases.map((showcase) => {
         const showcaseProducts = getShowcaseProductsForAdmin(products, showcase);
+        const productLoadingCount = resolveLoadingItemCount(showcaseProducts.length || undefined, productViewportCount);
+        const visibleShowcaseProducts = isLoading
+          ? showcaseProducts.length > 0
+            ? showcaseProducts.slice(0, productLoadingCount)
+            : createLoadingShowcaseProducts(productLoadingCount)
+          : showcaseProducts;
 
         return (
           <div
@@ -47,7 +85,7 @@ export function AdminShowcaseList({
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Loading loading="skeleton-item" isLoading={isLoading}>
-                  <span className="text-xs font-semibold text-primary-text">{showcaseProducts.length} محصول</span>
+                  <span className="text-xs font-semibold text-primary-text">{visibleShowcaseProducts.length} محصول</span>
                 </Loading>
                 <Loading loading="skeleton-item" isLoading={isLoading}>
                   <CustomButton
@@ -55,9 +93,10 @@ export function AdminShowcaseList({
                     rounded="full"
                     size="sm"
                     icon={<IoCreateOutline />}
+                    disabled={isLoading}
                     onClick={() => onEditShowcase(showcase)}
                   >
-                    ویرایش
+                    <span>ویرایش</span>
                   </CustomButton>
                 </Loading>
                 <Loading loading="skeleton-item" isLoading={isLoading}>
@@ -66,16 +105,17 @@ export function AdminShowcaseList({
                     rounded="full"
                     size="sm"
                     icon={<IoTrashOutline />}
+                    disabled={isLoading}
                     onClick={() => onDeleteShowcase(showcase)}
                   >
-                    حذف
+                    <span>حذف</span>
                   </CustomButton>
                 </Loading>
               </div>
             </div>
 
             <div className="flex cursor-grab gap-3 overflow-x-auto overscroll-x-contain pb-2 active:cursor-grabbing">
-              {showcaseProducts.length === 0 && (
+              {!isLoading && visibleShowcaseProducts.length === 0 && (
                 <div
                   className={`flex min-h-36 min-w-56 max-w-56 shrink-0 flex-col justify-center gap-2 rounded-lg border border-dashed bg-primary-card p-4 ${
                     isLoading ? "border-border-default" : "border-primary-border"
@@ -90,7 +130,7 @@ export function AdminShowcaseList({
                 </div>
               )}
 
-              {showcaseProducts.map((product, index) => (
+              {visibleShowcaseProducts.map((product, index) => (
                 <div
                   key={product.id}
                   draggable={!isLoading}

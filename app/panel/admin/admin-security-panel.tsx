@@ -58,7 +58,7 @@ export function AdminSecurityPanel() {
       const nextRequests = await fetchAdminAccessRequests({ force });
       setRequests(nextRequests);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "بارگذاری درخواست های مدیریت ناموفق بود.");
+      setStatus(error instanceof Error ? error.message : "بارگذاری درخواست‌ها ناموفق بود.");
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ export function AdminSecurityPanel() {
             : "درخواست مدیریت رد شد."
       );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "به روزرسانی درخواست مدیریت ناموفق بود.");
+      setStatus(error instanceof Error ? error.message : "به‌روزرسانی درخواست ناموفق بود.");
     } finally {
       setActingId("");
     }
@@ -111,15 +111,15 @@ export function AdminSecurityPanel() {
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-bg p-4 text-primary-text">
       <div className="flex flex-col gap-1">
-        <div className="text-base font-bold text-primary-text">مدیریت دسترسی ادمین</div>
+        <div className="text-base font-bold text-primary-text">دسترسی مدیریت</div>
         <div className="text-sm text-primary-text">
-          درخواست های کاربران برای ورود به پنل مدیریت را بررسی کنید و دسترسی های فعال را هر زمان لازم بود لغو کنید.
+          درخواست‌ها را بررسی کنید و دسترسی‌های فعال را لغو کنید.
         </div>
       </div>
 
       {checkedSuperadmin && !isSuperadmin ? (
         <div className="rounded-md border border-primary-border bg-primary-card px-3 py-2 text-sm font-semibold text-primary-text">
-          فقط حساب مدیر ارشد می تواند دسترسی مدیریت کاربران را تغییر دهد.
+          فقط مدیر ارشد می‌تواند دسترسی‌ها را تغییر دهد.
         </div>
       ) : null}
 
@@ -142,7 +142,7 @@ export function AdminSecurityPanel() {
               loading="dots"
               onClick={() => void loadRequests(true)}
             >
-              <span>به روزرسانی</span>
+              <span>به‌روزرسانی</span>
             </CustomButton>
           </div>
 
@@ -155,16 +155,16 @@ export function AdminSecurityPanel() {
           {loading ? (
             <div className="flex items-center gap-2 rounded-lg border border-primary-border bg-primary-card p-3 text-sm font-semibold text-primary-text">
               <Loading loading="dots" />
-              <span>در حال دریافت درخواست ها</span>
+              <span>در حال دریافت درخواست‌ها</span>
             </div>
           ) : null}
 
           {!loading ? (
             <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex flex-col gap-1">
-                <div className="text-sm font-bold text-primary-text">درخواست های جدید</div>
+                <div className="text-sm font-bold text-primary-text">درخواست‌های جدید</div>
                 <span className="text-xs text-secondary-text">
-                  کاربرانی که از مسیر قفل شده پنل مدیریت درخواست دسترسی داده اند.
+                  درخواست‌های ورود به پنل مدیریت.
                 </span>
               </div>
               {pendingRequests.length === 0 ? (
@@ -178,7 +178,7 @@ export function AdminSecurityPanel() {
                           {requestDisplayName(request)}
                         </span>
                         <span className="text-xs text-secondary-text">
-                          این کاربر با شماره {request.phone || request.username} درخواست دسترسی مدیریت دارد.
+                          شماره {request.phone || request.username}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -210,13 +210,13 @@ export function AdminSecurityPanel() {
           {!loading ? (
             <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex flex-col gap-1">
-                <div className="text-sm font-bold text-primary-text">دسترسی های فعال</div>
+                <div className="text-sm font-bold text-primary-text">دسترسی‌های فعال</div>
                 <span className="text-xs text-secondary-text">
-                  کاربرانی که اکنون می توانند وارد پنل مدیریت شوند.
+                  کاربران دارای دسترسی مدیریت.
                 </span>
               </div>
               {approvedRequests.length === 0 ? (
-                <span className="text-xs text-secondary-text">هیچ دسترسی فعالی برای کاربران ثبت نشده است.</span>
+                <span className="text-xs text-secondary-text">دسترسی فعالی ثبت نشده است.</span>
               ) : (
                 <div className="flex flex-col gap-2">
                   {approvedRequests.map((request) => (
@@ -249,7 +249,7 @@ export function AdminSecurityPanel() {
             <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex items-center gap-2">
                 <IoShieldCheckmarkOutline aria-hidden="true" />
-                <div className="text-sm font-bold text-primary-text">سوابق درخواست ها</div>
+                <div className="text-sm font-bold text-primary-text">سوابق درخواست‌ها</div>
               </div>
               <div className="flex flex-col gap-2">
                 {archivedRequests.map((request) => (

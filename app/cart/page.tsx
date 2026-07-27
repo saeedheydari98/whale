@@ -247,7 +247,7 @@ export default function CartPage() {
           }
         });
         setItems(nextItems);
-        setCheckoutMessage("پرداخت با موفقیت انجام شد و موجودی به‌روزرسانی شد.");
+        setCheckoutMessage("پرداخت با موفقیت انجام شد.");
         setIsCheckoutSuccessOpen(true);
       })
       .catch((error) => {
@@ -482,7 +482,7 @@ export default function CartPage() {
         >
           <div className="flex flex-col gap-3">
             <div className="text-sm text-secondary-text">
-              برای تکمیل خرید، اطلاعات ضروری حساب و ارسال سفارش را وارد کنید.
+              اطلاعات تحویل سفارش را وارد کنید.
             </div>
             <div ref={profileFormRef} className="grid gap-3 md:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -577,7 +577,7 @@ export default function CartPage() {
               خرید شما با موفقیت ثبت شد.
             </div>
             <div className="text-sm text-secondary-text">
-              محصولات به سوابق خرید شما اضافه شدند و موجودی فروشگاه به‌روزرسانی شد.
+              سوابق خریدتان به‌روزرسانی شد.
             </div>
           </div>
         </CustomModal>

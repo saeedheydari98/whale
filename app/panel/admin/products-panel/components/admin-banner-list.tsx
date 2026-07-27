@@ -35,9 +35,10 @@ export function AdminBannerList({ banner, onEdit, onPreview, isLoading = false }
               rounded="full"
               size="sm"
               icon={<IoCreateOutline />}
+              disabled={isLoading}
               onClick={() => onEdit(banner)}
             >
-              ویرایش
+              <span>ویرایش</span>
             </CustomButton>
           </Loading>
         </div>

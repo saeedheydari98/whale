@@ -141,7 +141,7 @@ export async function POST(request: Request) {
     const phone = String(profile?.phone || auth.user.username || "").trim();
 
     if (!phone) {
-      return apiFail("برای ثبت درخواست مدیریت باید شماره موبایل حساب شما ثبت شده باشد.", 400);
+      return apiFail("شماره موبایل را در پروفایل کامل کنید.", 400);
     }
 
     const existing = await prisma.adminAccessRequest.findFirst({
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
 
     return apiOk(
       { request: toPublicRequest(fullRequest), access: { isAdminUnlocked: false, status: saved.status } },
-      { status: existing ? 200 : 201, message: "درخواست مدیریت برای مدیر ارشد ارسال شد." }
+      { status: existing ? 200 : 201, message: "درخواست برای مدیر ارشد ارسال شد." }
     );
   } catch (error) {
     console.error("Admin access requests POST error:", error);

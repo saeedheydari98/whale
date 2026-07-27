@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Loading from "@/app/design-system/components/loading/loading";
+import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { addProductToCart } from "@/lib/cart-client";
 import { normalizeColorStock, type ProductRecord } from "@/lib/products-client";
@@ -56,13 +56,15 @@ export function ProductListingPage({
 }: ProductListingPageProps) {
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
-  const resolvedHeaderLoading = headerLoading ?? loading;
+  const viewportProductCount = useLoadingViewportCount("product-grid");
+  const resolvedLoading = loading || initialPageLoading;
+  const resolvedHeaderLoading = headerLoading ?? resolvedLoading;
   const totalProductCount = Number(totalProducts);
   const hasKnownTotalProducts = Number.isFinite(totalProductCount);
-  const resolvedTotalProducts = hasKnownTotalProducts ? totalProductCount : products.length;
-  const loadingCount = hasKnownTotalProducts ? Math.max(0, Math.min(PRODUCT_LIST_PAGE_SIZE, totalProductCount)) : 0;
+  const resolvedTotalProducts = hasKnownTotalProducts ? totalProductCount : (resolvedLoading ? viewportProductCount : products.length);
+  const loadingCount = resolvedLoading ? resolveLoadingItemCount(hasKnownTotalProducts ? totalProductCount : undefined, viewportProductCount) : 0;
   const loadingMoreCount = hasKnownTotalProducts
-    ? Math.max(0, Math.min(PRODUCT_LIST_PAGE_SIZE, totalProductCount - products.length))
+    ? resolveLoadingItemCount(Math.max(0, totalProductCount - products.length), viewportProductCount)
     : 0;
   const resolvedFilters = filters ?? EMPTY_PRODUCT_FILTERS;
 
@@ -85,10 +87,6 @@ export function ProductListingPage({
     window.setTimeout(() => setCartMessage(""), 1800);
   };
 
-  if (initialPageLoading) {
-    return <Loading loading="page" size="xl" />;
-  }
-
   return (
     <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-5 px-4 py-6">
@@ -103,7 +101,7 @@ export function ProductListingPage({
           filters={resolvedFilters}
           onFiltersChange={onFiltersChange}
         >
-          {!loading && products.length === 0 ? (
+          {!resolvedLoading && products.length === 0 ? (
             <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">{emptyText}</div>
           ) : null}
 
@@ -113,7 +111,7 @@ export function ProductListingPage({
 
           <ProductListGrid
             products={products}
-            loading={loading}
+            loading={resolvedLoading}
             loadingCount={loadingCount}
             loadingMore={loadingMore}
             loadingMoreCount={loadingMoreCount}

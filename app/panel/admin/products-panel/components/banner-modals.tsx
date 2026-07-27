@@ -39,7 +39,7 @@ export function BannerModals(props: BannerModalsProps) {
       <BannerModal
         open={props.isBannerOpen}
         onClose={props.onCloseBanner}
-        title="Register banner"
+        title="ثبت بنر"
         banner={props.draftBanner}
         showcases={props.showcases}
         imageUrl={props.draftBannerImageUrl}
@@ -52,8 +52,8 @@ export function BannerModals(props: BannerModalsProps) {
         onRemoveImage={(imageUrl) => props.onRemoveBannerImage(imageUrl, "draft")}
         onPreview={props.onPreview}
         onSubmit={props.onSubmitBanner}
-        submitLabel="Register banner"
-        emptyPreviewLabel="Banner preview"
+        submitLabel="ثبت بنر"
+        emptyPreviewLabel="پیش‌نمایش بنر"
       />
       <BannerModal
         open={props.isEditBannerOpen}
@@ -123,7 +123,7 @@ function BannerModal({
     <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg">
       {banner ? (
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto rounded-lg border border-primary-border bg-primary-card p-3">
-          <CustomInput value={banner.title} placeholder="Banner title" onChange={(event) => onPatch({ title: event.target.value })} />
+          <CustomInput value={banner.title} placeholder="عنوان بنر" onChange={(event) => onPatch({ title: event.target.value })} />
           <CustomInput
             type="number"
             value={banner.homeSortOrder}
@@ -134,7 +134,7 @@ function BannerModal({
             <div className="text-sm font-bold text-primary-text">محل نمایش بنر</div>
             <div className="flex flex-wrap gap-2">
               <BannerTargetCheckbox label="خانه" checked={banner.showOnHome} onChange={(showOnHome) => onPatch({ showOnHome })} />
-              <BannerTargetCheckbox label="دسته بندی" checked={banner.showOnCategories} onChange={(showOnCategories) => onPatch({ showOnCategories })} />
+              <BannerTargetCheckbox label="دسته‌بندی" checked={banner.showOnCategories} onChange={(showOnCategories) => onPatch({ showOnCategories })} />
               <BannerTargetCheckbox label="ویترین" checked={banner.showOnProducts} onChange={(showOnProducts) => onPatch({ showOnProducts })} />
               <label className="hidden cursor-pointer items-center gap-2 rounded-md border border-primary-border bg-primary-card px-3 py-2 text-sm font-semibold text-primary-text">
                 <input
@@ -172,8 +172,8 @@ function BannerModal({
             ) : null}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
-            <CustomInput name={`${errorKey}-interval-seconds`} type="number" min={1} max={60} step={1} value={banner.intervalSeconds} placeholder="Auto advance seconds" onChange={(event) => onPatch({ intervalSeconds: Number(event.target.value) })} />
-            <CustomInput name={`${errorKey}-height-percent`} type="number" min={10} max={100} step={1} value={banner.heightPercent} placeholder="Height percent" onChange={(event) => onPatch({ heightPercent: Number(event.target.value) })} />
+            <CustomInput name={`${errorKey}-interval-seconds`} type="number" min={1} max={60} step={1} value={banner.intervalSeconds} placeholder="زمان تغییر خودکار" onChange={(event) => onPatch({ intervalSeconds: Number(event.target.value) })} />
+            <CustomInput name={`${errorKey}-height-percent`} type="number" min={10} max={100} step={1} value={banner.heightPercent} placeholder="درصد ارتفاع" onChange={(event) => onPatch({ heightPercent: Number(event.target.value) })} />
           </div>
           <div
             data-invalid={hasRequiredError(errorKey) && banner.imageUrls.length === 0 ? "true" : undefined}
@@ -182,11 +182,11 @@ function BannerModal({
               hasRequiredError(errorKey) && banner.imageUrls.length === 0 ? "border-danger-border-nomode" : "border-primary-border"
             }`}
           >
-            <RequiredLabel required className="text-primary-text">Banner images</RequiredLabel>
+            <RequiredLabel required className="text-primary-text">تصاویر بنر</RequiredLabel>
             <div className="flex gap-2">
               <CustomInput value={imageUrl} placeholder="آدرس تصویر" onChange={(event) => setImageUrl(event.target.value)} />
               <CustomButton icon={<IoAdd />} onClick={onAddImageUrl}>
-                افزودن
+                <span>افزودن</span>
               </CustomButton>
             </div>
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-4 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
@@ -199,10 +199,10 @@ function BannerModal({
               {banner.imageUrls.map((item, index) => (
                 <div key={`${item}-${index}`} className="flex min-w-40 flex-col gap-2">
                   <button type="button" className="h-24 overflow-hidden rounded-md border border-primary-border bg-primary-media" onClick={() => onPreview(item)} aria-label="باز کردن تصویر بنر">
-                    <img src={item} alt={`Banner image ${index + 1}`} className="h-full w-full object-cover" />
+                    <img src={item} alt={`تصویر بنر ${index + 1}`} className="h-full w-full object-cover" />
                   </button>
                   <CustomButton variant="danger" size="sm" icon={<IoTrashOutline />} onClick={() => onRemoveImage(item)}>
-                    Remove
+                    <span>حذف</span>
                   </CustomButton>
                 </div>
               ))}
@@ -211,11 +211,11 @@ function BannerModal({
           <CustomSwitch checked={banner.active} onChange={(active) => onPatch({ active })} label={banner.active ? "فعال" : "مخفی"} size="sm" />
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
-              {submitLabel}
+              <span>{submitLabel}</span>
             </CustomButton>
             {onDelete ? (
               <CustomButton variant="danger" fullWidth icon={<IoTrashOutline />} onClick={onDelete}>
-                حذف
+                <span>حذف</span>
               </CustomButton>
             ) : null}
           </div>

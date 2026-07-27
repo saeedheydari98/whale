@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
   try {
     const authUser = await getAuthUser(request);
-    if (!authUser) return apiFail("برای ارسال درخواست مدیریت ابتدا وارد حساب شوید.", 401);
+    if (!authUser) return apiFail("برای ثبت درخواست وارد حساب شوید.", 401);
 
     if (authUser.role === "superadmin" || authUser.role === "admin") {
       return apiOk({
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const phone = String(profile?.phone || authUser.username || "").trim();
 
     if (!phone) {
-      return apiFail("برای ثبت درخواست مدیریت باید شماره موبایل حساب شما ثبت شده باشد.", 400);
+      return apiFail("شماره موبایل را در پروفایل کامل کنید.", 400);
     }
 
     const existing = await prisma.adminAccessRequest.findFirst({
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     return apiOk({
       security: { hasCode: false, isPanelLocked: false },
       access: { isAdminUnlocked: false, status: requestRecord.status },
-    }, { message: "درخواست مدیریت برای مدیر ارشد ارسال شد." });
+    }, { message: "درخواست برای مدیر ارشد ارسال شد." });
   } catch (error) {
     console.error("Admin access request compatibility error:", error);
     return apiServerError();

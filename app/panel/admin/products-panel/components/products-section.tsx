@@ -3,8 +3,10 @@
 import { useMemo, useState } from "react";
 import { IoCreateOutline, IoSearchOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { createProduct } from "../factories";
 import type { BrandForm, ProductForm } from "../types";
 import { formatPrice } from "../utils";
 
@@ -19,6 +21,18 @@ type ProductsSectionProps = {
   isLoading?: boolean;
 };
 
+function createLoadingProducts(count: number): ProductForm[] {
+  return Array.from({ length: count }, (_, index) => ({
+    ...createProduct(),
+    id: `loading-product-${index + 1}`,
+    title: `محصول ${index + 1}`,
+    price: "1000000",
+    discountPrice: "900000",
+    brand: "loading-brand",
+    sortOrder: index + 1,
+  }));
+}
+
 export function ProductsSection({
   products,
   brands,
@@ -30,6 +44,13 @@ export function ProductsSection({
   isLoading = false,
 }: ProductsSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const viewportProductCount = useLoadingViewportCount("admin-product-card");
+  const productLoadingCount = resolveLoadingItemCount(products.length || undefined, viewportProductCount);
+  const displayProducts = isLoading
+    ? products.length > 0
+      ? products.slice(0, productLoadingCount)
+      : createLoadingProducts(productLoadingCount)
+    : products;
   const brandTitleById = useMemo(() => {
     const entries: Array<[string, string]> = brands.flatMap((brand) => [
       [brand.id, brand.title],
@@ -38,10 +59,12 @@ export function ProductsSection({
     return new Map(entries);
   }, [brands]);
   const visibleProducts = useMemo(() => {
-    const normalizedSearch = searchQuery.trim().toLowerCase();
-    if (!normalizedSearch) return products;
+    if (isLoading && products.length === 0) return displayProducts;
 
-    return products.filter((product) => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+    if (!normalizedSearch) return displayProducts;
+
+    return displayProducts.filter((product) => {
       const brandTitle = brandTitleById.get(product.brand) ?? "";
       const searchText = [
         product.id,
@@ -65,8 +88,7 @@ export function ProductsSection({
 
       return searchText.includes(normalizedSearch);
     });
-  }, [brandTitleById, products, searchQuery]);
-  const loadingSkeletonCount = isLoading ? Math.max(visibleProducts.length, 4) : 0;
+  }, [brandTitleById, displayProducts, isLoading, products.length, searchQuery]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -101,14 +123,6 @@ export function ProductsSection({
       ) : null}
 
       <div className="flex flex-wrap gap-2.5">
-        {loadingSkeletonCount > 0 ? (
-          Array.from({ length: loadingSkeletonCount }, (_, item) => (
-            <Loading key={item} loading="skeleton-card" isLoading className="h-16 w-full max-w-64">
-              <div className="h-16 w-full max-w-64 rounded-lg border border-primary-border bg-primary-card" />
-            </Loading>
-          ))
-        ) : null}
-
         {visibleProducts.map((product) => {
           const productBrandTitle = brandTitleById.get(product.brand);
 

@@ -60,7 +60,7 @@ export default function CategoriesPage() {
     <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
-          <div className="text-3xl font-bold">دسته بندی محصولات فروشگاه وال</div>
+          <div className="text-3xl font-bold">دسته‌بندی محصولات فروشگاه وال</div>
         </div>
 
         {showWhaleLoading ? (
@@ -82,7 +82,7 @@ export default function CategoriesPage() {
                   <div className="flex flex-wrap gap-4">
                     {[0, 1, 2, 3].map((item) => (
                       <Loading key={item} loading="skeleton-item" isLoading>
-                        <CategoryOption label="دسته بندی" imageUrl="" size="lg" />
+                        <CategoryOption label="دسته‌بندی" imageUrl="" size="lg" />
                       </Loading>
                     ))}
                   </div>
@@ -94,7 +94,7 @@ export default function CategoriesPage() {
 
         {!loading && visibleCategories.length === 0 ? (
           <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
-            در حال حاضر دسته بندی فعالی وجود ندارد.
+            دسته‌بندی فعالی وجود ندارد.
           </div>
         ) : null}
 

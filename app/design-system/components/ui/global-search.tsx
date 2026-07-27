@@ -206,7 +206,7 @@ export function GlobalSearch() {
             type="search"
             value={value}
             onChange={handleSearchChange}
-            placeholder="جستجو محصول ..."
+            placeholder="جست‌وجوی محصول…"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="none"
@@ -267,7 +267,7 @@ export function GlobalSearch() {
       {showPanel ? (
         <div className="absolute top-full z-40 mt-2 flex w-full min-w-72 flex-col overflow-hidden rounded-lg border border-primary-border bg-primary-card shadow-lg md:w-72">
           {loading ? (
-            <div className="px-3 py-3 text-sm font-semibold text-secondary-text">در حال جستجو...</div>
+            <div className="px-3 py-3 text-sm font-semibold text-secondary-text">در حال جست‌وجو…</div>
           ) : results.length > 0 ? (
             <div className="flex max-h-80 flex-col overflow-y-auto">
               {results.map((product) => (

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline, IoTimeOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
@@ -41,7 +42,44 @@ type AdminOrder = {
   items: AdminOrderItem[];
 };
 
+type AdminOrderCard = {
+  order: AdminOrder;
+  item: AdminOrderItem;
+};
+
 const ADMIN_ORDERS_URL = "/api/admin/orders";
+
+function createLoadingOrderCards(count: number): AdminOrderCard[] {
+  return Array.from({ length: count }, (_, index) => {
+    const orderId = `loading-order-${index + 1}`;
+    return {
+      order: {
+        id: orderId,
+        status: "paid",
+        fulfillmentStatus: "pending",
+        total: "۰ تومان",
+        createdAt: new Date(0).toISOString(),
+        user: { username: "کاربر" },
+        profile: {
+          firstName: "کاربر",
+          lastName: "فروشگاه",
+          phone: "۰۹۰۰۰۰۰۰۰۰۰",
+          address: "نشانی سفارش",
+        },
+        items: [],
+      },
+      item: {
+        id: `loading-item-${index + 1}`,
+        title: `محصول ${index + 1}`,
+        price: "۰ تومان",
+        discountPrice: null,
+        imageUrl: "",
+        selectedColor: "رنگ",
+        quantity: 1,
+      },
+    };
+  });
+}
 
 function formatDate(value?: string | null) {
   if (!value) return "";
@@ -182,8 +220,9 @@ export function AdminOrdersPanel() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const viewportOrderCount = useLoadingViewportCount("admin-order-card");
 
-  const orderCards = useMemo(() => {
+  const orderCards = useMemo<AdminOrderCard[]>(() => {
     const normalizedSearch = searchQuery.trim().toLowerCase();
     const fromTime = getDateBound(dateFrom);
     const toTime = getDateBound(dateTo, true);
@@ -199,9 +238,12 @@ export function AdminOrdersPanel() {
   }, [dateFrom, dateTo, orders, searchQuery]);
 
   const hasFilters = Boolean(searchQuery.trim() || dateFrom || dateTo);
-  const loadingCardCount = loading
-    ? Math.min(6, Math.max(3, orderCards.length))
-    : 0;
+  const loadingOrderCount = resolveLoadingItemCount(orderCards.length || undefined, viewportOrderCount);
+  const visibleOrderCards = loading
+    ? orderCards.length > 0
+      ? orderCards.slice(0, loadingOrderCount)
+      : createLoadingOrderCards(loadingOrderCount)
+    : orderCards;
 
   const loadOrders = async (options?: { force?: boolean }) => {
     setLoading(true);
@@ -260,10 +302,12 @@ export function AdminOrdersPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="text-base font-bold text-primary-text">خریدها</div>
-          <span className="text-xs font-semibold text-secondary-text">{orderCards.length} کارت خرید</span>
+          <Loading loading="skeleton-item" isLoading={loading}>
+            <span className="text-xs font-semibold text-secondary-text">{visibleOrderCards.length} کارت خرید</span>
+          </Loading>
         </div>
         <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void loadOrders({ force: true })} isLoading={loading}>
-          <span>به روزرسانی</span>
+          <span>به‌روزرسانی</span>
         </CustomButton>
       </div>
 
@@ -271,7 +315,7 @@ export function AdminOrdersPanel() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-col gap-1">
             <div className="text-sm font-bold text-primary-text">فیلتر خریدها</div>
-            <span className="text-xs font-semibold text-secondary-text">تاریخ را با تقویم فارسی و به شکل ۱۴۰۳/۰۱/۰۱ وارد کنید.</span>
+            <span className="text-xs font-semibold text-secondary-text">نمونه تاریخ: ۱۴۰۳/۰۱/۰۱</span>
           </div>
           {hasFilters ? (
             <CustomButton
@@ -337,94 +381,117 @@ export function AdminOrdersPanel() {
         </div>
       ) : null}
 
-      {loadingCardCount > 0 ? (
-        <div className="flex flex-wrap gap-3">
-          {Array.from({ length: loadingCardCount }, (_, item) => (
-            <Loading key={item} loading="skeleton-card" isLoading className="h-32 w-full max-w-80">
-              <div className="h-32 w-full max-w-80 rounded-lg border border-primary-border bg-primary-card" />
-            </Loading>
-          ))}
-        </div>
-      ) : null}
-
       {!loading && orderCards.length === 0 ? (
         <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
           {hasFilters ? "خریدی با این فیلتر پیدا نشد." : "هنوز خریدی ثبت نشده است."}
         </div>
       ) : null}
 
-      {!loading && orderCards.length > 0 ? (
+      {visibleOrderCards.length > 0 ? (
         <div className="flex flex-wrap gap-3">
-          {orderCards.map(({ order, item }) => {
+          {visibleOrderCards.map(({ order, item }) => {
             const posted = order.fulfillmentStatus === "posted";
             const cardKey = `${order.id}-${item.id}`;
 
             return (
-              <div key={cardKey} className="flex w-full max-w-80 flex-col gap-2 rounded-lg border border-primary-border bg-primary-card p-2.5 shadow-sm">
+              <div
+                key={cardKey}
+                className={`flex w-full max-w-80 flex-col gap-2 rounded-lg border bg-primary-card p-2.5 shadow-sm ${
+                  loading ? "border-border-default" : "border-primary-border"
+                }`}
+              >
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
-                    ) : (
-                      <span className="text-[10px] text-secondary-text">بدون تصویر</span>
-                    )}
-                  </div>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <div className="line-clamp-1 text-sm font-bold text-primary-text">{item.title}</div>
-                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-secondary-text">
-                      <span>تعداد: {item.quantity}</span>
-                      {item.selectedColor ? <span>رنگ: {item.selectedColor}</span> : null}
+                  <Loading loading="skeleton-item" isLoading={loading} className="h-12 w-12 shrink-0">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-[10px] text-secondary-text">بدون تصویر</span>
+                      )}
                     </div>
-                    <span className="text-xs font-bold text-primary">{item.discountPrice || item.price || "بدون قیمت"}</span>
+                  </Loading>
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <div className="line-clamp-1 text-sm font-bold text-primary-text">{item.title}</div>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-secondary-text">
+                        <span>تعداد: {item.quantity}</span>
+                        {item.selectedColor ? <span>رنگ: {item.selectedColor}</span> : null}
+                      </div>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <span className="text-xs font-bold text-primary">{item.discountPrice || item.price || "بدون قیمت"}</span>
+                    </Loading>
                   </div>
                 </div>
 
                 <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-secondary-text">
-                  <span className="max-w-full truncate font-semibold text-primary-text">{customerName(order)}</span>
-                  <span>{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
-                  <span>{formatDate(order.createdAt)}</span>
+                  <Loading loading="skeleton-item" isLoading={loading}>
+                    <span className="max-w-full truncate font-semibold text-primary-text">{customerName(order)}</span>
+                  </Loading>
+                  <Loading loading="skeleton-item" isLoading={loading}>
+                    <span>{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
+                  </Loading>
+                  <Loading loading="skeleton-item" isLoading={loading}>
+                    <span>{formatDate(order.createdAt)}</span>
+                  </Loading>
                 </div>
-                {order.profile?.address ? <span className="line-clamp-1 text-xs text-secondary-text">{order.profile.address}</span> : null}
+                {order.profile?.address ? (
+                  <Loading loading="skeleton-item" isLoading={loading}>
+                    <span className="line-clamp-1 text-xs text-secondary-text">{order.profile.address}</span>
+                  </Loading>
+                ) : null}
 
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${
-                    posted
-                      ? "border-success-border bg-success-bg text-success-text"
-                      : "border-warning-border bg-warning-bg text-warning-text"
-                  }`}>
-                    {posted ? <IoCheckmarkCircleOutline aria-hidden="true" /> : <IoTimeOutline aria-hidden="true" />}
-                    <span>{posted ? "تحویل پست شده" : "در انتظار تحویل پست"}</span>
-                  </span>
+                  <Loading loading="skeleton-item" isLoading={loading}>
+                    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${
+                      posted
+                        ? "border-success-border bg-success-bg text-success-text"
+                        : "border-warning-border bg-warning-bg text-warning-text"
+                    }`}>
+                      {posted ? <IoCheckmarkCircleOutline aria-hidden="true" /> : <IoTimeOutline aria-hidden="true" />}
+                      <span>{posted ? "تحویل پست شده" : "در انتظار تحویل پست"}</span>
+                    </span>
+                  </Loading>
                 </div>
 
                 <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
-                  <CustomInput
-                    value={trackingDrafts[order.id] ?? ""}
-                    onChange={(event) => setTrackingDrafts((current) => ({ ...current, [order.id]: event.target.value }))}
-                    placeholder="کد پیگیری پست"
-                    aria-label="کد پیگیری پست"
-                    showLabel={false}
-                    size="sm"
-                    rounded="md"
-                  />
+                  <Loading loading="skeleton-item" isLoading={loading} className="w-full">
+                    <CustomInput
+                      value={trackingDrafts[order.id] ?? ""}
+                      onChange={(event) => setTrackingDrafts((current) => ({ ...current, [order.id]: event.target.value }))}
+                      placeholder="کد پیگیری پست"
+                      aria-label="کد پیگیری پست"
+                      showLabel={false}
+                      size="sm"
+                      rounded="md"
+                      disabled={loading}
+                    />
+                  </Loading>
                   <div className="flex flex-wrap gap-1.5">
-                    <CustomButton
-                      size="sm"
-                      variant="success"
-                      icon={<IoCheckmarkCircleOutline />}
-                      isLoading={savingId === order.id}
-                      onClick={() => void updateOrderDelivery(order.id, "posted")}
-                    >
-                      <span>تحویل پست شد</span>
-                    </CustomButton>
-                    <CustomButton
-                      size="sm"
-                      variant="neutral"
-                      disabled={savingId === order.id}
-                      onClick={() => void updateOrderDelivery(order.id, "pending")}
-                    >
-                      <span>در انتظار ارسال</span>
-                    </CustomButton>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <CustomButton
+                        size="sm"
+                        variant="success"
+                        icon={<IoCheckmarkCircleOutline />}
+                        isLoading={savingId === order.id}
+                        disabled={loading}
+                        onClick={() => void updateOrderDelivery(order.id, "posted")}
+                      >
+                        <span>تحویل پست شد</span>
+                      </CustomButton>
+                    </Loading>
+                    <Loading loading="skeleton-item" isLoading={loading}>
+                      <CustomButton
+                        size="sm"
+                        variant="neutral"
+                        disabled={loading || savingId === order.id}
+                        onClick={() => void updateOrderDelivery(order.id, "pending")}
+                      >
+                        <span>در انتظار ارسال</span>
+                      </CustomButton>
+                    </Loading>
                   </div>
                 </div>
               </div>

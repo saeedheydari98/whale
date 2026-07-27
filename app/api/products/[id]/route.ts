@@ -15,7 +15,7 @@ type Context = { params: Promise<{ id: string }> };
 
 async function getProductViewerState(productId: number, request: Request) {
   const authUser = await getAuthUser(request);
-  if (!authUser) return { isPurchased: false, hasRated: false };
+  if (!authUser) return { isPurchased: false, hasRated: false, userRating: null };
 
   const [purchased, previousRating] = await Promise.all([
     prisma.orderItem.findFirst({
@@ -34,13 +34,14 @@ async function getProductViewerState(productId: number, request: Request) {
         userId: authUser.id,
         rating: { not: null },
       },
-      select: { id: true },
+      select: { id: true, rating: true },
     }),
   ]);
 
   return {
     isPurchased: Boolean(purchased),
     hasRated: Boolean(previousRating),
+    userRating: previousRating?.rating ?? null,
   };
 }
 
@@ -57,7 +58,7 @@ export async function GET(request: Request, context: Context) {
     const productId = Number(detail.product?.id);
     const viewerState = Number.isInteger(productId) && productId > 0
       ? await getProductViewerState(productId, request)
-      : { isPurchased: false, hasRated: false };
+      : { isPurchased: false, hasRated: false, userRating: null };
 
     return apiOk({ ...detail, ...viewerState });
   } catch (error) {

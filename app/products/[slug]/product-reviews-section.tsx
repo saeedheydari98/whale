@@ -17,6 +17,7 @@ type ProductReviewsSectionProps = {
   reviews: ProductReview[];
   text: string;
   rating?: number;
+  userRating?: number;
   isPurchased: boolean;
   hasRated: boolean;
   error?: string;
@@ -57,6 +58,7 @@ export function ProductReviewsSection({
   reviews,
   text,
   rating,
+  userRating,
   isPurchased,
   hasRated,
   error,
@@ -78,6 +80,7 @@ export function ProductReviewsSection({
   const distribution = useMemo(() => buildDistribution(reviews), [reviews]);
   const maxCount = Math.max(1, ...distribution.map((item) => item.count));
   const canRate = isPurchased && !hasRated;
+  const displayRating = rating ?? userRating ?? 0;
 
   return (
     <section
@@ -87,7 +90,7 @@ export function ProductReviewsSection({
       <div className="flex flex-col gap-2 border-b border-primary-border pb-6">
         <div className="text-2xl font-bold text-primary-text">دیدگاه‌های خریداران</div>
         <div className="text-sm text-secondary-text">
-          تجربه خریداران را بخوانید و نظر خودتان را درباره این محصول ثبت کنید.
+          نظر خریداران و امتیازها را ببینید.
         </div>
       </div>
 
@@ -136,7 +139,7 @@ export function ProductReviewsSection({
               <div className="text-sm font-medium text-primary-text">امتیاز شما</div>
               <div className="flex flex-wrap items-center gap-3">
                 <StarRating
-                  value={rating ?? 0}
+                  value={displayRating}
                   size="lg"
                   interactive
                   disabled={!canRate}
@@ -152,17 +155,17 @@ export function ProductReviewsSection({
               </div>
               {!isPurchased ? (
                 <div className="text-xs leading-5 text-secondary-text">
-                  فقط خریداران تاییدشده می‌توانند امتیاز ستاره‌ای ثبت کنند. همچنان می‌توانید دیدگاه متنی بنویسید.
+                  امتیاز ستاره‌ای فقط برای خریداران فعال است.
                 </div>
               ) : hasRated ? (
                 <div className="flex items-center gap-1 text-xs font-medium text-secondary-text">
                   <IoCheckmarkCircle aria-hidden="true" />
-                  <span>امتیاز شما برای این محصول قبلا ثبت شده است.</span>
+                  <span>می‌توانید دیدگاه متنی هم ثبت کنید.</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-1 text-xs font-medium text-green-600">
                   <IoCheckmarkCircle aria-hidden="true" />
-                  <span>خرید تایید شده است؛ می‌توانید به این محصول امتیاز بدهید</span>
+                  <span>خرید تایید شده است.</span>
                 </div>
               )}
             </div>
@@ -204,7 +207,7 @@ export function ProductReviewsSection({
                 <IoChatbubbleEllipsesOutline className="text-4xl text-primary-border" aria-hidden="true" />
                 <div className="text-base font-semibold text-primary-text">هنوز دیدگاهی ثبت نشده است</div>
                 <div className="max-w-sm text-sm text-secondary-text">
-                  اولین نفری باشید که تجربه خود را درباره این محصول ثبت می‌کند.
+                  اولین دیدگاه این محصول را ثبت کنید.
                 </div>
               </div>
             ) : (
@@ -225,7 +228,7 @@ export function ProductReviewsSection({
                             </span>
                           </div>
                         ) : (
-                          <div className="text-xs text-secondary-text">فقط دیدگاه متنی؛ بدون امتیاز</div>
+                          <div className="text-xs text-secondary-text"></div>
                         )}
                       </div>
                       <div className="text-xs text-secondary-text">{formatReviewDate(review.createdAt)}</div>

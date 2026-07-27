@@ -52,7 +52,7 @@ export async function GET(request: Request, context: Context) {
               userId: authUser.id,
               rating: { not: null },
             },
-            select: { id: true },
+            select: { id: true, rating: true },
           }),
         ])
       : [null, null];
@@ -60,6 +60,7 @@ export async function GET(request: Request, context: Context) {
       comments,
       isPurchased: Boolean(purchased),
       hasRated: Boolean(previousRating),
+      userRating: previousRating?.rating ?? null,
     });
   } catch (error) {
     console.error("Comments GET error:", error);
@@ -81,7 +82,7 @@ export async function POST(request: Request, context: Context) {
     if (!product) return apiFail("محصول پیدا نشد.", 404);
 
     if (parsed.data.rating) {
-      if (!authUser) return apiFail("برای ثبت امتیاز ابتدا وارد حساب شوید.", 401);
+      if (!authUser) return apiFail("برای ثبت امتیاز وارد حساب شوید.", 401);
       const purchased = await prisma.orderItem.findFirst({
         where: {
           productId: product.id,
@@ -91,7 +92,7 @@ export async function POST(request: Request, context: Context) {
           },
         },
       });
-      if (!purchased) return apiFail("فقط خریداران این محصول می توانند امتیاز ثبت کنند.", 403);
+      if (!purchased) return apiFail("امتیاز ستاره‌ای فقط برای خریداران فعال است.", 403);
 
       const previousRating = await prisma.comment.findFirst({
         where: {
@@ -100,7 +101,7 @@ export async function POST(request: Request, context: Context) {
           rating: { not: null },
         },
       });
-      if (previousRating) return apiFail("شما قبلا برای این محصول امتیاز ثبت کرده اید.", 409);
+      if (previousRating) return apiFail("شما قبلا به این محصول امتیاز داده‌اید.", 409);
     }
 
     const comment = await prisma.comment.create({

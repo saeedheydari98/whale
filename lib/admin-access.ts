@@ -69,7 +69,7 @@ export async function requestAdminAccess() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
-  const data = await readApiJson(response, "ثبت درخواست مدیریت ناموفق بود.");
+  const data = await readApiJson(response, "ثبت درخواست ناموفق بود.");
   invalidateAdminRequestsCache();
   emitAdminAccessUpdated();
   return data?.data?.request as AdminAccessRequestRecord | null;
@@ -88,7 +88,7 @@ export async function fetchAdminAccessRequests(options?: { force?: boolean }) {
 
   pendingAdminRequests = fetch(ADMIN_REQUESTS_ENDPOINT, { cache: "no-store" })
     .then(async (response) => {
-      const data = await readApiJson(response, "بارگذاری درخواست های مدیریت ناموفق بود.");
+      const data = await readApiJson(response, "بارگذاری درخواست‌ها ناموفق بود.");
       const requests = Array.isArray(data?.data?.requests)
         ? data.data.requests as AdminAccessRequestRecord[]
         : [];
@@ -114,7 +114,7 @@ export async function reviewAdminAccessRequest(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, action }),
   });
-  const data = await readApiJson(response, "به روزرسانی درخواست مدیریت ناموفق بود.");
+  const data = await readApiJson(response, "به‌روزرسانی درخواست ناموفق بود.");
   invalidateAdminRequestsCache();
   clearAppGlobalCache();
   emitAdminAccessUpdated();

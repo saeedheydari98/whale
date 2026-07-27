@@ -150,7 +150,7 @@ function ProductModal({
 
           <div className="flex min-h-10 items-center rounded-md border border-primary-border bg-primary-card">
             <span className="text-xs text-secondary-text">
-              فرمول تخفیف: ((قیمت قبل از تخفیف - قیمت با تخفیف) / قیمت قبل از تخفیف) × ۱۰۰
+              درصد تخفیف از اختلاف دو قیمت محاسبه می‌شود.
             </span>
           </div>
 
@@ -164,7 +164,7 @@ function ProductModal({
 
           <div className="flex flex-col gap-3 rounded-lg border border-primary-border">
             <div className="text-sm font-bold">تصویر محصول</div>
-            <CustomInput value={product.imageUrl} placeholder="آدرس تصویر یا داده تصویر بارگذاری‌شده" onChange={(event) => onPatch({ imageUrl: event.target.value })} />
+            <CustomInput value={product.imageUrl} placeholder="آدرس تصویر" onChange={(event) => onPatch({ imageUrl: event.target.value })} />
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-4 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
               <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
               <span className="text-sm font-semibold">بارگذاری تصویر</span>
@@ -182,12 +182,12 @@ function ProductModal({
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <CustomButton isLoading={saving} loading="dots" loadingText="در حال ذخیره..." fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
-              {submitLabel}
+            <CustomButton isLoading={saving} loading="dots" loadingText="در حال ذخیره…" fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
+              <span>{submitLabel}</span>
             </CustomButton>
             {onDelete ? (
               <CustomButton variant="danger" fullWidth icon={<IoTrashOutline />} onClick={onDelete}>
-                حذف
+                <span>حذف</span>
               </CustomButton>
             ) : null}
           </div>

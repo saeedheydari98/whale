@@ -10,6 +10,23 @@ import { PRODUCT_COLOR_OPTIONS, STOCK_OPTIONS } from "../constants";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
 import { imageListToText, normalizeColorStock, textToImageList } from "../utils";
 
+const PRODUCT_COLOR_LABELS: Record<string, string> = {
+  black: "مشکی",
+  white: "سفید",
+  gray: "خاکستری",
+  red: "قرمز",
+  blue: "آبی",
+  green: "سبز",
+  yellow: "زرد",
+  orange: "نارنجی",
+  purple: "بنفش",
+  pink: "صورتی",
+};
+
+function productColorLabel(color: string) {
+  return PRODUCT_COLOR_LABELS[color] ?? color;
+}
+
 type InventoryControlsProps = {
   product: ProductForm;
   onChange: (patch: Partial<ProductForm>) => void;
@@ -75,7 +92,7 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
               <button
                 key={color}
                 type="button"
-                aria-label={`${color} stock`}
+                aria-label={`موجودی رنگ ${productColorLabel(color)}`}
                 onClick={() => setSelectedColor(color)}
                 className={`flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-bold tabular-nums transition hover:scale-105 ${
                   selected ? "border-primary text-primary-text ring-2 ring-primary-border" : "border-primary-border text-primary-text"
@@ -89,11 +106,11 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
         </div>
 
         <div className="flex w-24 shrink-0 flex-col gap-1">
-          <span className="truncate text-[11px] font-bold text-primary-text">{selectedColor}</span>
+          <span className="truncate text-[11px] font-bold text-primary-text">{productColorLabel(selectedColor)}</span>
           <CustomSelect
             size="sm"
             value={String(selectedCount)}
-            aria-label={`${selectedColor} stock quantity`}
+            aria-label={`تعداد موجودی رنگ ${productColorLabel(selectedColor)}`}
             className="h-8 py-1 text-xs"
             onChange={(event) => updateColorStock(selectedColor, Number(event.target.value))}
           >
@@ -177,7 +194,7 @@ export function ProductPlacementFields({
     <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-bold text-primary-text">جایگاه محصول</div>
-        <span className="text-[11px] font-semibold text-secondary-text">انتخاب‌های محصول</span>
+        <span className="text-[11px] font-semibold text-secondary-text">دسته‌بندی، ویترین و برند</span>
       </div>
 
       <SelectionGroup
@@ -271,20 +288,20 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
     <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
       <div className="text-sm font-bold text-primary-text">جزئیات محصول</div>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <CustomInput value={product.manufactureYear} placeholder="Manufacture year" onChange={(event) => onChange({ manufactureYear: event.target.value })} />
+        <CustomInput value={product.manufactureYear} placeholder="سال تولید" onChange={(event) => onChange({ manufactureYear: event.target.value })} />
       </div>
-      <CustomInput value={imageListToText(product.images)} placeholder="Gallery image URLs" onChange={(event) => onChange({ images: textToImageList(event.target.value) })} />
-      <CustomInput value={product.videoUrl} placeholder="Video URL" onChange={(event) => onChange({ videoUrl: event.target.value })} />
+      <CustomInput value={imageListToText(product.images)} placeholder="آدرس تصاویر گالری" onChange={(event) => onChange({ images: textToImageList(event.target.value) })} />
+      <CustomInput value={product.videoUrl} placeholder="آدرس ویدیو" onChange={(event) => onChange({ videoUrl: event.target.value })} />
       <div className="flex flex-col gap-2 sm:flex-row">
         <CustomInput
           value={product.sku}
-          label="SKU (کد یکتای کالا)"
-          placeholder="Sku"
+          label="کد یکتای کالا"
+          placeholder="کد کالا"
           onChange={(event) => onChange({ sku: event.target.value })}
         />
       </div>
       <span className="text-xs font-semibold text-secondary-text">
-        SKU مخفف Stock Keeping Unit است؛ یک کد اختیاری و یکتا برای شناسایی محصول در انبار و سفارش‌ها.
+        کد اختیاری برای پیگیری محصول در انبار و سفارش‌ها.
       </span>
       <div className="flex flex-wrap gap-2">
         <CustomSwitch checked={product.isActive} onChange={(isActive) => onChange({ isActive, active: isActive })} label={product.isActive ? "فعال" : "مخفی"} size="sm" />

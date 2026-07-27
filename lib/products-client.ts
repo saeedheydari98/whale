@@ -229,6 +229,7 @@ export type ProductDetailResult = {
   recommendations: ProductRecord[];
   isPurchased?: boolean;
   hasRated?: boolean;
+  userRating?: number | null;
 };
 
 export function slugifyCatalogValue(value: string | number | null | undefined) {
@@ -1195,6 +1196,14 @@ export async function getProductDetail(
     const recommendations = Array.isArray(json?.data?.recommendations)
       ? json.data.recommendations.map(normalizeProductRecord)
       : [];
+    const rawUserRating = json?.data?.userRating;
+    const parsedUserRating = Number(rawUserRating);
+    const hasValidUserRating =
+      rawUserRating != null &&
+      Number.isInteger(parsedUserRating) &&
+      parsedUserRating >= 1 &&
+      parsedUserRating <= 5;
+    const userRating = hasValidUserRating ? parsedUserRating : null;
 
     return {
       product,
@@ -1202,6 +1211,7 @@ export async function getProductDetail(
       recommendations,
       isPurchased: Boolean(json?.data?.isPurchased),
       hasRated: Boolean(json?.data?.hasRated),
+      userRating,
     };
   } catch {
     return {

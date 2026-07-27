@@ -60,7 +60,7 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
 
   const submitAdminRequest = async (user = authUser) => {
     if (!user) {
-      setStatus("برای ارسال درخواست مدیریت ابتدا وارد حساب خود شوید.");
+      setStatus("برای ثبت درخواست وارد حساب شوید.");
       return false;
     }
 
@@ -74,10 +74,10 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
 
     try {
       await requestAdminAccess();
-      setStatus("درخواست مدیریت شما برای مدیر ارشد ارسال شد.");
+      setStatus("درخواست برای مدیر ارشد ارسال شد.");
       return true;
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "ثبت درخواست مدیریت ناموفق بود.");
+      setStatus(error instanceof Error ? error.message : "ثبت درخواست ناموفق بود.");
       return false;
     } finally {
       setIsSubmitting(false);
@@ -187,7 +187,7 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
       <div className="flex flex-col gap-1">
         <div className="text-xl font-bold text-primary-text">دسترسی مدیریت</div>
         <div className="text-sm text-secondary-text">
-          برای ورود به پنل مدیریت باید درخواست شما توسط مدیر ارشد تایید شود.
+          درخواستتان پس از تایید مدیر ارشد فعال می‌شود.
         </div>
       </div>
 
@@ -199,9 +199,9 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
       ) : authUser ? (
         <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3">
           <div className="flex flex-col gap-1">
-            <span className="text-sm font-bold text-primary-text">درخواست دسترسی مدیریت</span>
+            <span className="text-sm font-bold text-primary-text">درخواست مدیریت</span>
             <span className="text-xs text-secondary-text">
-              درخواست با شماره {userPhone || "ثبت نشده"} برای مدیر ارشد ارسال می شود.
+              شماره درخواست: {userPhone || "ثبت نشده"}
             </span>
           </div>
           <CustomButton
@@ -213,18 +213,18 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
             disabled={!userPhone}
             onClick={() => void submitAdminRequest()}
           >
-            <span>ارسال درخواست مدیریت</span>
+            <span>ارسال درخواست</span>
           </CustomButton>
           {!userPhone ? (
             <div className="text-xs font-semibold text-danger-text-nomode">
-              شماره موبایل حساب شما ثبت نشده است. ابتدا پروفایل کاربری را تکمیل کنید.
+              شماره موبایل را در پروفایل کامل کنید.
             </div>
           ) : null}
         </div>
       ) : (
         <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3">
           <div className="text-sm font-semibold text-primary-text">
-            برای ثبت درخواست مدیریت ابتدا وارد حساب خود شوید.
+            برای ثبت درخواست وارد حساب شوید.
           </div>
           <div className="flex gap-2 rounded-md border border-primary-border bg-primary-bg p-1">
             <button

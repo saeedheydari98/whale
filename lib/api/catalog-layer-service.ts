@@ -1140,6 +1140,7 @@ export async function getProductDetail(identifier: string, searchParams: URLSear
       recommendations: recommendations.products,
       isPurchased: false,
       hasRated: false,
+      userRating: null,
     };
   });
 }
