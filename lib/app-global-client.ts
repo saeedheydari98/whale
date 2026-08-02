@@ -14,19 +14,7 @@ const APP_GLOBAL_CACHE_KEY = "app-global:v1";
 const APP_GLOBAL_CACHE_MS = Number.POSITIVE_INFINITY;
 const APP_GLOBAL_RETRY_DELAYS_MS = [200, 700, 1500] as const;
 
-type AppMenuItem = {
-  href: string;
-  label: string;
-  adminOnly?: boolean;
-};
-
 export type AppGlobalData = {
-  site: {
-    name: string;
-    locale: string;
-    dir: "rtl" | "ltr";
-  };
-  menu: AppMenuItem[];
   user: AuthClientUser | null;
   cart: {
     count: number;
@@ -46,13 +34,6 @@ let memoryCache: CachedGlobalData | null = null;
 let pendingGlobal: Promise<AppGlobalData> | null = null;
 
 const fallbackGlobalData: AppGlobalData = {
-  site: { name: "وال", locale: "fa-IR", dir: "rtl" },
-  menu: [
-    { href: "/", label: "خانه" },
-    { href: "/categories", label: "دسته بندی" },
-    { href: "/products", label: "ویترین" },
-    { href: "/panel/user", label: "حساب کاربری" },
-  ],
   user: null,
   cart: { count: 0 },
   theme: { primary: "gray", style: "light" },
@@ -125,12 +106,6 @@ function normalizeGlobalData(
   const serverCartCount = Number(data?.cart?.count);
   const localCartCount = getCartCount(readLocalCart(null));
   return {
-    site: {
-      ...fallbackGlobalData.site,
-      ...(data?.site ?? {}),
-      dir: data?.site?.dir === "ltr" ? "ltr" : "rtl",
-    },
-    menu: Array.isArray(data?.menu) && data.menu.length > 0 ? data.menu : fallbackGlobalData.menu,
     user,
     cart: {
       count: user && Number.isFinite(serverCartCount) ? serverCartCount : localCartCount,
@@ -191,10 +166,6 @@ function mergeGlobalPatch(current: AppGlobalData, patch: Partial<AppGlobalData>)
   return normalizeGlobalData({
     ...current,
     ...patch,
-    site: {
-      ...current.site,
-      ...(patch.site ?? {}),
-    },
     cart: {
       ...current.cart,
       ...(patch.cart ?? {}),
@@ -235,7 +206,7 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
     .then(async (res) => {
       const payload = await res.json();
       if (!res.ok || payload?.ok === false) {
-        throw new Error(payload?.message || payload?.error || "بارگذاری اطلاعات کلی سامانه ناموفق بود.");
+        throw new Error(payload?.message || payload?.error || "Global app load failed.");
       }
       const data = normalizeGlobalData(payload?.data);
       writeGlobalCache(data);
@@ -246,12 +217,11 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
       const cached = readAnyCachedGlobalData();
       const currentUser = readCachedAuthUser();
       const themeFallback = cached?.theme ?? readStoredThemeFallback() ?? fallbackGlobalData.theme;
-      const data = normalizeGlobalData({
+      return normalizeGlobalData({
         ...(cached ?? fallbackGlobalData),
         user: currentUser ?? cached?.user ?? null,
         theme: themeFallback,
       }, { themeFallback });
-      return data;
     })
     .finally(() => {
       pendingGlobal = null;

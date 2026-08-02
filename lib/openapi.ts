@@ -952,24 +952,6 @@ export const openApiDocument = {
       AppGlobalData: {
         type: "object",
         properties: {
-          site: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              locale: { type: "string" },
-              dir: { type: "string", enum: ["rtl", "ltr"] },
-            },
-          },
-          menu: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                href: { type: "string" },
-                label: { type: "string" },
-              },
-            },
-          },
           user: {
             allOf: [ref("PublicUser")],
             nullable: true,

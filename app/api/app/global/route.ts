@@ -11,13 +11,6 @@ const defaultTheme = {
   style: "light",
 };
 
-const menu = [
-  { href: "/", label: "خانه" },
-  { href: "/categories", label: "دسته بندی" },
-  { href: "/products", label: "ویترین" },
-  { href: "/panel/user", label: "حساب کاربری" },
-];
-
 async function loadTheme() {
   try {
     if (!(prisma as any).adminTheme?.findFirst) return defaultTheme;
@@ -70,12 +63,6 @@ export async function GET(request: Request) {
     const count = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
     return apiOk({
-      site: {
-        name: "وال",
-        locale: "fa-IR",
-        dir: "rtl",
-      },
-      menu,
       user: authUser
         ? {
             ...authUser,
