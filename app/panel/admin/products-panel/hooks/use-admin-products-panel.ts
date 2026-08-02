@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { clearProductsCache, getCatalogStructure, getProducts, type ProductsCache } from "@/lib/products-client";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
@@ -47,11 +47,35 @@ type AdminCatalogSnapshot = {
   banners: BannerForm[];
 };
 
+export type AdminSkeletonHints = {
+  products?: number;
+  banners?: number;
+  showcases?: number;
+  categories?: number;
+  brands?: number;
+  storefront?: Partial<Record<StorefrontLayoutTab, number>>;
+  categoryGroups?: number;
+  categoryItemsByGroupId?: Record<string, number>;
+  brandGroups?: number;
+  brandItemsByGroupId?: Record<string, number>;
+  showcaseProductsById?: Record<string, number>;
+};
+
 type AdminCatalogLoadSection = AdminCatalogSection | "all" | "product-form";
 type LoadedAdminCatalogSections = Record<AdminCatalogSection, boolean>;
+type StorefrontLayoutItemType = "banner" | "showcase" | "categoryGroup" | "brandGroup";
+type StorefrontLayoutItem = {
+  type: StorefrontLayoutItemType;
+  id: string;
+  title: string;
+  sortOrder: number;
+};
+type StorefrontLayoutResponse = Record<StorefrontLayoutTab, StorefrontLayoutItem[]>;
 
 const ADMIN_CATALOG_SECTION_URL = "/api/admin/catalog";
+const ADMIN_SKELETON_HINTS_KEY = "admin-catalog-skeleton-hints:v1";
 const ADMIN_CATALOG_SECTIONS: AdminCatalogSection[] = ["products", "banners", "showcases", "categories", "brands", "storefront"];
+const STOREFRONT_HINT_TABS: StorefrontLayoutTab[] = ["home", "categories", "products"];
 const EMPTY_CATALOG: ProductsCache = {
   products: [],
   showcases: [],
@@ -112,13 +136,174 @@ async function getAdminCatalogSection(section: AdminCatalogLoadSection, options?
   return toProductsCache(json?.data?.catalog);
 }
 
+function normalizeStorefrontLayoutItem(value: unknown): StorefrontLayoutItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const type = String(record.type ?? "").trim() as StorefrontLayoutItemType;
+  const id = String(record.id ?? "").trim();
+  const sortOrder = normalizedCount(record.sortOrder);
+
+  if (!id || sortOrder === undefined) return null;
+  if (type !== "banner" && type !== "showcase" && type !== "categoryGroup" && type !== "brandGroup") return null;
+
+  return {
+    type,
+    id,
+    title: String(record.title ?? ""),
+    sortOrder,
+  };
+}
+
+function normalizeStorefrontLayout(value: unknown): StorefrontLayoutResponse {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const productsValue = Array.isArray(record.products) ? record.products : record.showcases;
+  const normalizeItems = (items: unknown) => Array.isArray(items)
+    ? items.map(normalizeStorefrontLayoutItem).filter((item): item is StorefrontLayoutItem => Boolean(item))
+    : [];
+
+  return {
+    home: normalizeItems(record.home),
+    categories: normalizeItems(record.categories),
+    products: normalizeItems(productsValue),
+  };
+}
+
+async function getAdminStorefrontLayout(options?: { force?: boolean }) {
+  const json = await fetchJsonDeduped<{
+    ok?: boolean;
+    data?: { storefront?: unknown };
+    message?: string;
+    error?: string;
+  }>(`${ADMIN_CATALOG_SECTION_URL}/storefront`, { force: options?.force });
+
+  if (json?.ok === false) throw new Error(json.message || json.error || "Ø¯Ø±ÛŒØ§ÙØª Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ù…Ù…Ú©Ù† Ù†Ø´Ø¯.");
+  return normalizeStorefrontLayout(json?.data?.storefront);
+}
+
+function normalizeHintRecord(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .map(([key, count]) => [key, normalizedCount(count)] as const)
+    .filter((entry): entry is readonly [string, number] => entry[1] !== undefined);
+
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function normalizeStorefrontHints(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const next: Partial<Record<StorefrontLayoutTab, number>> = {};
+
+  for (const tab of STOREFRONT_HINT_TABS) {
+    const count = normalizedCount(record[tab]);
+    if (count !== undefined) next[tab] = count;
+  }
+
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function normalizeSkeletonHints(value: unknown): AdminSkeletonHints {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+
+  return {
+    products: normalizedCount(record.products),
+    banners: normalizedCount(record.banners),
+    showcases: normalizedCount(record.showcases),
+    categories: normalizedCount(record.categories),
+    brands: normalizedCount(record.brands),
+    storefront: normalizeStorefrontHints(record.storefront),
+    categoryGroups: normalizedCount(record.categoryGroups),
+    categoryItemsByGroupId: normalizeHintRecord(record.categoryItemsByGroupId),
+    brandGroups: normalizedCount(record.brandGroups),
+    brandItemsByGroupId: normalizeHintRecord(record.brandItemsByGroupId),
+    showcaseProductsById: normalizeHintRecord(record.showcaseProductsById),
+  };
+}
+
 function markCatalogSectionsLoaded(current: LoadedAdminCatalogSections, sections: AdminCatalogSection[]) {
   const next = { ...current };
   for (const section of sections) next[section] = true;
   return next;
 }
 
-function normalizeAdminCatalog(catalog: ProductsCache, includeProducts: boolean): AdminCatalogSnapshot {
+function normalizedCount(value: unknown) {
+  const count = Number(value);
+  return Number.isFinite(count) ? Math.max(0, Math.round(count)) : undefined;
+}
+
+function countByGroup<TItem extends { groupId?: string }>(items: TItem[]) {
+  return items.reduce<Record<string, number>>((counts, item) => {
+    const groupId = String(item.groupId ?? "").trim();
+    if (!groupId) return counts;
+    counts[groupId] = (counts[groupId] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function hasSkeletonHints(hints: AdminSkeletonHints) {
+  return Object.keys(hints).some((key) => {
+    const value = hints[key as keyof AdminSkeletonHints];
+    return value !== undefined && value !== null && (!(typeof value === "object") || Object.keys(value).length > 0);
+  });
+}
+
+function mergeSkeletonHints(current: AdminSkeletonHints, next: AdminSkeletonHints): AdminSkeletonHints {
+  return {
+    ...current,
+    ...next,
+    storefront: {
+      ...(current.storefront ?? {}),
+      ...(next.storefront ?? {}),
+    },
+    categoryItemsByGroupId: {
+      ...(current.categoryItemsByGroupId ?? {}),
+      ...(next.categoryItemsByGroupId ?? {}),
+    },
+    brandItemsByGroupId: {
+      ...(current.brandItemsByGroupId ?? {}),
+      ...(next.brandItemsByGroupId ?? {}),
+    },
+    showcaseProductsById: {
+      ...(current.showcaseProductsById ?? {}),
+      ...(next.showcaseProductsById ?? {}),
+    },
+  };
+}
+
+function sameSkeletonHints(first: AdminSkeletonHints, second: AdminSkeletonHints) {
+  return JSON.stringify(first) === JSON.stringify(second);
+}
+
+function readSkeletonHints(): AdminSkeletonHints {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ADMIN_SKELETON_HINTS_KEY) || "null");
+    return normalizeSkeletonHints(parsed);
+  } catch {
+    return {};
+  }
+}
+
+function writeSkeletonHints(hints: AdminSkeletonHints) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(ADMIN_SKELETON_HINTS_KEY, JSON.stringify(hints));
+  } catch {
+  }
+}
+
+function normalizeAdminCatalog(
+  catalog: ProductsCache,
+  includeProducts: boolean,
+  options?: { preserveEmptyCatalogLinks?: boolean }
+): AdminCatalogSnapshot {
+  const preserveEmptyCatalogLinks = options?.preserveEmptyCatalogLinks === true;
   const apiProducts = includeProducts
     ? dedupeProducts(catalog.products.map((item, index) => normalizeProduct(item as Partial<ProductForm>, index)))
     : [];
@@ -161,7 +346,9 @@ function normalizeAdminCatalog(catalog: ProductsCache, includeProducts: boolean)
       pageSortOrder: Number(item.pageSortOrder ?? 1),
       productCount: Number(item.productCount),
     }, index))
-    : [
+    : preserveEmptyCatalogLinks
+      ? []
+      : [
       normalizeCategory({
         id: "general",
         groupId: "default-categories",
@@ -203,14 +390,215 @@ function normalizeAdminCatalog(catalog: ProductsCache, includeProducts: boolean)
     }, index, "default-brands", "برندها"))
     : [normalizeCatalogLinkGroup({ id: "default-brands", title: "برندها", active: true, sortOrder: Number(nextBrands[0]?.homeSortOrder ?? 1) }, 0, "default-brands", "برندها")];
 
+  const finalCategoryGroups = preserveEmptyCatalogLinks && catalog.categoryGroups.length === 0 ? [] : nextCategoryGroups;
+  const finalBrandGroups = preserveEmptyCatalogLinks && catalog.brandGroups.length === 0 ? [] : nextBrandGroups;
+
   return {
     products: apiProducts,
     showcases: nextShowcases,
-    categoryGroups: nextCategoryGroups,
-    categories: nextCategories.map((category) => ({ ...category, groupId: category.groupId || nextCategoryGroups[0]?.id || "default-categories" })),
-    brandGroups: nextBrandGroups,
-    brands: nextBrands.map((brand) => ({ ...brand, groupId: brand.groupId || nextBrandGroups[0]?.id || "default-brands" })),
+    categoryGroups: finalCategoryGroups,
+    categories: nextCategories.map((category) => ({ ...category, groupId: category.groupId || finalCategoryGroups[0]?.id || "default-categories" })),
+    brandGroups: finalBrandGroups,
+    brands: nextBrands.map((brand) => ({ ...brand, groupId: brand.groupId || finalBrandGroups[0]?.id || "default-brands" })),
     banners: nextBanners,
+  };
+}
+
+function mergeStorefrontBanners(current: BannerForm[], layoutBanners: BannerForm[]) {
+  if (current.length === 0) return layoutBanners;
+  const layoutById = new Map(layoutBanners.map((banner) => [banner.id, banner]));
+  const currentIds = new Set(current.map((banner) => banner.id));
+  const merged = current.map((banner) => {
+    const layout = layoutById.get(banner.id);
+    return layout
+      ? {
+          ...banner,
+          showcaseId: layout.showcaseId,
+          active: layout.active,
+          showOnHome: layout.showOnHome,
+          showOnShowcase: layout.showOnShowcase,
+          showOnCategories: layout.showOnCategories,
+          showOnProducts: layout.showOnProducts,
+          intervalSeconds: layout.intervalSeconds,
+          heightPercent: layout.heightPercent,
+          homeSortOrder: layout.homeSortOrder,
+          showcaseSortOrder: layout.showcaseSortOrder,
+          categorySortOrder: layout.categorySortOrder,
+          productSortOrder: layout.productSortOrder,
+          sortOrder: layout.sortOrder,
+        }
+      : banner;
+  });
+
+  return [...merged, ...layoutBanners.filter((banner) => !currentIds.has(banner.id))];
+}
+
+function mergeStorefrontShowcases(current: ShowcaseForm[], layoutShowcases: ShowcaseForm[]) {
+  if (current.length === 0) return layoutShowcases;
+  const layoutById = new Map(layoutShowcases.map((showcase) => [showcase.id, showcase]));
+  const currentIds = new Set(current.map((showcase) => showcase.id));
+  const merged = current.map((showcase) => {
+    const layout = layoutById.get(showcase.id);
+    return layout
+      ? {
+          ...showcase,
+          title: layout.title || showcase.title,
+          active: layout.active,
+          productCount: layout.productCount,
+          sortOrder: layout.sortOrder,
+        }
+      : showcase;
+  });
+
+  return [...merged, ...layoutShowcases.filter((showcase) => !currentIds.has(showcase.id))];
+}
+
+function mergeStorefrontGroups(current: CatalogLinkGroupForm[], layoutGroups: CatalogLinkGroupForm[]) {
+  if (current.length === 0) return layoutGroups;
+  const layoutById = new Map(layoutGroups.map((group) => [group.id, group]));
+  const currentIds = new Set(current.map((group) => group.id));
+  const merged = current.map((group) => {
+    const layout = layoutById.get(group.id);
+    return layout
+      ? {
+          ...group,
+          title: layout.title || group.title,
+          active: layout.active,
+          sortOrder: layout.sortOrder,
+        }
+      : group;
+  });
+
+  return [...merged, ...layoutGroups.filter((group) => !currentIds.has(group.id))];
+}
+
+function sortStorefrontLayoutItems(items: StorefrontLayoutItem[]) {
+  return [...items].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function toStorefrontLayoutItem(type: StorefrontLayoutItemType, id: string, title: string, sortOrder: number): StorefrontLayoutItem {
+  return { type, id, title, sortOrder };
+}
+
+function storefrontLayoutToCatalog(layout: StorefrontLayoutResponse): ProductsCache {
+  const bannersById = new Map<string, Partial<BannerForm>>();
+  const addBanner = (item: StorefrontLayoutItem, tab: StorefrontLayoutTab) => {
+    const current = bannersById.get(item.id) ?? {
+      id: item.id,
+      title: item.title,
+      showcaseId: "",
+      imageUrls: [],
+      active: true,
+      showOnHome: false,
+      showOnShowcase: false,
+      showOnCategories: false,
+      showOnProducts: false,
+      intervalSeconds: 5,
+      heightPercent: 28,
+      homeSortOrder: item.sortOrder,
+      showcaseSortOrder: item.sortOrder,
+      categorySortOrder: item.sortOrder,
+      productSortOrder: item.sortOrder,
+      sortOrder: item.sortOrder,
+    };
+
+    if (tab === "home") {
+      current.showOnHome = true;
+      current.homeSortOrder = item.sortOrder;
+      current.sortOrder = item.sortOrder;
+    } else if (tab === "categories") {
+      current.showOnCategories = true;
+      current.categorySortOrder = item.sortOrder;
+    } else {
+      current.showOnProducts = true;
+      current.productSortOrder = item.sortOrder;
+      current.showcaseSortOrder = item.sortOrder;
+    }
+
+    bannersById.set(item.id, current);
+  };
+
+  for (const item of layout.home) if (item.type === "banner") addBanner(item, "home");
+  for (const item of layout.categories) if (item.type === "banner") addBanner(item, "categories");
+  for (const item of layout.products) if (item.type === "banner") addBanner(item, "products");
+
+  return {
+    ...EMPTY_CATALOG,
+    banners: Array.from(bannersById.values()) as ProductsCache["banners"],
+    showcases: layout.products
+      .filter((item) => item.type === "showcase")
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        active: true,
+        sortOrder: item.sortOrder,
+      })) as ProductsCache["showcases"],
+    categoryGroups: layout.categories
+      .filter((item) => item.type === "categoryGroup")
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        active: true,
+        sortOrder: item.sortOrder,
+      })) as ProductsCache["categoryGroups"],
+    brandGroups: layout.home
+      .filter((item) => item.type === "brandGroup")
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        active: true,
+        sortOrder: item.sortOrder,
+      })) as ProductsCache["brandGroups"],
+  };
+}
+
+function storefrontLayoutToSkeletonHints(layout: StorefrontLayoutResponse): AdminSkeletonHints {
+  return {
+    storefront: {
+      home: layout.home.length,
+      categories: layout.categories.length,
+      products: layout.products.length,
+    },
+    banners: new Set(
+      [...layout.home, ...layout.categories, ...layout.products]
+        .filter((item) => item.type === "banner")
+        .map((item) => item.id)
+    ).size,
+    showcases: layout.products.filter((item) => item.type === "showcase").length,
+    categoryGroups: layout.categories.filter((item) => item.type === "categoryGroup").length,
+    brandGroups: layout.home.filter((item) => item.type === "brandGroup").length,
+  };
+}
+
+function buildStorefrontLayoutPayload(
+  banners: BannerForm[],
+  showcases: ShowcaseForm[],
+  categoryGroups: CatalogLinkGroupForm[],
+  brandGroups: CatalogLinkGroupForm[]
+): StorefrontLayoutResponse {
+  return {
+    home: sortStorefrontLayoutItems([
+      ...banners
+        .filter((banner) => banner.showOnHome)
+        .map((banner) => toStorefrontLayoutItem("banner", banner.id, banner.title, Number(banner.homeSortOrder ?? banner.sortOrder))),
+      ...brandGroups
+        .filter((group) => group.active !== false)
+        .map((group) => toStorefrontLayoutItem("brandGroup", group.id, group.title, Number(group.sortOrder))),
+    ]),
+    categories: sortStorefrontLayoutItems([
+      ...banners
+        .filter((banner) => banner.showOnCategories)
+        .map((banner) => toStorefrontLayoutItem("banner", banner.id, banner.title, Number(banner.categorySortOrder ?? banner.sortOrder))),
+      ...categoryGroups
+        .filter((group) => group.active !== false)
+        .map((group) => toStorefrontLayoutItem("categoryGroup", group.id, group.title, Number(group.sortOrder))),
+    ]),
+    products: sortStorefrontLayoutItems([
+      ...banners
+        .filter((banner) => banner.showOnProducts)
+        .map((banner) => toStorefrontLayoutItem("banner", banner.id, banner.title, Number(banner.productSortOrder ?? banner.sortOrder))),
+      ...showcases.map((showcase) => toStorefrontLayoutItem("showcase", showcase.id, showcase.title, Number(showcase.sortOrder))),
+    ]),
   };
 }
 
@@ -261,6 +649,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [loadedSections, setLoadedSections] = useState<LoadedAdminCatalogSections>(initialLoadedSections);
   const [productFormReferencesLoaded, setProductFormReferencesLoaded] = useState(false);
+  const [skeletonHints, setSkeletonHints] = useState<AdminSkeletonHints>(() => readSkeletonHints());
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
@@ -278,6 +667,16 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const activeSectionReady = loadedSections[activeSection];
 
   const hasRequiredError = (key: string) => requiredErrors.includes(key);
+  const applySkeletonHints = useCallback((nextHints: AdminSkeletonHints) => {
+    if (!hasSkeletonHints(nextHints)) return;
+
+    setSkeletonHints((current) => {
+      const next = mergeSkeletonHints(current, nextHints);
+      if (sameSkeletonHints(current, next)) return current;
+      writeSkeletonHints(next);
+      return next;
+    });
+  }, []);
 
   const showRequiredErrors = (keys: string[], message: string) => {
     setRequiredErrors(keys);
@@ -287,7 +686,11 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
 
   const applyCatalogSectionSnapshot = (section: AdminCatalogLoadSection, catalog: ProductsCache) => {
     const hasProducts = catalog.products.length > 0;
-    const snapshot = normalizeAdminCatalog(catalog, hasProducts || section === "products" || section === "showcases" || section === "all");
+    const snapshot = normalizeAdminCatalog(
+      catalog,
+      hasProducts || section === "products" || section === "showcases" || section === "all",
+      { preserveEmptyCatalogLinks: section === "storefront" }
+    );
 
     if (section === "products") {
       setProducts(snapshot.products);
@@ -338,15 +741,13 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     }
 
     if (section === "storefront") {
-      setShowcases(snapshot.showcases);
-      setCategoryGroups(snapshot.categoryGroups);
-      setCategories(snapshot.categories);
-      setBrandGroups(snapshot.brandGroups);
-      setBrands(snapshot.brands);
-      setBanners(snapshot.banners);
-      setStructureLoaded(true);
-      setProductFormReferencesLoaded(true);
-      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["banners", "categories", "brands", "storefront"]));
+      setShowcases((current) => mergeStorefrontShowcases(current, snapshot.showcases));
+      setCategoryGroups((current) => loadedSections.categories ? mergeStorefrontGroups(current, snapshot.categoryGroups) : snapshot.categoryGroups);
+      setCategories((current) => loadedSections.categories ? current : snapshot.categories);
+      setBrandGroups((current) => loadedSections.brands ? mergeStorefrontGroups(current, snapshot.brandGroups) : snapshot.brandGroups);
+      setBrands((current) => loadedSections.brands ? current : snapshot.brands);
+      setBanners((current) => loadedSections.banners ? mergeStorefrontBanners(current, snapshot.banners) : snapshot.banners);
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["storefront"]));
       return;
     }
 
@@ -392,6 +793,21 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       setLoading(true);
 
       try {
+        if (activeSection === "storefront") {
+          let layout = await getAdminStorefrontLayout();
+
+          if (layout.home.length === 0 && layout.categories.length === 0 && layout.products.length === 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, 250));
+            layout = await getAdminStorefrontLayout({ force: true });
+          }
+          if (cancelled) return;
+
+          applySkeletonHints(storefrontLayoutToSkeletonHints(layout));
+          applyCatalogSectionSnapshot("storefront", storefrontLayoutToCatalog(layout));
+          await waitForMinimumLoading(startedAt);
+          return;
+        }
+
         let catalog = await getAdminCatalogSection(activeSection);
 
         if (!hasCatalogData(catalog)) {
@@ -416,7 +832,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     return () => {
       cancelled = true;
     };
-  }, [activeSection, activeSectionReady]);
+  }, [activeSection, activeSectionReady, applySkeletonHints]);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.sortOrder - b.sortOrder), [products]);
   const sortedShowcases = useMemo(() => ensureShowcases(products, showcases), [products, showcases]);
@@ -501,6 +917,63 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       ...(groupedBrandSections.length > 0 ? groupedBrandSections : brandSections),
     ].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [sortedBanners, sortedBrandGroups, sortedBrands, sortedCategories, sortedCategoryGroups, sortedShowcases, storefrontLayoutTab]);
+
+  const currentSkeletonHints = useMemo<AdminSkeletonHints>(() => {
+    const hints: AdminSkeletonHints = {};
+
+    if (productsLoaded || loadedSections.products) {
+      hints.products = sortedProducts.length;
+    }
+
+    if (loadedSections.banners) {
+      hints.banners = sortedBanners.length;
+    }
+
+    if (loadedSections.showcases) {
+      hints.showcases = sortedShowcases.length;
+      hints.showcaseProductsById = Object.fromEntries(
+        sortedShowcases.map((showcase) => {
+          const loadedProductCount = productsLoaded ? getShowcaseProductsForAdmin(sortedProducts, showcase).length : undefined;
+          const hintedProductCount = normalizedCount(showcase.productCount);
+          return [showcase.id, loadedProductCount ?? hintedProductCount ?? 0];
+        })
+      );
+    }
+
+    if (loadedSections.categories) {
+      hints.categories = sortedCategories.length;
+      hints.categoryGroups = sortedCategoryGroups.length;
+      hints.categoryItemsByGroupId = countByGroup(sortedCategories);
+    }
+
+    if (loadedSections.brands) {
+      hints.brands = sortedBrands.length;
+      hints.brandGroups = sortedBrandGroups.length;
+      hints.brandItemsByGroupId = countByGroup(sortedBrands);
+    }
+
+    if (loadedSections.storefront) {
+      hints.storefront = { [storefrontLayoutTab]: displaySections.length };
+    }
+
+    return hints;
+  }, [
+    displaySections.length,
+    loadedSections,
+    productsLoaded,
+    sortedBanners,
+    sortedBrandGroups,
+    sortedBrands,
+    sortedCategories,
+    sortedCategoryGroups,
+    sortedProducts,
+    sortedShowcases,
+    storefrontLayoutTab,
+  ]);
+
+  useEffect(() => {
+    applySkeletonHints(currentSkeletonHints);
+  }, [applySkeletonHints, currentSkeletonHints]);
 
   const persistProducts = async (
     nextProducts: ProductForm[],
@@ -745,6 +1218,63 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     } catch (error) {
       console.error("Catalog save error:", error);
       setStatus(error instanceof Error ? error.message : "ذخیره اطلاعات فروشگاه ناموفق بود.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const persistStorefrontLayout = async (
+    nextBanners = sortedBanners,
+    nextShowcases = sortedShowcases,
+    nextCategoryGroups = sortedCategoryGroups,
+    nextBrandGroups = sortedBrandGroups,
+    showSavedStatus = true
+  ) => {
+    setSaving(true);
+    setStatus("");
+
+    try {
+      const storefrontPayload = buildStorefrontLayoutPayload(
+        nextBanners.map(normalizeBannerTiming),
+        nextShowcases,
+        nextCategoryGroups,
+        nextBrandGroups
+      );
+      const res = await fetch(`${ADMIN_CATALOG_SECTION_URL}/storefront`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storefront: {
+            home: storefrontPayload.home,
+            categories: storefrontPayload.categories,
+            showcases: storefrontPayload.products,
+          },
+        }),
+      });
+      const maybeText = await res.text();
+      let data: any = null;
+
+      try {
+        data = maybeText ? JSON.parse(maybeText) : null;
+      } catch {
+        data = { ok: res.ok, raw: maybeText };
+      }
+
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message || data?.error || "Ø°Ø®ÛŒØ±Ù‡ Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ù†Ø§Ù…ÙˆÙÙ‚ Ø¨ÙˆØ¯.");
+      }
+
+      const layout = normalizeStorefrontLayout(data?.data?.storefront);
+      applySkeletonHints(storefrontLayoutToSkeletonHints(layout));
+      applyCatalogSectionSnapshot("storefront", storefrontLayoutToCatalog(layout));
+      clearProductsCache();
+      invalidateFetchCache(ADMIN_CATALOG_SECTION_URL);
+      if (showSavedStatus) setStatus("Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ø°Ø®ÛŒØ±Ù‡ Ø´Ø¯.");
+      return true;
+    } catch (error) {
+      console.error("Storefront layout save error:", error);
+      setStatus(error instanceof Error ? error.message : "Ø°Ø®ÛŒØ±Ù‡ Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ù†Ø§Ù…ÙˆÙÙ‚ Ø¨ÙˆØ¯.");
       return false;
     } finally {
       setSaving(false);
@@ -1386,7 +1916,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setBrandGroups((current) => current.map((item) => (item.id === groupId ? { ...item, sortOrder } : item)));
   };
 
-  const saveStorefrontPlacement = () => persistProducts(products, sortedShowcases, sortedBanners, sortedCategories, sortedBrands);
+  const saveStorefrontPlacement = () => persistStorefrontLayout();
 
   const reorderStorefrontSections = async (sourceKey: string, targetKey: string) => {
     if (!sourceKey || sourceKey === targetKey) return;
@@ -1425,7 +1955,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setBrands(nextBrands);
     setCategoryGroups(nextCategoryGroups);
     setBrandGroups(nextBrandGroups);
-    await persistProducts(products, nextShowcases, nextBanners, nextCategories, nextBrands, false, nextCategoryGroups, nextBrandGroups);
+    const saved = await persistStorefrontLayout(nextBanners, nextShowcases, nextCategoryGroups, nextBrandGroups, false);
+    if (!saved) return;
     setStatus("چیدمان فروشگاه ذخیره شد.");
   };
 
@@ -1439,6 +1970,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     sortedBrandGroups,
     sortedBanners,
     displaySections,
+    skeletonHints,
     loading,
     sectionReady: activeSectionReady,
     saving,

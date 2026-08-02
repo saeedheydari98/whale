@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { parseJsonBody, validationError } from "@/lib/api/validation";
 import { requireAdmin } from "@/lib/api/auth";
 import { bannerSchema, productSchema, showcaseSchema } from "@/lib/api/schemas";
+import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
 
 export const dynamic = "force-dynamic";
@@ -101,6 +102,239 @@ function emptyAdminCatalog() {
   };
 }
 
+type StorefrontLayoutTab = "home" | "categories" | "products";
+type BannerLayoutRecord = {
+  id: string;
+  title: string | null;
+  showcaseId: string | null;
+  active: boolean;
+  sortOrder: number;
+  images: unknown;
+};
+type BannerLayoutPatch = {
+  id?: unknown;
+  showcaseId?: unknown;
+  showOnHome?: unknown;
+  showOnShowcase?: unknown;
+  showOnCategories?: unknown;
+  showOnProducts?: unknown;
+  homeSortOrder?: unknown;
+  showcaseSortOrder?: unknown;
+  categorySortOrder?: unknown;
+  productSortOrder?: unknown;
+  sortOrder?: unknown;
+};
+type StorefrontLayoutItemType = "banner" | "showcase" | "categoryGroup" | "brandGroup";
+type StorefrontLayoutItem = {
+  type: StorefrontLayoutItemType;
+  id: string;
+  title: string;
+  sortOrder: number;
+};
+type StorefrontLayout = Record<StorefrontLayoutTab, StorefrontLayoutItem[]>;
+type StorefrontLayoutResponse = {
+  home: StorefrontLayoutItem[];
+  categories: StorefrontLayoutItem[];
+  showcases: StorefrontLayoutItem[];
+};
+type LayoutGroupRecord = {
+  id: string;
+  title: string | null;
+  active: boolean;
+  sortOrder: number;
+};
+type LayoutShowcaseRecord = {
+  id: string;
+  title: string | null;
+  active: boolean;
+  sortOrder: number;
+};
+
+const DEFAULT_CATEGORY_GROUP_TITLE = "Ø¯Ø³ØªÙ‡ Ø¨Ù†Ø¯ÛŒ Ù‡Ø§";
+const DEFAULT_BRAND_GROUP_TITLE = "Ø¨Ø±Ù†Ø¯Ù‡Ø§";
+
+function optionalBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function optionalNumber(value: unknown) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.round(parsed) : undefined;
+}
+
+function readImageMeta(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function readStoredImageUrls(value: unknown) {
+  if (Array.isArray(value)) return value.map((item) => String(item)).filter(Boolean);
+  const meta = readImageMeta(value);
+  const urls = Array.isArray(meta.urls) ? meta.urls : meta.imageUrls;
+  return Array.isArray(urls) ? urls.map((item) => String(item)).filter(Boolean) : [];
+}
+
+function getBannerLayout(banner: BannerLayoutRecord) {
+  const meta = readImageMeta(banner.images);
+  const showcaseId = String(banner.showcaseId ?? meta.showcaseId ?? "").trim();
+  const hasExplicitTargets = typeof meta.showOnHome === "boolean"
+    || typeof meta.showOnShowcase === "boolean"
+    || typeof meta.showOnCategories === "boolean"
+    || typeof meta.showOnProducts === "boolean";
+  const showOnHome = hasExplicitTargets ? meta.showOnHome !== false : !showcaseId;
+  const showOnShowcase = hasExplicitTargets ? meta.showOnShowcase === true : Boolean(showcaseId);
+  const showOnCategories = meta.showOnCategories === true;
+  const showOnProducts = typeof meta.showOnProducts === "boolean" ? meta.showOnProducts === true : showOnShowcase;
+  const homeSortOrder = optionalNumber(meta.homeSortOrder) ?? banner.sortOrder;
+  const showcaseSortOrder = optionalNumber(meta.showcaseSortOrder) ?? banner.sortOrder;
+  const categorySortOrder = optionalNumber(meta.categorySortOrder) ?? homeSortOrder;
+  const productSortOrder = optionalNumber(meta.productSortOrder) ?? showcaseSortOrder;
+
+  return {
+    showcaseId,
+    showOnHome,
+    showOnShowcase,
+    showOnCategories,
+    showOnProducts,
+    homeSortOrder,
+    showcaseSortOrder,
+    categorySortOrder,
+    productSortOrder,
+  };
+}
+
+function sortLayoutItems(items: StorefrontLayoutItem[]) {
+  return [...items].sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+function toLayoutItem(type: StorefrontLayoutItemType, item: { id: string; title?: string | null }, sortOrder: number): StorefrontLayoutItem {
+  return {
+    type,
+    id: item.id,
+    title: item.title ?? "",
+    sortOrder,
+  };
+}
+
+function bannerLayoutItems(banners: BannerLayoutRecord[], tab: StorefrontLayoutTab) {
+  return banners
+    .filter((banner) => {
+      const layout = getBannerLayout(banner);
+      if (tab === "categories") return layout.showOnCategories;
+      if (tab === "products") return layout.showOnProducts;
+      return layout.showOnHome;
+    })
+    .map((banner) => {
+      const layout = getBannerLayout(banner);
+      const sortOrder = tab === "categories"
+        ? layout.categorySortOrder
+        : tab === "products"
+          ? layout.productSortOrder
+          : layout.homeSortOrder;
+      return toLayoutItem("banner", banner, sortOrder);
+    });
+}
+
+function normalizeStorefrontLayoutItem(value: unknown): StorefrontLayoutItem | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const id = String(record.id ?? "").trim();
+  const type = String(record.type ?? "").trim() as StorefrontLayoutItemType;
+  const sortOrder = optionalNumber(record.sortOrder);
+
+  if (!id || sortOrder === undefined) return null;
+  if (type !== "banner" && type !== "showcase" && type !== "categoryGroup" && type !== "brandGroup") return null;
+
+  return {
+    type,
+    id,
+    title: String(record.title ?? ""),
+    sortOrder,
+  };
+}
+
+function normalizeStorefrontLayoutInput(value: unknown) {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  const productsValue = Array.isArray(record.products) ? record.products : record.showcases;
+
+  return {
+    home: Array.isArray(record.home) ? record.home.map(normalizeStorefrontLayoutItem).filter(Boolean) as StorefrontLayoutItem[] : [],
+    categories: Array.isArray(record.categories) ? record.categories.map(normalizeStorefrontLayoutItem).filter(Boolean) as StorefrontLayoutItem[] : [],
+    products: Array.isArray(productsValue) ? productsValue.map(normalizeStorefrontLayoutItem).filter(Boolean) as StorefrontLayoutItem[] : [],
+  };
+}
+
+function hasStorefrontLayoutItems(layout: StorefrontLayout) {
+  return layout.home.length > 0 || layout.categories.length > 0 || layout.products.length > 0;
+}
+
+function layoutOrderPatches(items: StorefrontLayoutItem[], type: StorefrontLayoutItemType) {
+  return items
+    .filter((item) => item.type === type)
+    .map((item) => ({ id: item.id, sortOrder: item.sortOrder }));
+}
+
+function buildBannerLayoutPatches(layout: StorefrontLayout): BannerLayoutPatch[] {
+  const entriesById = new Map<string, Partial<Record<StorefrontLayoutTab, StorefrontLayoutItem>>>();
+
+  for (const tab of ["home", "categories", "products"] as StorefrontLayoutTab[]) {
+    for (const item of layout[tab]) {
+      if (item.type !== "banner") continue;
+      entriesById.set(item.id, {
+        ...(entriesById.get(item.id) ?? {}),
+        [tab]: item,
+      });
+    }
+  }
+
+  return Array.from(entriesById.entries()).map(([id, entries]) => ({
+    id,
+    showOnHome: Boolean(entries.home),
+    showOnCategories: Boolean(entries.categories),
+    showOnProducts: Boolean(entries.products),
+    homeSortOrder: entries.home?.sortOrder,
+    categorySortOrder: entries.categories?.sortOrder,
+    productSortOrder: entries.products?.sortOrder,
+  }));
+}
+
+function toStorefrontLayoutResponse(layout: StorefrontLayout): StorefrontLayoutResponse {
+  return {
+    home: layout.home,
+    categories: layout.categories,
+    showcases: layout.products,
+  };
+}
+
+function mergeBannerImagesMeta(currentImages: unknown, patch: BannerLayoutPatch, currentLayout: ReturnType<typeof getBannerLayout>) {
+  const base = readImageMeta(currentImages);
+  const urls = readStoredImageUrls(currentImages);
+  const showOnHome = optionalBoolean(patch.showOnHome) ?? currentLayout.showOnHome;
+  const showOnShowcase = optionalBoolean(patch.showOnShowcase) ?? currentLayout.showOnShowcase;
+  const showOnCategories = optionalBoolean(patch.showOnCategories) ?? currentLayout.showOnCategories;
+  const showOnProducts = optionalBoolean(patch.showOnProducts) ?? currentLayout.showOnProducts;
+  const showcaseId = patch.showcaseId !== undefined
+    ? String(patch.showcaseId ?? "").trim()
+    : currentLayout.showcaseId;
+
+  return {
+    ...base,
+    urls,
+    showOnHome,
+    showOnShowcase,
+    showOnCategories,
+    showOnProducts,
+    showcaseId,
+    homeSortOrder: optionalNumber(patch.homeSortOrder ?? patch.sortOrder) ?? currentLayout.homeSortOrder,
+    showcaseSortOrder: optionalNumber(patch.showcaseSortOrder) ?? currentLayout.showcaseSortOrder,
+    categorySortOrder: optionalNumber(patch.categorySortOrder) ?? currentLayout.categorySortOrder,
+    productSortOrder: optionalNumber(patch.productSortOrder) ?? currentLayout.productSortOrder,
+  };
+}
+
 async function readAdminProducts() {
   return prisma.product.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] });
 }
@@ -126,7 +360,6 @@ type AdminShowcaseRecord = {
   categoryId?: string | null;
   manualProductIds?: unknown;
 };
-
 function stringList(value: unknown, fallback: string[] = []) {
   return Array.isArray(value)
     ? value.map((item) => String(item).trim()).filter(Boolean)
@@ -185,6 +418,184 @@ function withShowcaseCounts<T extends AdminShowcaseRecord>(
   }));
 }
 
+async function readAdminStorefrontLayout() {
+  const [
+    banners,
+    showcases,
+    categoryGroups,
+    brandGroups,
+    firstCategory,
+    firstBrand,
+  ] = await Promise.all([
+    prisma.banner.findMany({
+      select: {
+        id: true,
+        title: true,
+        showcaseId: true,
+        active: true,
+        sortOrder: true,
+        images: true,
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.showcase.findMany({
+      select: {
+        id: true,
+        title: true,
+        active: true,
+        sortOrder: true,
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.categoryGroup.findMany({
+      select: {
+        id: true,
+        title: true,
+        active: true,
+        sortOrder: true,
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.brandGroup.findMany({
+      select: {
+        id: true,
+        title: true,
+        active: true,
+        sortOrder: true,
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.category.findFirst({
+      select: {
+        pageSortOrder: true,
+      },
+      orderBy: [{ pageSortOrder: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.brand.findFirst({
+      select: {
+        homeSortOrder: true,
+      },
+      orderBy: [{ homeSortOrder: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+  ]);
+  const layoutCategoryGroups = categoryGroups.length > 0
+    ? categoryGroups
+    : firstCategory
+      ? [{ id: "default-categories", title: DEFAULT_CATEGORY_GROUP_TITLE, active: true, sortOrder: firstCategory.pageSortOrder ?? 1 }]
+      : [];
+  const layoutBrandGroups = brandGroups.length > 0
+    ? brandGroups
+    : firstBrand
+      ? [{ id: "default-brands", title: DEFAULT_BRAND_GROUP_TITLE, active: true, sortOrder: firstBrand.homeSortOrder ?? 1 }]
+      : [];
+  const layoutBanners = banners as BannerLayoutRecord[];
+  const layoutBrandGroupRecords = layoutBrandGroups as LayoutGroupRecord[];
+  const layoutCategoryGroupRecords = layoutCategoryGroups as LayoutGroupRecord[];
+  const layoutShowcases = showcases as LayoutShowcaseRecord[];
+  const homeGroups = layoutBrandGroupRecords
+    .filter((group) => group.active !== false)
+    .map((group) => toLayoutItem("brandGroup", group, Number(group.sortOrder ?? 1)));
+  const categoryGroupItems = layoutCategoryGroupRecords
+    .filter((group) => group.active !== false)
+    .map((group) => toLayoutItem("categoryGroup", group, Number(group.sortOrder ?? 1)));
+  const showcaseItems = layoutShowcases.map((showcase) =>
+    toLayoutItem("showcase", showcase, Number(showcase.sortOrder ?? 1))
+  );
+
+  const layout: StorefrontLayout = {
+    home: sortLayoutItems([...bannerLayoutItems(layoutBanners, "home"), ...homeGroups]),
+    categories: sortLayoutItems([...bannerLayoutItems(layoutBanners, "categories"), ...categoryGroupItems]),
+    products: sortLayoutItems([...bannerLayoutItems(layoutBanners, "products"), ...showcaseItems]),
+  };
+
+  return layout;
+}
+
+async function updateAdminStorefrontLayout(body: unknown) {
+  const record = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const layoutSource = record.storefront ?? record.layout ?? record;
+  const storefrontLayout = normalizeStorefrontLayoutInput(layoutSource);
+  const hasLayoutItems = hasStorefrontLayoutItems(storefrontLayout);
+  const layout = record.layout && typeof record.layout === "object"
+    ? record.layout as Record<string, unknown>
+    : record;
+  const bannerPatches = hasLayoutItems
+    ? buildBannerLayoutPatches(storefrontLayout)
+    : Array.isArray(layout.banners) ? layout.banners as BannerLayoutPatch[] : [];
+  const orderPatch = (items: unknown) => Array.isArray(items)
+    ? items
+        .map((item) => item && typeof item === "object" ? item as { id?: unknown; sortOrder?: unknown } : null)
+        .filter((item): item is { id?: unknown; sortOrder?: unknown } => Boolean(item?.id) && optionalNumber(item?.sortOrder) !== undefined)
+    : [];
+
+  if (bannerPatches.length > 0) {
+    const ids = bannerPatches.map((patch) => String(patch.id ?? "").trim()).filter(Boolean);
+    const existingBanners: BannerLayoutRecord[] = ids.length > 0
+      ? await prisma.banner.findMany({
+          where: { id: { in: Array.from(new Set(ids)) } },
+          select: {
+            id: true,
+            title: true,
+            showcaseId: true,
+            active: true,
+            sortOrder: true,
+            images: true,
+          },
+        })
+      : [];
+    const bannerById = new Map(existingBanners.map((banner) => [banner.id, banner]));
+
+    for (const patch of bannerPatches) {
+      const id = String(patch.id ?? "").trim();
+      const current = bannerById.get(id);
+      if (!current) continue;
+      const currentLayout = getBannerLayout(current);
+      const imagesMeta = mergeBannerImagesMeta(current.images, patch, currentLayout);
+      const nextShowOnShowcase = optionalBoolean(patch.showOnShowcase) ?? currentLayout.showOnShowcase;
+      const nextShowcaseId = patch.showcaseId !== undefined
+        ? String(patch.showcaseId ?? "").trim()
+        : currentLayout.showcaseId;
+      const nextHomeSortOrder = optionalNumber(patch.homeSortOrder ?? patch.sortOrder) ?? currentLayout.homeSortOrder;
+
+      await prisma.banner.update({
+        where: { id },
+        data: {
+          images: imagesMeta as any,
+          showcaseId: nextShowOnShowcase && nextShowcaseId ? nextShowcaseId : null,
+          sortOrder: nextHomeSortOrder,
+        },
+      });
+    }
+  }
+
+  const showcasePatches = hasLayoutItems ? layoutOrderPatches(storefrontLayout.products, "showcase") : orderPatch(layout.showcases);
+  const categoryGroupPatches = hasLayoutItems ? layoutOrderPatches(storefrontLayout.categories, "categoryGroup") : orderPatch(layout.categoryGroups);
+  const brandGroupPatches = hasLayoutItems ? layoutOrderPatches(storefrontLayout.home, "brandGroup") : orderPatch(layout.brandGroups);
+
+  for (const item of showcasePatches) {
+    await prisma.showcase.updateMany({
+      where: { id: String(item.id) },
+      data: { sortOrder: optionalNumber(item.sortOrder) },
+    });
+  }
+
+  for (const item of categoryGroupPatches) {
+    await prisma.categoryGroup.updateMany({
+      where: { id: String(item.id) },
+      data: { sortOrder: optionalNumber(item.sortOrder) },
+    });
+  }
+
+  for (const item of brandGroupPatches) {
+    await prisma.brandGroup.updateMany({
+      where: { id: String(item.id) },
+      data: { sortOrder: optionalNumber(item.sortOrder) },
+    });
+  }
+
+  await invalidateCatalogCache("admin.storefront-layout");
+}
+
 async function readAdminCatalogSection(section: string) {
   const base = emptyAdminCatalog();
 
@@ -224,7 +635,7 @@ async function readAdminCatalogSection(section: string) {
     return { ...base, brands: withBrandCounts(brands, productRefs), brandGroups };
   }
 
-  if (section === "storefront" || section === "product-form" || section === "all") {
+  if (section === "product-form" || section === "all") {
     const shouldIncludeProducts = section === "all";
     const [banners, showcases, categories, categoryGroups, brands, brandGroups, products, productRefs] = await Promise.all([
       section === "product-form" ? Promise.resolve([]) : prisma.banner.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
@@ -258,6 +669,10 @@ export async function GET(request: Request, context: Context) {
   const path = (await context.params).path ?? [];
 
   try {
+    if (path[0] === "catalog" && path[1] === "storefront") {
+      return apiOk({ storefront: toStorefrontLayoutResponse(await readAdminStorefrontLayout()) });
+    }
+
     if (path[0] === "catalog" && path[1]) {
       const catalog = await readAdminCatalogSection(path[1]);
       return catalog ? apiOk({ catalog }) : apiFail("Ù…Ø³ÛŒØ± Ù¾ÛŒØ¯Ø§ Ù†Ø´Ø¯.", 404);
@@ -404,6 +819,12 @@ async function updateEntity(request: Request, context: Context, partial: boolean
   const path = (await context.params).path ?? [];
 
   try {
+    if (path[0] === "catalog" && path[1] === "storefront") {
+      const body = await request.json().catch(() => null);
+      await updateAdminStorefrontLayout(body);
+      return apiOk({ storefront: toStorefrontLayoutResponse(await readAdminStorefrontLayout()) });
+    }
+
     if (path[0] === "structure") {
       const body = await request.json().catch(() => null);
       if (!body || typeof body !== "object") return apiFail("اطلاعات ارسالی معتبر نیست.", 422);

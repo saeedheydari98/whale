@@ -62,6 +62,14 @@ export function resolveLoadingItemCount(itemCount: number | undefined, viewportC
   return viewportCount;
 }
 
+export function resolveExactLoadingItemCount(itemCount: number | undefined, fallbackCount = 0) {
+  if (Number.isFinite(itemCount)) {
+    return Math.max(0, Math.round(Number(itemCount)));
+  }
+
+  return Math.max(0, Math.round(Number(fallbackCount)));
+}
+
 export function useLoadingViewportCount(layout: LoadingCountLayout) {
   const [count, setCount] = useState(() => getViewportCount(layout));
 

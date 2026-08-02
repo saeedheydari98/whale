@@ -11,6 +11,7 @@ const CATEGORIES_PAGE_STRUCTURE_URL = "/api/categories/structure";
 const PRODUCTS_PAGE_STRUCTURE_URL = "/api/products/structure";
 const PAGE_STRUCTURE_CACHE_PREFIX = "catalog-page-structure:";
 const PAGE_STRUCTURE_LOCAL_TTL_MS = 5 * 60 * 1000;
+const CATALOG_BOOTSTRAP_RETRY_DELAYS_MS = [200, 700, 1500] as const;
 export const PRODUCTS_CATALOG_UPDATED_EVENT = "products-catalog-updated";
 
 export type ProductRecord = {
@@ -300,6 +301,33 @@ export type GetProductsOptions = {
   /** Bypass session cache and refetch. */
   force?: boolean;
 };
+
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function isApiFailure(payload: unknown) {
+  return Boolean(payload && typeof payload === "object" && (payload as { ok?: unknown }).ok === false);
+}
+
+async function fetchJsonWithBootstrapRetry<T>(url: string, options?: { force?: boolean }): Promise<T> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= CATALOG_BOOTSTRAP_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const json = await fetchJsonDeduped<T>(url, { force: options?.force || attempt > 0 });
+      if (isApiFailure(json)) throw new Error("API response was not ok.");
+      return json;
+    } catch (error) {
+      lastError = error;
+      const delay = CATALOG_BOOTSTRAP_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      await wait(delay);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Catalog request failed.");
+}
 
 function getProductKey(product: Partial<ProductRecord>) {
   const id = String(product.id ?? "").trim();
@@ -992,7 +1020,7 @@ export async function getCatalogStructure(options?: boolean | GetProductsOptions
   const url = all ? CATALOG_STRUCTURE_URL_ALL : CATALOG_STRUCTURE_URL_ACTIVE;
 
   try {
-    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force });
+    const json = await fetchJsonWithBootstrapRetry<{ data?: unknown }>(url, { force });
     return withResolvedTree(parseApiPayload(json?.data));
   } catch {
     return emptyProductsCache();
@@ -1003,7 +1031,7 @@ async function getPageStructure(url: string, options?: Pick<GetProductsOptions, 
   const cached = options?.force ? null : readCachedPageStructure(url, { maxAgeMs: PAGE_STRUCTURE_LOCAL_TTL_MS });
 
   try {
-    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force: options?.force ?? false });
+    const json = await fetchJsonWithBootstrapRetry<{ data?: unknown }>(url, { force: options?.force ?? false });
     const page = withResolvedTree(parseApiPayload(json?.data));
     writeCachedPageStructure(url, page);
     return page;
@@ -1111,7 +1139,7 @@ export async function getProductPage(
   });
 
   try {
-    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force });
+    const json = await fetchJsonWithBootstrapRetry<{ data?: unknown }>(url, { force });
     return parseProductPage(json?.data);
   } catch {
     return {
@@ -1127,7 +1155,7 @@ async function getSectionProducts<TSection>(
   force = false
 ): Promise<SectionProductsResult<TSection>> {
   try {
-    const json = await fetchJsonDeduped<{ data?: unknown }>(url, { force });
+    const json = await fetchJsonWithBootstrapRetry<{ data?: unknown }>(url, { force });
     const data = json?.data && typeof json.data === "object" ? json.data as Record<string, unknown> : {};
     const page = parseProductPage(data);
     const section = sectionKey === "showcase" ? data : data[sectionKey] ?? null;

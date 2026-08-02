@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { IoCreateOutline, IoSearchOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { createProduct } from "../factories";
@@ -19,6 +19,7 @@ type ProductsSectionProps = {
   onPreview: (imageUrl?: string) => void;
   onReorderProducts: (sourceId: number | string, targetId: number | string) => void;
   isLoading?: boolean;
+  loadingCountHint?: number;
 };
 
 function createLoadingProducts(count: number): ProductForm[] {
@@ -42,10 +43,10 @@ export function ProductsSection({
   onPreview,
   onReorderProducts,
   isLoading = false,
+  loadingCountHint,
 }: ProductsSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const viewportProductCount = useLoadingViewportCount("admin-product-card");
-  const productLoadingCount = resolveLoadingItemCount(products.length || undefined, viewportProductCount);
+  const productLoadingCount = resolveExactLoadingItemCount(products.length || loadingCountHint);
   const displayProducts = isLoading
     ? products.length > 0
       ? products.slice(0, productLoadingCount)

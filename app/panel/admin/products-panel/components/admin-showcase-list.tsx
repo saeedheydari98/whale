@@ -3,7 +3,7 @@
 import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import Loading from "@/app/design-system/components/loading/loading";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { createProduct, createShowcase } from "../factories";
 import type { ProductForm, ShowcaseForm } from "../types";
 import { getShowcaseProductsForAdmin } from "../utils";
@@ -17,6 +17,8 @@ type AdminShowcaseListProps = {
   onPreview: (imageUrl?: string) => void;
   formatPrice: (value?: string) => string;
   isLoading?: boolean;
+  loadingCountHint?: number;
+  productCountHints?: Record<string, number>;
 };
 
 function createLoadingShowcases(count: number): ShowcaseForm[] {
@@ -49,10 +51,10 @@ export function AdminShowcaseList({
   onPreview,
   formatPrice,
   isLoading = false,
+  loadingCountHint,
+  productCountHints,
 }: AdminShowcaseListProps) {
-  const showcaseViewportCount = useLoadingViewportCount("admin-showcase-card");
-  const productViewportCount = useLoadingViewportCount("product-rail");
-  const showcaseLoadingCount = resolveLoadingItemCount(showcases.length || undefined, showcaseViewportCount);
+  const showcaseLoadingCount = resolveExactLoadingItemCount(showcases.length || loadingCountHint);
   const displayShowcases = isLoading
     ? showcases.length > 0
       ? showcases.slice(0, showcaseLoadingCount)
@@ -63,7 +65,8 @@ export function AdminShowcaseList({
     <div className="flex flex-col gap-5">
       {displayShowcases.map((showcase) => {
         const showcaseProducts = getShowcaseProductsForAdmin(products, showcase);
-        const productLoadingCount = resolveLoadingItemCount(showcaseProducts.length || undefined, productViewportCount);
+        const hintedProductCount = productCountHints?.[showcase.id] ?? showcase.productCount;
+        const productLoadingCount = resolveExactLoadingItemCount(showcaseProducts.length || hintedProductCount);
         const visibleShowcaseProducts = isLoading
           ? showcaseProducts.length > 0
             ? showcaseProducts.slice(0, productLoadingCount)

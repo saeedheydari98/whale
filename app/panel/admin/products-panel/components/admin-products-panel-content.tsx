@@ -1,7 +1,7 @@
 "use client";
 
 import Loading from "@/app/design-system/components/loading/loading";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { AdminBannerList } from "./admin-banner-list";
 import { AdminShowcaseList } from "./admin-showcase-list";
 import { SECTION_COUNT_LABELS, SECTION_TITLES } from "../constants";
@@ -44,11 +44,27 @@ function createLoadingBanners(count: number): BannerForm[] {
   }));
 }
 
+function hasFiniteLoadingHint(value: unknown) {
+  return Number.isFinite(Number(value));
+}
+
+function hasLoadingItemHints(value: Record<string, number> | undefined) {
+  return Object.keys(value ?? {}).length > 0;
+}
+
 export function AdminProductsPanelContent({ section, panel }: AdminProductsPanelContentProps) {
-  const bannerViewportCount = useLoadingViewportCount("admin-banner-card");
   const sectionCount = getSectionCount(section, panel);
   const contentLoading = panel.loading;
-  const bannerLoadingCount = resolveLoadingItemCount(panel.sortedBanners.length || undefined, bannerViewportCount);
+  const canUseActiveSectionState = !contentLoading || panel.sectionReady;
+  const hasCategorySkeletonHints = hasFiniteLoadingHint(panel.skeletonHints.categoryGroups)
+    || hasLoadingItemHints(panel.skeletonHints.categoryItemsByGroupId);
+  const categoryGroupsForRender = canUseActiveSectionState || hasCategorySkeletonHints
+    ? panel.sortedCategoryGroups
+    : [];
+  const categoriesForRender = canUseActiveSectionState
+    ? panel.sortedCategories
+    : [];
+  const bannerLoadingCount = resolveExactLoadingItemCount(panel.sortedBanners.length || panel.skeletonHints.banners);
   const visibleBanners = contentLoading
     ? panel.sortedBanners.length > 0
       ? panel.sortedBanners.slice(0, bannerLoadingCount)
@@ -77,6 +93,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onPreview={panel.openImagePreview}
           onReorderProducts={panel.reorderProducts}
           isLoading={contentLoading}
+          loadingCountHint={panel.skeletonHints.products}
         />
       ) : null}
 
@@ -100,13 +117,15 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onPreview={panel.openImagePreview}
           formatPrice={panel.formatPrice}
           isLoading={contentLoading}
+          loadingCountHint={panel.skeletonHints.showcases}
+          productCountHints={panel.skeletonHints.showcaseProductsById}
         />
       ) : null}
 
       {section === "categories" ? (
         <CategoriesSection
-          groups={panel.sortedCategoryGroups}
-          categories={panel.sortedCategories}
+          groups={categoryGroupsForRender}
+          categories={categoriesForRender}
           products={panel.sortedProducts}
           draggingCategoryId={panel.draggingCategoryId}
           setDraggingCategoryId={panel.setDraggingCategoryId}
@@ -116,6 +135,8 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onPreview={panel.openImagePreview}
           onReorderCategories={panel.reorderCategories}
           isLoading={contentLoading}
+          loadingGroupCountHint={panel.skeletonHints.categoryGroups}
+          loadingItemCountHints={panel.skeletonHints.categoryItemsByGroupId}
         />
       ) : null}
 
@@ -132,6 +153,8 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onPreview={panel.openImagePreview}
           onReorderBrands={panel.reorderBrands}
           isLoading={contentLoading}
+          loadingGroupCountHint={panel.skeletonHints.brandGroups}
+          loadingItemCountHints={panel.skeletonHints.brandItemsByGroupId}
         />
       ) : null}
 
@@ -149,6 +172,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onUpdateBrandGroupPlacement={panel.updateBrandGroupPlacement}
           onSave={panel.saveStorefrontPlacement}
           isLoading={contentLoading}
+          loadingCountHint={panel.skeletonHints.storefront?.[panel.storefrontLayoutTab]}
         />
       ) : null}
 
@@ -318,6 +342,18 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
 }
 
 function getSectionCount(section: AdminCatalogSection, panel: AdminProductsPanelState) {
+  if (panel.loading) {
+    if (section === "products" && hasFiniteLoadingHint(panel.skeletonHints.products)) return Number(panel.skeletonHints.products);
+    if (section === "banners" && hasFiniteLoadingHint(panel.skeletonHints.banners)) return Number(panel.skeletonHints.banners);
+    if (section === "showcases" && hasFiniteLoadingHint(panel.skeletonHints.showcases)) return Number(panel.skeletonHints.showcases);
+    if (section === "categories" && hasFiniteLoadingHint(panel.skeletonHints.categories)) return Number(panel.skeletonHints.categories);
+    if (section === "brands" && hasFiniteLoadingHint(panel.skeletonHints.brands)) return Number(panel.skeletonHints.brands);
+    if (section === "storefront" && hasFiniteLoadingHint(panel.skeletonHints.storefront?.[panel.storefrontLayoutTab])) {
+      return Number(panel.skeletonHints.storefront?.[panel.storefrontLayoutTab]);
+    }
+    return 0;
+  }
+
   if (section === "products") return panel.sortedProducts.length;
   if (section === "banners") return panel.sortedBanners.length;
   if (section === "showcases") return panel.sortedShowcases.length;

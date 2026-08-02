@@ -11,7 +11,8 @@ import { THEME_STATE_STORAGE_KEY } from "@/app/design-system/theme/storage";
 export const APP_GLOBAL_UPDATED_EVENT = "app-global-updated";
 
 const APP_GLOBAL_CACHE_KEY = "app-global:v1";
-const APP_GLOBAL_CACHE_MS = 30_000;
+const APP_GLOBAL_CACHE_MS = Number.POSITIVE_INFINITY;
+const APP_GLOBAL_RETRY_DELAYS_MS = [200, 700, 1500] as const;
 
 type AppMenuItem = {
   href: string;
@@ -102,6 +103,14 @@ function isFresh(cached: CachedGlobalData | null) {
   return Boolean(cached && Date.now() - cached.at < APP_GLOBAL_CACHE_MS);
 }
 
+function wait(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function isApiFailure(payload: unknown) {
+  return Boolean(payload && typeof payload === "object" && (payload as { ok?: unknown }).ok === false);
+}
+
 function readAnyCachedGlobalData() {
   return (memoryCache?.data ? withCurrentAuthUserFallback(memoryCache.data) : null)
     ?? readLocalGlobalCache()?.data
@@ -174,6 +183,26 @@ function writeGlobalCache(data: AppGlobalData) {
   }
 }
 
+function mergeGlobalPatch(current: AppGlobalData, patch: Partial<AppGlobalData>) {
+  const themeFallback = patch.theme
+    ? normalizeTheme(patch.theme, current.theme)
+    : current.theme;
+
+  return normalizeGlobalData({
+    ...current,
+    ...patch,
+    site: {
+      ...current.site,
+      ...(patch.site ?? {}),
+    },
+    cart: {
+      ...current.cart,
+      ...(patch.cart ?? {}),
+    },
+    theme: themeFallback,
+  }, { themeFallback });
+}
+
 function syncCachedAuthUserFromLocalGlobal(user: AuthClientUser | null) {
   if (user || !readCachedAuthUser()) {
     setCachedAuthUser(user, { emit: false });
@@ -202,7 +231,7 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
     if (pendingGlobal) return pendingGlobal;
   }
 
-  pendingGlobal = fetch("/api/app/global", { cache: "no-store", credentials: "same-origin" })
+  pendingGlobal = fetchAppGlobalResponse()
     .then(async (res) => {
       const payload = await res.json();
       if (!res.ok || payload?.ok === false) {
@@ -222,7 +251,6 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
         user: currentUser ?? cached?.user ?? null,
         theme: themeFallback,
       }, { themeFallback });
-      if (!memoryCache) memoryCache = { at: Date.now(), data };
       return data;
     })
     .finally(() => {
@@ -230,6 +258,28 @@ export async function fetchAppGlobal(options?: { force?: boolean }) {
     });
 
   return pendingGlobal;
+}
+
+async function fetchAppGlobalResponse() {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt <= APP_GLOBAL_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const res = await fetch("/api/app/global", { cache: "no-store", credentials: "same-origin" });
+      const payload = await res.clone().json().catch(() => null);
+      if (!res.ok || isApiFailure(payload)) {
+        throw new Error(payload?.message || payload?.error || "Global app load failed.");
+      }
+      return res;
+    } catch (error) {
+      lastError = error;
+      const delay = APP_GLOBAL_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      await wait(delay);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Global app load failed.");
 }
 
 export function clearAppGlobalCache() {
@@ -258,4 +308,18 @@ export function clearCachedGlobalUser() {
   });
   writeGlobalCache(next);
   emitGlobalUpdated();
+}
+
+export function updateCachedAppGlobal(patch: Partial<AppGlobalData>) {
+  const current = readAnyCachedGlobalData() ?? fallbackGlobalData;
+  const next = mergeGlobalPatch(current, patch);
+  writeGlobalCache(next);
+  emitGlobalUpdated();
+  return next;
+}
+
+export function updateCachedGlobalTheme(theme: Partial<AppGlobalData["theme"]>) {
+  return updateCachedAppGlobal({
+    theme: normalizeTheme(theme, readAnyCachedGlobalData()?.theme ?? fallbackGlobalData.theme),
+  });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import Loading from "@/app/design-system/components/loading/loading";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { addProductToCart } from "@/lib/cart-client";
 import { normalizeColorStock, type ProductRecord } from "@/lib/products-client";
@@ -13,6 +13,7 @@ import {
 import {
   ProductListGrid,
   PRODUCT_LIST_PAGE_SIZE,
+  resolveProductListLoadingCount,
 } from "./product-list-grid";
 
 type ProductListingPageProps = {
@@ -56,16 +57,18 @@ export function ProductListingPage({
 }: ProductListingPageProps) {
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
-  const viewportProductCount = useLoadingViewportCount("product-grid");
   const resolvedLoading = loading || initialPageLoading;
   const resolvedHeaderLoading = headerLoading ?? resolvedLoading;
   const totalProductCount = Number(totalProducts);
   const hasKnownTotalProducts = Number.isFinite(totalProductCount);
-  const resolvedTotalProducts = hasKnownTotalProducts ? totalProductCount : (resolvedLoading ? viewportProductCount : products.length);
-  const loadingCount = resolvedLoading ? resolveLoadingItemCount(hasKnownTotalProducts ? totalProductCount : undefined, viewportProductCount) : 0;
-  const loadingMoreCount = hasKnownTotalProducts
-    ? resolveLoadingItemCount(Math.max(0, totalProductCount - products.length), viewportProductCount)
+  const resolvedTotalProducts = hasKnownTotalProducts ? totalProductCount : (resolvedLoading ? 0 : products.length);
+  const loadingCount = resolvedLoading
+    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined)
     : 0;
+  const loadingMoreCount = loadingMore
+    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined, products.length)
+    : 0;
+  const shouldHoldLoadingWall = resolvedLoading && !hasKnownTotalProducts;
   const resolvedFilters = filters ?? EMPTY_PRODUCT_FILTERS;
 
   const addToCart = async (product: ProductRecord) => {
@@ -87,7 +90,9 @@ export function ProductListingPage({
     window.setTimeout(() => setCartMessage(""), 1800);
   };
 
-  return (
+  return shouldHoldLoadingWall ? (
+    <Loading loading="fullscreen" />
+  ) : (
     <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-5 px-4 py-6">
         <ProductListShell

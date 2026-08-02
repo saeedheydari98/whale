@@ -46,6 +46,7 @@ export type Showcase = {
   limit?: number | string;
   categoryId?: string | null;
   manualProductIds?: Array<number | string> | unknown;
+  productCount?: number | string;
   sortOrder: number;
 };
 

@@ -30,13 +30,17 @@ type AdminPanelUser = {
 
 export default function AdminPanelPage() {
   const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
-  const [hasAdminAccess, setHasAdminAccess] = useState<boolean | null>(null);
-  const [authUser, setAuthUser] = useState<AdminPanelUser | null>(null);
+  const globalUser = globalData?.user ?? null;
+  const [hasAdminAccess, setHasAdminAccess] = useState<boolean | null>(() =>
+    globalData ? hasAdminRole(globalData.user) : null
+  );
+  const [authUser, setAuthUser] = useState<AdminPanelUser | null>(() => globalUser);
   const [activeTab, setActiveTab] = useState<"theme" | "security" | "orders" | AdminCatalogSection>("theme");
 
   useEffect(() => {
     if (!globalData) return;
     setAuthUser(globalData.user);
+    setHasAdminAccess(hasAdminRole(globalData.user));
   }, [globalData]);
 
   useEffect(() => {
@@ -51,14 +55,6 @@ export default function AdminPanelPage() {
       setAuthUser(user);
       setHasAdminAccess(access);
     };
-
-    void syncAccessFromApi()
-      .catch((error) => {
-        if (cancelled) return;
-        console.error("Admin access profile load error:", error);
-        setAuthUser(null);
-        setHasAdminAccess(false);
-      });
 
     const unsubscribeAdminAccess = subscribeAdminAccess(() => {
       void syncAccessFromApi().catch((error) => {

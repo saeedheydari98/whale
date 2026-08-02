@@ -13,6 +13,7 @@ import { applyCSSVariables } from "./engine";
 import { generateCSSVariables } from "./css-vars";
 import { createTheme, ThemeStyle, ThemeColorKey } from "./theme";
 import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./storage";
+import { updateCachedGlobalTheme } from "@/lib/app-global-client";
 
 type ThemeMode = "light" | "dark";
 
@@ -47,10 +48,6 @@ const defaultAdminTheme: AdminThemeConfig = {
 const themeColors: readonly ThemeColorKey[] = ["green", "red", "blue", "yellow", "gray", "orange", "purple"];
 const themeStyles: readonly ThemeStyle[] = ["light", "dark", "fantasy"];
 const THEME_API_URL = "/api/theme";
-const THEME_FETCH_CACHE_MS = 30_000;
-
-let persistedThemeCache: { at: number; theme: AdminThemeConfig } | null = null;
-let pendingPersistedTheme: Promise<AdminThemeConfig | null> | null = null;
 
 function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark";
@@ -98,12 +95,17 @@ function readStoredThemeSnapshot(): Partial<ThemeSnapshot> | null {
   }
 }
 
-function readInitialThemeSnapshot(): ThemeSnapshot {
+function readInitialThemeSnapshot(initialAdminTheme?: unknown): ThemeSnapshot {
+  const globalAdminTheme = initialAdminTheme
+    ? normalizeAdminTheme(initialAdminTheme, defaultAdminTheme)
+    : null;
+
   if (typeof window === "undefined") {
+    const adminTheme = globalAdminTheme ?? defaultAdminTheme;
     return {
       mode: "light",
-      style: defaultAdminTheme.style,
-      adminTheme: defaultAdminTheme,
+      style: adminTheme.style,
+      adminTheme,
     };
   }
 
@@ -114,10 +116,17 @@ function readInitialThemeSnapshot(): ThemeSnapshot {
   const legacyMode = localStorage.getItem("theme-mode");
   const legacyStyle = localStorage.getItem("theme-style");
   const mode = stored?.mode ?? (isThemeMode(legacyMode) ? legacyMode : "light");
-  const style = stored?.style ?? storedAdminTheme.style ?? (isThemeStyle(legacyStyle) ? legacyStyle : defaultAdminTheme.style);
+  const mergedAdminTheme = normalizeAdminTheme({
+    ...storedAdminTheme,
+    ...(globalAdminTheme ?? {}),
+  }, defaultAdminTheme);
+  const style = globalAdminTheme?.style
+    ?? stored?.style
+    ?? mergedAdminTheme.style
+    ?? (isThemeStyle(legacyStyle) ? legacyStyle : defaultAdminTheme.style);
   const adminTheme = normalizeAdminTheme(
     {
-      ...storedAdminTheme,
+      ...mergedAdminTheme,
       style,
     },
     defaultAdminTheme
@@ -142,45 +151,6 @@ function persistThemeSnapshot(snapshot: ThemeSnapshot, vars: React.CSSProperties
   }
 }
 
-function rememberPersistedAdminTheme(theme: AdminThemeConfig) {
-  persistedThemeCache = {
-    at: Date.now(),
-    theme,
-  };
-}
-
-async function fetchPersistedAdminTheme(options?: { force?: boolean }) {
-  if (!options?.force && persistedThemeCache && Date.now() - persistedThemeCache.at < THEME_FETCH_CACHE_MS) {
-    return persistedThemeCache.theme;
-  }
-
-  if (pendingPersistedTheme) return pendingPersistedTheme;
-
-  pendingPersistedTheme = (async () => {
-    try {
-      const res = await fetch(THEME_API_URL, {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || payload?.ok === false) return null;
-
-      const nextTheme = normalizeAdminTheme(
-        readThemePayload<AdminThemeConfig>(payload, defaultAdminTheme),
-        defaultAdminTheme
-      );
-      rememberPersistedAdminTheme(nextTheme);
-      return nextTheme;
-    } catch {
-      return null;
-    } finally {
-      pendingPersistedTheme = null;
-    }
-  })();
-
-  return pendingPersistedTheme;
-}
-
 async function savePersistedAdminTheme(theme: AdminThemeConfig) {
   const res = await fetch(THEME_API_URL, {
     method: "PUT",
@@ -197,16 +167,17 @@ async function savePersistedAdminTheme(theme: AdminThemeConfig) {
     readThemePayload<AdminThemeConfig>(payload, theme),
     theme
   );
-  rememberPersistedAdminTheme(nextTheme);
   return nextTheme;
 }
 
 export function ThemeProvider({
   children,
+  initialAdminTheme,
 }: {
   children: React.ReactNode;
+  initialAdminTheme?: unknown;
 }) {
-  const [initialThemeSnapshot] = useState(() => readInitialThemeSnapshot());
+  const [initialThemeSnapshot] = useState(() => readInitialThemeSnapshot(initialAdminTheme));
   const [mode, setModeState] = useState<ThemeMode>(initialThemeSnapshot.mode);
   const [style, setStyle] = useState<ThemeStyle>(initialThemeSnapshot.style);
   const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(initialThemeSnapshot.adminTheme);
@@ -226,7 +197,7 @@ export function ThemeProvider({
   );
 
   useLayoutEffect(() => {
-    const nextSnapshot = readInitialThemeSnapshot();
+    const nextSnapshot = readInitialThemeSnapshot(initialAdminTheme);
     const nextTheme = createTheme(
       {
         mode: nextSnapshot.mode,
@@ -244,7 +215,7 @@ export function ThemeProvider({
     setModeState(nextSnapshot.mode);
     setStyle(nextSnapshot.style);
     setAdminTheme(nextSnapshot.adminTheme);
-  }, []);
+  }, [initialAdminTheme]);
 
   useLayoutEffect(() => {
     const vars = generateCSSVariables(theme);
@@ -255,7 +226,6 @@ export function ThemeProvider({
 
   useEffect(() => {
     let cancelled = false;
-    let requestId = 0;
 
     const applyAdminTheme = (nextAdminTheme: AdminThemeConfig) => {
       if (cancelled) return;
@@ -273,21 +243,6 @@ export function ThemeProvider({
       }, defaultAdminTheme));
     };
 
-    const syncPersistedTheme = (options?: { force?: boolean }) => {
-      requestId += 1;
-      const currentRequestId = requestId;
-
-      void fetchPersistedAdminTheme(options).then((nextAdminTheme) => {
-        if (!nextAdminTheme || cancelled || currentRequestId !== requestId) return;
-        applyAdminTheme(nextAdminTheme);
-      });
-    };
-
-    const syncThemes = () => {
-      syncStoredTheme();
-      syncPersistedTheme();
-    };
-
     const handleStorage = (event: StorageEvent) => {
       if (
         event.key
@@ -300,7 +255,6 @@ export function ThemeProvider({
       syncStoredTheme();
     };
 
-    syncThemes();
     window.addEventListener("storage", handleStorage);
 
     return () => {
@@ -320,6 +274,7 @@ export function ThemeProvider({
       const saved = await savePersistedAdminTheme(optimistic);
       setAdminTheme(saved);
       setStyle(saved.style);
+      updateCachedGlobalTheme(saved);
     } catch (error) {
       console.error("Failed to update admin theme:", error);
       setAdminTheme(prev);

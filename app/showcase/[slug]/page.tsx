@@ -3,7 +3,7 @@
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import Loading from "@/app/design-system/components/loading/loading";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import {
   EMPTY_PRODUCT_FILTERS,
@@ -15,6 +15,7 @@ import {
 import {
   ProductListGrid,
   PRODUCT_LIST_PAGE_SIZE,
+  resolveProductListLoadingCount,
 } from "@/app/products/product-list-grid";
 import { addProductToCart } from "@/lib/cart-client";
 import { getPageBootstrap } from "@/lib/page-bootstrap-client";
@@ -39,7 +40,6 @@ export default function ShowcasePage() {
   const filtersActive = hasProductFilters(filters);
   const [cartMessage, setCartMessage] = useState("");
   const [previewImage, setPreviewImage] = useState("");
-  const viewportProductCount = useLoadingViewportCount("product-grid");
 
   const structureQuery = useQuery({
     queryKey: ["catalog", "page-structure", "showcase", showcaseId],
@@ -86,10 +86,13 @@ export default function ShowcasePage() {
     ?? (normalizedSearchQuery || filtersActive || !Number.isFinite(showcaseProductCount) ? undefined : showcaseProductCount);
   const totalProductCount = Number(totalProducts);
   const hasKnownTotalProducts = Number.isFinite(totalProductCount);
-  const loadingCount = loading ? resolveLoadingItemCount(hasKnownTotalProducts ? totalProductCount : undefined, viewportProductCount) : 0;
-  const loadingMoreCount = hasKnownTotalProducts
-    ? resolveLoadingItemCount(Math.max(0, totalProductCount - products.length), viewportProductCount)
+  const loadingCount = loading
+    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined)
     : 0;
+  const loadingMoreCount = showcaseProductsQuery.isFetchingNextPage
+    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined, products.length)
+    : 0;
+  const shouldHoldLoadingWall = loading && !hasKnownTotalProducts;
 
   const showcaseBanners = useMemo(
     () => banners.filter((banner) => banner.active !== false && banner.showOnShowcase === true),
@@ -120,12 +123,14 @@ export default function ShowcasePage() {
     window.setTimeout(() => setCartMessage(""), 1800);
   };
 
-  return (
+  return shouldHoldLoadingWall ? (
+    <Loading loading="fullscreen" />
+  ) : (
     <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="flex w-full flex-col gap-4 p-4">
         <ProductListShell
           title={showcase?.title || `ویترین: ${showcaseId}`}
-          count={hasKnownTotalProducts ? totalProductCount : (loading ? viewportProductCount : products.length)}
+          count={hasKnownTotalProducts ? totalProductCount : (loading ? 0 : products.length)}
           headerLoading={headerLoading}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

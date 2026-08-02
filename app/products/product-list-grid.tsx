@@ -8,6 +8,14 @@ import type { Product } from "./product-showcase/types";
 
 export const PRODUCT_LIST_PAGE_SIZE = 12;
 
+export function resolveProductListLoadingCount(totalProducts?: number, loadedProducts = 0) {
+  const total = Number(totalProducts);
+  if (!Number.isFinite(total)) return 0;
+
+  const remaining = Math.max(0, Math.round(total) - Math.max(0, Math.round(loadedProducts)));
+  return Math.min(PRODUCT_LIST_PAGE_SIZE, remaining);
+}
+
 function getFinalPrice(product: Product) {
   return product.discountPrice || product.price;
 }

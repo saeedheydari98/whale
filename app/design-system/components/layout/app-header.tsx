@@ -122,10 +122,14 @@ export function AppHeader() {
   const { mode, setMode } = useTheme();
   const hideHeader = useScrollHeaderHide(10);
   const isMobile = useIsMobile();
+  const globalUser = globalData?.user ?? null;
+  const globalCartCount = globalData?.cart.count ?? 0;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(0);
-  const [authUser, setAuthUser] = useState<HeaderUser | null>(null);
-  const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
+  const [cartCount, setCartCount] = useState(() => getVisibleCartCount(globalUser, globalCartCount));
+  const [authUser, setAuthUser] = useState<HeaderUser | null>(() => globalUser);
+  const [accountProfile, setAccountProfile] = useState<UserProfile | null>(() =>
+    readUserProfile() ?? (getUserProfile(globalUser) as UserProfile | null)
+  );
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"choice" | "login">("choice");
   const [authLoginMethod, setAuthLoginMethod] = useState<"password" | "otp">("password");

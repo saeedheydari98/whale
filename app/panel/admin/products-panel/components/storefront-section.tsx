@@ -2,7 +2,7 @@
 
 import { IoSaveOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { STOREFRONT_TABS } from "../constants";
@@ -22,6 +22,7 @@ type StorefrontSectionProps = {
   onUpdateBrandGroupPlacement: (groupId: string, sortOrder: number) => void;
   onSave: () => void;
   isLoading?: boolean;
+  loadingCountHint?: number;
 };
 
 function createLoadingStorefrontEntries(count: number): StorefrontDisplayEntry[] {
@@ -112,10 +113,13 @@ export function StorefrontSection({
   onUpdateBrandGroupPlacement,
   onSave,
   isLoading = false,
+  loadingCountHint,
 }: StorefrontSectionProps) {
-  const viewportRowCount = useLoadingViewportCount("storefront-row");
-  const loadingRowCount = resolveLoadingItemCount(displaySections.length || undefined, viewportRowCount);
-  const visibleDisplaySections = isLoading && displaySections.length === 0
+  const hintedRowCount = Number(loadingCountHint);
+  const hasLoadingCountHint = Number.isFinite(hintedRowCount);
+  const useHintedPlaceholders = isLoading && hasLoadingCountHint && (hintedRowCount === 0 || displaySections.length < hintedRowCount);
+  const loadingRowCount = resolveExactLoadingItemCount(useHintedPlaceholders ? hintedRowCount : displaySections.length || loadingCountHint);
+  const visibleDisplaySections = useHintedPlaceholders || (isLoading && displaySections.length === 0)
     ? createLoadingStorefrontEntries(loadingRowCount)
     : isLoading
       ? displaySections.slice(0, loadingRowCount)

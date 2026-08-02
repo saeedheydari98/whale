@@ -2,7 +2,7 @@
 
 import { IoAdd } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
+import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import type { BrandForm, CatalogLinkGroupForm, CategoryForm, ProductForm } from "../types";
@@ -19,11 +19,13 @@ type CategoriesSectionProps = {
   onPreview: (imageUrl?: string) => void;
   onReorderCategories: (sourceId: string, targetId: string) => void;
   isLoading?: boolean;
+  loadingGroupCountHint?: number;
+  loadingItemCountHints?: Record<string, number>;
 };
 
-function createLoadingGroups(kind: "category" | "brand", count: number): CatalogLinkGroupForm[] {
+function createLoadingGroups(kind: "category" | "brand", count: number, groupIds: string[] = []): CatalogLinkGroupForm[] {
   return Array.from({ length: count }, (_, index) => ({
-    id: `loading-${kind}-group-${index + 1}`,
+    id: groupIds[index] ?? `loading-${kind}-group-${index + 1}`,
     title: kind === "category" ? "بخش دسته‌بندی" : "بخش برند",
     active: true,
     sortOrder: index + 1,
@@ -70,21 +72,25 @@ export function CategoriesSection({
   onPreview,
   onReorderCategories,
   isLoading = false,
+  loadingGroupCountHint,
+  loadingItemCountHints,
 }: CategoriesSectionProps) {
-  const groupViewportCount = useLoadingViewportCount("admin-showcase-card");
-  const itemViewportCount = useLoadingViewportCount("admin-catalog-item");
-  const groupLoadingCount = resolveLoadingItemCount(groups.length || undefined, groupViewportCount);
+  const hintedGroupCount = Number(loadingGroupCountHint);
+  const hasGroupCountHint = Number.isFinite(hintedGroupCount);
+  const useHintedGroups = isLoading && hasGroupCountHint && (hintedGroupCount === 0 || groups.length < hintedGroupCount);
+  const groupLoadingCount = resolveExactLoadingItemCount(useHintedGroups ? hintedGroupCount : groups.length || loadingGroupCountHint);
+  const loadingGroupIds = Object.keys(loadingItemCountHints ?? {});
   const displayGroups = isLoading
-    ? groups.length > 0
+    ? !useHintedGroups && groups.length > 0
       ? groups.slice(0, groupLoadingCount)
-      : createLoadingGroups("category", groupLoadingCount)
+      : createLoadingGroups("category", groupLoadingCount, loadingGroupIds)
     : groups;
 
   return (
     <div className="flex flex-col gap-4">
       {displayGroups.map((group) => {
         const groupCategories = categories.filter((category) => category.groupId === group.id);
-        const categoryLoadingCount = resolveLoadingItemCount(groupCategories.length || undefined, itemViewportCount);
+        const categoryLoadingCount = resolveExactLoadingItemCount(groupCategories.length || loadingItemCountHints?.[group.id]);
         const visibleGroupCategories = isLoading
           ? groupCategories.length > 0
             ? groupCategories.slice(0, categoryLoadingCount)
@@ -191,6 +197,8 @@ type BrandsSectionProps = {
   onPreview: (imageUrl?: string) => void;
   onReorderBrands: (sourceId: string, targetId: string) => void;
   isLoading?: boolean;
+  loadingGroupCountHint?: number;
+  loadingItemCountHints?: Record<string, number>;
 };
 
 export function BrandsSection({
@@ -205,21 +213,25 @@ export function BrandsSection({
   onPreview,
   onReorderBrands,
   isLoading = false,
+  loadingGroupCountHint,
+  loadingItemCountHints,
 }: BrandsSectionProps) {
-  const groupViewportCount = useLoadingViewportCount("admin-showcase-card");
-  const itemViewportCount = useLoadingViewportCount("admin-catalog-item");
-  const groupLoadingCount = resolveLoadingItemCount(groups.length || undefined, groupViewportCount);
+  const hintedGroupCount = Number(loadingGroupCountHint);
+  const hasGroupCountHint = Number.isFinite(hintedGroupCount);
+  const useHintedGroups = isLoading && hasGroupCountHint && (hintedGroupCount === 0 || groups.length < hintedGroupCount);
+  const groupLoadingCount = resolveExactLoadingItemCount(useHintedGroups ? hintedGroupCount : groups.length || loadingGroupCountHint);
+  const loadingGroupIds = Object.keys(loadingItemCountHints ?? {});
   const displayGroups = isLoading
-    ? groups.length > 0
+    ? !useHintedGroups && groups.length > 0
       ? groups.slice(0, groupLoadingCount)
-      : createLoadingGroups("brand", groupLoadingCount)
+      : createLoadingGroups("brand", groupLoadingCount, loadingGroupIds)
     : groups;
 
   return (
     <div className="flex flex-col gap-4">
       {displayGroups.map((group) => {
         const groupBrands = brands.filter((brand) => brand.groupId === group.id);
-        const brandLoadingCount = resolveLoadingItemCount(groupBrands.length || undefined, itemViewportCount);
+        const brandLoadingCount = resolveExactLoadingItemCount(groupBrands.length || loadingItemCountHints?.[group.id]);
         const visibleGroupBrands = isLoading
           ? groupBrands.length > 0
             ? groupBrands.slice(0, brandLoadingCount)

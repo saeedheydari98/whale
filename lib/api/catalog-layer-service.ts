@@ -59,6 +59,19 @@ const productSummarySelect = {
 
 type ProductSummaryRecord = Prisma.ProductGetPayload<{ select: typeof productSummarySelect }>;
 
+const productRelationSelect = {
+  id: true,
+  showcaseId: true,
+  showcaseIds: true,
+  categoryId: true,
+  categoryIds: true,
+  brand: true,
+  active: true,
+  isActive: true,
+} satisfies Prisma.ProductSelect;
+
+type ProductRelationRecord = Prisma.ProductGetPayload<{ select: typeof productRelationSelect }>;
+
 type ShowcaseMatchRecord = {
   id: string;
   mode?: string | null;
@@ -576,17 +589,16 @@ async function findPageBanners(includeInactive: boolean) {
     : Promise.resolve([]);
 }
 
-async function findVisibleProductRelations(includeInactive: boolean): Promise<ProductSummaryRecord[]> {
+async function findVisibleProductRelations(includeInactive: boolean): Promise<ProductRelationRecord[]> {
   return prisma.product.findMany({
     where: includeInactive ? {} : { active: true, isActive: true, deletedAt: null },
-    select: productSummarySelect,
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    select: productRelationSelect,
   });
 }
 
 function countShowcaseProducts(
   showcase: ShowcaseMatchRecord,
-  products: ProductSummaryRecord[]
+  products: ProductRelationRecord[]
 ) {
   const mode = showcase.mode === "auto" ? "auto" : "manual";
   const manualIds = normalizeManualProductIds(showcase.manualProductIds);
@@ -676,14 +688,11 @@ export async function getProductsPageStructure(searchParams: URLSearchParams) {
       findVisibleProductRelations(includeInactive),
     ]);
     const clientShowcases = (showcases as ShowcaseRecord[])
-      .map((showcase) => ({
-        ...toClientShowcase({
-          ...showcase,
-          productCount: countShowcaseProducts(showcase, products),
-        }),
-        products: resolveShowcaseProductCandidates(showcase, showcase.id, products).map(toProductSummary),
+      .map((showcase) => toClientShowcase({
+        ...showcase,
+        productCount: countShowcaseProducts(showcase, products),
       }))
-      .filter((showcase) => includeInactive || showcase.products.length > 0);
+      .filter((showcase) => includeInactive || Number(showcase.productCount ?? 0) > 0);
     const clientBanners = visibleBanners(banners, "products");
 
     return pageStructure("products", {

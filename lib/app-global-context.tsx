@@ -26,9 +26,9 @@ type AppGlobalContextValue = {
 const AppGlobalContext = createContext<AppGlobalContextValue | null>(null);
 
 export function AppGlobalProvider({ children }: { children: ReactNode }) {
-  const [mounted, setMounted] = useState(false);
   const [data, setData] = useState<AppGlobalData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [bootstrapping, setBootstrapping] = useState(true);
 
   const refresh = useCallback(async (options?: { force?: boolean }) => {
     setLoading(true);
@@ -39,23 +39,25 @@ export function AppGlobalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    setMounted(true);
     let cancelled = false;
-    const cached = readCachedAppGlobal();
+    const cached = readCachedAppGlobal({ allowStale: true });
     if (cached) {
       setData(cached);
-      setLoading(false);
     }
 
-    void fetchAppGlobal({ force: Boolean(cached) }).then((next) => {
+    void fetchAppGlobal({ force: true }).then((next) => {
       if (cancelled) return;
       setData(next);
       setLoading(false);
+      setBootstrapping(false);
     });
 
     const syncCached = () => {
-      const cached = readCachedAppGlobal();
-      if (cached) setData(cached);
+      const cached = readCachedAppGlobal({ allowStale: true });
+      if (cached) {
+        setData(cached);
+        setLoading(false);
+      }
     };
     window.addEventListener(APP_GLOBAL_UPDATED_EVENT, syncCached);
     window.addEventListener("storage", syncCached);
@@ -71,8 +73,7 @@ export function AppGlobalProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppGlobalContext.Provider value={value}>
-      {children}
-      {mounted && loading && !data ? <Loading loading="fullscreen" /> : null}
+      {bootstrapping ? <Loading loading="fullscreen" /> : children}
     </AppGlobalContext.Provider>
   );
 }

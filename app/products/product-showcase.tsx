@@ -61,6 +61,7 @@ function normalizeShowcase(item: Partial<Showcase>, index: number): Showcase {
     limit: Number.isFinite(Number(item.limit)) ? Math.max(1, Math.round(Number(item.limit))) : 8,
     categoryId: String(item.categoryId ?? ""),
     manualProductIds: Array.isArray(item.manualProductIds) ? item.manualProductIds.map((value) => String(value)) : [],
+    productCount: Number.isFinite(Number(item.productCount)) ? Math.max(0, Math.round(Number(item.productCount))) : undefined,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
 }
@@ -114,6 +115,18 @@ function ensureShowcases(products: Product[], savedShowcases: Showcase[]) {
   return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+function resolveShowcaseLoadingCount(showcase: Showcase, productsLength: number, viewportProductCount: number) {
+  if (productsLength > 0) return resolveLoadingItemCount(productsLength, viewportProductCount);
+
+  const knownProductCount = Number(showcase.productCount);
+  if (Number.isFinite(knownProductCount)) {
+    return resolveLoadingItemCount(Math.max(0, Math.round(knownProductCount)), viewportProductCount);
+  }
+
+  const requestedProductCount = Number(showcase.limit);
+  return resolveLoadingItemCount(Number.isFinite(requestedProductCount) ? requestedProductCount : undefined, viewportProductCount);
+}
+
 type BannerSection = {
   type: "banner";
   item: Banner;
@@ -158,8 +171,7 @@ function LazyShowcaseSection({
     ? products
     : (showcaseProductsQuery.data?.products as Product[] | undefined) ?? [];
   const isLoading = !hasInitialProducts && showcaseProductsQuery.isLoading;
-  const requestedProductCount = Number(showcase.limit);
-  const loadingCount = resolveLoadingItemCount(Number.isFinite(requestedProductCount) ? requestedProductCount : undefined, viewportProductCount);
+  const loadingCount = resolveShowcaseLoadingCount(showcase, loadedProducts.length, viewportProductCount);
 
   if (!isLoading && loadedProducts.length === 0) return null;
 
@@ -322,14 +334,13 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
   const loadingSections = useMemo<DisplaySection[]>(() => {
     const withShowcaseProducts = (showcase: Showcase): ShowcaseDisplaySection => {
       const products = showcaseProductsById.get(showcase.id) ?? [];
-      const requestedProductCount = Number(showcase.limit);
-      const productCardCount = resolveLoadingItemCount(Number.isFinite(requestedProductCount) ? requestedProductCount : undefined, viewportProductCount);
+      const productCardCount = resolveShowcaseLoadingCount(showcase, products.length, viewportProductCount);
 
       return {
         type: "showcase",
         item: showcase,
         products,
-        loadingCount: products.length > 0 ? resolveLoadingItemCount(products.length, viewportProductCount) : productCardCount,
+        loadingCount: productCardCount,
         sortOrder: showcase.sortOrder,
       };
     };
@@ -340,11 +351,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           ? section
           : {
               ...section,
-              loadingCount: section.products.length > 0
-                ? resolveLoadingItemCount(section.products.length, viewportProductCount)
-                : Number.isFinite(Number(section.item.limit))
-                  ? resolveLoadingItemCount(Number(section.item.limit), viewportProductCount)
-                  : viewportProductCount,
+              loadingCount: resolveShowcaseLoadingCount(section.item, section.products.length, viewportProductCount),
             }
       );
     }
@@ -495,13 +502,8 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           {/* Normal showcase/banner sections */}
 
           {displaySections.map((section) => {
-            const requestedProductCount = section.type === "showcase" ? Number(section.item.limit) : 0;
             const fallbackProductCount = section.type === "showcase"
-              ? section.products.length > 0
-                ? resolveLoadingItemCount(section.products.length, viewportProductCount)
-                : Number.isFinite(requestedProductCount)
-                  ? resolveLoadingItemCount(requestedProductCount, viewportProductCount)
-                  : viewportProductCount
+              ? resolveShowcaseLoadingCount(section.item, section.products.length, viewportProductCount)
               : 0;
             const fallback = section.type === "banner" ? (
               <BannerCarousel banner={section.item} onPreview={() => undefined} isLoading />

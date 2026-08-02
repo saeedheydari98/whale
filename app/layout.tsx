@@ -1,5 +1,4 @@
 import localFont from "next/font/local";
-import { ThemeProvider } from "./design-system/theme/provider";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
 import { AppFooter } from "./design-system/components/layout/app-footer";
@@ -7,6 +6,7 @@ import { AdminPanelFloatButton } from "./design-system/components/layout/admin-p
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppGlobalProvider } from "@/lib/app-global-context";
+import { AppThemeProvider } from "@/lib/app-theme-provider";
 import { createTheme } from "./design-system/theme/theme";
 import { generateCSSVariables } from "./design-system/theme/css-vars";
 import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./design-system/theme/storage";
@@ -78,10 +78,10 @@ export default function RootLayout({
         <InlineThemeScript />
       </head>
       <body className="flex flex-col min-h-screen text-right" dir="rtl">
-        <ThemeProvider>
-          <AppNotificationProvider>
-            <CatalogQueryProvider>
-              <AppGlobalProvider>
+        <AppGlobalProvider>
+          <AppThemeProvider>
+            <AppNotificationProvider>
+              <CatalogQueryProvider>
                 <ProductsCatalogProvider>
                   <AppHeader />
                   <main className="flex-1 pb-14 md:pb-0">
@@ -90,10 +90,10 @@ export default function RootLayout({
                   <AppFooter />
                   <AdminPanelFloatButton />
                 </ProductsCatalogProvider>
-              </AppGlobalProvider>
-            </CatalogQueryProvider>
-          </AppNotificationProvider>
-        </ThemeProvider>
+              </CatalogQueryProvider>
+            </AppNotificationProvider>
+          </AppThemeProvider>
+        </AppGlobalProvider>
       </body>
     </html>
   );
