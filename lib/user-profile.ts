@@ -29,7 +29,7 @@ export const EMPTY_USER_PROFILE: UserProfile = {
 };
 
 const PHONE_PATTERN = /^09\d{9}$/;
-const USER_PROFILE_API_URL = "/api/user/profile";
+const USER_PROFILE_API_URL = "/api/app/user";
 
 function readProfileFromApiData(data: any) {
   return data?.data?.user?.profile ?? data?.data?.profile ?? null;
@@ -160,7 +160,7 @@ export async function fetchUserProfile(options?: { write?: boolean; emit?: boole
 
 export async function saveUserProfile(profile: UserProfile) {
   const nextProfile = normalizeUserProfile(profile);
-  const res = await fetch("/api/user/profile", {
+  const res = await fetch(USER_PROFILE_API_URL, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ profile: nextProfile }),

@@ -11,16 +11,17 @@ import React, {
 } from "react";
 import { applyCSSVariables } from "./engine";
 import { generateCSSVariables } from "./css-vars";
-import { createTheme, ThemeStyle, ThemeColorKey } from "./theme";
+import { createTheme, ThemeStyle } from "./theme";
 import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./storage";
-import { updateCachedGlobalTheme } from "@/lib/app-global-client";
+import {
+  normalizeAppTheme,
+  saveAppTheme,
+  type AppThemeData,
+} from "@/lib/app-theme-client";
 
 type ThemeMode = "light" | "dark";
 
-type AdminThemeConfig = {
-  primary: ThemeColorKey;
-  style: ThemeStyle;
-};
+type AdminThemeConfig = AppThemeData;
 
 type ThemeSnapshot = {
   mode: ThemeMode;
@@ -45,9 +46,7 @@ const defaultAdminTheme: AdminThemeConfig = {
   style: "light",
 };
 
-const themeColors: readonly ThemeColorKey[] = ["green", "red", "blue", "yellow", "gray", "orange", "purple"];
 const themeStyles: readonly ThemeStyle[] = ["light", "dark", "fantasy"];
-const THEME_API_URL = "/api/theme";
 
 function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark";
@@ -59,23 +58,7 @@ function isThemeStyle(value: unknown): value is ThemeStyle {
 
 function normalizeAdminTheme(value: unknown, fallback: AdminThemeConfig = defaultAdminTheme): AdminThemeConfig {
   if (!value || typeof value !== "object") return fallback;
-  const record = value as Partial<AdminThemeConfig>;
-  return {
-    primary: themeColors.includes(record.primary as ThemeColorKey)
-      ? record.primary as ThemeColorKey
-      : fallback.primary,
-    style: themeStyles.includes(record.style as ThemeStyle)
-      ? record.style as ThemeStyle
-      : fallback.style,
-  };
-}
-
-function readThemePayload<T>(payload: unknown, fallback: T): T {
-  if (!payload || typeof payload !== "object") return fallback;
-  const record = payload as { data?: { theme?: unknown } };
-  return (record.data?.theme && typeof record.data.theme === "object"
-    ? record.data.theme
-    : fallback) as T;
+  return normalizeAppTheme(value as Partial<AdminThemeConfig>, fallback);
 }
 
 function readStoredThemeSnapshot(): Partial<ThemeSnapshot> | null {
@@ -149,25 +132,6 @@ function persistThemeSnapshot(snapshot: ThemeSnapshot, vars: React.CSSProperties
     localStorage.setItem(THEME_CSS_VARS_STORAGE_KEY, JSON.stringify(vars));
   } catch {
   }
-}
-
-async function savePersistedAdminTheme(theme: AdminThemeConfig) {
-  const res = await fetch(THEME_API_URL, {
-    method: "PUT",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(theme),
-  });
-  const payload = await res.json().catch(() => null);
-  if (!res.ok || payload?.ok === false) {
-    throw new Error(payload?.message || payload?.error || "Theme save failed.");
-  }
-
-  const nextTheme = normalizeAdminTheme(
-    readThemePayload<AdminThemeConfig>(payload, theme),
-    theme
-  );
-  return nextTheme;
 }
 
 export function ThemeProvider({
@@ -266,15 +230,14 @@ export function ThemeProvider({
   const updateAdminTheme = useCallback(async (next: Partial<AdminThemeConfig>) => {
     const prev = adminTheme;
     const prevStyle = style;
-    const optimistic = { ...prev, ...next };
+    const optimistic = normalizeAdminTheme({ ...prev, ...next }, prev);
     setAdminTheme(optimistic);
     setStyle(optimistic.style);
 
     try {
-      const saved = await savePersistedAdminTheme(optimistic);
+      const saved = await saveAppTheme(optimistic);
       setAdminTheme(saved);
       setStyle(saved.style);
-      updateCachedGlobalTheme(saved);
     } catch (error) {
       console.error("Failed to update admin theme:", error);
       setAdminTheme(prev);

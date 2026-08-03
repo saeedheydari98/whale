@@ -3,7 +3,7 @@
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
 export const AUTH_USER_UPDATED_EVENT = "auth-user-updated";
-const USER_PROFILE_API_URL = "/api/user/profile";
+const USER_PROFILE_API_URL = "/api/app/user";
 
 export type AuthClientUser = {
   id?: number | string;

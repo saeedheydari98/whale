@@ -2,16 +2,16 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { IoShieldCheckmarkOutline } from "react-icons/io5";
-import { useAppGlobal } from "@/lib/app-global-context";
+import { useAppUser } from "@/lib/app-user-context";
 import { hasAdminRole } from "@/lib/auth-client";
 import { FloatButton } from "../ui/float-button";
 
 export function AdminPanelFloatButton() {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: globalData } = useAppGlobal();
+  const { data: appUserData } = useAppUser();
 
-  if (!hasAdminRole(globalData?.user) || pathname.startsWith("/panel/admin")) {
+  if (!hasAdminRole(appUserData?.user) || pathname.startsWith("/panel/admin")) {
     return null;
   }
 

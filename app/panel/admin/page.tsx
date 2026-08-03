@@ -18,7 +18,7 @@ import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
 import { AdminOrdersPanel } from "@/app/panel/admin/admin-orders-panel";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
-import { useAppGlobal } from "@/lib/app-global-context";
+import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
 import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
@@ -29,26 +29,26 @@ type AdminPanelUser = {
 };
 
 export default function AdminPanelPage() {
-  const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
-  const globalUser = globalData?.user ?? null;
+  const { data: appUserData, refresh: refreshAppUser } = useAppUser();
+  const appUser = appUserData?.user ?? null;
   const [hasAdminAccess, setHasAdminAccess] = useState<boolean | null>(() =>
-    globalData ? hasAdminRole(globalData.user) : null
+    appUserData ? hasAdminRole(appUserData.user) : null
   );
-  const [authUser, setAuthUser] = useState<AdminPanelUser | null>(() => globalUser);
+  const [authUser, setAuthUser] = useState<AdminPanelUser | null>(() => appUser);
   const [activeTab, setActiveTab] = useState<"theme" | "security" | "orders" | AdminCatalogSection>("theme");
 
   useEffect(() => {
-    if (!globalData) return;
-    setAuthUser(globalData.user);
-    setHasAdminAccess(hasAdminRole(globalData.user));
-  }, [globalData]);
+    if (!appUserData) return;
+    setAuthUser(appUserData.user);
+    setHasAdminAccess(hasAdminRole(appUserData.user));
+  }, [appUserData]);
 
   useEffect(() => {
     let cancelled = false;
 
     const syncAccessFromApi = async () => {
       setHasAdminAccess(null);
-      await refreshGlobal({ force: true });
+      await refreshAppUser({ force: true });
       const user = await fetchCurrentUser({ force: true, allowStaleOnError: false });
       if (cancelled) return;
       const access = hasAdminRole(user);
@@ -79,7 +79,7 @@ export default function AdminPanelPage() {
       unsubscribeAdminAccess();
       unsubscribeAuthUser();
     };
-  }, [refreshGlobal]);
+  }, [refreshAppUser]);
 
   useEffect(() => {
     if (authUser?.role !== "superadmin" && activeTab === "security") {

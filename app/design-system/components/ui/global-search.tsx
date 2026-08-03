@@ -6,7 +6,7 @@ import { FiSearch } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import { CustomInput } from "./input";
 import { useIsMobile } from "@/hooks/useIsMobile";
-import { APP_GLOBAL_UPDATED_EVENT } from "@/lib/app-global-client";
+import { APP_USER_UPDATED_EVENT } from "@/lib/app-user-client";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
 import { productSlug, type ProductRecord } from "@/lib/products-client";
 
@@ -131,8 +131,8 @@ export function GlobalSearch() {
       window.setTimeout(clearInjectedPhone, 350);
     };
 
-    window.addEventListener(APP_GLOBAL_UPDATED_EVENT, scheduleClear);
-    return () => window.removeEventListener(APP_GLOBAL_UPDATED_EVENT, scheduleClear);
+    window.addEventListener(APP_USER_UPDATED_EVENT, scheduleClear);
+    return () => window.removeEventListener(APP_USER_UPDATED_EVENT, scheduleClear);
   }, [clearInjectedPhone]);
 
   useEffect(() => {

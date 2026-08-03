@@ -5,7 +5,7 @@ import { AppFooter } from "./design-system/components/layout/app-footer";
 import { AdminPanelFloatButton } from "./design-system/components/layout/admin-panel-float-button";
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
-import { AppGlobalProvider } from "@/lib/app-global-context";
+import { AppUserProvider } from "@/lib/app-user-context";
 import { AppThemeProvider } from "@/lib/app-theme-provider";
 import { createTheme } from "./design-system/theme/theme";
 import { generateCSSVariables } from "./design-system/theme/css-vars";
@@ -78,8 +78,8 @@ export default function RootLayout({
         <InlineThemeScript />
       </head>
       <body className="flex flex-col min-h-screen text-right" dir="rtl">
-        <AppGlobalProvider>
-          <AppThemeProvider>
+        <AppThemeProvider>
+          <AppUserProvider>
             <AppNotificationProvider>
               <CatalogQueryProvider>
                 <ProductsCatalogProvider>
@@ -92,8 +92,8 @@ export default function RootLayout({
                 </ProductsCatalogProvider>
               </CatalogQueryProvider>
             </AppNotificationProvider>
-          </AppThemeProvider>
-        </AppGlobalProvider>
+          </AppUserProvider>
+        </AppThemeProvider>
       </body>
     </html>
   );

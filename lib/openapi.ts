@@ -322,6 +322,41 @@ export const openApiDocument = {
         },
         required: ["id", "email", "role"],
       },
+      AppUser: {
+        type: "object",
+        properties: {
+          id: { type: "integer" },
+          username: { type: "string", nullable: true },
+          name: { type: "string", nullable: true },
+          role: { type: "string", enum: ["user", "admin", "superadmin"] },
+          profile: nullableRef("AppUserProfile"),
+        },
+        required: ["id", "role"],
+      },
+      AppUserProfile: {
+        type: "object",
+        properties: {
+          firstName: { type: "string" },
+          lastName: { type: "string" },
+          phone: { type: "string", pattern: "^09\\d{9}$" },
+          email: { type: "string", format: "email", nullable: true },
+          address: { type: "string" },
+          isAdminUnlocked: { type: "boolean" },
+        },
+        required: ["firstName", "lastName", "phone", "address", "isAdminUnlocked"],
+      },
+      AppUserProfileInput: {
+        type: "object",
+        properties: {
+          firstName: { type: "string", minLength: 2, maxLength: 50 },
+          lastName: { type: "string", minLength: 2, maxLength: 50 },
+          phone: { type: "string", pattern: "^09\\d{9}$" },
+          email: { type: "string", format: "email" },
+          address: { type: "string", minLength: 5, maxLength: 200 },
+          isAdminUnlocked: { type: "boolean" },
+        },
+        required: ["firstName", "lastName", "phone", "address"],
+      },
       CustomerProfile: {
         type: "object",
         properties: {
@@ -949,21 +984,35 @@ export const openApiDocument = {
           },
         },
       },
-      AppGlobalData: {
+      AppUserData: {
         type: "object",
         properties: {
-          user: {
-            allOf: [ref("PublicUser")],
-            nullable: true,
-          },
+          user: nullableRef("AppUser"),
           cart: {
             type: "object",
             properties: {
               count: { type: "integer" },
             },
           },
-          theme: ref("ThemeConfig"),
         },
+      },
+      AppUserProfileSaveData: {
+        type: "object",
+        properties: {
+          user: {
+            oneOf: [
+              ref("AppUser"),
+              {
+                type: "object",
+                properties: {
+                  profile: ref("AppUserProfile"),
+                },
+                required: ["profile"],
+              },
+            ],
+          },
+        },
+        required: ["user"],
       },
     },
   },
@@ -993,12 +1042,35 @@ export const openApiDocument = {
         },
       },
     },
+    "/api/app/user": {
+      get: operation({
+        tags: ["App"],
+        summary: "Get user, profile, and cart bootstrap data",
+        operationId: "getAppUser",
+        data: ref("AppUserData"),
+      }),
+      put: operation({
+        tags: ["App"],
+        summary: "Replace current user profile",
+        operationId: "putAppUserProfile",
+        body: ref("AppUserProfileInput"),
+        data: ref("AppUserProfileSaveData"),
+      }),
+      patch: operation({
+        tags: ["App"],
+        summary: "Update current user profile",
+        operationId: "patchAppUserProfile",
+        body: ref("AppUserProfileInput"),
+        data: ref("AppUserProfileSaveData"),
+      }),
+    },
     "/api/app/global": {
       get: operation({
         tags: ["App"],
-        summary: "Get global application bootstrap data",
-        operationId: "getAppGlobal",
-        data: ref("AppGlobalData"),
+        summary: "Get legacy global bootstrap data",
+        operationId: "getLegacyAppUser",
+        data: ref("AppUserData"),
+        deprecated: true,
       }),
     },
     "/api/auth/me": {
@@ -1632,36 +1704,29 @@ export const openApiDocument = {
     "/api/user/profile": {
       get: operation({
         tags: ["Profile"],
-        summary: "Get authenticated user profile",
+        summary: "Get authenticated user profile compatibility route",
         operationId: "getUserProfile",
-        data: {
-          type: "object",
-          properties: {
-            user: {
-              allOf: [ref("PublicUser")],
-              properties: {
-                profile: nullableRef("CustomerProfile"),
-              },
-            },
-          },
-        },
+        data: ref("AppUserData"),
         security: authSecurity,
+        deprecated: true,
       }),
       put: operation({
         tags: ["Profile"],
-        summary: "Replace user profile",
+        summary: "Replace user profile compatibility route",
         operationId: "replaceUserProfile",
-        body: ref("CustomerProfileInput"),
-        data: singleData("user", "PublicUser"),
+        body: ref("AppUserProfileInput"),
+        data: ref("AppUserProfileSaveData"),
         security: authSecurity,
+        deprecated: true,
       }),
       patch: operation({
         tags: ["Profile"],
-        summary: "Update user profile",
+        summary: "Update user profile compatibility route",
         operationId: "updateUserProfile",
-        body: ref("CustomerProfileInput"),
-        data: singleData("user", "PublicUser"),
+        body: ref("AppUserProfileInput"),
+        data: ref("AppUserProfileSaveData"),
         security: authSecurity,
+        deprecated: true,
       }),
     },
     "/api/user/profile/avatar": {
@@ -2087,17 +2152,19 @@ export const openApiDocument = {
       }),
       put: operation({
         tags: ["Theme"],
-        summary: "Save theme",
+        summary: "Save system theme",
         operationId: "saveTheme",
         body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
+        security: authSecurity,
       }),
       post: operation({
         tags: ["Theme"],
-        summary: "Save theme",
+        summary: "Save system theme",
         operationId: "postTheme",
         body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
+        security: authSecurity,
       }),
     },
     "/api/theme/admin": {
@@ -2114,24 +2181,24 @@ export const openApiDocument = {
         operationId: "saveThemeAdmin",
         body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
+        security: authSecurity,
         deprecated: true,
       }),
     },
     "/api/admin/theme": {
       get: operation({
         tags: ["Theme"],
-        summary: "Get admin theme compatibility route",
+        summary: "Get admin theme",
         operationId: "getAdminTheme",
         data: singleData("theme", "ThemeConfig"),
-        deprecated: true,
       }),
       put: operation({
         tags: ["Theme"],
-        summary: "Save admin theme compatibility route",
+        summary: "Save admin theme",
         operationId: "putAdminTheme",
         body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
-        deprecated: true,
+        security: authSecurity,
       }),
     },
   },

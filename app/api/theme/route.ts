@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { requireAdmin } from "@/lib/api/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,6 +18,8 @@ const defaultTheme: ThemeConfig = {
   primary: "gray",
   style: "light",
 };
+
+const THEME_SERVER_CACHE_MS = 30_000;
 
 function isThemeStyle(value: string): value is ThemeStyle {
   return value === "light" || value === "dark" || value === "fantasy";
@@ -38,11 +41,72 @@ const hasThemeModel =
   (prisma as any).adminTheme &&
   typeof (prisma as any).adminTheme.findFirst === "function";
 
+let cachedTheme: { at: number; theme: ThemeConfig } | null = null;
+let themeStorageReady = false;
+
 function normalizeTheme(value: Partial<ThemeConfig> | null | undefined): ThemeConfig {
   return {
     primary: isThemeColor(String(value?.primary)) ? value?.primary as ThemeColor : defaultTheme.primary,
     style: isThemeStyle(String(value?.style)) ? value?.style as ThemeStyle : defaultTheme.style,
   };
+}
+
+function readCachedTheme() {
+  return cachedTheme && Date.now() - cachedTheme.at < THEME_SERVER_CACHE_MS
+    ? cachedTheme.theme
+    : null;
+}
+
+function writeCachedTheme(theme: ThemeConfig) {
+  cachedTheme = { at: Date.now(), theme };
+}
+
+async function ensureThemeStorage() {
+  if (themeStorageReady || !hasThemeModel) return hasThemeModel;
+
+  await prisma.$executeRaw`
+    CREATE TABLE IF NOT EXISTS "AdminTheme" (
+      "id" SERIAL PRIMARY KEY,
+      "primary" TEXT NOT NULL DEFAULT 'gray',
+      "style" TEXT NOT NULL DEFAULT 'light',
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `;
+  await prisma.$executeRaw`
+    ALTER TABLE "AdminTheme"
+    ADD COLUMN IF NOT EXISTS "primary" TEXT NOT NULL DEFAULT 'gray'
+  `;
+  await prisma.$executeRaw`
+    ALTER TABLE "AdminTheme"
+    ADD COLUMN IF NOT EXISTS "style" TEXT NOT NULL DEFAULT 'light'
+  `;
+  await prisma.$executeRaw`
+    ALTER TABLE "AdminTheme"
+    ADD COLUMN IF NOT EXISTS "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  `;
+  await prisma.$executeRaw`
+    ALTER TABLE "AdminTheme"
+    ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  `;
+
+  themeStorageReady = true;
+  return true;
+}
+
+async function loadTheme() {
+  const cached = readCachedTheme();
+  if (cached) return cached;
+
+  try {
+    if (!hasThemeModel) return defaultTheme;
+    const record = await (prisma as any).adminTheme.findFirst();
+    const theme = normalizeTheme(record);
+    writeCachedTheme(theme);
+    return theme;
+  } catch {
+    return cachedTheme?.theme ?? defaultTheme;
+  }
 }
 
 function toThemeResponse(theme: ThemeConfig) {
@@ -52,6 +116,19 @@ function toThemeResponse(theme: ThemeConfig) {
       theme,
     },
   });
+}
+
+function toThemeSaveErrorResponse() {
+  return NextResponse.json(
+    {
+      ok: false,
+      message: "Theme save failed.",
+      data: {
+        theme: cachedTheme?.theme ?? defaultTheme,
+      },
+    },
+    { status: 500 }
+  );
 }
 
 function guard(request: Request) {
@@ -64,24 +141,22 @@ export async function GET(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
 
-  if (!hasThemeModel) return toThemeResponse(defaultTheme);
-
-  try {
-    const record = await (prisma as any).adminTheme.findFirst();
-    return toThemeResponse(normalizeTheme(record));
-  } catch {
-    return toThemeResponse(defaultTheme);
-  }
+  return toThemeResponse(await loadTheme());
 }
 
 export async function POST(request: Request) {
   const blocked = guard(request);
   if (blocked) return blocked;
+  const auth = await requireAdmin(request);
+  if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({})) as Partial<ThemeConfig>;
   const nextTheme = normalizeTheme(body);
 
-  if (!hasThemeModel) return toThemeResponse(nextTheme);
+  if (!(await ensureThemeStorage().catch(() => false))) {
+    writeCachedTheme(nextTheme);
+    return toThemeResponse(nextTheme);
+  }
 
   try {
     const existing = await (prisma as any).adminTheme.findFirst();
@@ -101,10 +176,12 @@ export async function POST(request: Request) {
           },
         });
 
-    return toThemeResponse(normalizeTheme(record));
+    const savedTheme = normalizeTheme(record);
+    writeCachedTheme(savedTheme);
+    return toThemeResponse(savedTheme);
   } catch (error) {
     console.error("Theme save error:", error);
-    return toThemeResponse(nextTheme);
+    return toThemeSaveErrorResponse();
   }
 }
 

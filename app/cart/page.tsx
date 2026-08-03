@@ -30,7 +30,7 @@ import {
   writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
-import { useAppGlobal } from "@/lib/app-global-context";
+import { useAppUser } from "@/lib/app-user-context";
 import { readCachedAuthUser } from "@/lib/auth-client";
 import { getProductDetail } from "@/lib/products-client";
 import { getStockColorValue, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
@@ -79,16 +79,15 @@ export default function CartPage() {
   const [authUser, setAuthUser] = useState<any>(null);
   const profileFormRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { data: globalData } = useAppGlobal();
-  const globalUser = globalData?.user ?? null;
-  const globalUserKey = useMemo(
+  const { data: appUserData } = useAppUser();
+  const appUser = appUserData?.user ?? null;
+  const appUserKey = useMemo(
     () => [
-      globalUser?.id ?? "",
-      globalUser?.username ?? "",
-      globalUser?.email ?? "",
-      globalUser?.role ?? "",
+      appUser?.id ?? "",
+      appUser?.username ?? "",
+      appUser?.role ?? "",
     ].join("|"),
-    [globalUser?.email, globalUser?.id, globalUser?.role, globalUser?.username]
+    [appUser?.id, appUser?.role, appUser?.username]
   );
   const productQueries = useQueries({
     queries: items.map((item) => {
@@ -111,7 +110,7 @@ export default function CartPage() {
     let cancelled = false;
 
     void (async () => {
-      const user = globalUser ?? readCachedAuthUser();
+      const user = appUser ?? readCachedAuthUser();
       const localProfile = readUserProfile();
       setAuthUser(user);
       setItems(readLocalCart(user));
@@ -128,7 +127,7 @@ export default function CartPage() {
     return () => {
       cancelled = true;
     };
-  }, [globalUserKey]);
+  }, [appUserKey]);
 
   useEffect(() => {
     const syncLocalCart = () => setItems(readLocalCart());

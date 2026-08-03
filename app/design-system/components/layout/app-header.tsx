@@ -28,12 +28,15 @@ import {
   setCachedAuthUser,
   subscribeAuthUser,
 } from "@/lib/auth-client";
-import { clearCachedGlobalUser } from "@/lib/app-global-client";
-import { useAppGlobal } from "@/lib/app-global-context";
+import { clearCachedAppUser } from "@/lib/app-user-client";
+import { useAppUser } from "@/lib/app-user-context";
 import {
   clearUserProfile,
+  isUserProfileComplete,
+  normalizeUserProfile,
   readUserProfile,
   USER_PROFILE_UPDATED_EVENT,
+  writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
 import { GiSpermWhale } from "react-icons/gi";
@@ -52,6 +55,8 @@ type HeaderProfile = {
   lastName?: string | null;
   phone?: string | null;
   email?: string | null;
+  address?: string | null;
+  isAdminUnlocked?: boolean | null;
 };
 
 const navItems = [
@@ -97,6 +102,17 @@ function getUserProfile(user: HeaderUser | null | undefined): HeaderProfile | nu
     : null;
 }
 
+function readAccountProfileFromUser(user: HeaderUser | null | undefined) {
+  const profile = normalizeUserProfile(getUserProfile(user) as Partial<UserProfile> | null | undefined);
+  return isUserProfileComplete(profile) ? profile : null;
+}
+
+function syncStoredProfileFromUser(user: HeaderUser | null | undefined) {
+  const profile = readAccountProfileFromUser(user);
+  if (profile) writeUserProfile(profile, { emit: false });
+  return profile;
+}
+
 function getUserFullName(user: HeaderUser | null | undefined, preferredProfile?: HeaderProfile | null) {
   const profile = preferredProfile ?? getUserProfile(user);
   const profileName = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim();
@@ -118,17 +134,17 @@ function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount:
 }
 
 export function AppHeader() {
-  const { data: globalData, refresh: refreshGlobal } = useAppGlobal();
+  const { data: appUserData, refresh: refreshAppUser } = useAppUser();
   const { mode, setMode } = useTheme();
   const hideHeader = useScrollHeaderHide(10);
   const isMobile = useIsMobile();
-  const globalUser = globalData?.user ?? null;
-  const globalCartCount = globalData?.cart.count ?? 0;
+  const appUser = appUserData?.user ?? null;
+  const appUserCartCount = appUserData?.cart.count ?? 0;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(() => getVisibleCartCount(globalUser, globalCartCount));
-  const [authUser, setAuthUser] = useState<HeaderUser | null>(() => globalUser);
+  const [cartCount, setCartCount] = useState(() => getVisibleCartCount(appUser, appUserCartCount));
+  const [authUser, setAuthUser] = useState<HeaderUser | null>(() => appUser);
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(() =>
-    readUserProfile() ?? (getUserProfile(globalUser) as UserProfile | null)
+    readAccountProfileFromUser(appUser) ?? readUserProfile()
   );
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"choice" | "login">("choice");
@@ -153,23 +169,35 @@ export function AppHeader() {
       : "ورود به حساب";
 
   useEffect(() => {
-    if (!globalData) return;
-    setAuthUser(globalData.user);
-    setAccountProfile(readUserProfile() ?? (getUserProfile(globalData.user) as UserProfile | null));
-    setCartCount(getVisibleCartCount(globalData.user, globalData.cart.count));
-  }, [globalData]);
+    if (!appUserData) return;
+    setAuthUser(appUserData.user);
+    setAccountProfile(syncStoredProfileFromUser(appUserData.user) ?? readUserProfile());
+    setCartCount(getVisibleCartCount(appUserData.user, appUserData.cart.count));
+    if (!appUserData.user) {
+      setAccountProfile(null);
+    }
+  }, [appUserData]);
 
   useEffect(() => {
+    let cancelled = false;
     const syncCartCount = () => {
       setCartCount(getVisibleCartCount(undefined, 0));
     };
     const syncProfile = () => {
       setAccountProfile(readUserProfile());
     };
-    const syncGlobalFromApi = async (force = false) => {
-      const next = await refreshGlobal({ force });
+    const syncUserFromApi = async (force = false) => {
+      const next = await refreshAppUser({ force });
+      if (cancelled) return;
       setAuthUser(next.user);
       setCartCount(getVisibleCartCount(next.user, next.cart.count));
+      if (!next.user) {
+        setAccountProfile(null);
+        return;
+      }
+
+      if (cancelled) return;
+      setAccountProfile(syncStoredProfileFromUser(next.user) ?? readUserProfile());
     };
 
     syncCartCount();
@@ -178,16 +206,17 @@ export function AppHeader() {
     window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
     window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
     const unsubscribeAuthUser = subscribeAuthUser(() => {
-      void syncGlobalFromApi(true);
+      void syncUserFromApi(true);
     });
 
     return () => {
+      cancelled = true;
       window.removeEventListener("storage", syncCartCount);
       window.removeEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
       window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
       unsubscribeAuthUser();
     };
-  }, [refreshGlobal]);
+  }, [refreshAppUser]);
 
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
@@ -215,7 +244,8 @@ export function AppHeader() {
       setAuthOpen(false);
       setAuthPassword("");
       setAuthStatus("");
-      await refreshGlobal({ force: true });
+      const nextUserData = await refreshAppUser({ force: true });
+      setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
       const accountCart = await getCart();
       setCartCount(getCartCount(accountCart.items));
       router.refresh();
@@ -274,7 +304,8 @@ export function AppHeader() {
       setAuthPassword("");
       setAuthOtpCode("");
       setAuthOtpSent(false);
-      await refreshGlobal({ force: true });
+      const nextUserData = await refreshAppUser({ force: true });
+      setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
       const accountCart = await getCart();
       setCartCount(getCartCount(accountCart.items));
       router.refresh();
@@ -292,12 +323,12 @@ export function AppHeader() {
     clearLocalCartSnapshot(null);
     clearUserProfile(currentUser);
     clearCachedAuthUser({ emit: false });
-    clearCachedGlobalUser();
+    clearCachedAppUser();
     setAuthUser(null);
     setCartCount(0);
     setAuthOpen(false);
-    void refreshGlobal({ force: true }).then((nextGlobal) => {
-      setCartCount(nextGlobal.cart.count);
+    void refreshAppUser({ force: true }).then((nextUserData) => {
+      setCartCount(nextUserData.cart.count);
     });
     router.refresh();
   };

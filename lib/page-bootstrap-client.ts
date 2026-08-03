@@ -1,15 +1,15 @@
 "use client";
 
-import { fetchAppGlobal } from "@/lib/app-global-client";
+import { fetchAppUser } from "@/lib/app-user-client";
 
 export async function getPageBootstrap<TPage>(
   loadPageStructure: () => Promise<TPage>,
-  options?: { forceGlobal?: boolean }
+  options?: { forceUser?: boolean }
 ) {
-  const [global, page] = await Promise.all([
-    fetchAppGlobal({ force: options?.forceGlobal }),
+  const [user, page] = await Promise.all([
+    fetchAppUser({ force: options?.forceUser }),
     loadPageStructure(),
   ]);
 
-  return { global, page };
+  return { user, page };
 }

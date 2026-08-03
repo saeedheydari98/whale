@@ -1,6 +1,6 @@
 "use client";
 
-import { clearAppGlobalCache } from "@/lib/app-global-client";
+import { clearAppUserCache } from "@/lib/app-user-client";
 import { fetchCurrentUser, hasAdminRole, readCachedAuthUser } from "@/lib/auth-client";
 
 export const ADMIN_ACCESS_UPDATED_EVENT = "admin-access-updated";
@@ -116,7 +116,7 @@ export async function reviewAdminAccessRequest(
   });
   const data = await readApiJson(response, "به‌روزرسانی درخواست ناموفق بود.");
   invalidateAdminRequestsCache();
-  clearAppGlobalCache();
+  clearAppUserCache();
   emitAdminAccessUpdated();
   return data?.data?.request as AdminAccessRequestRecord | null;
 }
