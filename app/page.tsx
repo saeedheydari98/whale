@@ -66,7 +66,7 @@ export default function Home() {
     <main className="min-h-screen bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
-          <div className="text-3xl font-bold">به فروشگاه وال خوش آمدبد</div>
+          <div className="text-3xl font-bold">به فروشگاه وال خوش آمدید</div>
         </div>
 
         {showWhaleLoading ? (
