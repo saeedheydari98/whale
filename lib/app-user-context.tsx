@@ -9,10 +9,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CART_UPDATED_EVENT } from "@/lib/cart-client";
 import {
   APP_USER_UPDATED_EVENT,
   fetchAppUser,
   readCachedAppUser,
+  syncCachedCartCount,
   type AppUserData,
 } from "@/lib/app-user-client";
 import Loading from "@/app/design-system/components/loading/loading";
@@ -67,13 +69,22 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
         setBootstrapping(false);
       }
     };
+    const syncCartCount = () => {
+      const next = syncCachedCartCount();
+      setData(next);
+      setLoading(false);
+      setBootstrapping(false);
+    };
+
     window.addEventListener(APP_USER_UPDATED_EVENT, syncCached);
     window.addEventListener("storage", syncCached);
+    window.addEventListener(CART_UPDATED_EVENT, syncCartCount);
 
     return () => {
       cancelled = true;
       window.removeEventListener(APP_USER_UPDATED_EVENT, syncCached);
       window.removeEventListener("storage", syncCached);
+      window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
     };
   }, []);
 

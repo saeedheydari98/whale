@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "swagger": "node scripts/swagger-server.mjs",
-    "build": "next build",
+    "postinstall": "prisma generate",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
     "storybook": "storybook dev -p 6006",

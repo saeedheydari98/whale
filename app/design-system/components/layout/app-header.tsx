@@ -25,10 +25,11 @@ import {
 } from "@/lib/cart-client";
 import {
   clearCachedAuthUser,
+  readCachedAuthUser,
   setCachedAuthUser,
   subscribeAuthUser,
 } from "@/lib/auth-client";
-import { clearCachedAppUser } from "@/lib/app-user-client";
+import { clearCachedAppUser, readCachedAppUser } from "@/lib/app-user-client";
 import { useAppUser } from "@/lib/app-user-context";
 import {
   clearUserProfile,
@@ -128,9 +129,11 @@ function getUserMarketingEmail(user: HeaderUser | null | undefined, preferredPro
 }
 
 function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount: number) {
-  return hasLocalCartSnapshot(user)
-    ? getCartCount(readLocalCart(user))
-    : fallbackCount;
+  if (hasLocalCartSnapshot(user)) {
+    return getCartCount(readLocalCart(user));
+  }
+
+  return Math.max(0, fallbackCount);
 }
 
 export function AppHeader() {
@@ -181,7 +184,9 @@ export function AppHeader() {
   useEffect(() => {
     let cancelled = false;
     const syncCartCount = () => {
-      setCartCount(getVisibleCartCount(undefined, 0));
+      const user = readCachedAuthUser();
+      const cachedCount = readCachedAppUser({ allowStale: true })?.cart.count ?? 0;
+      setCartCount(getVisibleCartCount(user, cachedCount));
     };
     const syncProfile = () => {
       setAccountProfile(readUserProfile());
@@ -328,7 +333,7 @@ export function AppHeader() {
     setCartCount(0);
     setAuthOpen(false);
     void refreshAppUser({ force: true }).then((nextUserData) => {
-      setCartCount(nextUserData.cart.count);
+      setCartCount(getVisibleCartCount(null, nextUserData.cart.count));
     });
     router.refresh();
   };

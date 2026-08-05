@@ -5,7 +5,11 @@ import {
   setCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
-import { getCartCount, readLocalCart } from "@/lib/cart-client";
+import {
+  getCartCount,
+  hasLocalCartSnapshot,
+  readLocalCart,
+} from "@/lib/cart-client";
 
 export const APP_USER_UPDATED_EVENT = "app-user-updated";
 
@@ -97,17 +101,51 @@ function normalizeAppUser(user: AuthClientUser | AppClientUser | null | undefine
   };
 }
 
+function resolveCartCount(
+  user: AppClientUser | null,
+  serverCartCount: number | undefined
+) {
+  const authUser = user ?? readCachedAuthUser();
+  const localCartCount = getCartCount(readLocalCart(authUser));
+
+  if (hasLocalCartSnapshot(authUser)) {
+    return localCartCount;
+  }
+
+  if (user && serverCartCount !== undefined && Number.isFinite(serverCartCount)) {
+    return Math.max(0, serverCartCount);
+  }
+
+  return localCartCount;
+}
+
 function normalizeUserData(data: AppUserDataInput | null | undefined): AppUserData {
   const user = normalizeAppUser(data?.user);
   const serverCartCount = Number(data?.cart?.count);
-  const localCartCount = getCartCount(readLocalCart(null));
 
   return {
     user,
     cart: {
-      count: user && Number.isFinite(serverCartCount) ? serverCartCount : localCartCount,
+      count: resolveCartCount(
+        user,
+        Number.isFinite(serverCartCount) ? serverCartCount : undefined
+      ),
     },
   };
+}
+
+export function syncCachedCartCount(user?: AppClientUser | null) {
+  const current = readAnyCachedUserData() ?? fallbackUserData;
+  const nextCount = resolveCartCount(
+    user ?? current.user,
+    current.cart.count
+  );
+
+  if (current.cart.count === nextCount) {
+    return current;
+  }
+
+  return updateCachedAppUser({ cart: { count: nextCount } });
 }
 
 function withCurrentAuthUserFallback(data: AppUserData) {
