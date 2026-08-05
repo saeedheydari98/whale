@@ -17,7 +17,6 @@ import {
   syncCachedCartCount,
   type AppUserData,
 } from "@/lib/app-user-client";
-import Loading from "@/app/design-system/components/loading/loading";
 
 type AppUserContextValue = {
   data: AppUserData | null;
@@ -28,10 +27,8 @@ type AppUserContextValue = {
 const AppUserContext = createContext<AppUserContextValue | null>(null);
 
 export function AppUserProvider({ children }: { children: ReactNode }) {
-  const [initialData] = useState(() => readCachedAppUser({ allowStale: true }));
-  const [data, setData] = useState<AppUserData | null>(initialData);
-  const [loading, setLoading] = useState(() => !initialData);
-  const [bootstrapping, setBootstrapping] = useState(() => !initialData);
+  const [data, setData] = useState<AppUserData | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async (options?: { force?: boolean }) => {
     setLoading(true);
@@ -47,10 +44,9 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
     if (cached) {
       setData(cached);
       setLoading(false);
-      setBootstrapping(false);
     }
 
-    void fetchAppUser({ force: true })
+    void fetchAppUser({ force: !cached })
       .then((next) => {
         if (cancelled) return;
         setData(next);
@@ -58,7 +54,6 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       .finally(() => {
         if (cancelled) return;
         setLoading(false);
-        setBootstrapping(false);
       });
 
     const syncCached = () => {
@@ -66,14 +61,12 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       if (cached) {
         setData(cached);
         setLoading(false);
-        setBootstrapping(false);
       }
     };
     const syncCartCount = () => {
       const next = syncCachedCartCount();
       setData(next);
       setLoading(false);
-      setBootstrapping(false);
     };
 
     window.addEventListener(APP_USER_UPDATED_EVENT, syncCached);
@@ -92,7 +85,7 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppUserContext.Provider value={value}>
-      {bootstrapping ? <Loading loading="fullscreen" /> : children}
+      {children}
     </AppUserContext.Provider>
   );
 }

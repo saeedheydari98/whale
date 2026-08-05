@@ -86,13 +86,18 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
 }
 
 function AccountButton({ user, profile, onOpen }: { user: HeaderUser | null; profile: UserProfile | null; onOpen: () => void }) {
+  const [mounted, setMounted] = useState(false);
   const label = getUserFullName(user, profile) || getUserPhone(user, profile) || "";
   const initial = label.trim().charAt(0).toUpperCase();
   const className = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-base font-bold text-primary-text transition-colors hover:bg-primary-soft hover:text-primary";
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
     <button type="button" className={className} aria-label="Account" onClick={onOpen}>
-      {user && initial ? <span>{initial}</span> : <IoPersonCircleOutline />}
+      {mounted && user && initial ? <span>{initial}</span> : <IoPersonCircleOutline />}
     </button>
   );
 }
@@ -141,14 +146,10 @@ export function AppHeader() {
   const { mode, setMode } = useTheme();
   const hideHeader = useScrollHeaderHide(10);
   const isMobile = useIsMobile();
-  const appUser = appUserData?.user ?? null;
-  const appUserCartCount = appUserData?.cart.count ?? 0;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [cartCount, setCartCount] = useState(() => getVisibleCartCount(appUser, appUserCartCount));
-  const [authUser, setAuthUser] = useState<HeaderUser | null>(() => appUser);
-  const [accountProfile, setAccountProfile] = useState<UserProfile | null>(() =>
-    readAccountProfileFromUser(appUser) ?? readUserProfile()
-  );
+  const [cartCount, setCartCount] = useState(0);
+  const [authUser, setAuthUser] = useState<HeaderUser | null>(null);
+  const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"choice" | "login">("choice");
   const [authLoginMethod, setAuthLoginMethod] = useState<"password" | "otp">("password");

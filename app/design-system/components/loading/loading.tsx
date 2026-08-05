@@ -146,7 +146,7 @@ export default function Loading({
           className
         )}
         style={{
-          backgroundColor: "color-mix(in srgb, var(--primary-base) 88%, var(--bg-base))",
+          backgroundColor: "var(--primary-base)",
         }}
       >
         <GiSpermWhale

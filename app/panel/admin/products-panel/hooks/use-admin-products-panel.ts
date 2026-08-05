@@ -5,6 +5,7 @@ import { clearProductsCache, getCatalogStructure, getProducts, type ProductsCach
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { useFileDataUrl } from "@/hooks/useFileDataUrl";
+import { isAllowedWebpImageValue, WEBP_ONLY_ERROR } from "@/lib/image-upload";
 import { createBanner, createBrand, createCatalogLinkGroup, createCategory, createProduct, createShowcase } from "../factories";
 import type {
   BannerForm,
@@ -1526,30 +1527,44 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const handleImageUpload = (file: File | null) => {
-    void readFileAsDataUrl(file).then((imageUrl) => {
-      if (imageUrl) updateDraftProduct({ imageUrl });
+    void readFileAsDataUrl(file).then((result) => {
+      if (!result.ok) {
+        if (result.error) setStatus(result.error);
+        return;
+      }
+      updateDraftProduct({ imageUrl: result.dataUrl });
     });
   };
 
   const handleEditImageUpload = (file: File | null) => {
-    void readFileAsDataUrl(file).then((imageUrl) => {
-      if (imageUrl) updateEditingProduct({ imageUrl });
+    void readFileAsDataUrl(file).then((result) => {
+      if (!result.ok) {
+        if (result.error) setStatus(result.error);
+        return;
+      }
+      updateEditingProduct({ imageUrl: result.dataUrl });
     });
   };
 
   const handleCategoryImageUpload = (file: File | null, mode: "draft" | "edit") => {
-    void readFileAsDataUrl(file).then((imageUrl) => {
-      if (!imageUrl) return;
-      if (mode === "draft") updateDraftCategory({ imageUrl });
-      else updateEditingCategory({ imageUrl });
+    void readFileAsDataUrl(file).then((result) => {
+      if (!result.ok) {
+        if (result.error) setStatus(result.error);
+        return;
+      }
+      if (mode === "draft") updateDraftCategory({ imageUrl: result.dataUrl });
+      else updateEditingCategory({ imageUrl: result.dataUrl });
     });
   };
 
   const handleBrandImageUpload = (file: File | null, mode: "draft" | "edit") => {
-    void readFileAsDataUrl(file).then((imageUrl) => {
-      if (!imageUrl) return;
-      if (mode === "draft") updateDraftBrand({ imageUrl });
-      else updateEditingBrand({ imageUrl });
+    void readFileAsDataUrl(file).then((result) => {
+      if (!result.ok) {
+        if (result.error) setStatus(result.error);
+        return;
+      }
+      if (mode === "draft") updateDraftBrand({ imageUrl: result.dataUrl });
+      else updateEditingBrand({ imageUrl: result.dataUrl });
     });
   };
 
@@ -1563,12 +1578,22 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const handleBannerImagesUpload = (files: FileList | null, mode: "draft" | "edit") => {
-    void readFilesAsDataUrls(files).then((imageUrls) => appendBannerImages(imageUrls.filter(Boolean), mode));
+    void readFilesAsDataUrls(files).then((result) => {
+      if (!result.ok) {
+        if (result.error) setStatus(result.error);
+        return;
+      }
+      appendBannerImages(result.dataUrls.filter(Boolean), mode);
+    });
   };
 
   const addBannerImageUrl = (mode: "draft" | "edit") => {
     const imageUrl = mode === "draft" ? draftBannerImageUrl.trim() : editingBannerImageUrl.trim();
     if (!imageUrl) return;
+    if (!isAllowedWebpImageValue(imageUrl)) {
+      setStatus(WEBP_ONLY_ERROR);
+      return;
+    }
     appendBannerImages([imageUrl], mode);
     if (mode === "draft") setDraftBannerImageUrl("");
     else setEditingBannerImageUrl("");

@@ -5,6 +5,7 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
+import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
 import { InventoryControls, ProductAdvancedFields, ProductPlacementFields } from "./product-form-fields";
 
@@ -164,11 +165,12 @@ function ProductModal({
 
           <div className="flex flex-col gap-3 rounded-lg border border-primary-border">
             <div className="text-sm font-bold">تصویر محصول</div>
-            <CustomInput value={product.imageUrl} placeholder="آدرس تصویر" onChange={(event) => onPatch({ imageUrl: event.target.value })} />
+            <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
+            <CustomInput value={product.imageUrl} placeholder="آدرس تصویر WebP" onChange={(event) => onPatch({ imageUrl: event.target.value })} />
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-4 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
               <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-              <span className="text-sm font-semibold">بارگذاری تصویر</span>
-              <input type="file" accept="image/*" className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
+              <span className="text-sm font-semibold">بارگذاری تصویر WebP</span>
+              <input type="file" accept={WEBP_IMAGE_ACCEPT} className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
             </label>
             <div className="flex h-40 items-center justify-center overflow-hidden rounded-md border border-primary-border bg-primary-media">
               {product.imageUrl ? (

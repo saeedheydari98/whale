@@ -164,7 +164,7 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
     };
   } catch (error) {
     console.error("Auth user load error:", error);
-    return null;
+    throw error;
   }
 }
 

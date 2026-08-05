@@ -1,4 +1,22 @@
 import { z } from "zod";
+import { isAllowedWebpImageValue, WEBP_ONLY_ERROR } from "@/lib/image-upload";
+
+const webpImageValueSchema = z
+  .string()
+  .trim()
+  .refine(isAllowedWebpImageValue, { message: WEBP_ONLY_ERROR });
+
+const optionalWebpImageValueSchema = z.union([
+  z.literal(""),
+  webpImageValueSchema,
+]);
+
+const optionalNullableWebpImageValueSchema = z
+  .string()
+  .trim()
+  .optional()
+  .nullable()
+  .refine((value) => value == null || isAllowedWebpImageValue(value), { message: WEBP_ONLY_ERROR });
 
 const USERNAME_REGEX = /^[a-z0-9._-]+$/;
 const NAME_REGEX = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
@@ -73,18 +91,18 @@ export const changePasswordSchema = z.object({
 });
 
 export const profileSchema = customerProfileSchema.extend({
-  avatarUrl: z.string().trim().optional().nullable(),
+  avatarUrl: optionalNullableWebpImageValueSchema,
   isAdminUnlocked: z.boolean().optional(),
 });
 
 export const avatarSchema = z.object({
-  avatarUrl: z.string().trim().min(1),
+  avatarUrl: webpImageValueSchema.min(1, WEBP_ONLY_ERROR),
 });
 
 export const bannerSchema = z.object({
   title: z.string().trim().optional().nullable(),
   showcaseId: z.string().trim().optional().nullable(),
-  imageUrls: z.array(z.string().trim()).optional(),
+  imageUrls: z.array(webpImageValueSchema).optional(),
   images: z.unknown().optional(),
   active: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
@@ -95,7 +113,7 @@ export const bannerSchema = z.object({
 export const showcaseSchema = z.object({
   title: z.string().trim().optional().nullable(),
   description: z.string().trim().optional().nullable(),
-  imageUrl: z.string().trim().optional().nullable(),
+  imageUrl: optionalNullableWebpImageValueSchema,
   active: z.boolean().optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
@@ -110,8 +128,8 @@ export const productSchema = z.object({
   originalPrice: z.string().trim().optional().nullable(),
   discountPrice: z.string().trim().optional().nullable(),
   discountPercent: z.coerce.number().int().min(0).optional().nullable(),
-  imageUrl: z.string().trim().optional().nullable(),
-  images: z.array(z.string().trim()).optional(),
+  imageUrl: optionalNullableWebpImageValueSchema,
+  images: z.array(webpImageValueSchema).optional(),
   videoUrl: z.string().trim().optional().nullable(),
   badge: z.string().trim().optional().nullable(),
   ctaLabel: z.string().trim().optional().nullable(),

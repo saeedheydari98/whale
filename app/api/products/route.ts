@@ -6,6 +6,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { normalizeProductData } from "@/lib/api/catalog-service";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 import { getCatalogStructure, getProductList } from "@/lib/api/catalog-layer-service";
+import { findInvalidWebpImageValue } from "@/lib/image-upload";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -964,6 +965,17 @@ export async function POST(request: Request) {
   const missingCategory = normalized.some((p) => !String(p.categoryId ?? "").trim());
   if (missingCategory) {
     return NextResponse.json({ ok: false, error: "دسته بندی برای همه محصولات الزامی است." }, { status: 400 });
+  }
+
+  const invalidWebpImage = findInvalidWebpImageValue([
+    ...normalized.flatMap((item) => [item.imageUrl, ...(Array.isArray(item.images) ? item.images : [])]),
+    ...showcases.map((item) => item.imageUrl),
+    ...categories.map((item) => item.imageUrl),
+    ...brands.map((item) => item.imageUrl),
+    ...banners.flatMap((item) => getImageUrls(item)),
+  ]);
+  if (invalidWebpImage) {
+    return NextResponse.json({ ok: false, error: invalidWebpImage }, { status: 400 });
   }
 
   if (!hasProductModel) {

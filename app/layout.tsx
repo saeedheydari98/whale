@@ -1,4 +1,5 @@
 import localFont from "next/font/local";
+import Script from "next/script";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
 import { AppFooter } from "./design-system/components/layout/app-footer";
@@ -28,14 +29,14 @@ const storeFont = localFont({
 const initialThemeVariables = generateCSSVariables(
   createTheme(
     {
-      mode: "light",
+      mode: "dark",
       source: "developer",
       adminActive: true,
-      style: "light",
+      style: "dark",
     },
     {
       primary: "gray",
-      style: "light",
+      style: "dark",
     }
   )
 );
@@ -57,16 +58,6 @@ const initialThemeScript = `
 })();
 `;
 
-function InlineThemeScript() {
-  return (
-    <script
-      type="text/javascript"
-      suppressHydrationWarning
-      dangerouslySetInnerHTML={{ __html: initialThemeScript }}
-    />
-  );
-}
-
 export default function RootLayout({
   children,
 }: {
@@ -74,10 +65,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" className={storeFont.variable} style={initialThemeVariables} suppressHydrationWarning>
-      <head>
-        <InlineThemeScript />
-      </head>
       <body className="flex flex-col min-h-screen text-right" dir="rtl">
+        <Script id="theme-bootstrap" strategy="beforeInteractive">
+          {initialThemeScript}
+        </Script>
         <AppThemeProvider>
           <AppUserProvider>
             <AppNotificationProvider>

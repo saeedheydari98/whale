@@ -270,7 +270,7 @@ export function ThemePalettePicker({
           {styleOptions.map((item) => {
             const background = resolveColor(selectedColor, item, staticTone);
             const selected = selectedStyle === item;
-            const selectedTextColor = getThemeContrastColor(background, selectedColor, item);
+            const textColor = getThemeContrastColor(background, selectedColor, item);
 
             return (
               <CustomButton
@@ -278,11 +278,12 @@ export function ThemePalettePicker({
                 rounded="full"
                 size="sm"
                 style={{
-                  backgroundColor: selected ? background : "transparent",
-                  borderColor: selected ? background : hexToRgba(background, 0.38),
+                  backgroundColor: background,
+                  borderColor: selected ? getContrastColor(background) : hexToRgba(background, 0.45),
                   borderStyle: "solid",
                   borderWidth: "1px",
-                  color: selected ? selectedTextColor : "var(--primary-text)",
+                  boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
+                  color: textColor,
                 }}
                 icon={selected ? <IoCheckmark aria-hidden="true" /> : undefined}
                 disabled={disabled}

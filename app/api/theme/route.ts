@@ -16,7 +16,7 @@ type ThemeConfig = {
 
 const defaultTheme: ThemeConfig = {
   primary: "gray",
-  style: "light",
+  style: "dark",
 };
 
 const THEME_SERVER_CACHE_MS = 30_000;
@@ -89,6 +89,10 @@ async function ensureThemeStorage() {
     ALTER TABLE "AdminTheme"
     ADD COLUMN IF NOT EXISTS "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
   `;
+  await prisma.$executeRaw`
+    ALTER TABLE "AdminTheme"
+    DROP COLUMN IF EXISTS "tone"
+  `;
 
   themeStorageReady = true;
   return true;
@@ -151,7 +155,8 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response;
 
   const body = await request.json().catch(() => ({})) as Partial<ThemeConfig>;
-  const nextTheme = normalizeTheme(body);
+  const currentTheme = await loadTheme();
+  const nextTheme = normalizeTheme({ ...currentTheme, ...body });
 
   if (!(await ensureThemeStorage().catch(() => false))) {
     writeCachedTheme(nextTheme);

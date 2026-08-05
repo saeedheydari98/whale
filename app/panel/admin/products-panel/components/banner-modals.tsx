@@ -5,6 +5,7 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
+import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import type { BannerForm, ShowcaseForm } from "../types";
@@ -183,16 +184,17 @@ function BannerModal({
             }`}
           >
             <RequiredLabel required className="text-primary-text">تصاویر بنر</RequiredLabel>
+            <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
             <div className="flex gap-2">
-              <CustomInput value={imageUrl} placeholder="آدرس تصویر" onChange={(event) => setImageUrl(event.target.value)} />
+              <CustomInput value={imageUrl} placeholder="آدرس تصویر WebP" onChange={(event) => setImageUrl(event.target.value)} />
               <CustomButton icon={<IoAdd />} onClick={onAddImageUrl}>
                 <span>افزودن</span>
               </CustomButton>
             </div>
             <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-4 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
               <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-              <span className="text-sm font-semibold">بارگذاری تصاویر</span>
-              <input type="file" accept="image/*" multiple className="hidden" onChange={(event) => onUpload(event.target.files)} />
+              <span className="text-sm font-semibold">بارگذاری تصاویر WebP</span>
+              <input type="file" accept={WEBP_IMAGE_ACCEPT} multiple className="hidden" onChange={(event) => onUpload(event.target.files)} />
             </label>
             <div className="flex gap-2 overflow-x-auto pb-2">
               {banner.imageUrls.length === 0 && emptyPreviewLabel ? <span className="text-sm text-secondary-text">{emptyPreviewLabel}</span> : null}

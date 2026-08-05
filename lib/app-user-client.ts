@@ -10,6 +10,7 @@ import {
   hasLocalCartSnapshot,
   readLocalCart,
 } from "@/lib/cart-client";
+import { fetchJsonDeduped } from "@/lib/fetch-json";
 
 export const APP_USER_UPDATED_EVENT = "app-user-updated";
 
@@ -255,29 +256,42 @@ export function readCachedAppUser(options?: { allowStale?: boolean }) {
 }
 
 export async function fetchAppUser(options?: { force?: boolean }) {
+  const cached = readCachedAppUser({ allowStale: true });
+  const cachedEntry = memoryCache ?? readLocalUserCache();
+  const USER_STALE_MS = 60_000;
+
   if (options?.force) {
-    memoryCache = null;
     if (pendingUser) return pendingUser;
   } else {
-    const cached = readCachedAppUser();
-    if (cached) return cached;
+    if (cached) {
+      if (
+        cachedEntry
+        && Date.now() - cachedEntry.at >= USER_STALE_MS
+        && !pendingUser
+      ) {
+        void fetchAppUserPayload({ force: true })
+          .then((payload) => {
+            const data = normalizeUserData(payload?.data);
+            writeUserCache(data);
+            emitUserUpdated();
+          })
+          .catch(() => undefined);
+      }
+      return cached;
+    }
     if (pendingUser) return pendingUser;
   }
 
-  const requestTask = fetchAppUserResponse()
-    .then(async (res) => {
-      const payload = await res.json();
-      if (!res.ok || payload?.ok === false) {
-        throw new Error(payload?.message || payload?.error || "User bootstrap load failed.");
-      }
+  const requestTask = fetchAppUserPayload({ force: options?.force })
+    .then((payload) => {
       const data = normalizeUserData(payload?.data);
       writeUserCache(data);
       emitUserUpdated();
       return data;
     })
-    .catch(() => fallbackFromCache());
+    .catch(() => cached ?? fallbackFromCache());
 
-  pendingUser = withSoftTimeout(requestTask, APP_USER_SOFT_TIMEOUT_MS, fallbackFromCache)
+  pendingUser = withSoftTimeout(requestTask, APP_USER_SOFT_TIMEOUT_MS, () => cached ?? fallbackFromCache())
     .finally(() => {
       pendingUser = null;
     });
@@ -285,17 +299,26 @@ export async function fetchAppUser(options?: { force?: boolean }) {
   return pendingUser;
 }
 
-async function fetchAppUserResponse() {
+type AppUserApiPayload = {
+  ok?: boolean;
+  data?: AppUserDataInput;
+  message?: string;
+  error?: string;
+};
+
+async function fetchAppUserPayload(options?: { force?: boolean }) {
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt <= APP_USER_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
-      const res = await fetch("/api/app/user", { cache: "no-store", credentials: "same-origin" });
-      const payload = await res.clone().json().catch(() => null);
-      if (!res.ok || isApiFailure(payload)) {
+      const payload = await fetchJsonDeduped<AppUserApiPayload>("/api/app/user", {
+        force: options?.force || attempt > 0,
+        staleMs: APP_USER_CACHE_MS,
+      });
+      if (isApiFailure(payload)) {
         throw new Error(payload?.message || payload?.error || "User bootstrap load failed.");
       }
-      return res;
+      return payload;
     } catch (error) {
       lastError = error;
       const delay = APP_USER_RETRY_DELAYS_MS[attempt];

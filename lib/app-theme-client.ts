@@ -1,9 +1,7 @@
 "use client";
 
-import {
-  THEME_STATE_STORAGE_KEY,
-} from "@/app/design-system/theme/storage";
 import type { ThemeColorKey, ThemeStyle } from "@/app/design-system/theme/theme";
+import { fetchJsonDeduped } from "@/lib/fetch-json";
 
 export const APP_THEME_UPDATED_EVENT = "app-theme-updated";
 
@@ -32,7 +30,7 @@ let pendingTheme: Promise<AppThemeData> | null = null;
 
 export const fallbackAppTheme: AppThemeData = {
   primary: "gray",
-  style: "light",
+  style: "dark",
 };
 
 function isThemeStyle(value: unknown): value is ThemeStyle {
@@ -85,27 +83,12 @@ function readStoredThemeFallback(): AppThemeData | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(THEME_STATE_STORAGE_KEY) || "null") as {
-      style?: unknown;
-      adminTheme?: {
-        primary?: unknown;
-        style?: unknown;
-      };
-    } | null;
-    if (!parsed || typeof parsed !== "object") return null;
-
-    const primary = isThemeColor(parsed.adminTheme?.primary) ? parsed.adminTheme.primary : undefined;
-    const style = isThemeStyle(parsed.adminTheme?.style)
-      ? parsed.adminTheme.style
-      : isThemeStyle(parsed.style)
-        ? parsed.style
-        : undefined;
-    if (!primary && !style) return null;
-
-    return normalizeAppTheme({ primary, style });
+    const parsed = JSON.parse(localStorage.getItem(APP_THEME_CACHE_KEY) || "null") as CachedThemeData | null;
+    if (parsed?.data) return normalizeAppTheme(parsed.data);
   } catch {
-    return null;
   }
+
+  return null;
 }
 
 function readLocalThemeCache() {
@@ -179,12 +162,8 @@ export async function fetchAppTheme(options?: { force?: boolean; timeoutMs?: num
     if (pendingTheme) return pendingTheme;
   }
 
-  const requestTask = fetchAppThemeResponse()
-    .then(async (res) => {
-      const payload = await res.json();
-      if (!res.ok || payload?.ok === false) {
-        throw new Error(payload?.message || payload?.error || "Theme load failed.");
-      }
+  const requestTask = fetchAppThemePayload({ force: options?.force })
+    .then((payload) => {
       const data = readThemePayload(payload, fallbackFromCache());
       writeThemeCache(data);
       emitThemeUpdated();
@@ -200,20 +179,22 @@ export async function fetchAppTheme(options?: { force?: boolean; timeoutMs?: num
   return pendingTheme;
 }
 
-async function fetchAppThemeResponse() {
+async function fetchAppThemePayload(options?: { force?: boolean }) {
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt <= APP_THEME_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
-      const res = await fetch(APP_THEME_API_URL, {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      const payload = await res.clone().json().catch(() => null);
-      if (!res.ok || isApiFailure(payload)) {
+      const payload = await fetchJsonDeduped<{ ok?: boolean; data?: { theme?: unknown }; message?: string; error?: string }>(
+        APP_THEME_API_URL,
+        {
+          force: options?.force || attempt > 0,
+          staleMs: APP_THEME_CACHE_MS,
+        }
+      );
+      if (isApiFailure(payload)) {
         throw new Error(payload?.message || payload?.error || "Theme load failed.");
       }
-      return res;
+      return payload;
     } catch (error) {
       lastError = error;
       const delay = APP_THEME_RETRY_DELAYS_MS[attempt];
@@ -226,18 +207,24 @@ async function fetchAppThemeResponse() {
 }
 
 export async function saveAppTheme(theme: AppThemeData) {
+  const current = readAnyCachedAppTheme() ?? fallbackAppTheme;
+  const payloadTheme = normalizeAppTheme({
+    ...current,
+    ...theme,
+  }, current);
+
   const res = await fetch(APP_THEME_ADMIN_API_URL, {
     method: "PUT",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(theme),
+    body: JSON.stringify(payloadTheme),
   });
   const payload = await res.json().catch(() => null);
   if (!res.ok || payload?.ok === false) {
     throw new Error(payload?.message || payload?.error || "Theme save failed.");
   }
 
-  const nextTheme = readThemePayload(payload, theme);
+  const nextTheme = readThemePayload(payload, payloadTheme);
   writeThemeCache(nextTheme);
   emitThemeUpdated();
   return nextTheme;

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from "react";
-import { IoChevronBackOutline, IoChevronForwardOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 import type { Banner } from "./types";
@@ -173,30 +172,6 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
             ))}
           </div>
         </button>
-        {imageCount > 1 ? (
-          <>
-            <button
-              type="button"
-              data-drag-ignore="true"
-              className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-primary-border bg-primary-card/85 text-lg text-primary-text shadow-md backdrop-blur transition hover:bg-primary hover:text-primary-contrast"
-              disabled={snapDirection !== null || isResettingRail}
-              onClick={() => moveBanner("previous")}
-              aria-label="تصویر قبلی"
-            >
-              <IoChevronBackOutline aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              data-drag-ignore="true"
-              className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-primary-border bg-primary-card/85 text-lg text-primary-text shadow-md backdrop-blur transition hover:bg-primary hover:text-primary-contrast"
-              disabled={snapDirection !== null || isResettingRail}
-              onClick={() => moveBanner("next")}
-              aria-label="تصویر بعدی"
-            >
-              <IoChevronForwardOutline aria-hidden="true" />
-            </button>
-          </>
-        ) : null}
       </div>
       {imageUrls.length > 1 && (
         <div className="flex justify-center gap-2">

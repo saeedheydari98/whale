@@ -1,27 +1,22 @@
 "use client";
 
-import { useCallback } from "react";
-
-function readFile(file: File) {
-  return new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => resolve("");
-    reader.readAsDataURL(file);
-  });
-}
+import {
+  readWebpFileAsDataUrl,
+  readWebpFilesAsDataUrls,
+  type WebpDataUrlResult,
+  type WebpDataUrlsResult,
+} from "@/lib/image-upload";
 
 export function useFileDataUrl() {
-  const readFileAsDataUrl = useCallback(async (file: File | null | undefined) => {
-    if (!file) return "";
-    return readFile(file);
-  }, []);
+  const readFileAsDataUrl = async (file: File | null | undefined): Promise<WebpDataUrlResult> => {
+    return readWebpFileAsDataUrl(file);
+  };
 
-  const readFilesAsDataUrls = useCallback(async (files: FileList | File[] | null | undefined) => {
-    const selectedFiles = Array.from(files ?? []);
-    if (selectedFiles.length === 0) return [];
-    return Promise.all(selectedFiles.map(readFile));
-  }, []);
+  const readFilesAsDataUrls = async (
+    files: FileList | File[] | null | undefined
+  ): Promise<WebpDataUrlsResult> => {
+    return readWebpFilesAsDataUrls(files);
+  };
 
   return {
     readFileAsDataUrl,

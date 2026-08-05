@@ -8,6 +8,7 @@ import { RequiredLabel } from "@/app/design-system/components/ui/required-label"
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
+import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import type { BrandForm, CatalogLinkGroupForm, CategoryForm } from "../types";
 
 type CategoryBrandModalsProps = {
@@ -198,11 +199,12 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
             onChange={(event) => onPatch({ title: event.target.value } as Partial<TItem>)}
           />
           <CustomInput value={item.slug} placeholder="نامک" onChange={(event) => onPatch({ slug: event.target.value } as Partial<TItem>)} />
+          <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
           <CustomInput value={item.imageUrl} placeholder={imagePlaceholder} onChange={(event) => onPatch({ imageUrl: event.target.value } as Partial<TItem>)} />
           <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-3 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
             <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
             <span className="text-sm font-semibold">{uploadLabel}</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
+            <input type="file" accept={WEBP_IMAGE_ACCEPT} className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
           </label>
           <CategoryOption label={item.title || previewFallback} imageUrl={item.imageUrl} onImageClick={() => onPreview(item.imageUrl)} />
           <CustomInput type="number" value={item.sortOrder} placeholder={sortPlaceholder} onChange={(event) => onPatch({ sortOrder: Number(event.target.value) } as Partial<TItem>)} />
