@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import Loading from "@/app/design-system/components/loading/loading";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { LazyViewportSection } from "@/app/design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import { getCategoriesPageStructure, readCachedCategoriesPageStructure, slugifyCatalogValue, type ProductsCache } from "@/lib/products-client";
@@ -57,7 +58,7 @@ export default function CategoriesPage() {
   const showWhaleLoading = loading && displaySections.length === 0;
 
   return (
-    <main className="min-h-screen bg-primary-base text-primary-text">
+    <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
           <div className="text-3xl font-bold">دسته‌بندی محصولات فروشگاه وال</div>
@@ -93,9 +94,7 @@ export default function CategoriesPage() {
         ) : null}
 
         {!loading && visibleCategories.length === 0 ? (
-          <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
-            دسته‌بندی فعالی وجود ندارد.
-          </div>
+          <CustomEmptyState />
         ) : null}
 
         {!loading ? (
@@ -121,7 +120,7 @@ export default function CategoriesPage() {
                   <div className="flex w-full gap-4 overflow-x-auto overscroll-x-contain pb-1">
                     {(section.item.length > 0 ? section.item.slice(0, 4) : [0, 1, 2, 3]).map((category) => (
                       <Loading key={typeof category === "number" ? category : category.id} loading="skeleton-item" isLoading>
-                        <CategoryOption label={typeof category === "number" ? "Ø¯Ø³ØªÙ‡ Ø¨Ù†Ø¯ÛŒ" : category.title} imageUrl="" size="lg" className="min-w-28 shrink-0" />
+                        <CategoryOption label={typeof category === "number" ? "دسته‌بندی" : category.title} imageUrl="" size="lg" className="min-w-28 shrink-0" />
                       </Loading>
                     ))}
                   </div>

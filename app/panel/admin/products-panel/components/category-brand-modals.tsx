@@ -4,12 +4,12 @@ import { IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "react-icons
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
-import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import type { BrandForm, CatalogLinkGroupForm, CategoryForm } from "../types";
+import { AdminModalSection } from "./admin-modal-section";
 
 type CategoryBrandModalsProps = {
   categoryGroups: CatalogLinkGroupForm[];
@@ -180,35 +180,63 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
   onSubmit,
   onDelete,
 }: TaxonomyModalProps<TItem>) {
+  const hasTitle = Boolean(item?.title.trim());
+  const hasImage = Boolean(item?.imageUrl.trim());
+  const hasGroup = Boolean(item?.groupId.trim() && item.groupId !== "default-categories" && item.groupId !== "default-brands");
+
   return (
-    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg">
+    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {item ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
-          <RequiredLabel required className="text-primary-text">{entityTitle}</RequiredLabel>
-          <CustomSelect value={item.groupId} aria-label={groupAriaLabel} onChange={(event) => onPatch({ groupId: event.target.value } as Partial<TItem>)}>
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.title}
-              </option>
-            ))}
-          </CustomSelect>
-          <CustomInput
-            value={item.title}
-            placeholder={entityTitle}
-            invalid={hasRequiredError(requiredErrorKey) && !item.title.trim()}
-            onChange={(event) => onPatch({ title: event.target.value } as Partial<TItem>)}
-          />
-          <CustomInput value={item.slug} placeholder="نامک" onChange={(event) => onPatch({ slug: event.target.value } as Partial<TItem>)} />
-          <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
-          <CustomInput value={item.imageUrl} placeholder={imagePlaceholder} onChange={(event) => onPatch({ imageUrl: event.target.value } as Partial<TItem>)} />
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-3 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
-            <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-            <span className="text-sm font-semibold">{uploadLabel}</span>
-            <input type="file" accept={WEBP_IMAGE_ACCEPT} className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
-          </label>
-          <CategoryOption label={item.title || previewFallback} imageUrl={item.imageUrl} onImageClick={() => onPreview(item.imageUrl)} />
-          <CustomInput type="number" value={item.sortOrder} placeholder={sortPlaceholder} onChange={(event) => onPatch({ sortOrder: Number(event.target.value) } as Partial<TItem>)} />
-          <CustomSwitch checked={item.active} onChange={(active) => onPatch({ active } as Partial<TItem>)} label={item.active ? "فعال" : "مخفی"} size="sm" />
+        <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
+          <AdminModalSection
+            title="اطلاعات"
+            status={hasTitle ? "complete" : "incomplete"}
+            invalid={hasRequiredError(requiredErrorKey) && !hasTitle}
+            meta="عنوان و نامک"
+            defaultOpen={!hasTitle}
+          >
+            <CustomInput
+              value={item.title}
+              placeholder={entityTitle}
+              invalid={hasRequiredError(requiredErrorKey) && !item.title.trim()}
+              onChange={(event) => onPatch({ title: event.target.value } as Partial<TItem>)}
+            />
+            <CustomInput value={item.slug} placeholder="نامک" onChange={(event) => onPatch({ slug: event.target.value } as Partial<TItem>)} />
+          </AdminModalSection>
+
+          <AdminModalSection
+            title="تصویر"
+            status={hasImage ? "complete" : "incomplete"}
+            meta="تصویر WebP و پیش‌نمایش"
+            defaultOpen={!hasImage}
+          >
+            <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
+            <CustomInput value={item.imageUrl} placeholder={imagePlaceholder} onChange={(event) => onPatch({ imageUrl: event.target.value } as Partial<TItem>)} />
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-3 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
+              <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
+              <span className="text-sm font-semibold">{uploadLabel}</span>
+              <input type="file" accept={WEBP_IMAGE_ACCEPT} className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
+            </label>
+            <CategoryOption label={item.title || previewFallback} imageUrl={item.imageUrl} onImageClick={() => onPreview(item.imageUrl)} />
+          </AdminModalSection>
+
+          <AdminModalSection
+            title="جایگاه و وضعیت"
+            status={hasGroup ? "complete" : "optional"}
+            meta={item.active ? "فعال" : "مخفی"}
+            defaultOpen={!hasGroup}
+          >
+            <CustomSelect value={item.groupId} aria-label={groupAriaLabel} onChange={(event) => onPatch({ groupId: event.target.value } as Partial<TItem>)}>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.title}
+                </option>
+              ))}
+            </CustomSelect>
+            <CustomInput type="number" value={item.sortOrder} placeholder={sortPlaceholder} onChange={(event) => onPatch({ sortOrder: Number(event.target.value) } as Partial<TItem>)} />
+            <CustomSwitch checked={item.active} onChange={(active) => onPatch({ active } as Partial<TItem>)} label={item.active ? "فعال" : "مخفی"} size="sm" />
+          </AdminModalSection>
+
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
               <span>{submitLabel}</span>

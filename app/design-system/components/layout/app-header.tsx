@@ -40,6 +40,7 @@ import {
   writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
+import { getProfileFullName, getProfileMarketingEmail, getUserPhone } from "@/lib/user-display";
 import { GiSpermWhale } from "react-icons/gi";
 
 type HeaderUser = {
@@ -87,7 +88,7 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
 
 function AccountButton({ user, profile, onOpen }: { user: HeaderUser | null; profile: UserProfile | null; onOpen: () => void }) {
   const [mounted, setMounted] = useState(false);
-  const label = getUserFullName(user, profile) || getUserPhone(user, profile) || "";
+  const label = getProfileFullName(profile ?? getUserProfile(user)) || getUserPhone(user, profile) || "";
   const initial = label.trim().charAt(0).toUpperCase();
   const className = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-base font-bold text-primary-text transition-colors hover:bg-primary-soft hover:text-primary";
 
@@ -119,20 +120,6 @@ function syncStoredProfileFromUser(user: HeaderUser | null | undefined) {
   return profile;
 }
 
-function getUserFullName(user: HeaderUser | null | undefined, preferredProfile?: HeaderProfile | null) {
-  const profile = preferredProfile ?? getUserProfile(user);
-  const profileName = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim();
-  return profileName;
-}
-
-function getUserPhone(user: HeaderUser | null | undefined, preferredProfile?: HeaderProfile | null) {
-  return String((preferredProfile ?? getUserProfile(user))?.phone || "").trim();
-}
-
-function getUserMarketingEmail(user: HeaderUser | null | undefined, preferredProfile?: HeaderProfile | null) {
-  return String((preferredProfile ?? getUserProfile(user))?.email || "").trim();
-}
-
 function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount: number) {
   if (hasLocalCartSnapshot(user)) {
     return getCartCount(readLocalCart(user));
@@ -162,10 +149,10 @@ export function AppHeader() {
   const router = useRouter();
   const pathname = usePathname();
   const showMobileBack = isMobile && pathname !== "/";
-  const accountLabel = getUserFullName(authUser, accountProfile) || getUserPhone(authUser, accountProfile);
+  const accountLabel = getProfileFullName(accountProfile ?? getUserProfile(authUser)) || getUserPhone(authUser, accountProfile);
   const accountInitial = accountLabel.trim().charAt(0).toUpperCase() || "?";
   const accountPhone = getUserPhone(authUser, accountProfile);
-  const accountEmail = getUserMarketingEmail(authUser, accountProfile);
+  const accountEmail = getProfileMarketingEmail(accountProfile ?? getUserProfile(authUser));
   const authModalTitle = authUser
     ? "حساب کاربری"
     : authMode === "choice"
@@ -342,10 +329,10 @@ export function AppHeader() {
   return (
     <header
       className={`
-        sticky top-0 z-30 overflow-visible border-b border-primary-border 
+        relative z-30 border-primary-border 
         bg-primary-panel backdrop-blur flex justify-center items-center 
-        w-full h-20 transition-transform duration-300
-        ${hideHeader ? '-translate-y-full' : 'translate-y-0'}
+        w-full transition-all duration-300
+        ${hideHeader ? 'h-0 -translate-y-full overflow-hidden border-b-0 border-transparent opacity-0' : 'h-20 translate-y-0 overflow-visible border-b opacity-100'}
       `}
     >
       <div className="relative flex justify-between items-center w-full gap-3 px-4">
@@ -456,20 +443,6 @@ export function AppHeader() {
             )}
           </div>
         </div>
-      )}
-      {false && isMobile && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around gap-1 border-t border-primary-border bg-primary-panel px-2 py-2 shadow-lg backdrop-blur">
-          {visibleNavItems.map((item) => (
-            <HeaderNavLink
-              key={item.href}
-              href={item.href}
-              icon={item.icon}
-              className="h-14 flex-1 flex-col gap-1 rounded-md border-0 px-1 py-1 text-[11px]"
-            >
-              {item.label}
-            </HeaderNavLink>
-          ))}
-        </nav>
       )}
       <CustomModal
         open={authOpen}

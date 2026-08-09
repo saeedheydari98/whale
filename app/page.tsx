@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "./design-system/components/ui/category-option";
 import Loading from "./design-system/components/loading/loading";
+import { CustomEmptyState } from "./design-system/components/ui/empty-state";
 import { LazyViewportSection } from "./design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./products/product-showcase/banner-carousel";
 import { getHomePageStructure, readCachedHomePageStructure, type ProductsCache } from "@/lib/products-client";
@@ -63,7 +64,7 @@ export default function Home() {
   const showWhaleLoading = loading && displaySections.length === 0;
 
   return (
-    <main className="min-h-screen bg-primary-base text-primary-text">
+    <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
           <div className="text-3xl font-bold">به فروشگاه وال خوش آمدید</div>
@@ -115,7 +116,7 @@ export default function Home() {
                   <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-1">
                     {(section.item.length > 0 ? section.item.slice(0, 4) : [0, 1, 2, 3]).map((brand) => (
                       <Loading key={typeof brand === "number" ? brand : brand.id} loading="skeleton-item" isLoading>
-                        <CategoryOption label={typeof brand === "number" ? "Ø¨Ø±Ù†Ø¯" : brand.title} imageUrl="" size="lg" className="min-w-28 shrink-0" />
+                        <CategoryOption label={typeof brand === "number" ? "برند" : brand.title} imageUrl="" size="lg" className="min-w-28 shrink-0" />
                       </Loading>
                     ))}
                   </div>
@@ -137,7 +138,7 @@ export default function Home() {
                   <span className="text-xs font-semibold text-secondary-text">{section.item.length} برند</span>
                 </div>
                 {brands.length === 0 ? (
-                  <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">در حال حاضر برند فعالی وجود ندارد.</div>
+                  <CustomEmptyState size="sm" />
                 ) : null}
                 <div className="flex gap-4 overflow-x-auto overscroll-x-contain pb-1">
                   {section.item.map((brand) => (

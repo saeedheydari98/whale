@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
 import { addProductToCart } from "@/lib/cart-client";
 import { isProductAvailable, normalizeColorStock, type ProductRecord } from "@/lib/products-client";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { ProductListGrid } from "@/app/products/product-list-grid";
 
@@ -61,7 +62,7 @@ export default function SearchPage() {
   };
 
   return (
-    <main className="min-h-screen bg-primary-base text-primary-text">
+    <main className="min-h-full bg-primary-base text-primary-text">
       <section className="mx-auto w-full px-4 py-8">
         <div className="flex items-center justify-between mb-4">
           <div className="text-2xl font-bold">نتایج جست‌وجو برای «{q}»</div>
@@ -83,7 +84,7 @@ export default function SearchPage() {
         ) : null}
 
         {!loading && results && results.length === 0 ? (
-          <div className="text-sm text-secondary-text">نتیجه‌ای پیدا نشد.</div>
+          <CustomEmptyState description="نتیجه‌ای با این جست‌وجو پیدا نشد." />
         ) : null}
       </section>
     </main>

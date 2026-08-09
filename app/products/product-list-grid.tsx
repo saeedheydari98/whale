@@ -2,6 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { LazyViewportSection } from "@/app/design-system/components/ui/lazy-viewport-section";
+import {
+  formatCurrencyWithCommas as formatPrice,
+  getDiscountPercentValue as getDiscountPercent,
+  getFinalPriceValue as getFinalPrice,
+} from "@/lib/price-format";
 import { type ProductRecord } from "@/lib/products-client";
 import { ProductShowcaseCard } from "./product-showcase/showcase-section";
 import type { Product } from "./product-showcase/types";
@@ -14,26 +19,6 @@ export function resolveProductListLoadingCount(totalProducts?: number, loadedPro
 
   const remaining = Math.max(0, Math.round(total) - Math.max(0, Math.round(loadedProducts)));
   return Math.min(PRODUCT_LIST_PAGE_SIZE, remaining);
-}
-
-function getFinalPrice(product: Product) {
-  return product.discountPrice || product.price;
-}
-
-function formatPrice(value?: string) {
-  const normalized = String(value || "").replace(/[^\d.]/g, "");
-  const parsed = Number(normalized);
-
-  if (!Number.isFinite(parsed) || !normalized) {
-    return value || "";
-  }
-
-  return `$${parsed.toLocaleString("en-US")}`;
-}
-
-function getDiscountPercent(product: Product) {
-  const percent = Number(product.discountPercent);
-  return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
 }
 
 type LoadMoreOnViewProps = {

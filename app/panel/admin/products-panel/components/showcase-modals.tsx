@@ -4,12 +4,12 @@ import { IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
-import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { SHOWCASE_SORT_OPTIONS } from "../constants";
 import type { CategoryForm, ProductForm, ShowcaseForm } from "../types";
 import { toggleProductId } from "../utils";
+import { AdminModalSection } from "./admin-modal-section";
 
 type ShowcaseModalsProps = {
   products: ProductForm[];
@@ -91,28 +91,52 @@ function ShowcaseModal({
   onDelete,
   submitLabel,
 }: ShowcaseModalProps) {
+  const hasTitle = Boolean(showcase?.title.trim());
+  const manualComplete = Boolean(showcase && showcase.mode !== "auto" && showcase.manualProductIds.length > 0);
+  const autoComplete = Boolean(showcase && showcase.mode === "auto" && Number(showcase.limit) > 0);
+  const ruleComplete = Boolean(showcase && (showcase.mode === "auto" ? autoComplete : manualComplete));
+
   return (
-    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg">
+    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {showcase ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
-          <RequiredLabel required className="text-primary-text">عنوان ویترین</RequiredLabel>
-          <CustomInput
-            value={showcase.title}
-            placeholder="عنوان ویترین"
-            invalid={hasRequiredError(requiredErrorKey) && !showcase.title.trim()}
-            onChange={(event) => onPatch({ title: event.target.value })}
-          />
-          <CustomInput type="number" value={showcase.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
-          <CustomSelect value={showcase.mode} aria-label="حالت ویترین" onChange={(event) => onPatch({ mode: event.target.value === "auto" ? "auto" : "manual" })}>
-            <option value="manual">انتخاب دستی محصول</option>
-            <option value="auto">خودکار بر اساس قانون</option>
-          </CustomSelect>
-          {showcase.mode === "auto" ? (
-            <AutoShowcaseFields showcase={showcase} categories={categories} onPatch={onPatch} />
-          ) : (
-            <ManualShowcaseProducts showcase={showcase} products={products} onPatch={onPatch} />
-          )}
-          <CustomSwitch checked={showcase.active} onChange={(active) => onPatch({ active })} label={showcase.active ? "فعال" : "مخفی"} size="sm" />
+        <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
+          <AdminModalSection
+            title="اطلاعات ویترین"
+            status={hasTitle ? "complete" : "incomplete"}
+            invalid={hasRequiredError(requiredErrorKey) && !hasTitle}
+            meta="عنوان و ترتیب نمایش"
+            defaultOpen={!hasTitle}
+          >
+            <CustomInput
+              value={showcase.title}
+              placeholder="عنوان ویترین"
+              invalid={hasRequiredError(requiredErrorKey) && !showcase.title.trim()}
+              onChange={(event) => onPatch({ title: event.target.value })}
+            />
+            <CustomInput type="number" value={showcase.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
+          </AdminModalSection>
+
+          <AdminModalSection
+            title="حالت و محصولات"
+            status={ruleComplete ? "complete" : "incomplete"}
+            meta={showcase.mode === "auto" ? "قانون خودکار" : "انتخاب دستی محصول"}
+            defaultOpen={!ruleComplete}
+          >
+            <CustomSelect value={showcase.mode} aria-label="حالت ویترین" onChange={(event) => onPatch({ mode: event.target.value === "auto" ? "auto" : "manual" })}>
+              <option value="manual">انتخاب دستی محصول</option>
+              <option value="auto">خودکار بر اساس قانون</option>
+            </CustomSelect>
+            {showcase.mode === "auto" ? (
+              <AutoShowcaseFields showcase={showcase} categories={categories} onPatch={onPatch} />
+            ) : (
+              <ManualShowcaseProducts showcase={showcase} products={products} onPatch={onPatch} />
+            )}
+          </AdminModalSection>
+
+          <AdminModalSection title="وضعیت" status="optional" meta={showcase.active ? "فعال" : "مخفی"}>
+            <CustomSwitch checked={showcase.active} onChange={(active) => onPatch({ active })} label={showcase.active ? "فعال" : "مخفی"} size="sm" />
+          </AdminModalSection>
+
           <div className="flex flex-col gap-2 sm:flex-row">
             {onDelete ? (
               <CustomButton variant="danger" fullWidth icon={<IoTrashOutline />} onClick={onDelete}>

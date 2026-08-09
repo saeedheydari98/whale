@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { IoCheckmarkCircle, IoChatbubbleEllipsesOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
 
 export type ProductReview = {
@@ -203,13 +204,11 @@ export function ProductReviewsSection({
             </div>
 
             {reviews.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-primary-border bg-primary-card py-12 text-center">
-                <IoChatbubbleEllipsesOutline className="text-4xl text-primary-border" aria-hidden="true" />
-                <div className="text-base font-semibold text-primary-text">هنوز دیدگاهی ثبت نشده است</div>
-                <div className="max-w-sm text-sm text-secondary-text">
-                  اولین دیدگاه این محصول را ثبت کنید.
-                </div>
-              </div>
+              <CustomEmptyState
+                description="اولین دیدگاه این محصول را ثبت کنید."
+                icon={<IoChatbubbleEllipsesOutline />}
+                className="border-dashed py-12 text-center"
+              />
             ) : (
               <div className="flex flex-col gap-4">
                 {reviews.map((review) => (

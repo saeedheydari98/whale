@@ -35,6 +35,14 @@ type ProductShowcaseCardProps = {
   getDiscountPercent: (product: Product) => number;
 };
 
+function getPrimaryProductImage(product?: Product) {
+  if (!product) return "";
+  const imageUrls = Array.isArray(product.images)
+    ? product.images.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+  return String(product.imageUrl ?? "").trim() || imageUrls[0] || "";
+}
+
 export function ProductShowcaseCard({
   product,
   isLoading = false,
@@ -48,6 +56,7 @@ export function ProductShowcaseCard({
   const productId = product?.id ?? productTitle;
   const available = product ? isProductAvailable(product) : true;
   const discountPercent = product ? getDiscountPercent(product) : 0;
+  const primaryImage = getPrimaryProductImage(product);
 
   return (
     <article
@@ -59,15 +68,15 @@ export function ProductShowcaseCard({
         <button
           type="button"
           className="relative flex min-h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
-          onClick={() => onPreview?.(product?.imageUrl)}
-          disabled={isLoading || !product?.imageUrl || !onPreview}
+          onClick={() => onPreview?.(primaryImage)}
+          disabled={isLoading || !primaryImage || !onPreview}
           aria-label="باز کردن تصویر محصول"
         >
           <Loading loading="skeleton-item" isLoading={isLoading} className="h-full w-full">
             <div className="flex h-full w-full items-center justify-center">
-              {product?.imageUrl ? (
+              {primaryImage ? (
                 <img
-                  src={product.imageUrl}
+                  src={primaryImage}
                   alt={productTitle}
                   loading="lazy"
                   className="h-full w-full object-cover"

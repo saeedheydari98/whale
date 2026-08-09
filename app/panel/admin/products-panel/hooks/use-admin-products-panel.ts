@@ -23,6 +23,8 @@ import {
   dedupeProducts,
   ensureShowcases,
   formatPrice,
+  formatNumberWithCommas,
+  getProductImageUrls,
   getProductKey,
   getShowcaseProductsForAdmin,
   hasMatchingColorStock,
@@ -33,6 +35,7 @@ import {
   normalizeCategory,
   normalizeProduct,
   normalizeShowcase,
+  productImagePatch,
   slugifyValue,
   storefrontKey,
   waitForMinimumLoading,
@@ -77,6 +80,12 @@ const ADMIN_CATALOG_SECTION_URL = "/api/admin/catalog";
 const ADMIN_SKELETON_HINTS_KEY = "admin-catalog-skeleton-hints:v1";
 const ADMIN_CATALOG_SECTIONS: AdminCatalogSection[] = ["products", "banners", "showcases", "categories", "brands", "storefront"];
 const STOREFRONT_HINT_TABS: StorefrontLayoutTab[] = ["home", "categories", "products"];
+
+function visibleStatusMessage(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (!message || /[A-Za-z]/.test(message)) return fallback;
+  return message;
+}
 const EMPTY_CATALOG: ProductsCache = {
   products: [],
   showcases: [],
@@ -179,7 +188,7 @@ async function getAdminStorefrontLayout(options?: { force?: boolean }) {
     error?: string;
   }>(`${ADMIN_CATALOG_SECTION_URL}/storefront`, { force: options?.force });
 
-  if (json?.ok === false) throw new Error(json.message || json.error || "Ø¯Ø±ÛŒØ§ÙØª Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ù…Ù…Ú©Ù† Ù†Ø´Ø¯.");
+  if (json?.ok === false) throw new Error(json.message || json.error || "دریافت چیدمان فروشگاه ممکن نشد.");
   return normalizeStorefrontLayout(json?.data?.storefront);
 }
 
@@ -1202,7 +1211,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           setLoadedSections(() => markCatalogSectionsLoaded(initialLoadedSections, ADMIN_CATALOG_SECTIONS));
           clearProductsCache();
           invalidateFetchCache(ADMIN_CATALOG_SECTION_URL);
-          if (showSavedStatus) setStatus("Catalog saved to database.");
+          if (showSavedStatus) setStatus("اطلاعات فروشگاه در پایگاه داده ذخیره شد.");
           return true;
         }
 
@@ -1218,7 +1227,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       throw new Error("ذخیره اطلاعات فروشگاه بعد از چند تلاش ناموفق بود.");
     } catch (error) {
       console.error("Catalog save error:", error);
-      setStatus(error instanceof Error ? error.message : "ذخیره اطلاعات فروشگاه ناموفق بود.");
+      setStatus(visibleStatusMessage(error, "ذخیره اطلاعات فروشگاه ناموفق بود."));
       return false;
     } finally {
       setSaving(false);
@@ -1263,7 +1272,15 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       }
 
       if (!res.ok || data?.ok === false) {
-        throw new Error(data?.message || data?.error || "Ø°Ø®ÛŒØ±Ù‡ Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ù†Ø§Ù…ÙˆÙÙ‚ Ø¨ÙˆØ¯.");
+        data = {
+          ...data,
+          message: visibleStatusMessage(
+            data?.message || data?.error ? new Error(String(data?.message || data?.error)) : null,
+            "ذخیره چیدمان فروشگاه ناموفق بود."
+          ),
+          error: undefined,
+        };
+        throw new Error(String(data.message));
       }
 
       const layout = normalizeStorefrontLayout(data?.data?.storefront);
@@ -1271,11 +1288,18 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       applyCatalogSectionSnapshot("storefront", storefrontLayoutToCatalog(layout));
       clearProductsCache();
       invalidateFetchCache(ADMIN_CATALOG_SECTION_URL);
-      if (showSavedStatus) setStatus("Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ø°Ø®ÛŒØ±Ù‡ Ø´Ø¯.");
+      if (showSavedStatus) {
+        setStatus("چیدمان فروشگاه ذخیره شد.");
+        return true;
+      }
       return true;
     } catch (error) {
       console.error("Storefront layout save error:", error);
-      setStatus(error instanceof Error ? error.message : "Ø°Ø®ÛŒØ±Ù‡ Ú†ÛŒØ¯Ù…Ø§Ù† ÙØ±ÙˆØ´Ú¯Ø§Ù‡ Ù†Ø§Ù…ÙˆÙÙ‚ Ø¨ÙˆØ¯.");
+      if (!(error instanceof Error) || /[A-Za-z]/.test(error.message)) {
+        setStatus("ذخیره چیدمان فروشگاه ناموفق بود.");
+        return false;
+      }
+      setStatus(error.message);
       return false;
     } finally {
       setSaving(false);
@@ -1526,24 +1550,69 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setEditingProduct((current) => (current ? updatePricingPatch(current, patch) : current));
   };
 
-  const handleImageUpload = (file: File | null) => {
-    void readFileAsDataUrl(file).then((result) => {
+  const appendProductImages = (imageUrls: string[], mode: "draft" | "edit") => {
+    const urls = imageUrls.map((imageUrl) => String(imageUrl).trim()).filter(Boolean);
+    if (urls.length === 0) return;
+
+    if (mode === "draft") {
+      setDraftProduct((current) => ({
+        ...current,
+        ...productImagePatch([...getProductImageUrls(current), ...urls]),
+      }));
+      return;
+    }
+
+    setEditingProduct((current) => current ? ({
+      ...current,
+      ...productImagePatch([...getProductImageUrls(current), ...urls]),
+    }) : current);
+  };
+
+  const handleImageUpload = (files: FileList | null) => {
+    void readFilesAsDataUrls(files).then((result) => {
       if (!result.ok) {
         if (result.error) setStatus(result.error);
         return;
       }
-      updateDraftProduct({ imageUrl: result.dataUrl });
+      appendProductImages(result.dataUrls, "draft");
     });
   };
 
-  const handleEditImageUpload = (file: File | null) => {
-    void readFileAsDataUrl(file).then((result) => {
+  const handleEditImageUpload = (files: FileList | null) => {
+    void readFilesAsDataUrls(files).then((result) => {
       if (!result.ok) {
         if (result.error) setStatus(result.error);
         return;
       }
-      updateEditingProduct({ imageUrl: result.dataUrl });
+      appendProductImages(result.dataUrls, "edit");
     });
+  };
+
+  const addProductImageUrl = (imageUrl: string, mode: "draft" | "edit") => {
+    const trimmed = imageUrl.trim();
+    if (!trimmed) return false;
+    if (!isAllowedWebpImageValue(trimmed)) {
+      setStatus(WEBP_ONLY_ERROR);
+      return false;
+    }
+
+    appendProductImages([trimmed], mode);
+    return true;
+  };
+
+  const removeProductImage = (imageUrl: string, mode: "draft" | "edit") => {
+    if (mode === "draft") {
+      setDraftProduct((current) => ({
+        ...current,
+        ...productImagePatch(getProductImageUrls(current).filter((item) => item !== imageUrl)),
+      }));
+      return;
+    }
+
+    setEditingProduct((current) => current ? ({
+      ...current,
+      ...productImagePatch(getProductImageUrls(current).filter((item) => item !== imageUrl)),
+    }) : current);
   };
 
   const handleCategoryImageUpload = (file: File | null, mode: "draft" | "edit") => {
@@ -2104,6 +2173,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     handleCategoryImageUpload,
     handleBrandImageUpload,
     handleBannerImagesUpload,
+    addProductImageUrl,
+    removeProductImage,
     addBannerImageUrl,
     removeBannerImage,
     submitDraftProduct,
@@ -2142,9 +2213,14 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
 }
 
 function updatePricingPatch(product: ProductForm, patch: Partial<ProductForm>) {
-  const next = { ...product, ...patch };
+  const normalizedPatch = {
+    ...patch,
+    ...(patch.originalPrice !== undefined ? { originalPrice: formatNumberWithCommas(patch.originalPrice) } : {}),
+    ...(patch.discountPrice !== undefined ? { discountPrice: formatNumberWithCommas(patch.discountPrice) } : {}),
+  };
+  const next = { ...product, ...normalizedPatch };
 
-  if (patch.originalPrice !== undefined || patch.discountPrice !== undefined) {
+  if (normalizedPatch.originalPrice !== undefined || normalizedPatch.discountPrice !== undefined) {
     const discountPercent = calculateDiscountPercent(next.originalPrice, next.discountPrice);
     return {
       ...next,

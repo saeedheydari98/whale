@@ -2,7 +2,7 @@
 
 import React from "react";
 import { resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, GradientDirection, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, glassSurfaceClasses, GradientDirection, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomSwitchProps = {
@@ -41,7 +41,7 @@ export function CustomSwitch({
   const colorStyle = resolveVariantCssVars(variant);
   const resolvedCustomColor = customColor || undefined;
   const switchColor = resolvedCustomColor ?? colorStyle.backgroundColor;
-  const switchBackgroundColor = checked ? switchColor : "#9ca3af";
+  const switchBackgroundColor = resolveGlassBackground(checked ? switchColor : "var(--neutral)", checked ? 86 : 72);
   const borderColor = resolvedCustomColor ? strengthenBorderColor(resolvedCustomColor) : colorStyle.borderColor;
   const isDisabled = disabled || isLoading;
 
@@ -58,6 +58,7 @@ export function CustomSwitch({
           radiusVariants[rounded],
           borderVariants[border],
           shadowVariants[shadow],
+          glassSurfaceClasses,
           motionVariants.smooth,
           isDisabled && "opacity-50 cursor-not-allowed"
         )}

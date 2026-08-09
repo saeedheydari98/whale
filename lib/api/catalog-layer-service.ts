@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { matchesSearchQuery } from "@/lib/product-search";
 import { pageResult, pagination, parseMoney } from "@/lib/api/catalog-service";
 import { withCatalogCache } from "@/lib/api/catalog-cache";
+import { getBannerImageData, getPlacement } from "@/lib/catalog-utils";
+import { normalizeColorStock } from "@/lib/color-counts";
 
 const STRUCTURE_TTL_SECONDS = 60;
 const DETAILS_TTL_SECONDS = 45;
@@ -123,70 +125,6 @@ function normalizeManualProductIds(value: unknown) {
   return Array.isArray(value)
     ? value.map((item) => String(item).trim()).filter(Boolean)
     : [];
-}
-
-function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count))
-  );
-}
-
-function getPlacement(item: { placement?: number | string | null; sortOrder?: number | string | null } | undefined, fallback = 0) {
-  if (Number.isFinite(Number(item?.placement))) return Number(item?.placement);
-  if (Number.isFinite(Number(item?.sortOrder))) return Number(item?.sortOrder);
-  return fallback;
-}
-
-function getBannerImageData(value: unknown) {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const record = value as {
-      urls?: unknown;
-      imageUrls?: unknown;
-      showcaseId?: unknown;
-      showOnHome?: unknown;
-      showOnShowcase?: unknown;
-      showOnCategories?: unknown;
-      showOnProducts?: unknown;
-      homeSortOrder?: unknown;
-      showcaseSortOrder?: unknown;
-      categorySortOrder?: unknown;
-      productSortOrder?: unknown;
-    };
-    const urls = Array.isArray(record.urls) ? record.urls : record.imageUrls;
-
-    return {
-      imageUrls: Array.isArray(urls) ? urls.map((item) => String(item)).filter(Boolean) : [],
-      showcaseId: typeof record.showcaseId === "string" ? record.showcaseId : "",
-      showOnHome: typeof record.showOnHome === "boolean" ? record.showOnHome : undefined,
-      showOnShowcase: typeof record.showOnShowcase === "boolean" ? record.showOnShowcase : undefined,
-      showOnCategories: typeof record.showOnCategories === "boolean" ? record.showOnCategories : undefined,
-      showOnProducts: typeof record.showOnProducts === "boolean" ? record.showOnProducts : undefined,
-      homeSortOrder: Number.isFinite(Number(record.homeSortOrder)) ? Number(record.homeSortOrder) : undefined,
-      showcaseSortOrder: Number.isFinite(Number(record.showcaseSortOrder)) ? Number(record.showcaseSortOrder) : undefined,
-      categorySortOrder: Number.isFinite(Number(record.categorySortOrder)) ? Number(record.categorySortOrder) : undefined,
-      productSortOrder: Number.isFinite(Number(record.productSortOrder)) ? Number(record.productSortOrder) : undefined,
-    };
-  }
-
-  return {
-    imageUrls: Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [],
-    showcaseId: "",
-    showOnHome: undefined,
-    showOnShowcase: undefined,
-    showOnCategories: undefined,
-    showOnProducts: undefined,
-    homeSortOrder: undefined,
-    showcaseSortOrder: undefined,
-    categorySortOrder: undefined,
-    productSortOrder: undefined,
-  };
 }
 
 function toClientBanner(banner: BannerRecord) {

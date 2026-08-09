@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { HiMiniXMark } from "react-icons/hi2";
+import { CustomButton } from "@/app/design-system/components/ui/button";
 
 type ImagePreviewModalProps = {
   imageUrl: string;
@@ -15,32 +17,22 @@ export function ImagePreviewModal({ imageUrl, onClose }: ImagePreviewModalProps)
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!imageUrl) return;
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [imageUrl, onClose]);
-
   if (!imageUrl) return null;
 
   const modal = (
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80"
-      onClick={onClose}
+      className="fixed inset-0 z-[10000] flex flex-col items-center justify-center gap-3 bg-black/80 p-4"
       role="dialog"
       aria-modal="true"
       aria-label="پیش‌نمایش تصویر"
     >
+      <div className="flex w-full justify-end">
+        <CustomButton variant="danger" size="sm" icon={<HiMiniXMark size={22} />} onClick={onClose} aria-label="بستن پیش‌نمایش تصویر" />
+      </div>
       <img
         src={imageUrl}
         alt=""
         className="max-h-[100vh] max-w-[100vw] object-contain"
-        onClick={(event) => event.stopPropagation()}
       />
     </div>
   );

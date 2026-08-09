@@ -354,6 +354,85 @@ textarea {
   text-align: inherit;
 }
 
+.bg-primary-card {
+  background-color: color-mix(in srgb, var(--primary-card) 78%, transparent);
+}
+
+.bg-secondary-card {
+  background-color: color-mix(in srgb, var(--secondary-card) 78%, transparent);
+}
+
+.bg-primary-panel {
+  background-color: color-mix(in srgb, var(--primary-panel) 82%, transparent);
+}
+
+.bg-secondary-panel {
+  background-color: color-mix(in srgb, var(--secondary-panel) 82%, transparent);
+}
+
+.bg-primary-bg {
+  background-color: color-mix(in srgb, var(--primary-bg) 72%, transparent);
+}
+
+.bg-secondary-bg {
+  background-color: color-mix(in srgb, var(--secondary-bg) 72%, transparent);
+}
+
+.bg-primary-soft {
+  background-color: color-mix(in srgb, var(--primary-soft) 78%, transparent);
+}
+
+.bg-secondary-soft {
+  background-color: color-mix(in srgb, var(--secondary-soft) 78%, transparent);
+}
+
+.bg-primary-media {
+  background-color: color-mix(in srgb, var(--primary-media) 82%, transparent);
+}
+
+.bg-secondary-media {
+  background-color: color-mix(in srgb, var(--secondary-media) 82%, transparent);
+}
+
+.bg-success-bg {
+  background-color: color-mix(in srgb, var(--success-bg) 78%, transparent);
+}
+
+.bg-danger-bg {
+  background-color: color-mix(in srgb, var(--danger-bg) 78%, transparent);
+}
+
+.bg-warning-bg {
+  background-color: color-mix(in srgb, var(--warning-bg) 78%, transparent);
+}
+
+.bg-info-bg {
+  background-color: color-mix(in srgb, var(--info-bg) 78%, transparent);
+}
+
+.bg-neutral-bg {
+  background-color: color-mix(in srgb, var(--neutral-bg) 78%, transparent);
+}
+
+.bg-primary-card,
+.bg-secondary-card,
+.bg-primary-panel,
+.bg-secondary-panel,
+.bg-primary-bg,
+.bg-secondary-bg,
+.bg-primary-soft,
+.bg-secondary-soft,
+.bg-primary-media,
+.bg-secondary-media,
+.bg-success-bg,
+.bg-danger-bg,
+.bg-warning-bg,
+.bg-info-bg,
+.bg-neutral-bg {
+  -webkit-backdrop-filter: blur(18px) saturate(1.28);
+  backdrop-filter: blur(18px) saturate(1.28);
+}
+
 .price-range-input {
   appearance: none;
   background: transparent;

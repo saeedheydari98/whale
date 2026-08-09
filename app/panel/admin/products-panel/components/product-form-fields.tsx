@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { IoCheckmarkSharp, IoChevronDown } from "react-icons/io5";
+import { IoCheckmarkSharp } from "react-icons/io5";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { getStockColorValue } from "@/app/design-system/components/ui/color-stock-dots";
 import { PRODUCT_COLOR_OPTIONS, STOCK_OPTIONS } from "../constants";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
-import { imageListToText, normalizeColorStock, textToImageList } from "../utils";
+import { normalizeColorStock } from "../utils";
 
 const PRODUCT_COLOR_LABELS: Record<string, string> = {
   black: "مشکی",
@@ -54,14 +56,14 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
     <div
       data-invalid={!stockMatchesTotal ? "true" : undefined}
       className={`flex flex-col gap-2 rounded-lg border bg-primary-card p-2 ${
-        stockMatchesTotal ? "border-primary-border" : "border-danger-border-nomode"
+        stockMatchesTotal ? "border-primary-border" : "border-danger-border"
       }`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="text-sm font-bold text-primary-text">موجودی</div>
           <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-            stockMatchesTotal ? "border-primary-border text-secondary-text" : "border-danger-border-nomode text-danger-text-nomode"
+            stockMatchesTotal ? "border-primary-border text-secondary-text" : "border-danger-border text-danger-text"
           }`}>
             {assignedStock}/{totalStock}
           </span>
@@ -124,7 +126,7 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
       </div>
 
       {!stockMatchesTotal ? (
-        <span className="text-xs font-semibold text-danger-text-nomode">
+        <span className="text-xs font-semibold text-danger-text">
           مجموع رنگ‌ها باید با موجودی کل برابر باشد.
         </span>
       ) : null}
@@ -153,7 +155,7 @@ export function ProductPlacementFields({
   hasRequiredError,
   categoryErrorKey,
 }: ProductPlacementFieldsProps) {
-  const [expandedSection, setExpandedSection] = useState<PlacementSectionId>("categories");
+  const [expandedSection, setExpandedSection] = useState<PlacementSectionId | "">("categories");
   const selectedCategoryIds = product.categoryIds.length > 0
     ? product.categoryIds
     : product.categoryId
@@ -165,11 +167,11 @@ export function ProductPlacementFields({
       ? [product.showcaseId]
       : [];
   const selectedBrand = brands.find((brand) => product.brand === brand.id || product.brand === brand.title);
-  const noBrandSelected = !selectedBrand;
+  const noBrandSelected = Boolean(product.brand) && !selectedBrand;
   const hasCategoryError = hasRequiredError(categoryErrorKey) && selectedCategoryIds.length === 0;
   const selectedCategoryLabels = selectedCategoryIds.map((id) => categories.find((category) => category.id === id)?.title || id);
   const selectedShowcaseLabels = selectedShowcaseIds.map((id) => showcases.find((showcase) => showcase.id === id)?.title || id);
-  const selectedBrandLabels = [selectedBrand?.title || "بدون برند"];
+  const selectedBrandLabels = product.brand ? [selectedBrand?.title || "بدون برند"] : [];
 
   const toggleCategory = (categoryId: string) => {
     if (selectedCategoryIds.includes(categoryId)) {
@@ -205,7 +207,7 @@ export function ProductPlacementFields({
         expanded={expandedSection === "categories"}
         selectedLabels={selectedCategoryLabels}
         role="group"
-        onToggle={() => setExpandedSection("categories")}
+        onToggle={(nextOpen) => setExpandedSection(nextOpen ? "categories" : "")}
       >
         {categories.length > 0 ? (
           categories.map((category) => (
@@ -219,7 +221,7 @@ export function ProductPlacementFields({
             />
           ))
         ) : (
-          <span className="text-xs text-secondary-text">دسته‌بندی‌ای تعریف نشده است.</span>
+          <CustomEmptyState description="دسته‌بندی‌ای برای انتخاب وجود ندارد." size="sm" className="w-full" />
         )}
       </SelectionGroup>
 
@@ -231,7 +233,7 @@ export function ProductPlacementFields({
         selectedLabels={selectedShowcaseLabels}
         emptyLabel="بدون ویترین"
         role="group"
-        onToggle={() => setExpandedSection("showcases")}
+        onToggle={(nextOpen) => setExpandedSection(nextOpen ? "showcases" : "")}
       >
         {showcases.length > 0 ? (
           showcases.map((showcase) => (
@@ -244,7 +246,7 @@ export function ProductPlacementFields({
             />
           ))
         ) : (
-          <span className="text-xs text-secondary-text">ویترینی تعریف نشده است.</span>
+          <CustomEmptyState description="ویترینی برای انتخاب وجود ندارد." size="sm" className="w-full" />
         )}
       </SelectionGroup>
 
@@ -255,7 +257,7 @@ export function ProductPlacementFields({
         expanded={expandedSection === "brand"}
         selectedLabels={selectedBrandLabels}
         role="radiogroup"
-        onToggle={() => setExpandedSection("brand")}
+        onToggle={(nextOpen) => setExpandedSection(nextOpen ? "brand" : "")}
       >
         <SelectableOption
           label="بدون برند"
@@ -288,15 +290,45 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
     <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
       <div className="text-sm font-bold text-primary-text">جزئیات محصول</div>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <CustomInput value={product.manufactureYear} placeholder="سال تولید" onChange={(event) => onChange({ manufactureYear: event.target.value })} />
+        <CustomInput value={product.manufactureYear} placeholder="سال تولید" showLabel={false} onChange={(event) => onChange({ manufactureYear: event.target.value })} />
       </div>
-      <CustomInput value={imageListToText(product.images)} placeholder="آدرس تصاویر گالری" onChange={(event) => onChange({ images: textToImageList(event.target.value) })} />
-      <CustomInput value={product.videoUrl} placeholder="آدرس ویدیو" onChange={(event) => onChange({ videoUrl: event.target.value })} />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <CustomInput
+          value={product.weight}
+          placeholder="وزن"
+          showLabel={false}
+          inputMode="decimal"
+          onChange={(event) => onChange({ weight: event.target.value })}
+        />
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <CustomInput
+          value={product.length}
+          placeholder="طول"
+          showLabel={false}
+          inputMode="decimal"
+          onChange={(event) => onChange({ length: event.target.value })}
+        />
+        <CustomInput
+          value={product.width}
+          placeholder="عرض"
+          showLabel={false}
+          inputMode="decimal"
+          onChange={(event) => onChange({ width: event.target.value })}
+        />
+        <CustomInput
+          value={product.height}
+          placeholder="ارتفاع"
+          showLabel={false}
+          inputMode="decimal"
+          onChange={(event) => onChange({ height: event.target.value })}
+        />
+      </div>
       <div className="flex flex-col gap-2 sm:flex-row">
         <CustomInput
           value={product.sku}
-          label="کد یکتای کالا"
           placeholder="کد کالا"
+          showLabel={false}
           onChange={(event) => onChange({ sku: event.target.value })}
         />
       </div>
@@ -321,7 +353,7 @@ type SelectionGroupProps = {
   selectedLabels: string[];
   emptyLabel?: string;
   role: "group" | "radiogroup";
-  onToggle: () => void;
+  onToggle: (open: boolean) => void;
   children: ReactNode;
 };
 
@@ -337,39 +369,23 @@ function SelectionGroup({
   onToggle,
   children,
 }: SelectionGroupProps) {
+  const hasSelection = selectedLabels.some(Boolean);
+
   return (
-    <div
-      data-invalid={invalid ? "true" : undefined}
-      className={`flex flex-col gap-2 border-t pt-2 ${
-        invalid ? "border-danger-border-nomode" : "border-primary-border"
-      }`}
+    <CustomAccordion
+      title={title}
+      meta={meta}
+      status={invalid ? "incomplete" : hasSelection ? "complete" : "optional"}
+      invalid={invalid}
+      open={expanded}
+      showStatusLabel={false}
+      onOpenChange={onToggle}
     >
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-controls={`${id}-options`}
-        onClick={onToggle}
-        className="flex items-center justify-between gap-2 rounded-md bg-transparent py-1 text-start transition hover:bg-primary-bg"
-      >
-        <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-xs font-bold text-primary-text">{title}</span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${invalid ? "bg-primary-bg text-danger-text-nomode" : "bg-primary-bg text-secondary-text"}`}>
-            {meta}
-          </span>
-        </span>
-        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary-border text-sm text-primary-text transition ${
-          expanded ? "rotate-180 bg-primary-soft" : "bg-primary-card"
-        }`}>
-          <IoChevronDown aria-hidden="true" />
-        </span>
-      </button>
       <SelectionSummary labels={selectedLabels} emptyLabel={emptyLabel} />
-      {expanded ? (
-        <div id={`${id}-options`} className="flex max-h-44 flex-wrap items-stretch gap-1.5 overflow-y-auto pt-1" role={role} aria-label={title}>
-          {children}
-        </div>
-      ) : null}
-    </div>
+      <div id={`${id}-options`} className="flex max-h-44 flex-wrap items-stretch gap-1.5 overflow-y-auto pt-1" role={role} aria-label={title}>
+        {children}
+      </div>
+    </CustomAccordion>
   );
 }
 

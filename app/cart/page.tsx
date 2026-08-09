@@ -5,6 +5,7 @@ import { useQueries } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../design-system/components/ui/button";
+import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { CustomInput } from "../design-system/components/ui/input";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { RequiredLabel } from "../design-system/components/ui/required-label";
@@ -32,34 +33,14 @@ import {
 } from "@/lib/user-profile";
 import { useAppUser } from "@/lib/app-user-context";
 import { readCachedAuthUser } from "@/lib/auth-client";
+import {
+  formatCurrencyWithCommas as formatPrice,
+  getDiscountPercentValue as getDiscountPercent,
+  getFinalPriceValue as getFinalPrice,
+  readFormattedPriceNumber as readPriceNumber,
+} from "@/lib/price-format";
 import { getProductDetail } from "@/lib/products-client";
 import { getStockColorValue, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
-
-function getFinalPrice(item: CartItemRecord) {
-  return item.discountPrice || item.price;
-}
-
-function formatPrice(value?: string | number) {
-  const normalized = String(value || "").replace(/[^\d.]/g, "");
-  const parsed = Number(normalized);
-
-  if (!Number.isFinite(parsed) || !normalized) {
-    return String(value || "");
-  }
-
-  return `$${parsed.toLocaleString("en-US")}`;
-}
-
-function readPriceNumber(value?: string) {
-  const normalized = String(value || "").replace(/[^\d.]/g, "");
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function getDiscountPercent(item: CartItemRecord) {
-  const percent = Number(item.discountPercent);
-  return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
-}
 
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
 const PHONE_PATTERN = /^09\d{9}$/;
@@ -258,7 +239,7 @@ export default function CartPage() {
   };
 
   return (
-    <main className="min-h-screen bg-primary-base text-primary-text">
+    <main className="min-h-full bg-primary-base text-primary-text">
       <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex items-center justify-between gap-3 border-b border-primary-border pb-4">
           <div>
@@ -296,9 +277,7 @@ export default function CartPage() {
         ) : null}
 
         {items.length === 0 ? (
-          <div className="rounded-lg border border-primary-border bg-primary-card p-6 text-sm text-secondary-text">
-            سبد خرید شما خالی است.
-          </div>
+          <CustomEmptyState description="سبد خرید شما خالی است." />
         ) : (
           <div className="grid gap-4">
             {items.map((item, index) => {

@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { CustomButton } from "./button";
 import { UICommonVariant } from "../../variants/ui.variant";
 import { LoadingVariant } from "../loading/loading";
@@ -49,10 +50,15 @@ export function FloatButton({
   disabled = false,
   className,
 }: FloatButtonProps) {
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const positionClass =
     position === "bottom-left" ? "left-4 bottom-20 md:left-6 md:bottom-6" : "right-4 bottom-20 md:right-6 md:bottom-6";
 
-  return (
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
+  const button = (
     <div className={`fixed z-[60] ${positionClass} ${className || ""}`}>
       <CustomButton
         variant={variant}
@@ -76,4 +82,8 @@ export function FloatButton({
       </CustomButton>
     </div>
   );
+
+  if (!portalTarget) return null;
+
+  return createPortal(button, portalTarget);
 }

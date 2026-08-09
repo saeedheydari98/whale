@@ -5,8 +5,11 @@ import { IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline, IoTimeOutli
 import Loading from "@/app/design-system/components/loading/loading";
 import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
+import { formatPersianDate as formatDate } from "@/lib/date-format";
+import { formatPlainPrice, toLatinDigits } from "@/lib/price-format";
 
 type AdminOrderItem = {
   id: string;
@@ -81,13 +84,6 @@ function createLoadingOrderCards(count: number): AdminOrderCard[] {
   });
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("fa-IR-u-ca-persian").format(date);
-}
-
 function customerName(order: AdminOrder) {
   const profileName = `${order.profile?.firstName ?? ""} ${order.profile?.lastName ?? ""}`.trim();
   return profileName || order.user?.name || order.user?.username || "کاربر بدون نام";
@@ -117,33 +113,6 @@ function orderSearchText(order: AdminOrder, item: AdminOrderItem) {
     item.selectedColor,
     item.quantity,
   ].filter(Boolean).join(" ").toLowerCase();
-}
-
-const persianDigits: Record<string, string> = {
-  "۰": "0",
-  "۱": "1",
-  "۲": "2",
-  "۳": "3",
-  "۴": "4",
-  "۵": "5",
-  "۶": "6",
-  "۷": "7",
-  "۸": "8",
-  "۹": "9",
-  "٠": "0",
-  "١": "1",
-  "٢": "2",
-  "٣": "3",
-  "٤": "4",
-  "٥": "5",
-  "٦": "6",
-  "٧": "7",
-  "٨": "8",
-  "٩": "9",
-};
-
-function toLatinDigits(value: string) {
-  return value.replace(/[۰-۹٠-٩]/g, (digit) => persianDigits[digit] ?? digit);
 }
 
 function jalaliToGregorian(jalaliYear: number, jalaliMonth: number, jalaliDay: number) {
@@ -382,9 +351,7 @@ export function AdminOrdersPanel() {
       ) : null}
 
       {!loading && orderCards.length === 0 ? (
-        <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
-          {hasFilters ? "خریدی با این فیلتر پیدا نشد." : "هنوز خریدی ثبت نشده است."}
-        </div>
+        <CustomEmptyState description={hasFilters ? "نتیجه‌ای با این فیلترها پیدا نشد." : "هنوز سفارشی ثبت نشده است."} />
       ) : null}
 
       {visibleOrderCards.length > 0 ? (
@@ -421,7 +388,7 @@ export function AdminOrdersPanel() {
                       </div>
                     </Loading>
                     <Loading loading="skeleton-item" isLoading={loading}>
-                      <span className="text-xs font-bold text-primary">{item.discountPrice || item.price || "بدون قیمت"}</span>
+                      <span className="text-xs font-bold text-primary">{formatPlainPrice(item.discountPrice || item.price)}</span>
                     </Loading>
                   </div>
                 </div>

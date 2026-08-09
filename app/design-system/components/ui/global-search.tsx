@@ -4,10 +4,12 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { FiSearch } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
+import { CustomEmptyState } from "./empty-state";
 import { CustomInput } from "./input";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { APP_USER_UPDATED_EVENT } from "@/lib/app-user-client";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
+import { formatNumberWithCommas, toLatinDigits } from "@/lib/price-format";
 import { productSlug, type ProductRecord } from "@/lib/products-client";
 
 type SearchPayload = {
@@ -20,33 +22,6 @@ type SearchPayload = {
 };
 
 const INPUT_ID = "global-search-input";
-
-const persianDigits: Record<string, string> = {
-  "۰": "0",
-  "۱": "1",
-  "۲": "2",
-  "۳": "3",
-  "۴": "4",
-  "۵": "5",
-  "۶": "6",
-  "۷": "7",
-  "۸": "8",
-  "۹": "9",
-  "٠": "0",
-  "١": "1",
-  "٢": "2",
-  "٣": "3",
-  "٤": "4",
-  "٥": "5",
-  "٦": "6",
-  "٧": "7",
-  "٨": "8",
-  "٩": "9",
-};
-
-function toLatinDigits(value: string) {
-  return value.replace(/[۰-۹٠-٩]/g, (digit) => persianDigits[digit] ?? digit);
-}
 
 function isLikelyPhoneAutofill(value: string) {
   const digits = toLatinDigits(value).replace(/\D/g, "");
@@ -287,13 +262,13 @@ export function GlobalSearch() {
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="line-clamp-1 text-sm font-bold text-primary-text">{product.title}</span>
-                    <span className="line-clamp-1 text-xs font-semibold text-secondary-text">{product.discountPrice || product.price}</span>
+                    <span className="line-clamp-1 text-xs font-semibold text-secondary-text">{formatNumberWithCommas(product.discountPrice || product.price) || product.discountPrice || product.price}</span>
                   </span>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="px-3 py-3 text-sm font-semibold text-secondary-text">یافت نشد</div>
+            <CustomEmptyState size="sm" className="border-0" />
           )}
         </div>
       ) : null}

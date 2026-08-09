@@ -5,7 +5,7 @@ import React from "react";
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
 import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, GradientDirection, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, glassSurfaceClasses, GradientDirection, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 
 type BaseProps = React.HTMLAttributes<HTMLSpanElement>;
 
@@ -46,6 +46,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
 }) => {
   const { theme } = useTheme();
   const variantStyle = resolveVariantCssVars(variant);
+  const glassBackground = resolveGlassBackground(variantStyle.backgroundColor, 84);
 
   const tokenStyle: React.CSSProperties = {};
 
@@ -57,8 +58,9 @@ export const CustomTag: React.FC<CustomTagProps> = ({
     });
 
     if (token.startsWith("bg-")) {
-      tokenStyle.backgroundColor = resolvedColor;
-      Object.assign(tokenStyle, resolveGradientStyle(resolvedColor, gradient));
+      const tokenBackground = resolveGlassBackground(resolvedColor, 84);
+      tokenStyle.backgroundColor = tokenBackground;
+      Object.assign(tokenStyle, resolveGradientStyle(tokenBackground, gradient));
       tokenStyle.borderColor = strengthenBorderColor(resolvedColor);
       tokenStyle.color = resolveTokenTextColor(theme, token, 50);
     }
@@ -72,8 +74,8 @@ export const CustomTag: React.FC<CustomTagProps> = ({
     <span
       {...rest}
       style={{
-        backgroundColor: variantStyle.backgroundColor,
-        ...resolveGradientStyle(variantStyle.backgroundColor, gradient),
+        backgroundColor: glassBackground,
+        ...resolveGradientStyle(glassBackground, gradient),
         color: variantStyle.color,
         borderColor: variantStyle.borderColor,
         ...style,
@@ -86,6 +88,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
         radiusVariants[rounded],
         borderVariants[border],
         shadowVariants[shadow],
+        glassSurfaceClasses,
         className
       )}
     >

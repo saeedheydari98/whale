@@ -3,7 +3,7 @@
 import React from "react";
 import { IoEyeOffOutline, IoEyeOutline } from "react-icons/io5";
 import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, glassSurfaceClasses, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomInputElement = HTMLInputElement | HTMLTextAreaElement;
@@ -35,7 +35,7 @@ export function CustomInput({
   variant = "primary",
   size = "md",
   rounded = "md",
-  border = "borderB",
+  border = "base",
   gradient = "btu",
   shadow = "none",
   fullWidth = true,
@@ -61,23 +61,42 @@ export function CustomInput({
   const inputId = React.useId();
   const [showPassword, setShowPassword] = React.useState(false);
   const [numberDraft, setNumberDraft] = React.useState<string | null>(null);
+  const [hasUncontrolledValue, setHasUncontrolledValue] = React.useState(() => hasInputValue(rest.defaultValue));
   const colorStyle = resolveControlCssVars(variant);
+  const glassBackground = resolveGlassBackground(colorStyle.backgroundColor, 74);
   const isDisabled = disabled || isLoading;
   const isPassword = !multiline && type === "password";
   const isNumber = !multiline && type === "number";
-  const visibleLabel = showLabel ? label || String(rest["aria-label"] || rest.placeholder || "") : "";
+  const labelText = label || String(rest["aria-label"] || rest.placeholder || "");
+  const visibleLabel = labelText;
   const resolvedId = rest.id || inputId;
   const displayedValue = isNumber && numberDraft !== null ? numberDraft : value;
+  const hasControlledValue = value !== undefined;
+  const hasCurrentValue = numberDraft !== null
+    ? hasInputValue(numberDraft)
+    : hasControlledValue
+      ? hasInputValue(value)
+      : hasUncontrolledValue;
+  const shouldShowFloatingLabel = Boolean(visibleLabel && hasCurrentValue);
+  const resolvedPlaceholder = shouldShowFloatingLabel ? "" : rest.placeholder;
   const resolvedHeightProp = height === "" ? undefined : height;
   const resolvedHeight = resolvedHeightProp ?? (multiline ? style?.height ?? "8rem" : undefined);
-  const controlStyle = {
-    backgroundColor: colorStyle.backgroundColor,
-    ...resolveGradientStyle(colorStyle.backgroundColor, gradient),
-    borderColor: invalid ? "var(--danger-border-nomode)" : colorStyle.borderColor,
+  const wrapperStyle = {
+    backgroundColor: glassBackground,
+    ...resolveGradientStyle(glassBackground, gradient),
     ...style,
     ...(resolvedHeight !== undefined ? { height: resolvedHeight } : {}),
   };
+  const controlStyle = {
+    backgroundColor: "transparent",
+    borderColor: "transparent",
+    ...(resolvedHeight !== undefined ? { height: resolvedHeight } : {}),
+  };
+  const fieldsetStyle = {
+    borderColor: invalid ? "var(--danger-border-nomode)" : colorStyle.borderColor,
+  };
   const handleChange = (event: React.ChangeEvent<CustomInputElement>) => {
+    if (!hasControlledValue) setHasUncontrolledValue(hasInputValue(event.target.value));
     if (isNumber && event.target.value === "") {
       setNumberDraft("");
       return;
@@ -101,11 +120,11 @@ export function CustomInput({
     </button>
   ) : null);
   const controlClassName = cx(
-    "text-primary-text placeholder:text-secondary-text",
-    invalid ? "focus:outline-none focus:ring-2 focus:ring-danger-border-nomode" : "focus:outline-none focus:ring-2 focus:ring-primary-border",
+    "peer relative z-10 bg-transparent text-primary-text placeholder:text-secondary-text",
+    "focus:outline-none",
     sizeVariants[size],
     radiusVariants[rounded],
-    borderVariants[border],
+    "border border-transparent",
     shadowVariants[shadow],
     motionVariants.smooth,
     !isDisabled && interactionStates.hover.none,
@@ -116,16 +135,25 @@ export function CustomInput({
     multiline && "resize-y py-3 leading-6",
     className
   );
+  const labelOffsetClass = icon !== undefined ? "right-10" : "right-3";
+  const legendOffsetClass = icon !== undefined ? "mr-9" : "mr-2";
   const control = (
-    <div className={cx("relative inline-flex", multiline ? "items-start" : "items-center", fullWidth && "w-full")}>
-      {!isLoading && icon && (
-        <span className={cx("absolute right-3 text-secondary-text", multiline && "top-3")}>{icon}</span>
+    <div
+      className={cx(
+        "relative inline-flex",
+        multiline ? "items-start" : "items-center",
+        fullWidth && "w-full",
+        radiusVariants[rounded],
+        glassSurfaceClasses
       )}
+      style={wrapperStyle}
+    >
       {multiline ? (
         <textarea
           {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
           id={resolvedId}
           value={displayedValue}
+          placeholder={resolvedPlaceholder}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={invalid || rest["aria-invalid"]}
@@ -139,6 +167,7 @@ export function CustomInput({
           id={resolvedId}
           type={isPassword && showPassword ? "text" : type}
           value={displayedValue}
+          placeholder={resolvedPlaceholder}
           onChange={handleChange}
           onBlur={handleBlur}
           aria-invalid={invalid || rest["aria-invalid"]}
@@ -147,26 +176,60 @@ export function CustomInput({
           style={controlStyle}
         />
       )}
+      <fieldset
+        aria-hidden="true"
+        className={cx(
+          "pointer-events-none absolute inset-0 z-0 min-w-0",
+          radiusVariants[rounded],
+          borderVariants[border],
+          invalid ? "peer-focus:ring-2 peer-focus:ring-danger-border-nomode" : "peer-focus:ring-2 peer-focus:ring-primary-border",
+          motionVariants.smooth
+        )}
+        style={fieldsetStyle}
+      >
+        <legend
+          className={cx(
+            "invisible h-3 max-w-0 overflow-hidden whitespace-nowrap px-0 text-[11px] font-bold leading-none text-primary transition-all duration-200",
+            shouldShowFloatingLabel && "max-w-[calc(100%-1.5rem)] px-1.5",
+            legendOffsetClass
+          )}
+        >
+          <span>{visibleLabel}</span>
+        </legend>
+      </fieldset>
+      {shouldShowFloatingLabel ? (
+        <label
+          htmlFor={resolvedId}
+          className={cx(
+            "pointer-events-none absolute top-0 z-20 flex -translate-y-1/2 items-center px-1.5 text-[11px] font-bold leading-none text-primary transition-colors",
+            labelOffsetClass
+          )}
+        >
+          <span>{visibleLabel}</span>
+        </label>
+      ) : null}
+      {!isLoading && icon && (
+        <span className={cx("absolute right-3 z-20 text-secondary-text", multiline && "top-3")}>{icon}</span>
+      )}
       {isLoading && (
-        <span className={cx("absolute left-3 flex items-center gap-2 text-secondary-text", multiline && "top-3")}>
+        <span className={cx("absolute left-3 z-20 flex items-center gap-2 text-secondary-text", multiline && "top-3")}>
           <Loading loading={loading} size={size} />
           {loadingText && <span className="text-sm">{loadingText}</span>}
         </span>
       )}
       {!isLoading && resolvedIconAfter && (
-        <span className={cx("absolute left-3 text-primary-text", multiline && "top-3")}>{resolvedIconAfter}</span>
+        <span className={cx("absolute left-3 z-20 text-primary-text", multiline && "top-3")}>{resolvedIconAfter}</span>
       )}
     </div>
   );
 
   if (!visibleLabel) return control;
 
-  return (
-    <div className={cx("flex flex-col gap-1", fullWidth && "w-full")}>
-      <label htmlFor={resolvedId} className="text-xs font-bold text-secondary-text">
-        <span>{visibleLabel}</span>
-      </label>
-      {control}
-    </div>
-  );
+  return <div className={cx("flex flex-col", fullWidth && "w-full")}>{control}</div>;
+}
+
+function hasInputValue(value: unknown) {
+  if (value === undefined || value === null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return String(value).length > 0;
 }

@@ -5,10 +5,10 @@ import { IoSaveOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
-import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import type { BrandForm, CatalogLinkGroupForm, CategoryForm } from "../types";
+import { AdminModalSection } from "./admin-modal-section";
 
 type CatalogGroupModalsProps = {
   categories: CategoryForm[];
@@ -134,31 +134,40 @@ function CatalogGroupModal({
   onPatch,
   onSubmit,
 }: CatalogGroupModalProps) {
+  const hasTitle = Boolean(item?.title.trim());
+  const hasLinks = selectedIds.length > 0;
+
   return (
-    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg">
+    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {item ? (
-        <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
-          <RequiredLabel required className="text-primary-text">نام بخش</RequiredLabel>
-          <CustomInput
-            value={item.title}
-            placeholder={titlePlaceholder}
-            invalid={hasRequiredError(errorKey) && !item.title.trim()}
-            onChange={(event) => onPatch({ title: event.target.value })}
-          />
-          <CustomInput
-            type="number"
-            value={item.sortOrder}
-            placeholder="ترتیب نمایش بخش"
-            onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })}
-          />
-          <CustomSwitch
-            checked={item.active}
-            onChange={(active) => onPatch({ active })}
-            label={item.active ? "فعال" : "مخفی"}
-            size="sm"
-          />
-          <div className="flex flex-col gap-2">
-            <div className="text-sm font-bold text-primary-text">لینک‌های داخل بخش</div>
+        <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
+          <AdminModalSection
+            title="اطلاعات بخش"
+            status={hasTitle ? "complete" : "incomplete"}
+            invalid={hasRequiredError(errorKey) && !hasTitle}
+            meta="نام و ترتیب نمایش"
+            defaultOpen={!hasTitle}
+          >
+            <CustomInput
+              value={item.title}
+              placeholder={titlePlaceholder}
+              invalid={hasRequiredError(errorKey) && !item.title.trim()}
+              onChange={(event) => onPatch({ title: event.target.value })}
+            />
+            <CustomInput
+              type="number"
+              value={item.sortOrder}
+              placeholder="ترتیب نمایش بخش"
+              onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })}
+            />
+          </AdminModalSection>
+
+          <AdminModalSection
+            title="لینک‌های داخل بخش"
+            status={hasLinks ? "complete" : "incomplete"}
+            meta={`${selectedIds.length} انتخاب`}
+            defaultOpen={!hasLinks}
+          >
             <div className="flex flex-wrap gap-3 rounded-md border border-primary-border p-2">
               {linkOptions.length === 0 ? (
                 <span className="text-xs text-secondary-text">بعد از ساخت بخش می‌توانید لینک جدید اضافه کنید.</span>
@@ -180,7 +189,16 @@ function CatalogGroupModal({
                 />
               ))}
             </div>
-          </div>
+          </AdminModalSection>
+
+          <AdminModalSection title="وضعیت" status="optional" meta={item.active ? "فعال" : "مخفی"}>
+            <CustomSwitch
+              checked={item.active}
+              onChange={(active) => onPatch({ active })}
+              label={item.active ? "فعال" : "مخفی"}
+              size="sm"
+            />
+          </AdminModalSection>
           <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
             <span>ذخیره بخش</span>
           </CustomButton>

@@ -6,6 +6,7 @@ import {
   ThemeColorKey,
   variantNames,
 } from "./theme";
+import { getContrastColor } from "./color-utils";
 
 type VariantName = (typeof variantNames)[number];
 
@@ -31,14 +32,6 @@ export function generateCSSVariables(theme: Theme) {
 
   const withSurface = (color: string, amount: number, surface = "var(--bg-base)") =>
     `color-mix(in srgb, ${color} ${amount}%, ${surface})`;
-  const getContrastColor = (color: string) => {
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
-
-    return r * 0.299 + g * 0.587 + b * 0.114 > 150 ? "#111111" : "#ffffff";
-  };
-
   const getVariantColorKey = (variant: VariantName): ThemeColorKey =>
     variant === "primary" ? adminColorKey : semanticThemeMap[variant];
 

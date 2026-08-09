@@ -19,7 +19,7 @@ const requestBody = (schema: OpenApiObject, description = "JSON payload") => ({
   content: jsonContent(schema),
 });
 
-const successResponse = (data: OpenApiObject, description = "Successful response") => ({
+const successResponse = (data: OpenApiObject, description = "پاسخ موفق") => ({
   description,
   content: jsonContent({
     allOf: [

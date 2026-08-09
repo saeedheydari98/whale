@@ -1,8 +1,10 @@
 "use client";
 
-import { ReactNode, useId, useState } from "react";
-import { IoChevronDown, IoCheckmark } from "react-icons/io5";
+import { ReactNode, useState } from "react";
+import { IoCheckmark } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
+import { getContrastColor } from "@/app/design-system/theme/color-utils";
 import { resolveColor, ThemeColorKey, ThemeStyle, ThemeTone } from "@/app/design-system/theme/theme";
 
 const colorOptions: ThemeColorKey[] = [
@@ -61,13 +63,6 @@ const paletteScopeClasses: Record<
   },
 };
 
-export const getContrastColor = (hex: string) => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return r * 0.299 + g * 0.587 + b * 0.114 > 150 ? "#111111" : "#ffffff";
-};
-
 const getThemeContrastColor = (
   background: string,
   color: ThemeColorKey,
@@ -99,7 +94,6 @@ type ThemePalettePickerProps = {
 
 type PaletteSectionProps = {
   children: ReactNode;
-  id: string;
   open: boolean;
   preview: ReactNode;
   scopeClasses: (typeof paletteScopeClasses)[PaletteScope];
@@ -111,7 +105,6 @@ type PaletteSectionProps = {
 
 function PaletteSection({
   children,
-  id,
   open,
   preview,
   scopeClasses,
@@ -121,38 +114,17 @@ function PaletteSection({
   onToggle,
 }: PaletteSectionProps) {
   return (
-    <div className={`flex flex-col gap-3 border-t py-3 first:border-t-0 first:pt-0 last:pb-0 ${scopeClasses.border}`}>
-      <button
-        type="button"
-        aria-controls={id}
-        aria-expanded={open}
-        className="flex w-full cursor-pointer touch-manipulation items-center justify-between gap-3 rounded-lg bg-transparent p-0 text-start text-primary-text transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary-border focus-visible:ring-offset-2"
-        onClick={onToggle}
-      >
-        <span className="flex min-w-0 items-center gap-3">
-          {preview}
-          <span className="flex min-w-0 flex-col gap-1">
-            <span className="text-sm font-semibold">{title}</span>
-            <span className={`truncate text-xs font-semibold ${valueClassName}`}>{value}</span>
-          </span>
-        </span>
-        <span
-          aria-hidden="true"
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform ${scopeClasses.icon}`}
-          style={{
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-          }}
-        >
-          <IoChevronDown />
-        </span>
-      </button>
-
-      {open ? (
-        <div id={id} className="flex flex-wrap gap-2">
-          {children}
-        </div>
-      ) : null}
-    </div>
+    <CustomAccordion
+      title={title}
+      leading={preview}
+      meta={<span className={`truncate text-xs font-semibold ${valueClassName}`}>{value}</span>}
+      open={open}
+      showStatusLabel={false}
+      contentClassName="flex-row flex-wrap gap-2"
+      onOpenChange={onToggle}
+    >
+      {children}
+    </CustomAccordion>
   );
 }
 
@@ -164,7 +136,6 @@ export function ThemePalettePicker({
   selectionClassName,
   onChange,
 }: ThemePalettePickerProps) {
-  const paletteId = useId();
   const [openSections, setOpenSections] = useState<Record<PaletteSection, boolean>>({
     colors: true,
     styles: false,
@@ -201,10 +172,9 @@ export function ThemePalettePicker({
       </div>
 
       <div
-        className={`flex flex-col rounded-xl border p-3 ${scopeClasses.borderSoft} ${disabled ? "opacity-70" : "opacity-100"}`}
+        className={`flex flex-col rounded-xl border p-3 gap-2 ${scopeClasses.borderSoft} ${disabled ? "opacity-70" : "opacity-100"}`}
       >
         <PaletteSection
-          id={`${paletteId}-colors`}
           open={openSections.colors}
           scopeClasses={scopeClasses}
           title="رنگ‌ها"
@@ -248,7 +218,6 @@ export function ThemePalettePicker({
         </PaletteSection>
 
         <PaletteSection
-          id={`${paletteId}-styles`}
           open={openSections.styles}
           scopeClasses={scopeClasses}
           title="سبک‌ها"

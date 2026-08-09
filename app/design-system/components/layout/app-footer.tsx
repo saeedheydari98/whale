@@ -23,9 +23,9 @@ export function AppFooter() {
     : pathname === href || pathname.startsWith(`${href}/`);
 
   return (
-    <footer className="flex h-11 w-full items-center justify-center border-t border-primary-border bg-primary-panel p-2 font-bold text-primary-text md:h-12">
+    <footer className="z-40 flex h-14 w-full shrink-0 items-center justify-center border-t border-primary-border bg-primary-panel/95 font-bold text-primary-text shadow-lg backdrop-blur md:h-12 md:bg-primary-panel">
       {isMobile ? (
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around gap-1 border-t border-primary-border bg-primary-panel/95 px-2 py-1.5 shadow-lg backdrop-blur">
+        <nav className="flex h-full w-full items-center justify-around gap-1 px-2 py-1.5">
           {visibleNavItems.map((item) => {
             const active = isActiveLink(item.href);
             return (

@@ -192,7 +192,7 @@ async function fetchAppThemePayload(options?: { force?: boolean }) {
         }
       );
       if (isApiFailure(payload)) {
-        throw new Error(payload?.message || payload?.error || "Theme load failed.");
+        throw new Error(payload?.message || payload?.error || "بارگذاری تم ناموفق بود.");
       }
       return payload;
     } catch (error) {
@@ -203,7 +203,7 @@ async function fetchAppThemePayload(options?: { force?: boolean }) {
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Theme load failed.");
+  throw lastError instanceof Error ? lastError : new Error("بارگذاری تم ناموفق بود.");
 }
 
 export async function saveAppTheme(theme: AppThemeData) {
@@ -221,7 +221,7 @@ export async function saveAppTheme(theme: AppThemeData) {
   });
   const payload = await res.json().catch(() => null);
   if (!res.ok || payload?.ok === false) {
-    throw new Error(payload?.message || payload?.error || "Theme save failed.");
+    throw new Error(payload?.message || payload?.error || "ذخیره تم ناموفق بود.");
   }
 
   const nextTheme = readThemePayload(payload, payloadTheme);

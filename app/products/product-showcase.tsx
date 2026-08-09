@@ -3,9 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { addProductToCart } from "@/lib/cart-client";
+import {
+  formatCurrencyWithCommas as formatPrice,
+  getDiscountPercentValue as getDiscountPercent,
+  getFinalPriceValue as getFinalPrice,
+} from "@/lib/price-format";
+import { normalizeColorStock } from "@/lib/color-counts";
 import { getProducts, getProductsPageStructure, getShowcaseProducts, isProductAvailable, readCachedProductsPageStructure, type ProductsCache } from "@/lib/products-client";
 import { resolveLoadingItemCount, useLoadingViewportCount } from "../design-system/components/loading/loading-count";
 import Loading from "../design-system/components/loading/loading";
+import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { LazyViewportSection } from "../design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
@@ -13,38 +20,6 @@ import { ShowcaseSection } from "./product-showcase/showcase-section";
 import type { Banner, Product, Showcase } from "./product-showcase/types";
 
 // No default showcase id: only use explicit showcase ids provided by data
-function getFinalPrice(product: Product) {
-  return product.discountPrice || product.price;
-}
-
-function formatPrice(value?: string) {
-  const normalized = String(value || "").replace(/[^\d.]/g, "");
-  const parsed = Number(normalized);
-
-  if (!Number.isFinite(parsed) || !normalized) {
-    return value || "";
-  }
-
-  return `$${parsed.toLocaleString("en-US")}`;
-}
-
-function getDiscountPercent(product: Product) {
-  const percent = Number(product.discountPercent);
-  return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
-}
-
-function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count))
-  );
-}
 
 function getFirstAvailableColor(product: Product) {
   const colorStock = normalizeColorStock(product.colorStock);
@@ -447,7 +422,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
   const Root = root;
 
   return (
-    <Root className="min-h-screen bg-primary-base text-primary-text">
+    <Root className="min-h-full bg-primary-base text-primary-text">
       <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex flex-col gap-2 border-b border-primary-border pb-4">
           <div className="text-3xl font-bold">ویترین محصولات فروشگاه وال</div>
@@ -474,9 +449,9 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
                   products={section.products}
                   onAddToCart={() => undefined}
                   onPreview={() => undefined}
-                  formatPrice={(value) => value || ""}
-                  getFinalPrice={(product) => product.discountPrice || product.price}
-                  getDiscountPercent={(product) => Number(product.discountPercent) || 0}
+                  formatPrice={formatPrice}
+                  getFinalPrice={getFinalPrice}
+                  getDiscountPercent={getDiscountPercent}
                   isLoading
                   loadingCount={section.loadingCount}
                 />
@@ -486,9 +461,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
         ) : null}
 
         {!loading && mode === "products" && sortedProducts.length === 0 ? (
-          <div className="rounded-lg border border-primary-border bg-primary-card p-6 text-sm text-secondary-text">
-            در حال حاضر محصول فعالی وجود ندارد.
-          </div>
+          <CustomEmptyState />
         ) : null}
 
         {cartMessage ? (
@@ -513,9 +486,9 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
                 products={[]}
                 onAddToCart={() => undefined}
                 onPreview={() => undefined}
-                formatPrice={(value) => value || ""}
-                getFinalPrice={(product) => product.discountPrice || product.price}
-                getDiscountPercent={(product) => Number(product.discountPercent) || 0}
+                formatPrice={formatPrice}
+                getFinalPrice={getFinalPrice}
+                getDiscountPercent={getDiscountPercent}
                 hideShowcaseLink={mode === "products"}
                 isLoading
                 loadingCount={fallbackProductCount}

@@ -1,5 +1,15 @@
 import { MIN_LOADING_MS } from "./constants";
+import {
+  calculateDiscountPercentValue,
+  formatCurrencyWithCommas,
+  formatNumberWithCommas,
+  readFormattedPriceNumber,
+} from "@/lib/price-format";
+import { getProductIdentityKey } from "@/lib/catalog-utils";
+import { normalizeColorStock } from "@/lib/color-counts";
 import type { BannerForm, BrandForm, CatalogLinkGroupForm, CategoryForm, ProductForm, ShowcaseForm } from "./types";
+
+export { normalizeColorStock };
 
 export function waitForMinimumLoading(startedAt: number) {
   const remaining = MIN_LOADING_MS - (Date.now() - startedAt);
@@ -8,12 +18,31 @@ export function waitForMinimumLoading(startedAt: number) {
     : Promise.resolve();
 }
 
-export function imageListToText(value: unknown) {
-  return Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean).join(", ") : "";
+function uniqueImageList(values: unknown[]) {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+
+  for (const value of values) {
+    const url = String(value ?? "").trim();
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    urls.push(url);
+  }
+
+  return urls;
 }
 
-export function textToImageList(value: string) {
-  return value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+export function getProductImageUrls(product: Pick<Partial<ProductForm>, "imageUrl" | "images">) {
+  const imageUrls = Array.isArray(product.images) ? product.images : [];
+  return uniqueImageList([product.imageUrl, ...imageUrls]);
+}
+
+export function productImagePatch(imageUrls: unknown[]): Pick<ProductForm, "imageUrl" | "images"> {
+  const urls = uniqueImageList(imageUrls);
+  return {
+    imageUrl: urls[0] ?? "",
+    images: urls,
+  };
 }
 
 export function toggleProductId(list: Array<number | string>, productId: number | string) {
@@ -22,21 +51,7 @@ export function toggleProductId(list: Array<number | string>, productId: number 
   return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
 }
 
-export function getProductKey(product: Partial<ProductForm>) {
-  const id = String(product.id ?? "").trim();
-  if (id && /^\d+$/.test(id)) return `id:${id}`;
-
-  return [
-    product.title,
-    product.description,
-    product.price,
-    product.originalPrice,
-    product.discountPrice,
-    product.imageUrl,
-  ]
-    .map((value) => String(value ?? "").trim().toLowerCase())
-    .join("|");
-}
+export const getProductKey = getProductIdentityKey;
 
 export function dedupeProducts(products: ProductForm[]) {
   const seen = new Set<string>();
@@ -54,6 +69,7 @@ export function normalizeProduct(item: Partial<ProductForm>, index: number): Pro
   const stockQuantity = Number.isFinite(Number(item.stockQuantity)) ? Math.max(0, Math.round(Number(item.stockQuantity))) : 0;
   const categoryIds = normalizeStringList(item.categoryIds, [String(item.categoryId ?? "general").trim() || "general"]);
   const showcaseIds = normalizeStringList(item.showcaseIds, item.showcaseId ? [String(item.showcaseId)] : []);
+  const imageUrls = getProductImageUrls(item);
 
   return {
     id: item.id ?? `local-${Date.now()}-${index}`,
@@ -66,8 +82,8 @@ export function normalizeProduct(item: Partial<ProductForm>, index: number): Pro
     originalPrice: String(item.originalPrice ?? ""),
     discountPrice: finalPrice,
     discountPercent: String(item.discountPercent ?? ""),
-    imageUrl: String(item.imageUrl ?? ""),
-    images: Array.isArray(item.images) ? item.images.map((value) => String(value)).filter(Boolean) : [],
+    imageUrl: imageUrls[0] ?? "",
+    images: imageUrls,
     videoUrl: String(item.videoUrl ?? ""),
     badge: String(item.badge ?? ""),
     ctaLabel: "مشاهده",
@@ -107,19 +123,6 @@ export function normalizeProduct(item: Partial<ProductForm>, index: number): Pro
     colorStock: normalizeColorStock(item.colorStock),
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
   };
-}
-
-export function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count))
-  );
 }
 
 export function getAssignedColorStock(value: unknown) {
@@ -295,33 +298,10 @@ export function ensureShowcases(products: ProductForm[], savedShowcases: Showcas
   return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-export function readPriceNumber(value?: string | number | null) {
-  const normalized = String(value ?? "").replace(/[^0-9.]/g, "");
-  const number = Number(normalized);
-  return Number.isFinite(number) ? number : 0;
-}
-
-export function calculateDiscountPercent(originalPrice: string, discountPrice: string) {
-  const original = readPriceNumber(originalPrice);
-  const discounted = readPriceNumber(discountPrice);
-
-  if (original <= 0 || discounted <= 0 || discounted >= original) {
-    return "";
-  }
-
-  return String(Math.round(((original - discounted) / original) * 100));
-}
-
-export function formatPrice(value?: string | number | null) {
-  const normalized = String(value || "").replace(/[^\d.]/g, "");
-  const parsed = Number(normalized);
-
-  if (!Number.isFinite(parsed) || !normalized) {
-    return String(value || "");
-  }
-
-  return `$${parsed.toLocaleString("en-US")}`;
-}
+export const readPriceNumber = readFormattedPriceNumber;
+export const calculateDiscountPercent = calculateDiscountPercentValue;
+export const formatPrice = formatCurrencyWithCommas;
+export { formatNumberWithCommas };
 
 export function sortAdminShowcaseProducts(products: ProductForm[], sort: string) {
   return [...products].sort((a, b) => {

@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { readCartItemColorSelection } from "@/lib/cart-color-selection";
 import { matchesSearchQuery } from "@/lib/product-search";
 
 export function parseMoney(value: unknown) {
@@ -23,6 +24,24 @@ export function pageResult<T>(items: T[], page: number, limit: number, total: nu
   };
 }
 
+function normalizeProductImageUrls(data: { imageUrl?: unknown; images?: unknown }) {
+  const values = [
+    data.imageUrl,
+    ...(Array.isArray(data.images) ? data.images : []),
+  ];
+  const seen = new Set<string>();
+  const imageUrls: string[] = [];
+
+  for (const value of values) {
+    const imageUrl = String(value ?? "").trim();
+    if (!imageUrl || seen.has(imageUrl)) continue;
+    seen.add(imageUrl);
+    imageUrls.push(imageUrl);
+  }
+
+  return imageUrls;
+}
+
 export function normalizeProductData(data: any) {
   const stockQuantity = Number.isFinite(Number(data.stockQuantity)) ? Math.max(0, Math.round(Number(data.stockQuantity))) : 0;
   const categoryId = String(data.categoryId ?? "").trim();
@@ -36,6 +55,7 @@ export function normalizeProductData(data: any) {
     : data.showcaseId
       ? [String(data.showcaseId).trim()]
       : [];
+  const imageUrls = normalizeProductImageUrls(data);
 
   return {
     showcaseId: data.showcaseId || null,
@@ -47,8 +67,8 @@ export function normalizeProductData(data: any) {
     originalPrice: data.originalPrice || null,
     discountPrice: data.discountPrice || null,
     discountPercent: data.discountPercent ?? null,
-    imageUrl: data.imageUrl || null,
-    images: Array.isArray(data.images) && data.images.length > 0 ? data.images : Prisma.JsonNull,
+    imageUrl: String(data.imageUrl ?? "").trim() || imageUrls[0] || null,
+    images: imageUrls.length > 0 ? imageUrls : Prisma.JsonNull,
     videoUrl: data.videoUrl || null,
     badge: data.badge || null,
     ctaLabel: data.ctaLabel || "مشاهده محصول",
@@ -121,9 +141,13 @@ export function normalizeProductPatchData(data: Record<string, unknown>): Prisma
   if (hasOwn(data, "originalPrice")) patch.originalPrice = nullableText(data.originalPrice);
   if (hasOwn(data, "discountPrice")) patch.discountPrice = nullableText(data.discountPrice);
   if (hasOwn(data, "discountPercent")) patch.discountPercent = data.discountPercent as number | null;
-  if (hasOwn(data, "imageUrl")) patch.imageUrl = nullableText(data.imageUrl);
+  if (hasOwn(data, "imageUrl") || hasOwn(data, "images")) {
+    const imageUrls = normalizeProductImageUrls(data);
+    patch.imageUrl = nullableText(data.imageUrl) || imageUrls[0] || null;
+  }
   if (hasOwn(data, "images")) {
-    patch.images = Array.isArray(data.images) && data.images.length > 0 ? data.images : Prisma.JsonNull;
+    const imageUrls = normalizeProductImageUrls(data);
+    patch.images = imageUrls.length > 0 ? imageUrls : Prisma.JsonNull;
   }
   if (hasOwn(data, "videoUrl")) patch.videoUrl = nullableText(data.videoUrl);
   if (hasOwn(data, "badge")) patch.badge = nullableText(data.badge);
@@ -309,33 +333,6 @@ export async function getOrCreateActiveCart(userId: number) {
     create: { profileId: profile.id, status: "active" },
     include: { items: { orderBy: { createdAt: "asc" } }, profile: true },
   });
-}
-
-const CART_COLOR_SELECTION_PREFIX = "colors:";
-
-function readCartItemColorSelection(value: unknown, quantity: number) {
-  const text = String(value ?? "").trim();
-  if (!text) return {};
-
-  if (text.startsWith(CART_COLOR_SELECTION_PREFIX)) {
-    try {
-      const parsed = JSON.parse(text.slice(CART_COLOR_SELECTION_PREFIX.length));
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-
-      return Object.fromEntries(
-        Object.entries(parsed as Record<string, unknown>)
-          .map(([color, count]) => [
-            color.trim(),
-            Math.max(0, Math.round(Number(count))),
-          ] as const)
-          .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
-      );
-    } catch {
-      return {};
-    }
-  }
-
-  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
 }
 
 export function cartItemDto(item: any) {

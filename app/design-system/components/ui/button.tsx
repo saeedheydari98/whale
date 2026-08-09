@@ -6,7 +6,7 @@ import React from "react";
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
 import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cursorVariants, cx, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cursorVariants, cx, glassSurfaceClasses, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 
@@ -63,6 +63,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
 }) => {
   const { theme } = useTheme();
   const variantStyle = resolveVariantCssVars(variant);
+  const glassBackground = resolveGlassBackground(variantStyle.backgroundColor, 88);
   const isDisabled = disabled || isLoading;
 
   const tokenStyle: React.CSSProperties = {};
@@ -75,8 +76,9 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     });
 
     if (token.startsWith("bg-")) {
-      tokenStyle.backgroundColor = resolvedColor;
-      Object.assign(tokenStyle, resolveGradientStyle(resolvedColor, gradient));
+      const tokenBackground = resolveGlassBackground(resolvedColor, 88);
+      tokenStyle.backgroundColor = tokenBackground;
+      Object.assign(tokenStyle, resolveGradientStyle(tokenBackground, gradient));
       tokenStyle.borderColor = strengthenBorderColor(resolvedColor);
       tokenStyle.color = resolveTokenTextColor(theme, token, 50);
     }
@@ -94,6 +96,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     borderVariants[border],
     cursorVariants[cursor],
     shadowVariants[shadow],
+    !unstyled && glassSurfaceClasses,
     motionVariants.smooth,
     !isDisabled && interactionStates.hover[hover],
     !isDisabled && interactionStates.active.press,
@@ -120,8 +123,8 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
         ...(unstyled
           ? {}
           : {
-              backgroundColor: variantStyle.backgroundColor,
-              ...resolveGradientStyle(variantStyle.backgroundColor, gradient),
+              backgroundColor: glassBackground,
+              ...resolveGradientStyle(glassBackground, gradient),
               color: variantStyle.color,
               borderColor: variantStyle.borderColor,
             }),
@@ -159,8 +162,8 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
         ...(unstyled
           ? {}
           : {
-              backgroundColor: variantStyle.backgroundColor,
-              ...resolveGradientStyle(variantStyle.backgroundColor, gradient),
+              backgroundColor: glassBackground,
+              ...resolveGradientStyle(glassBackground, gradient),
               color: variantStyle.color,
               borderColor: variantStyle.borderColor,
             }),

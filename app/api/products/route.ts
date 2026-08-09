@@ -7,6 +7,8 @@ import { normalizeProductData } from "@/lib/api/catalog-service";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 import { getCatalogStructure, getProductList } from "@/lib/api/catalog-layer-service";
 import { findInvalidWebpImageValue } from "@/lib/image-upload";
+import { getBannerImageData, getPlacement, getProductIdentityKey } from "@/lib/catalog-utils";
+import { normalizeColorStock } from "@/lib/color-counts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -173,6 +175,24 @@ function slugifyCatalogValue(value: string | number | null | undefined) {
     .replace(/^-|-$/g, "");
 }
 
+function normalizeProductImageUrls(value: Pick<Partial<ProductPayload>, "imageUrl" | "images">) {
+  const values = [
+    value.imageUrl,
+    ...(Array.isArray(value.images) ? value.images : []),
+  ];
+  const seen = new Set<string>();
+  const imageUrls: string[] = [];
+
+  for (const item of values) {
+    const imageUrl = String(item ?? "").trim();
+    if (!imageUrl || seen.has(imageUrl)) continue;
+    seen.add(imageUrl);
+    imageUrls.push(imageUrl);
+  }
+
+  return imageUrls;
+}
+
 function normalizeProduct(value: Partial<ProductPayload>, index: number): ProductPayload {
   const placement = Number.isFinite(Number(value.placement))
     ? Number(value.placement)
@@ -188,6 +208,7 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
     : String(value.showcaseId ?? "").trim()
       ? [String(value.showcaseId ?? "").trim()]
       : [];
+  const imageUrls = normalizeProductImageUrls(value);
 
   return {
     id: value.id,
@@ -200,8 +221,8 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
     originalPrice: String(value.originalPrice ?? "").trim(),
     discountPrice: String(value.discountPrice ?? "").trim(),
     discountPercent: Number.isFinite(Number(value.discountPercent)) ? Math.max(0, Math.round(Number(value.discountPercent))) : 0,
-    imageUrl: String(value.imageUrl ?? "").trim(),
-    images: Array.isArray(value.images) ? value.images.map((item) => String(item)).filter(Boolean) : [],
+    imageUrl: String(value.imageUrl ?? "").trim() || imageUrls[0] || "",
+    images: imageUrls,
     videoUrl: String(value.videoUrl ?? "").trim(),
     badge: String(value.badge ?? "").trim(),
     ctaLabel: "مشاهده",
@@ -241,19 +262,6 @@ function normalizeProduct(value: Partial<ProductPayload>, index: number): Produc
     colorStock: normalizeColorStock(value.colorStock),
     sortOrder: placement,
   };
-}
-
-function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count))
-  );
 }
 
 function sortProducts(products: ProductPayload[]) {
@@ -312,28 +320,11 @@ function clampWholeNumber(value: unknown, min: number, max: number, fallback: nu
   return Math.max(min, Math.min(max, Math.round(parsed)));
 }
 
-function getProductKey(product: Partial<ProductPayload>) {
-  const id = String(product.id ?? "").trim();
-  if (id && /^\d+$/.test(id)) return `id:${id}`;
-
-  return [
-    String(product.showcaseId ?? "").trim().toLowerCase(),
-    product.title,
-    product.description,
-    product.price,
-    product.originalPrice,
-    product.discountPrice,
-    product.imageUrl,
-  ]
-    .map((value) => String(value ?? "").trim().toLowerCase())
-    .join("|");
-}
-
 function dedupeProducts(products: ProductPayload[]) {
   const seen = new Set<string>();
 
   return products.filter((product) => {
-    const key = getProductKey(product);
+    const key = getProductIdentityKey(product, { includeShowcaseId: true });
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -737,12 +728,6 @@ function buildCatalogTree(
   };
 }
 
-function getPlacement(value: { placement?: number | string; sortOrder?: number | string } | undefined, fallback = 0) {
-  if (Number.isFinite(Number(value?.placement))) return Number(value?.placement);
-  if (Number.isFinite(Number(value?.sortOrder))) return Number(value?.sortOrder);
-  return fallback;
-}
-
 function getImageUrls(value: BannerPayload) {
   if (Array.isArray(value.imageUrls)) {
     return value.imageUrls.map((item) => String(item)).filter(Boolean);
@@ -764,50 +749,6 @@ function getImageUrls(value: BannerPayload) {
       return "";
     })
     .filter(Boolean);
-}
-
-function getBannerImageData(value: unknown) {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const record = value as {
-      urls?: unknown;
-      imageUrls?: unknown;
-      showcaseId?: unknown;
-      showOnHome?: unknown;
-      showOnShowcase?: unknown;
-      showOnCategories?: unknown;
-      showOnProducts?: unknown;
-      homeSortOrder?: unknown;
-      showcaseSortOrder?: unknown;
-      categorySortOrder?: unknown;
-      productSortOrder?: unknown;
-    };
-    const urls = Array.isArray(record.urls) ? record.urls : record.imageUrls;
-    return {
-      imageUrls: Array.isArray(urls) ? urls.map((item) => String(item)).filter(Boolean) : [],
-      showcaseId: typeof record.showcaseId === "string" ? record.showcaseId : "",
-      showOnHome: typeof record.showOnHome === "boolean" ? record.showOnHome : undefined,
-      showOnShowcase: typeof record.showOnShowcase === "boolean" ? record.showOnShowcase : undefined,
-      showOnCategories: typeof record.showOnCategories === "boolean" ? record.showOnCategories : undefined,
-      showOnProducts: typeof record.showOnProducts === "boolean" ? record.showOnProducts : undefined,
-      homeSortOrder: Number.isFinite(Number(record.homeSortOrder)) ? Number(record.homeSortOrder) : undefined,
-      showcaseSortOrder: Number.isFinite(Number(record.showcaseSortOrder)) ? Number(record.showcaseSortOrder) : undefined,
-      categorySortOrder: Number.isFinite(Number(record.categorySortOrder)) ? Number(record.categorySortOrder) : undefined,
-      productSortOrder: Number.isFinite(Number(record.productSortOrder)) ? Number(record.productSortOrder) : undefined,
-    };
-  }
-
-  return {
-    imageUrls: Array.isArray(value) ? value.map((item) => String(item)).filter(Boolean) : [],
-    showcaseId: "",
-    showOnHome: undefined,
-    showOnShowcase: undefined,
-    showOnCategories: undefined,
-    showOnProducts: undefined,
-    homeSortOrder: undefined,
-    showcaseSortOrder: undefined,
-    categorySortOrder: undefined,
-    productSortOrder: undefined,
-  };
 }
 
 function catalogErrorMessage(error: unknown) {

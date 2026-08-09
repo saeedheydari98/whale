@@ -2,6 +2,7 @@
 
 import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import Loading from "@/app/design-system/components/loading/loading";
 import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { createProduct, createShowcase } from "../factories";
@@ -119,18 +120,11 @@ export function AdminShowcaseList({
 
             <div className="flex cursor-grab gap-3 overflow-x-auto overscroll-x-contain pb-2 active:cursor-grabbing">
               {!isLoading && visibleShowcaseProducts.length === 0 && (
-                <div
-                  className={`flex min-h-36 min-w-56 max-w-56 shrink-0 flex-col justify-center gap-2 rounded-lg border border-dashed bg-primary-card p-4 ${
-                    isLoading ? "border-border-default" : "border-primary-border"
-                  }`}
-                >
-                  <Loading loading="skeleton-item" isLoading={isLoading}>
-                    <div className="text-xs font-bold text-primary-text">ویترین خالی است</div>
-                  </Loading>
-                  <Loading loading="skeleton-item" isLoading={isLoading}>
-                    <span className="text-[11px] text-secondary-text">یک محصول به این ویترین اضافه کنید.</span>
-                  </Loading>
-                </div>
+                <CustomEmptyState
+                  description="یک محصول به این ویترین اضافه کنید."
+                  size="sm"
+                  className="min-h-36 min-w-56 max-w-56 shrink-0 justify-center border-dashed"
+                />
               )}
 
               {visibleShowcaseProducts.map((product, index) => (

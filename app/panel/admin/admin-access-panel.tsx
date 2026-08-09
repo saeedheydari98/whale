@@ -12,15 +12,11 @@ import {
   setCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
+import { getUserPhone } from "@/lib/user-display";
 
 type AdminAccessPanelProps = {
   onUnlock: () => void;
 };
-
-function getUserPhone(user: AuthClientUser | null) {
-  const profile = user?.profile as { phone?: string | null } | null | undefined;
-  return String(profile?.phone || user?.username || "").trim();
-}
 
 export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
   const [authUser, setAuthUser] = useState<AuthClientUser | null>(null);
@@ -180,7 +176,7 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
     }
   };
 
-  const userPhone = getUserPhone(authUser);
+  const userPhone = getUserPhone(authUser, undefined, { fallbackToUsername: true });
 
   return (
     <section className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-primary-border bg-primary-card p-6 shadow-sm">

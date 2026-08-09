@@ -5,6 +5,7 @@ import { IoCreateOutline, IoSearchOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { createProduct } from "../factories";
 import type { BrandForm, ProductForm } from "../types";
@@ -118,9 +119,7 @@ export function ProductsSection({
       </div>
 
       {!isLoading && visibleProducts.length === 0 ? (
-        <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
-          {searchQuery.trim() ? "محصولی با این جستجو پیدا نشد." : "هنوز محصولی ثبت نشده است."}
-        </div>
+        <CustomEmptyState description={searchQuery.trim() ? "نتیجه‌ای با این جست‌وجو پیدا نشد." : "هنوز محصولی ثبت نشده است."} />
       ) : null}
 
       <div className="flex flex-wrap gap-2.5">

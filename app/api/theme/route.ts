@@ -126,7 +126,7 @@ function toThemeSaveErrorResponse() {
   return NextResponse.json(
     {
       ok: false,
-      message: "Theme save failed.",
+      message: "ذخیره تم ناموفق بود.",
       data: {
         theme: cachedTheme?.theme ?? defaultTheme,
       },

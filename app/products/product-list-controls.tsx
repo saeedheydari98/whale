@@ -9,6 +9,7 @@ import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
+import { formatTomanPrice, numericTextValue as numericFilterValue, readPriceNumberWithFallback as readPriceNumber } from "@/lib/price-format";
 
 export type ProductFilterState = {
   priceMin: string;
@@ -38,50 +39,9 @@ export const PRODUCT_SORT_OPTIONS = [
   { value: "topRated", label: "بالاترین امتیاز" },
 ];
 
-const persianDigits: Record<string, string> = {
-  "۰": "0",
-  "۱": "1",
-  "۲": "2",
-  "۳": "3",
-  "۴": "4",
-  "۵": "5",
-  "۶": "6",
-  "۷": "7",
-  "۸": "8",
-  "۹": "9",
-  "٠": "0",
-  "١": "1",
-  "٢": "2",
-  "٣": "3",
-  "٤": "4",
-  "٥": "5",
-  "٦": "6",
-  "٧": "7",
-  "٨": "8",
-  "٩": "9",
-};
-
-function toLatinDigits(value: string) {
-  return value.replace(/[۰-۹٠-٩]/g, (digit) => persianDigits[digit] ?? digit);
-}
-
-function numericFilterValue(value: string) {
-  const normalized = toLatinDigits(value).replace(/[^\d.]/g, "");
-  return normalized || undefined;
-}
-
 const DEFAULT_PRICE_RANGE_MAX = 10_000_000;
 const PRICE_RANGE_STEP = 50_000;
 const PRICE_FILTER_COMMIT_DELAY_MS = 450;
-
-function readPriceNumber(value: string, fallback: number) {
-  const parsed = Number(numericFilterValue(value));
-  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : fallback;
-}
-
-function formatPriceLabel(value: number) {
-  return `${Math.round(value).toLocaleString("fa-IR")} تومان`;
-}
 
 export function productFilterParams(filters: ProductFilterState) {
   return {
@@ -175,7 +135,7 @@ function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, 
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-bold text-primary-text">محدوده قیمت</div>
         <span className="text-xs font-semibold text-secondary-text">
-          {formatPriceLabel(minValue)} تا {formatPriceLabel(maxValue)}
+          {formatTomanPrice(minValue)} تا {formatTomanPrice(maxValue)}
         </span>
       </div>
       <div
@@ -210,8 +170,8 @@ function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, 
         />
       </div>
       <div className="flex items-center justify-between gap-3 text-xs font-semibold text-secondary-text">
-        <span>{formatPriceLabel(0)}</span>
-        <span>{formatPriceLabel(rangeMax)}</span>
+        <span>{formatTomanPrice(0)}</span>
+        <span>{formatTomanPrice(rangeMax)}</span>
       </div>
     </div>
   );

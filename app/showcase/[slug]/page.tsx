@@ -4,6 +4,7 @@ import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Loading from "@/app/design-system/components/loading/loading";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import {
   EMPTY_PRODUCT_FILTERS,
@@ -126,7 +127,7 @@ export default function ShowcasePage() {
   return shouldHoldLoadingWall ? (
     <Loading loading="fullscreen" />
   ) : (
-    <main className="min-h-screen bg-primary-base text-primary-text">
+    <main className="min-h-full bg-primary-base text-primary-text">
       <div className="flex w-full flex-col gap-4 p-4">
         <ProductListShell
           title={showcase?.title || `ویترین: ${showcaseId}`}
@@ -178,9 +179,7 @@ export default function ShowcasePage() {
           ) : null}
 
           {!loading && products.length === 0 ? (
-            <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">
-              محصولی برای این ویترین پیدا نشد.
-            </div>
+            <CustomEmptyState />
           ) : null}
 
           <ProductListGrid

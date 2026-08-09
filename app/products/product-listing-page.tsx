@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Loading from "@/app/design-system/components/loading/loading";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { addProductToCart } from "@/lib/cart-client";
 import { normalizeColorStock, type ProductRecord } from "@/lib/products-client";
@@ -93,7 +94,7 @@ export function ProductListingPage({
   return shouldHoldLoadingWall ? (
     <Loading loading="fullscreen" />
   ) : (
-    <main className="min-h-screen bg-primary-base text-primary-text">
+    <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-5 px-4 py-6">
         <ProductListShell
           title={title}
@@ -107,7 +108,7 @@ export function ProductListingPage({
           onFiltersChange={onFiltersChange}
         >
           {!resolvedLoading && products.length === 0 ? (
-            <div className="rounded-lg border border-primary-border bg-primary-card p-4 text-sm text-secondary-text">{emptyText}</div>
+            <CustomEmptyState description={emptyText} />
           ) : null}
 
           {cartMessage ? (

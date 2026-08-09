@@ -2,7 +2,7 @@
 
 import React from "react";
 import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, GradientDirection, motionVariants, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, glassSurfaceClasses, GradientDirection, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomSelectProps = Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> & {
@@ -36,6 +36,7 @@ export function CustomSelect({
   ...rest
 }: CustomSelectProps) {
   const colorStyle = resolveControlCssVars(variant);
+  const glassBackground = resolveGlassBackground(colorStyle.backgroundColor, 74);
   const isDisabled = disabled || isLoading;
 
   return (
@@ -50,14 +51,15 @@ export function CustomSelect({
           radiusVariants[rounded],
           borderVariants[border],
           shadowVariants[shadow],
+          glassSurfaceClasses,
           motionVariants.smooth,
           fullWidth && "w-full",
           isDisabled && "opacity-50 cursor-not-allowed",
           className
         )}
         style={{
-          backgroundColor: colorStyle.backgroundColor,
-          ...resolveGradientStyle(colorStyle.backgroundColor, gradient),
+          backgroundColor: glassBackground,
+          ...resolveGradientStyle(glassBackground, gradient),
           borderColor: colorStyle.borderColor,
           ...style,
         }}

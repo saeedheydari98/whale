@@ -336,6 +336,10 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         updateEditingPricing={panel.updateEditingPricing}
         onDraftImageUpload={panel.handleImageUpload}
         onEditImageUpload={panel.handleEditImageUpload}
+        onDraftImageUrlAdd={(imageUrl) => panel.addProductImageUrl(imageUrl, "draft")}
+        onEditImageUrlAdd={(imageUrl) => panel.addProductImageUrl(imageUrl, "edit")}
+        onDraftImageRemove={(imageUrl) => panel.removeProductImage(imageUrl, "draft")}
+        onEditImageRemove={(imageUrl) => panel.removeProductImage(imageUrl, "edit")}
         onPreview={panel.openImagePreview}
         onSubmitDraft={panel.submitDraftProduct}
         onSubmitEdit={panel.submitEditingProduct}

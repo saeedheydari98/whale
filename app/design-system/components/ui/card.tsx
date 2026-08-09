@@ -2,7 +2,7 @@
 
 import React from "react";
 import { resolveVariantCssVars, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, GradientDirection, interactionStates, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, cx, glassSurfaceClasses, GradientDirection, interactionStates, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomCardProps = React.HTMLAttributes<HTMLDivElement> & {
@@ -39,7 +39,7 @@ export function CustomCard({
   ...rest
 }: CustomCardProps) {
   const colorStyle = resolveVariantCssVars(variant);
-  const backgroundColor = "var(--secondary-card)";
+  const backgroundColor = resolveGlassBackground("var(--secondary-card)", 78);
 
   return (
     <article
@@ -49,6 +49,7 @@ export function CustomCard({
         radiusVariants[rounded],
         borderVariants[border],
         shadowVariants[shadow],
+        glassSurfaceClasses,
         hover !== "none" && interactionStates.hover[hover],
         className
       )}

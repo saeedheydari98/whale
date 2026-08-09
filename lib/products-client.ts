@@ -1,6 +1,10 @@
 "use client";
 
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
+import { getPlacement, getProductIdentityKey as getProductKey } from "@/lib/catalog-utils";
+import { normalizeColorStock } from "@/lib/color-counts";
+
+export { normalizeColorStock };
 
 const CATALOG_URL_ACTIVE = "/api/products";
 const CATALOG_URL_ALL = "/api/products?all=1";
@@ -316,7 +320,7 @@ async function fetchJsonWithBootstrapRetry<T>(url: string, options?: { force?: b
   for (let attempt = 0; attempt <= CATALOG_BOOTSTRAP_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
       const json = await fetchJsonDeduped<T>(url, { force: options?.force || attempt > 0 });
-      if (isApiFailure(json)) throw new Error("API response was not ok.");
+      if (isApiFailure(json)) throw new Error("دریافت اطلاعات فروشگاه ناموفق بود.");
       return json;
     } catch (error) {
       lastError = error;
@@ -326,23 +330,7 @@ async function fetchJsonWithBootstrapRetry<T>(url: string, options?: { force?: b
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("Catalog request failed.");
-}
-
-function getProductKey(product: Partial<ProductRecord>) {
-  const id = String(product.id ?? "").trim();
-  if (id && /^\d+$/.test(id)) return `id:${id}`;
-
-  return [
-    product.title,
-    product.description,
-    product.price,
-    product.originalPrice,
-    product.discountPrice,
-    product.imageUrl,
-  ]
-    .map((value) => String(value ?? "").trim().toLowerCase())
-    .join("|");
+  throw lastError instanceof Error ? lastError : new Error("دریافت اطلاعات فروشگاه ناموفق بود.");
 }
 
 function dedupeProducts(products: ProductRecord[]) {
@@ -367,12 +355,6 @@ function emptyProductsCache(): ProductsCache {
     tree: { sections: [] },
     catalog: { placement: 0, showcases: [], categoryGroups: [], categories: [], brandGroups: [], brands: [], banners: [] },
   };
-}
-
-function getPlacement(item: { placement?: number | string; sortOrder?: number | string } | undefined, fallback = 0) {
-  if (Number.isFinite(Number(item?.placement))) return Number(item?.placement);
-  if (Number.isFinite(Number(item?.sortOrder))) return Number(item?.sortOrder);
-  return fallback;
 }
 
 function getBannerImageUrls(banner: BannerRecord) {
@@ -444,36 +426,40 @@ function getBannerMeta(banner: BannerRecord) {
   return { showcaseId, showOnHome, showOnShowcase, showOnCategories, showOnProducts, homeSortOrder, showcaseSortOrder, categorySortOrder, productSortOrder };
 }
 
-export function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count))
-  );
-}
-
 export function normalizeStringList(value: unknown, fallback: string[] = []) {
   return Array.isArray(value)
     ? value.map((item) => String(item).trim()).filter(Boolean)
     : fallback;
 }
 
+function normalizeProductImages(product: Pick<Partial<ProductRecord>, "imageUrl" | "images">) {
+  const values = [
+    product.imageUrl,
+    ...(Array.isArray(product.images) ? product.images : []),
+  ];
+  const seen = new Set<string>();
+  const imageUrls: string[] = [];
+
+  for (const value of values) {
+    const imageUrl = String(value ?? "").trim();
+    if (!imageUrl || seen.has(imageUrl)) continue;
+    seen.add(imageUrl);
+    imageUrls.push(imageUrl);
+  }
+
+  return imageUrls;
+}
+
 function normalizeProductRecord(product: ProductRecord, fallbackOrder: number): ProductRecord {
   const placement = getPlacement(product, fallbackOrder);
   const stockQuantity = Number.isFinite(Number(product.stockQuantity)) ? Math.max(0, Math.round(Number(product.stockQuantity))) : 0;
-  const imageList = Array.isArray(product.images)
-    ? product.images.map((item) => String(item)).filter(Boolean)
-    : [];
+  const imageList = normalizeProductImages(product);
 
   return {
     ...product,
     slug: String(product.slug ?? productSlug(product)),
     ctaLabel: "مشاهده محصول",
+    imageUrl: String(product.imageUrl ?? "").trim() || imageList[0] || "",
     images: imageList,
     active: product.active !== false && product.isActive !== false,
     isActive: product.isActive !== false && product.active !== false,

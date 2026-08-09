@@ -10,6 +10,7 @@ import {
 } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import {
   fetchAdminAccessRequests,
   reviewAdminAccessRequest,
@@ -168,7 +169,7 @@ export function AdminSecurityPanel() {
                 </span>
               </div>
               {pendingRequests.length === 0 ? (
-                <span className="text-xs text-secondary-text">درخواست جدیدی ثبت نشده است.</span>
+                <CustomEmptyState description="درخواست جدیدی برای بررسی وجود ندارد." size="sm" />
               ) : (
                 <div className="flex flex-col gap-2">
                   {pendingRequests.map((request) => (
@@ -216,7 +217,7 @@ export function AdminSecurityPanel() {
                 </span>
               </div>
               {approvedRequests.length === 0 ? (
-                <span className="text-xs text-secondary-text">دسترسی فعالی ثبت نشده است.</span>
+                <CustomEmptyState description="هنوز دسترسی فعالی ثبت نشده است." size="sm" />
               ) : (
                 <div className="flex flex-col gap-2">
                   {approvedRequests.map((request) => (

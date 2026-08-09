@@ -3,14 +3,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
+import { IoBagAddOutline } from "react-icons/io5";
 import { findProductById, getProductDetail, isProductAvailable, type ProductDetailResult, type ProductRecord } from "@/lib/products-client";
 import { addProductToCart } from "@/lib/cart-client";
+import {
+  formatCurrencyWithCommas as formatPrice,
+  getDiscountPercentValue as getDiscountPercent,
+  getFinalPriceValue as getFinalPrice,
+} from "@/lib/price-format";
+import { formatShortPersianDate as formatDate } from "@/lib/date-format";
+import { normalizeColorStock } from "@/lib/color-counts";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomTag } from "@/app/design-system/components/ui/tag";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
 import Loading from "@/app/design-system/components/loading/loading";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
+import { ProductImageGallery } from "./product-image-gallery";
 import ColorStockDots from "@/app/design-system/components/ui/color-stock-dots";
 
 const LOADING_PRODUCT: ProductRecord = {
@@ -33,37 +42,6 @@ const PRODUCT_TABS: Array<{ id: ProductTab; label: string }> = [
   { id: "price", label: "تغییرات قیمت" },
 ];
 
-function getFinalPrice(product: ProductRecord) {
-  return product.discountPrice || product.price;
-}
-
-function formatPrice(value?: string) {
-  const normalized = String(value || "").replace(/[^\d.]/g, "");
-  const parsed = Number(normalized);
-
-  if (!Number.isFinite(parsed) || !normalized) {
-    return value || "";
-  }
-
-  return `$${parsed.toLocaleString("en-US")}`;
-}
-
-function getDiscountPercent(product: ProductRecord) {
-  const percent = Number(product.discountPercent);
-  return Number.isFinite(percent) && percent > 0 ? Math.round(percent) : 0;
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "";
-  const time = new Date(value).getTime();
-  if (!Number.isFinite(time)) return String(value);
-  return new Date(time).toLocaleDateString("fa-IR", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
 function formatDimensionValue(value?: number | string | null) {
   return String(value ?? "").trim();
 }
@@ -74,19 +52,6 @@ function formatDimensions(product: ProductRecord) {
     .filter(Boolean);
 
   return dimensions.length > 0 ? dimensions.join(" × ") : "";
-}
-
-function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count))
-  );
 }
 
 function commentDisplayName(comment: any) {
@@ -124,6 +89,24 @@ function normalizeRatingValue(value: unknown) {
   return Number.isInteger(ratingValue) && ratingValue >= 1 && ratingValue <= 5
     ? ratingValue
     : undefined;
+}
+
+function getProductGalleryImages(product: ProductRecord) {
+  const values = [
+    product.imageUrl,
+    ...(Array.isArray(product.images) ? product.images : []),
+  ];
+  const seen = new Set<string>();
+  const imageUrls: string[] = [];
+
+  for (const value of values) {
+    const imageUrl = String(value ?? "").trim();
+    if (!imageUrl || seen.has(imageUrl)) continue;
+    seen.add(imageUrl);
+    imageUrls.push(imageUrl);
+  }
+
+  return imageUrls;
 }
 
 function findProductInQueryValue(value: unknown, productId: string, depth = 0): ProductRecord | null {
@@ -332,8 +315,7 @@ export default function ProductPage() {
   if (!product) {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 bg-primary-base p-6">
-        <div className="text-lg font-bold text-primary-text">محصول پیدا نشد</div>
-        <div className="text-sm text-secondary-text">محصول موردنظر در فروشگاه پیدا نشد.</div>
+        <CustomEmptyState description="محصول موردنظر در فروشگاه پیدا نشد." />
       </div>
     );
   }
@@ -365,9 +347,10 @@ export default function ProductPage() {
       ]
     : detailRows;
   const finalPriceDate = formatDate(product.updatedAt || product.publishedAt || product.createdAt);
+  const productGalleryImages = getProductGalleryImages(product);
 
   return (
-    <main className="min-h-screen bg-primary-base text-primary-text">
+    <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         {cartMessage ? (
           <div className="rounded-lg border border-primary-border bg-primary-card px-4 py-3 text-sm font-semibold text-primary">
@@ -378,19 +361,7 @@ export default function ProductPage() {
         <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
           <section className="flex w-full flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:w-[42rem] lg:max-w-[42rem] lg:shrink-0">
             <div className="flex w-full flex-col gap-4">
-              <Loading loading="skeleton-item" isLoading={catalogLoading} className="flex aspect-square w-full">
-                <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-primary-border bg-primary-media">
-                  {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <IoBagHandleOutline className="text-6xl text-primary" aria-hidden="true" />
-                  )}
-                </div>
-              </Loading>
+              <ProductImageGallery imageUrls={productGalleryImages} title={product.title} isLoading={catalogLoading} />
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
@@ -514,7 +485,7 @@ export default function ProductPage() {
                       </div>
                     </Loading>
                   )) : (
-                    <div className="text-sm text-secondary-text">اطلاعات تکمیلی برای این محصول ثبت نشده است.</div>
+                    <CustomEmptyState description="اطلاعات تکمیلی برای این محصول وجود ندارد." size="sm" />
                   )}
                 </div>
                 <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
@@ -524,9 +495,7 @@ export default function ProductPage() {
                       <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">{product.description}</div>
                     </Loading>
                   ) : (
-                    <div className="text-sm leading-7 text-secondary-text">
-                      توضیحی برای این محصول ثبت نشده است.
-                    </div>
+                    <CustomEmptyState description="توضیحی برای این محصول وجود ندارد." size="sm" />
                   )}
                 </div>
               </section>

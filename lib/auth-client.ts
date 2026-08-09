@@ -64,7 +64,7 @@ export async function fetchCurrentUser(options?: { force?: boolean; allowStaleOn
   try {
     const data = await pendingUserRequest;
     if (data?.ok === false) {
-      throw new Error(data?.message || data?.error || "Profile load failed.");
+      throw new Error(data?.message || data?.error || "بارگذاری پروفایل ناموفق بود.");
     }
     const user = data?.data?.user?.role ? data.data.user as AuthClientUser : null;
     setCachedAuthUser(user, { emit: false });

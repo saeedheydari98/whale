@@ -6,7 +6,7 @@ import { CustomButton } from "./button";
 import { CustomCard } from "./card";
 import { UICommonVariant } from "../../variants/ui.variant";
 import { LoadingVariant } from "../loading/loading";
-import { borderVariants, GradientDirection, radiusVariants, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, GradientDirection, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import { HiMiniXMark } from "react-icons/hi2";
 
 type CustomModalProps = {
@@ -25,6 +25,7 @@ type CustomModalProps = {
   loading?: LoadingVariant;
   isLoading?: boolean;
   loadingText?: string;
+  closeOnBackdrop?: boolean;
 };
 
 export function CustomModal({
@@ -43,9 +44,10 @@ export function CustomModal({
   loading = "spinner",
   isLoading = false,
   loadingText,
+  closeOnBackdrop = true,
 }: CustomModalProps) {
   const [mounted, setMounted] = React.useState(false);
-  const overlayColor = "color-mix(in srgb, var(--primary) 4%, transparent)";
+  const overlayColor = "color-mix(in srgb, var(--primary) 8%, transparent)";
 
   React.useEffect(() => {
     setMounted(true);
@@ -53,12 +55,12 @@ export function CustomModal({
 
   if (!open) return null;
 
-  const cardBackgroundColor = "color-mix(in srgb, var(--primary-card) 82%, var(--bg-surface))";
+  const cardBackgroundColor = resolveGlassBackground("var(--bg-surface)", 88);
   const modal = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
       style={{ backgroundColor: overlayColor }}
-      onClick={onClose}
+      onClick={closeOnBackdrop ? onClose : undefined}
       role="dialog"
       aria-modal="true"
     >
@@ -72,7 +74,7 @@ export function CustomModal({
         style={{
           backgroundColor: cardBackgroundColor,
           ...resolveGradientStyle(cardBackgroundColor, gradient),
-          color: "var(--primary-text)",
+          color: "var(--body-text)",
         }}
         shadow={shadow}
         hover="none"

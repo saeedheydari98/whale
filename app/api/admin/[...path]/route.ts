@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/api/auth";
 import { bannerSchema, productSchema, showcaseSchema } from "@/lib/api/schemas";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
+import { readImageMetaRecord as readImageMeta, readStoredImageUrls } from "@/lib/catalog-utils";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -150,8 +151,8 @@ type LayoutShowcaseRecord = {
   sortOrder: number;
 };
 
-const DEFAULT_CATEGORY_GROUP_TITLE = "Ø¯Ø³ØªÙ‡ Ø¨Ù†Ø¯ÛŒ Ù‡Ø§";
-const DEFAULT_BRAND_GROUP_TITLE = "Ø¨Ø±Ù†Ø¯Ù‡Ø§";
+const DEFAULT_CATEGORY_GROUP_TITLE = "دسته‌بندی‌ها";
+const DEFAULT_BRAND_GROUP_TITLE = "برندها";
 
 function optionalBoolean(value: unknown) {
   return typeof value === "boolean" ? value : undefined;
@@ -160,19 +161,6 @@ function optionalBoolean(value: unknown) {
 function optionalNumber(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.round(parsed) : undefined;
-}
-
-function readImageMeta(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-}
-
-function readStoredImageUrls(value: unknown) {
-  if (Array.isArray(value)) return value.map((item) => String(item)).filter(Boolean);
-  const meta = readImageMeta(value);
-  const urls = Array.isArray(meta.urls) ? meta.urls : meta.imageUrls;
-  return Array.isArray(urls) ? urls.map((item) => String(item)).filter(Boolean) : [];
 }
 
 function getBannerLayout(banner: BannerLayoutRecord) {
@@ -675,7 +663,7 @@ export async function GET(request: Request, context: Context) {
 
     if (path[0] === "catalog" && path[1]) {
       const catalog = await readAdminCatalogSection(path[1]);
-      return catalog ? apiOk({ catalog }) : apiFail("Ù…Ø³ÛŒØ± Ù¾ÛŒØ¯Ø§ Ù†Ø´Ø¯.", 404);
+      return catalog ? apiOk({ catalog }) : apiFail("مسیر پیدا نشد.", 404);
     }
 
     if (path[0] === "dashboard") {

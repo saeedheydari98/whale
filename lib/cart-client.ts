@@ -12,15 +12,23 @@ import {
   readCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
+import {
+  colorSelectionTotal,
+  normalizeCartColorStock,
+  normalizeColorSelection,
+  parseSerializedColorSelection,
+  serializeColorSelection,
+  type CartColorSelection,
+} from "@/lib/cart-color-selection";
+
+export { normalizeCartColorStock };
+export type { CartColorSelection };
 
 export const CART_STORAGE_KEY = "product-cart";
 export const CART_UPDATED_EVENT = "product-cart-updated";
 
 const SILENT_NOTIFICATION_HEADERS = { [NOTIFICATION_SILENT_HEADER]: "true" };
 const GUEST_CART_STORAGE_KEY = `${CART_STORAGE_KEY}:guest`;
-const COLOR_SELECTION_PREFIX = "colors:";
-
-export type CartColorSelection = Record<string, number>;
 
 export type CartItemRecord = {
   id?: number | string;
@@ -111,59 +119,6 @@ function notifyCartSuccess(message: string) {
 
 function notifyCartError(message: string) {
   notifyApp({ type: "error", message });
-}
-
-export function normalizeCartColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count))
-  );
-}
-
-function normalizeColorSelection(value: unknown): CartColorSelection {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
-  );
-}
-
-function parseSerializedColorSelection(value: unknown, quantity: number): CartColorSelection {
-  const text = String(value ?? "").trim();
-  if (!text) return {};
-
-  if (text.startsWith(COLOR_SELECTION_PREFIX)) {
-    try {
-      return normalizeColorSelection(JSON.parse(text.slice(COLOR_SELECTION_PREFIX.length)));
-    } catch {
-      return {};
-    }
-  }
-
-  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
-}
-
-function colorSelectionTotal(selection: CartColorSelection) {
-  return Object.values(selection).reduce((sum, count) => sum + Math.max(0, Math.round(Number(count) || 0)), 0);
-}
-
-function serializeColorSelection(selection: CartColorSelection) {
-  const normalized = normalizeColorSelection(selection);
-  const entries = Object.entries(normalized);
-  if (entries.length === 0) return "";
-  if (entries.length === 1) return entries[0][0];
-  return `${COLOR_SELECTION_PREFIX}${JSON.stringify(Object.fromEntries(entries))}`;
 }
 
 export function getCartItemColorSelection(item: Partial<CartItemRecord>): CartColorSelection {

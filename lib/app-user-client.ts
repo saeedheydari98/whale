@@ -316,7 +316,7 @@ async function fetchAppUserPayload(options?: { force?: boolean }) {
         staleMs: APP_USER_CACHE_MS,
       });
       if (isApiFailure(payload)) {
-        throw new Error(payload?.message || payload?.error || "User bootstrap load failed.");
+        throw new Error(payload?.message || payload?.error || "بارگذاری اطلاعات کاربر ناموفق بود.");
       }
       return payload;
     } catch (error) {
@@ -327,7 +327,7 @@ async function fetchAppUserPayload(options?: { force?: boolean }) {
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error("User bootstrap load failed.");
+  throw lastError instanceof Error ? lastError : new Error("بارگذاری اطلاعات کاربر ناموفق بود.");
 }
 
 export function clearAppUserCache() {

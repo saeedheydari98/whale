@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { readImageMetaRecord as readImageMeta } from "@/lib/catalog-utils";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,11 +43,6 @@ function normalizeImages(value: BannerPayload) {
   }
 
   return [];
-}
-
-function readImageMeta(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return value as Partial<BannerPayload> & { urls?: unknown; imageUrls?: unknown };
 }
 
 function normalizeBanner(value: BannerPayload, index: number) {

@@ -4,19 +4,15 @@ import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { requireUser } from "@/lib/api/auth";
 import { getOrCreateActiveCart } from "@/lib/api/catalog-service";
+import { readFormattedPriceNumber as readPriceNumber } from "@/lib/price-format";
+import {
+  colorSelectionTotal,
+  readCartItemColorSelection as readColorSelection,
+} from "@/lib/cart-color-selection";
+import { normalizeColorStock } from "@/lib/color-counts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, val]) => [key, Number(val) || 0]));
-}
-
-function readPriceNumber(value?: string | null) {
-  const parsed = Number(String(value || "").replace(/[^\d.]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
 
 type CheckoutCartItem = {
   productId: number | null;
@@ -37,40 +33,6 @@ type ProductUpdatePlan = {
   quantity: number;
   colorStock: Record<string, number>;
 };
-
-const COLOR_SELECTION_PREFIX = "colors:";
-
-function normalizeColorSelection(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
-  );
-}
-
-function readColorSelection(selectedColor: unknown, quantity: number) {
-  const text = String(selectedColor ?? "").trim();
-  if (!text) return {};
-
-  if (text.startsWith(COLOR_SELECTION_PREFIX)) {
-    try {
-      return normalizeColorSelection(JSON.parse(text.slice(COLOR_SELECTION_PREFIX.length)));
-    } catch {
-      return {};
-    }
-  }
-
-  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
-}
-
-function colorSelectionTotal(selection: Record<string, number>) {
-  return Object.values(selection).reduce((sum, count) => sum + Math.max(0, Math.round(Number(count) || 0)), 0);
-}
 
 export async function POST(request: Request) {
   const limited = rateLimit(request);

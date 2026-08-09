@@ -4,11 +4,11 @@ import { IoAdd, IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "reac
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
-import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
 import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import type { BannerForm, ShowcaseForm } from "../types";
+import { AdminModalSection } from "./admin-modal-section";
 
 type BannerModalsProps = {
   showcases: ShowcaseForm[];
@@ -120,19 +120,43 @@ function BannerModal({
   submitLabel,
   emptyPreviewLabel,
 }: BannerModalProps) {
+  const hasTitle = Boolean(banner?.title.trim());
+  const hasTarget = Boolean(banner && (banner.showOnHome || banner.showOnCategories || banner.showOnProducts || banner.showOnShowcase));
+  const timingComplete = Boolean(
+    banner
+    && Number.isFinite(Number(banner.intervalSeconds))
+    && Number(banner.intervalSeconds) >= 1
+    && Number.isFinite(Number(banner.heightPercent))
+    && Number(banner.heightPercent) >= 10
+    && Number(banner.heightPercent) <= 100
+  );
+  const hasImages = Boolean(banner && banner.imageUrls.length > 0);
+
   return (
-    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg">
+    <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {banner ? (
-        <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto rounded-lg border border-primary-border bg-primary-card p-3">
-          <CustomInput value={banner.title} placeholder="عنوان بنر" onChange={(event) => onPatch({ title: event.target.value })} />
-          <CustomInput
-            type="number"
-            value={banner.homeSortOrder}
-            placeholder="ترتیب نمایش"
-            onChange={(event) => onPatch({ homeSortOrder: Number(event.target.value), sortOrder: Number(event.target.value) })}
-          />
-          <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-soft p-3">
-            <div className="text-sm font-bold text-primary-text">محل نمایش بنر</div>
+        <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
+          <AdminModalSection
+            title="اطلاعات بنر"
+            status={hasTitle ? "complete" : "optional"}
+            meta="عنوان و ترتیب اصلی"
+            defaultOpen={!hasTitle}
+          >
+            <CustomInput value={banner.title} placeholder="عنوان بنر" onChange={(event) => onPatch({ title: event.target.value })} />
+            <CustomInput
+              type="number"
+              value={banner.homeSortOrder}
+              placeholder="ترتیب نمایش"
+              onChange={(event) => onPatch({ homeSortOrder: Number(event.target.value), sortOrder: Number(event.target.value) })}
+            />
+          </AdminModalSection>
+
+          <AdminModalSection
+            title="محل نمایش بنر"
+            status={hasTarget ? "complete" : "incomplete"}
+            meta="خانه، دسته‌بندی یا ویترین"
+            defaultOpen={!hasTarget}
+          >
             <div className="flex flex-wrap gap-2">
               <BannerTargetCheckbox label="خانه" checked={banner.showOnHome} onChange={(showOnHome) => onPatch({ showOnHome })} />
               <BannerTargetCheckbox label="دسته‌بندی" checked={banner.showOnCategories} onChange={(showOnCategories) => onPatch({ showOnCategories })} />
@@ -171,19 +195,27 @@ function BannerModal({
                 />
               </div>
             ) : null}
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          </AdminModalSection>
+
+          <AdminModalSection
+            title="زمان‌بندی و اندازه"
+            status={timingComplete ? "complete" : "incomplete"}
+            meta="تغییر خودکار و ارتفاع بنر"
+            defaultOpen={!timingComplete}
+          >
+            <div className="flex flex-col gap-2 sm:flex-row">
             <CustomInput name={`${errorKey}-interval-seconds`} type="number" min={1} max={60} step={1} value={banner.intervalSeconds} placeholder="زمان تغییر خودکار" onChange={(event) => onPatch({ intervalSeconds: Number(event.target.value) })} />
             <CustomInput name={`${errorKey}-height-percent`} type="number" min={10} max={100} step={1} value={banner.heightPercent} placeholder="درصد ارتفاع" onChange={(event) => onPatch({ heightPercent: Number(event.target.value) })} />
-          </div>
-          <div
-            data-invalid={hasRequiredError(errorKey) && banner.imageUrls.length === 0 ? "true" : undefined}
-            tabIndex={-1}
-            className={`flex flex-col gap-3 rounded-lg border bg-primary-soft p-3 outline-none ${
-              hasRequiredError(errorKey) && banner.imageUrls.length === 0 ? "border-danger-border-nomode" : "border-primary-border"
-            }`}
+            </div>
+          </AdminModalSection>
+
+          <AdminModalSection
+            title="تصاویر بنر"
+            status={hasImages ? "complete" : "incomplete"}
+            invalid={hasRequiredError(errorKey) && !hasImages}
+            meta="گالری WebP بنر"
+            defaultOpen={!hasImages}
           >
-            <RequiredLabel required className="text-primary-text">تصاویر بنر</RequiredLabel>
             <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
             <div className="flex gap-2">
               <CustomInput value={imageUrl} placeholder="آدرس تصویر WebP" onChange={(event) => setImageUrl(event.target.value)} />
@@ -209,8 +241,12 @@ function BannerModal({
                 </div>
               ))}
             </div>
-          </div>
-          <CustomSwitch checked={banner.active} onChange={(active) => onPatch({ active })} label={banner.active ? "فعال" : "مخفی"} size="sm" />
+          </AdminModalSection>
+
+          <AdminModalSection title="وضعیت" status="optional" meta={banner.active ? "فعال" : "مخفی"}>
+            <CustomSwitch checked={banner.active} onChange={(active) => onPatch({ active })} label={banner.active ? "فعال" : "مخفی"} size="sm" />
+          </AdminModalSection>
+
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
               <span>{submitLabel}</span>

@@ -13,6 +13,7 @@ import {
   IoReceiptOutline,
 } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
 import { AdminAccessPanel } from "@/app/panel/admin/admin-access-panel";
 import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
@@ -28,6 +29,8 @@ type AdminPanelUser = {
   role?: string | null;
 };
 
+type AdminPanelTab = "theme" | "security" | "orders" | AdminCatalogSection;
+
 export default function AdminPanelPage() {
   const { data: appUserData, refresh: refreshAppUser } = useAppUser();
   const appUser = appUserData?.user ?? null;
@@ -35,7 +38,7 @@ export default function AdminPanelPage() {
     appUserData ? hasAdminRole(appUserData.user) : null
   );
   const [authUser, setAuthUser] = useState<AdminPanelUser | null>(() => appUser);
-  const [activeTab, setActiveTab] = useState<"theme" | "security" | "orders" | AdminCatalogSection>("theme");
+  const [activeTab, setActiveTab] = useState<AdminPanelTab>("theme");
 
   useEffect(() => {
     if (!appUserData) return;
@@ -88,9 +91,9 @@ export default function AdminPanelPage() {
   }, [activeTab, authUser?.role]);
 
   const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === SUPERADMIN_PHONE;
-  const tabs = [
+  const tabs: Array<CustomTabItem<AdminPanelTab>> = [
     { id: "theme", label: "ظاهر", icon: <IoColorPaletteOutline /> },
-    ...(isSuperadmin ? [{ id: "security", label: "دسترسی‌ها", icon: <IoShieldCheckmarkOutline /> }] : []),
+    ...(isSuperadmin ? [{ id: "security" as const, label: "دسترسی‌ها", icon: <IoShieldCheckmarkOutline /> }] : []),
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
     { id: "orders", label: "خریدها", icon: <IoReceiptOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
@@ -101,7 +104,7 @@ export default function AdminPanelPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-primary-base p-6 text-primary-text">
+    <main className="min-h-full bg-primary-base p-6 text-primary-text">
       {hasAdminAccess === null ? (
         <div className="flex min-h-[50vh] items-center justify-center">
           <Loading loading="page" size="xl" />
@@ -110,23 +113,7 @@ export default function AdminPanelPage() {
         <div className="flex w-full flex-col gap-6">
           <section className="flex flex-col gap-4">
             <div className="text-primary text-2xl font-bold">پنل مدیریت</div>
-            <div className="flex w-full flex-nowrap gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-primary-border bg-primary-soft p-1 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  className={`flex h-11 shrink-0 basis-28 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition md:basis-auto ${
-                    activeTab === tab.id
-                      ? "border-primary-border bg-primary text-primary-contrast shadow-sm"
-                      : "border-transparent bg-primary-card text-primary-text hover:border-primary-border hover:bg-primary-bg"
-                  }`}
-                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                >
-                  <span className="text-base" aria-hidden="true">{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </div>
+            <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
           </section>
 
           {activeTab === "theme" ? <AdminThemePanel /> : null}

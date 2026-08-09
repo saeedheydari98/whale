@@ -4,6 +4,13 @@ import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getAuthUser } from "@/lib/api/auth";
 import { cartItemDto, getOrCreateActiveCart } from "@/lib/api/catalog-service";
+import { readFormattedPriceNumber as readPriceNumber } from "@/lib/price-format";
+import {
+  colorSelectionTotal,
+  readCartItemColorSelection as readColorSelection,
+  serializeColorSelection,
+} from "@/lib/cart-color-selection";
+import { normalizeColorStock } from "@/lib/color-counts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -61,8 +68,6 @@ type CartProductSnapshot = {
   isActive: boolean;
 };
 
-const COLOR_SELECTION_PREFIX = "colors:";
-
 function normalizeProfile(value: ProfilePayload) {
   return {
     firstName: String(value.firstName ?? "").trim(),
@@ -83,49 +88,6 @@ function isProfileComplete(profile: ReturnType<typeof normalizeProfile>) {
   );
 }
 
-function normalizeColorSelection(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([color, count]) => [
-        color.trim(),
-        Math.max(0, Math.round(Number(count))),
-      ] as const)
-      .filter(([color, count]) => color && Number.isFinite(count) && count > 0)
-  );
-}
-
-function readColorSelection(selectedColor: unknown, quantity: number, selectedColors?: unknown) {
-  const fromObject = normalizeColorSelection(selectedColors);
-  if (Object.keys(fromObject).length > 0) return fromObject;
-
-  const text = String(selectedColor ?? "").trim();
-  if (!text) return {};
-
-  if (text.startsWith(COLOR_SELECTION_PREFIX)) {
-    try {
-      return normalizeColorSelection(JSON.parse(text.slice(COLOR_SELECTION_PREFIX.length)));
-    } catch {
-      return {};
-    }
-  }
-
-  return { [text]: Math.max(1, Math.round(Number(quantity) || 1)) };
-}
-
-function colorSelectionTotal(selection: Record<string, number>) {
-  return Object.values(selection).reduce((sum, count) => sum + Math.max(0, Math.round(Number(count) || 0)), 0);
-}
-
-function serializeColorSelection(selection: Record<string, number>) {
-  const normalized = normalizeColorSelection(selection);
-  const entries = Object.entries(normalized);
-  if (entries.length === 0) return null;
-  if (entries.length === 1) return entries[0][0];
-  return `${COLOR_SELECTION_PREFIX}${JSON.stringify(Object.fromEntries(entries))}`;
-}
-
 function normalizeCartItem(value: CartItemPayload) {
   const productId = Number(value.productId ?? value.id);
   const quantity = Math.max(1, Math.round(Number(value.quantity ?? 1)));
@@ -143,7 +105,7 @@ function normalizeCartItem(value: CartItemPayload) {
       ? Math.max(0, Math.round(Number(value.discountPercent)))
       : null,
     imageUrl: value.imageUrl ? String(value.imageUrl) : null,
-    selectedColor: serializeColorSelection(selectedColors) ?? (value.selectedColor ? String(value.selectedColor).trim() : null),
+    selectedColor: serializeColorSelection(selectedColors) || (value.selectedColor ? String(value.selectedColor).trim() : null),
     selectedColors,
     quantity: selectedTotal > 0 ? selectedTotal : quantity,
   };
@@ -173,7 +135,7 @@ function mergeCartItems(items: ReturnType<typeof normalizeCartItem>[]) {
         ...existing,
         ...item,
         selectedColors,
-        selectedColor: serializeColorSelection(selectedColors) ?? existing.selectedColor ?? item.selectedColor,
+        selectedColor: serializeColorSelection(selectedColors) || existing.selectedColor || item.selectedColor,
         quantity: selectedTotal > 0 ? selectedTotal : existing.quantity + item.quantity,
       });
       continue;
@@ -182,21 +144,6 @@ function mergeCartItems(items: ReturnType<typeof normalizeCartItem>[]) {
   }
 
   return Array.from(byKey.values());
-}
-
-function normalizeColorStock(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>).map(([key, val]) => [
-      key,
-      Math.max(0, Math.round(Number(val) || 0)),
-    ])
-  );
-}
-
-function readPriceNumber(value?: string | null) {
-  const parsed = Number(String(value || "").replace(/[^\d.]/g, ""));
-  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 async function findLegacyProfile(request: Request, bodyProfile?: ProfilePayload) {

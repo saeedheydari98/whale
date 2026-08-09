@@ -65,7 +65,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fa" dir="rtl" className={storeFont.variable} style={initialThemeVariables} suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen text-right" dir="rtl">
+      <body className="h-[100dvh] overflow-hidden bg-primary-base text-right" dir="rtl">
         <Script id="theme-bootstrap" strategy="beforeInteractive">
           {initialThemeScript}
         </Script>
@@ -74,11 +74,17 @@ export default function RootLayout({
             <AppNotificationProvider>
               <CatalogQueryProvider>
                 <ProductsCatalogProvider>
-                  <AppHeader />
-                  <main className="flex-1 pb-14 md:pb-0">
-                    {children}
-                  </main>
-                  <AppFooter />
+                  <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-primary-base text-primary-text">
+                    <div className="shrink-0">
+                      <AppHeader />
+                    </div>
+                    <main data-app-scroll-container className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                      {children}
+                    </main>
+                    <div className="shrink-0">
+                      <AppFooter />
+                    </div>
+                  </div>
                   <AdminPanelFloatButton />
                 </ProductsCatalogProvider>
               </CatalogQueryProvider>

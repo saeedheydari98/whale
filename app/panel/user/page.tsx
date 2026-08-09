@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IoCheckmarkCircleOutline } from "react-icons/io5";
+import { IoCheckmarkCircleOutline, IoPersonCircleOutline, IoReceiptOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
+import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
 import { AUTH_USER_UPDATED_EVENT } from "@/lib/auth-client";
+import { formatPlainPrice } from "@/lib/price-format";
 import { UserProfilePanel } from "./user-profile-panel";
 
 type OrderItem = {
@@ -104,7 +107,7 @@ function UserOrdersPanel() {
         </span>
       </div>
       {orders.length === 0 ? (
-        <span className="text-sm text-primary-text">هنوز خریدی ثبت نشده است.</span>
+        <CustomEmptyState description="هنوز خریدی ثبت نشده است." size="sm" />
       ) : (
         <div className="flex flex-wrap gap-3">
           {orders.flatMap((order) =>
@@ -128,7 +131,7 @@ function UserOrdersPanel() {
                       {item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}
                     </span>
                     <span className="text-xs font-semibold text-primary">
-                      {item.discountPrice || item.price || "بدون قیمت"}
+                      {formatPlainPrice(item.discountPrice || item.price)}
                     </span>
                   </div>
                 </div>
@@ -163,30 +166,16 @@ function UserOrdersPanel() {
 
 export default function UserPanelPage() {
   const [activeTab, setActiveTab] = useState<"profile" | "orders">("profile");
+  const tabs: Array<CustomTabItem<typeof activeTab>> = [
+    { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
+    { id: "orders", label: "خریدها", icon: <IoReceiptOutline /> },
+  ];
 
   return (
-    <main className="min-h-screen bg-primary-base p-6 text-primary-text">
+    <main className="min-h-full bg-primary-base p-6 text-primary-text">
       <div className="flex flex-col gap-4">
         <div className="text-2xl text-primary-text font-bold">حساب کاربری</div>
-        <div className="flex flex-wrap gap-2 rounded-lg border border-primary-border bg-primary-card p-2">
-          {[
-            { id: "profile", label: "پروفایل" },
-            { id: "orders", label: "خریدها" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`rounded-md border px-4 py-2 text-sm font-semibold transition ${
-                activeTab === tab.id
-                  ? "border-primary-border bg-primary text-primary-contrast"
-                  : "border-primary-border bg-primary-base text-primary-text hover:bg-primary-card"
-              }`}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
+        <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
         {activeTab === "profile" ? <UserProfilePanel /> : null}
         {activeTab === "orders" ? <UserOrdersPanel /> : null}
       </div>

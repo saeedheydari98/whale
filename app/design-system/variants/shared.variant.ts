@@ -136,11 +136,17 @@ export const gradientDirections = {
 
 export type GradientDirection = keyof typeof gradientDirections;
 
+export const glassSurfaceClasses = "backdrop-blur-xl backdrop-saturate-150";
+
+export function resolveGlassBackground(backgroundColor: string, opacity = 82) {
+  return `color-mix(in srgb, ${backgroundColor} ${opacity}%, transparent)`;
+}
+
 export function resolveGradientStyle(
   backgroundColor: string,
   gradient: GradientDirection = "btu"
 ) {
-  const fadedColor = `color-mix(in srgb, ${backgroundColor} 82%, var(--bg-surface))`;
+  const fadedColor = `color-mix(in srgb, ${backgroundColor} 72%, transparent)`;
 
   return {
     backgroundImage: `linear-gradient(${gradientDirections[gradient]}, ${backgroundColor} 0%, ${fadedColor} 100%)`,
