@@ -2,10 +2,6 @@ import type { AdminCatalogSection, StorefrontLayoutTab } from "./types";
 
 export const MIN_LOADING_MS = 350;
 
-export const STOCK_OPTIONS = [
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100,
-];
-
 export const PRODUCT_COLOR_OPTIONS = [
   "black",
   "white",

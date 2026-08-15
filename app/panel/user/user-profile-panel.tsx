@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { IoKeyOutline, IoLogInOutline, IoSaveOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
-import { RequiredLabel } from "@/app/design-system/components/ui/required-label";
 import { persistCart, readLocalCart } from "@/lib/cart-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import {
@@ -228,7 +227,6 @@ export function UserProfilePanel() {
       {!authUser ? (
         <div className="grid gap-3 rounded-md border border-primary-border bg-primary-base p-3 md:grid-cols-2">
           <div className="flex flex-col gap-2">
-            <RequiredLabel required className="text-primary-text">رمز عبور</RequiredLabel>
             <CustomInput
               value={registerDraft.password}
               variant="primary"
@@ -239,7 +237,6 @@ export function UserProfilePanel() {
               title="۸ تا ۷۲ کاراکتر با حداقل یک حرف و یک عدد"
               required
               invalid={showRequiredErrors && !registerDraft.password}
-              showLabel={false}
               aria-label="رمز عبور"
               onChange={(event) => {
                 setRegisterDraft((current) => ({ ...current, password: event.target.value }));
@@ -248,7 +245,6 @@ export function UserProfilePanel() {
             />
           </div>
           <div className="flex flex-col gap-2">
-            <RequiredLabel required className="text-primary-text">تکرار رمز عبور</RequiredLabel>
             <CustomInput
               value={registerDraft.passwordConfirm}
               variant="primary"
@@ -258,7 +254,6 @@ export function UserProfilePanel() {
               pattern="(?=.*[A-Za-z])(?=.*\d)[^\s]{8,72}"
               required
               invalid={showRequiredErrors && !registerDraft.passwordConfirm}
-              showLabel={false}
               aria-label="تکرار رمز عبور"
               onChange={(event) => {
                 setRegisterDraft((current) => ({ ...current, passwordConfirm: event.target.value }));
@@ -271,7 +266,6 @@ export function UserProfilePanel() {
 
       <div ref={formRef} className="grid gap-3 md:grid-cols-2">
         <div className="flex flex-col gap-2">
-          <RequiredLabel required className="text-primary-text">نام</RequiredLabel>
           <CustomInput
             value={profileDraft.firstName}
             variant="primary"
@@ -279,13 +273,11 @@ export function UserProfilePanel() {
             pattern="[\p{L}][\p{L}\s'-]{1,49}"
             required
             invalid={showRequiredErrors && !NAME_PATTERN.test(profileDraft.firstName.trim())}
-            showLabel={false}
             aria-label="نام"
             onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
           />
         </div>
         <div className="flex flex-col gap-2">
-          <RequiredLabel required className="text-primary-text">نام خانوادگی</RequiredLabel>
           <CustomInput
             value={profileDraft.lastName}
             variant="primary"
@@ -293,13 +285,11 @@ export function UserProfilePanel() {
             pattern="[\p{L}][\p{L}\s'-]{1,49}"
             required
             invalid={showRequiredErrors && !NAME_PATTERN.test(profileDraft.lastName.trim())}
-            showLabel={false}
             aria-label="نام خانوادگی"
             onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
           />
         </div>
         <div className="flex flex-col gap-2">
-          <RequiredLabel required className="text-primary-text">شماره تماس</RequiredLabel>
           <CustomInput
             value={profileDraft.phone}
             variant="primary"
@@ -308,14 +298,12 @@ export function UserProfilePanel() {
             maxLength={11}
             required
             invalid={showRequiredErrors && !PHONE_PATTERN.test(profileDraft.phone.trim())}
-            showLabel={false}
             inputMode="tel"
             aria-label="شماره تماس"
             onChange={(event) => updateProfileDraft({ phone: event.target.value })}
           />
         </div>
         <div className="flex flex-col gap-2">
-          <RequiredLabel className="text-primary-text">ایمیل</RequiredLabel>
           <CustomInput
             value={profileDraft.email}
             variant="primary"
@@ -324,13 +312,11 @@ export function UserProfilePanel() {
             autoComplete="email"
             pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
             invalid={showRequiredErrors && Boolean(profileDraft.email.trim()) && !EMAIL_PATTERN.test(profileDraft.email.trim())}
-            showLabel={false}
             aria-label="ایمیل"
             onChange={(event) => updateProfileDraft({ email: event.target.value })}
           />
         </div>
         <div className="flex flex-col gap-2 md:col-span-2">
-          <RequiredLabel required className="text-primary-text">آدرس</RequiredLabel>
           <CustomInput
             value={profileDraft.address}
             variant="primary"
@@ -339,7 +325,6 @@ export function UserProfilePanel() {
             maxLength={200}
             required
             invalid={showRequiredErrors && (profileDraft.address.trim().length < 5 || profileDraft.address.trim().length > 200)}
-            showLabel={false}
             aria-label="آدرس"
             onChange={(event) => updateProfileDraft({ address: event.target.value })}
           />

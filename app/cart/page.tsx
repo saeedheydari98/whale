@@ -8,7 +8,6 @@ import { CustomButton } from "../design-system/components/ui/button";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { CustomInput } from "../design-system/components/ui/input";
 import { CustomModal } from "../design-system/components/ui/modal";
-import { RequiredLabel } from "../design-system/components/ui/required-label";
 import {
   CART_UPDATED_EVENT,
   clearCart as clearCartData,
@@ -464,33 +463,28 @@ export default function CartPage() {
             </div>
             <div ref={profileFormRef} className="grid gap-3 md:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <RequiredLabel required className="text-primary-text">نام</RequiredLabel>
                 <CustomInput
                   value={profileDraft.firstName}
                   pattern="[\p{L}][\p{L}\s'-]{1,49}"
                   placeholder="نام"
                   required
                   invalid={showProfileRequiredErrors && !NAME_PATTERN.test(profileDraft.firstName.trim())}
-                  showLabel={false}
                   aria-label="نام"
                   onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <RequiredLabel required className="text-primary-text">نام خانوادگی</RequiredLabel>
                 <CustomInput
                   value={profileDraft.lastName}
                   pattern="[\p{L}][\p{L}\s'-]{1,49}"
                   placeholder="نام خانوادگی"
                   required
                   invalid={showProfileRequiredErrors && !NAME_PATTERN.test(profileDraft.lastName.trim())}
-                  showLabel={false}
                   aria-label="نام خانوادگی"
                   onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <RequiredLabel required className="text-primary-text">شماره تماس</RequiredLabel>
                 <CustomInput
                   value={profileDraft.phone}
                   pattern="09\d{9}"
@@ -498,27 +492,23 @@ export default function CartPage() {
                   placeholder="شماره تماس"
                   required
                   invalid={showProfileRequiredErrors && !PHONE_PATTERN.test(profileDraft.phone.trim())}
-                  showLabel={false}
                   inputMode="tel"
                   aria-label="شماره تماس"
                   onChange={(event) => updateProfileDraft({ phone: event.target.value })}
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <RequiredLabel className="text-primary-text">ایمیل</RequiredLabel>
                 <CustomInput
                   value={profileDraft.email}
                   type="email"
                   pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
                   placeholder="ایمیل اختیاری"
                   invalid={showProfileRequiredErrors && Boolean(profileDraft.email.trim()) && !EMAIL_PATTERN.test(profileDraft.email.trim())}
-                  showLabel={false}
                   aria-label="ایمیل"
                   onChange={(event) => updateProfileDraft({ email: event.target.value })}
                 />
               </div>
               <div className="flex flex-col gap-2 md:col-span-2">
-                <RequiredLabel required className="text-primary-text">آدرس</RequiredLabel>
                 <CustomInput
                   value={profileDraft.address}
                   placeholder="آدرس کامل"
@@ -526,7 +516,6 @@ export default function CartPage() {
                   maxLength={200}
                   required
                   invalid={showProfileRequiredErrors && (profileDraft.address.trim().length < 5 || profileDraft.address.trim().length > 200)}
-                  showLabel={false}
                   aria-label="آدرس"
                   onChange={(event) => updateProfileDraft({ address: event.target.value })}
                 />

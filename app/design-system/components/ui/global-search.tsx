@@ -178,7 +178,7 @@ export function GlobalSearch() {
             key={inputResetKey}
             id={INPUT_ID}
             name="product-search-query"
-            type="search"
+            type="text"
             value={value}
             onChange={handleSearchChange}
             placeholder="جست‌وجوی محصول…"
@@ -194,7 +194,7 @@ export function GlobalSearch() {
             showLabel={false}
             fullWidth={isOpen}
             rounded="full"
-            border="none"
+            border="base"
             className={
               isOpen
                 ? "h-10 px-7 text-sm"

@@ -172,10 +172,10 @@ function ProductModal({
             meta="نام، اسلاگ، برچسب و لینک دکمه"
             defaultOpen={!hasTitle}
           >
-            <CustomInput value={product.title} placeholder="نام" showLabel={false} invalid={hasRequiredError(titleErrorKey) && !product.title.trim()} onChange={(event) => onPatch({ title: event.target.value })} />
-            <CustomInput value={product.slug} placeholder="اسلاگ" showLabel={false} onChange={(event) => onPatch({ slug: event.target.value })} />
-            <CustomInput value={product.badge} placeholder="برچسب" showLabel={false} onChange={(event) => onPatch({ badge: event.target.value })} />
-            <CustomInput value={product.ctaHref} placeholder="لینک دکمه" showLabel={false} onChange={(event) => onPatch({ ctaHref: event.target.value })} />
+            <CustomInput value={product.title} placeholder="نام" invalid={hasRequiredError(titleErrorKey) && !product.title.trim()} onChange={(event) => onPatch({ title: event.target.value })} />
+            <CustomInput value={product.slug} placeholder="اسلاگ" onChange={(event) => onPatch({ slug: event.target.value })} />
+            <CustomInput value={product.badge} placeholder="برچسب" onChange={(event) => onPatch({ badge: event.target.value })} />
+            <CustomInput value={product.ctaHref} placeholder="لینک دکمه" onChange={(event) => onPatch({ ctaHref: event.target.value })} />
           </AdminModalSection>
 
           <AdminModalSection
@@ -188,14 +188,12 @@ function ProductModal({
             <CustomInput
               value={formatNumberWithCommas(product.originalPrice)}
               placeholder="قیمت قبل از تخفیف"
-              showLabel={false}
               inputMode="numeric"
               onChange={(event) => onPricingPatch({ originalPrice: event.target.value })}
             />
             <CustomInput
               value={formatNumberWithCommas(product.discountPrice)}
               placeholder="قیمت با تخفیف"
-              showLabel={false}
               inputMode="numeric"
               invalid={hasRequiredError(priceErrorKey) && !product.discountPrice.trim()}
               onChange={(event) => onPricingPatch({ discountPrice: event.target.value })}
@@ -223,7 +221,7 @@ function ProductModal({
               hasRequiredError={hasRequiredError}
               categoryErrorKey={categoryErrorKey}
             />
-            <CustomInput type="number" value={product.sortOrder} placeholder="ترتیب نمایش" showLabel={false} onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
+            <CustomInput type="number" value={product.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
           </AdminModalSection>
 
           <AdminModalSection
@@ -261,7 +259,7 @@ function ProductModal({
           >
             <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است. اولین تصویر روی کارت محصول نمایش داده می‌شود.</div>
             <div className="flex gap-2">
-              <CustomInput value={pendingImageUrl} placeholder="آدرس تصویر WebP" showLabel={false} onChange={(event) => setPendingImageUrl(event.target.value)} />
+              <CustomInput value={pendingImageUrl} placeholder="آدرس تصویر WebP" onChange={(event) => setPendingImageUrl(event.target.value)} />
               <CustomButton icon={<IoAdd />} onClick={addPendingImageUrl}>
                 <span>افزودن</span>
               </CustomButton>

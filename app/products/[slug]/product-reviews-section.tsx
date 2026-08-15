@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { IoCheckmarkCircle, IoChatbubbleEllipsesOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
+import { CustomInput } from "@/app/design-system/components/ui/input";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
 
 export type ProductReview = {
@@ -175,13 +176,16 @@ export function ProductReviewsSection({
               <div className="text-sm font-medium text-primary-text">
                 دیدگاه شما
               </div>
-              <textarea
+              <CustomInput
+                multiline
                 id="review-text"
                 aria-label="دیدگاه شما"
                 value={text}
                 onChange={(event) => onTextChange(event.target.value)}
                 placeholder="از کیفیت، ارزش خرید یا تجربه استفاده از این محصول بنویسید."
-                className="min-h-28 w-full resize-y rounded-lg border border-primary-border bg-primary-soft p-3 text-sm text-primary-text outline-none focus:border-primary"
+                rounded="lg"
+                className="min-h-28 text-sm"
+                style={{ backgroundColor: "var(--primary-soft)" }}
               />
             </div>
 

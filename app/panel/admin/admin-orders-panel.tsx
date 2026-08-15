@@ -430,7 +430,6 @@ export function AdminOrdersPanel() {
                       onChange={(event) => setTrackingDrafts((current) => ({ ...current, [order.id]: event.target.value }))}
                       placeholder="کد پیگیری پست"
                       aria-label="کد پیگیری پست"
-                      showLabel={false}
                       size="sm"
                       rounded="md"
                       disabled={loading}

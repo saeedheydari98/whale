@@ -5,10 +5,9 @@ import { IoCheckmarkSharp } from "react-icons/io5";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
-import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { getStockColorValue } from "@/app/design-system/components/ui/color-stock-dots";
-import { PRODUCT_COLOR_OPTIONS, STOCK_OPTIONS } from "../constants";
+import { PRODUCT_COLOR_OPTIONS } from "../constants";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
 import { normalizeColorStock } from "../utils";
 
@@ -29,6 +28,10 @@ function productColorLabel(color: string) {
   return PRODUCT_COLOR_LABELS[color] ?? color;
 }
 
+function normalizeStockCount(count: number) {
+  return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
+}
+
 type InventoryControlsProps = {
   product: ProductForm;
   onChange: (patch: Partial<ProductForm>) => void;
@@ -43,11 +46,10 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
   const selectedCount = Number(colorStock[selectedColor] ?? 0);
 
   const updateColorStock = (color: string, count: number) => {
-    const normalizedCount = Math.max(0, Math.round(Number(count)));
     onChange({
       colorStock: {
         ...colorStock,
-        [color]: normalizedCount,
+        [color]: normalizeStockCount(count),
       },
     });
   };
@@ -69,19 +71,17 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
           </span>
         </div>
         <div className="flex w-28 shrink-0">
-          <CustomSelect
+          <CustomInput
+            type="number"
+            min={0}
+            step={1}
             size="sm"
-            value={String(product.stockQuantity)}
+            value={product.stockQuantity}
+            placeholder="موجودی کل"
             aria-label="موجودی کل"
             className="h-8 py-1 text-xs"
-            onChange={(event) => onChange({ stockQuantity: Number(event.target.value) })}
-          >
-            {STOCK_OPTIONS.map((count) => (
-              <option key={count} value={count}>
-                {count}
-              </option>
-            ))}
-          </CustomSelect>
+            onChange={(event) => onChange({ stockQuantity: normalizeStockCount(Number(event.target.value)) })}
+          />
         </div>
       </div>
 
@@ -109,19 +109,17 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
 
         <div className="flex w-24 shrink-0 flex-col gap-1">
           <span className="truncate text-[11px] font-bold text-primary-text">{productColorLabel(selectedColor)}</span>
-          <CustomSelect
+          <CustomInput
+            type="number"
+            min={0}
+            step={1}
             size="sm"
-            value={String(selectedCount)}
+            value={selectedCount}
+            placeholder="تعداد"
             aria-label={`تعداد موجودی رنگ ${productColorLabel(selectedColor)}`}
             className="h-8 py-1 text-xs"
             onChange={(event) => updateColorStock(selectedColor, Number(event.target.value))}
-          >
-            {STOCK_OPTIONS.map((count) => (
-              <option key={count} value={count}>
-                {count}
-              </option>
-            ))}
-          </CustomSelect>
+          />
         </div>
       </div>
 
@@ -290,13 +288,12 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
     <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
       <div className="text-sm font-bold text-primary-text">جزئیات محصول</div>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <CustomInput value={product.manufactureYear} placeholder="سال تولید" showLabel={false} onChange={(event) => onChange({ manufactureYear: event.target.value })} />
+        <CustomInput value={product.manufactureYear} placeholder="سال تولید" onChange={(event) => onChange({ manufactureYear: event.target.value })} />
       </div>
       <div className="flex flex-col gap-2 sm:flex-row">
         <CustomInput
           value={product.weight}
           placeholder="وزن"
-          showLabel={false}
           inputMode="decimal"
           onChange={(event) => onChange({ weight: event.target.value })}
         />
@@ -305,21 +302,18 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
         <CustomInput
           value={product.length}
           placeholder="طول"
-          showLabel={false}
           inputMode="decimal"
           onChange={(event) => onChange({ length: event.target.value })}
         />
         <CustomInput
           value={product.width}
           placeholder="عرض"
-          showLabel={false}
           inputMode="decimal"
           onChange={(event) => onChange({ width: event.target.value })}
         />
         <CustomInput
           value={product.height}
           placeholder="ارتفاع"
-          showLabel={false}
           inputMode="decimal"
           onChange={(event) => onChange({ height: event.target.value })}
         />
@@ -328,7 +322,6 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
         <CustomInput
           value={product.sku}
           placeholder="کد کالا"
-          showLabel={false}
           onChange={(event) => onChange({ sku: event.target.value })}
         />
       </div>

@@ -332,7 +332,7 @@ export function AppHeader() {
         relative z-30 border-primary-border 
         bg-primary-panel backdrop-blur flex justify-center items-center 
         w-full transition-all duration-300
-        ${hideHeader ? 'h-0 -translate-y-full overflow-hidden border-b-0 border-transparent opacity-0' : 'h-20 translate-y-0 overflow-visible border-b opacity-100'}
+        ${hideHeader ? 'h-0 -translate-y-20 overflow-hidden border-b-0 border-transparent opacity-0' : 'h-20 translate-y-0 overflow-visible border-b opacity-100'}
       `}
     >
       <div className="relative flex justify-between items-center w-full gap-3 px-4">

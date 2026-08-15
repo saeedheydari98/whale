@@ -8,8 +8,8 @@ import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomInputElement = HTMLInputElement | HTMLTextAreaElement;
 
-type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'height' | 'onChange' | 'onBlur'> &
-  Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size' | 'height' | 'onChange' | 'onBlur'> & {
+type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'height' | 'onChange' | 'onBlur' | 'onFocus'> &
+  Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size' | 'height' | 'onChange' | 'onBlur' | 'onFocus'> & {
   variant?: UICommonVariant;
   size?: keyof typeof sizeVariants;
   rounded?: keyof typeof radiusVariants;
@@ -29,6 +29,7 @@ type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'
   height?: React.CSSProperties["height"];
   onChange?: React.ChangeEventHandler<CustomInputElement>;
   onBlur?: React.FocusEventHandler<CustomInputElement>;
+  onFocus?: React.FocusEventHandler<CustomInputElement>;
 };
 
 export function CustomInput({
@@ -54,6 +55,7 @@ export function CustomInput({
   style,
   onChange,
   onBlur,
+  onFocus,
   value,
   type,
   ...rest
@@ -61,14 +63,20 @@ export function CustomInput({
   const inputId = React.useId();
   const [showPassword, setShowPassword] = React.useState(false);
   const [numberDraft, setNumberDraft] = React.useState<string | null>(null);
+  const [isFocused, setIsFocused] = React.useState(false);
   const [hasUncontrolledValue, setHasUncontrolledValue] = React.useState(() => hasInputValue(rest.defaultValue));
   const colorStyle = resolveControlCssVars(variant);
   const glassBackground = resolveGlassBackground(colorStyle.backgroundColor, 74);
   const isDisabled = disabled || isLoading;
   const isPassword = !multiline && type === "password";
   const isNumber = !multiline && type === "number";
-  const labelText = label || String(rest["aria-label"] || rest.placeholder || "");
-  const visibleLabel = labelText;
+  const isSearchInput = !multiline && (
+    type === "search"
+    || rest.inputMode === "search"
+    || rest.enterKeyHint === "search"
+  );
+  const labelText = label || String(rest.placeholder || rest["aria-label"] || "");
+  const visibleLabel = showLabel && !isSearchInput ? labelText : "";
   const resolvedId = rest.id || inputId;
   const displayedValue = isNumber && numberDraft !== null ? numberDraft : value;
   const hasControlledValue = value !== undefined;
@@ -77,7 +85,7 @@ export function CustomInput({
     : hasControlledValue
       ? hasInputValue(value)
       : hasUncontrolledValue;
-  const shouldShowFloatingLabel = Boolean(visibleLabel && hasCurrentValue);
+  const shouldShowFloatingLabel = Boolean(visibleLabel && (isFocused || hasCurrentValue));
   const resolvedPlaceholder = shouldShowFloatingLabel ? "" : rest.placeholder;
   const resolvedHeightProp = height === "" ? undefined : height;
   const resolvedHeight = resolvedHeightProp ?? (multiline ? style?.height ?? "8rem" : undefined);
@@ -93,7 +101,11 @@ export function CustomInput({
     ...(resolvedHeight !== undefined ? { height: resolvedHeight } : {}),
   };
   const fieldsetStyle = {
-    borderColor: invalid ? "var(--danger-border-nomode)" : colorStyle.borderColor,
+    borderColor: invalid
+      ? "var(--danger-border-nomode)"
+      : isFocused
+        ? "var(--primary-border)"
+        : colorStyle.borderColor,
   };
   const handleChange = (event: React.ChangeEvent<CustomInputElement>) => {
     if (!hasControlledValue) setHasUncontrolledValue(hasInputValue(event.target.value));
@@ -105,8 +117,13 @@ export function CustomInput({
     onChange?.(event);
   };
   const handleBlur = (event: React.FocusEvent<CustomInputElement>) => {
+    setIsFocused(false);
     if (isNumber && numberDraft !== null) setNumberDraft(null);
     onBlur?.(event);
+  };
+  const handleFocus = (event: React.FocusEvent<CustomInputElement>) => {
+    setIsFocused(true);
+    onFocus?.(event);
   };
   const resolvedIconAfter = iconAfter ?? (isPassword ? (
     <button
@@ -136,7 +153,7 @@ export function CustomInput({
     className
   );
   const labelOffsetClass = icon !== undefined ? "right-10" : "right-3";
-  const legendOffsetClass = icon !== undefined ? "mr-9" : "mr-2";
+  const legendOffsetClass = icon !== undefined ? "mr-10" : "mr-3";
   const control = (
     <div
       className={cx(
@@ -156,6 +173,7 @@ export function CustomInput({
           placeholder={resolvedPlaceholder}
           onChange={handleChange}
           onBlur={handleBlur}
+          onFocus={handleFocus}
           aria-invalid={invalid || rest["aria-invalid"]}
           disabled={isDisabled}
           className={controlClassName}
@@ -170,6 +188,7 @@ export function CustomInput({
           placeholder={resolvedPlaceholder}
           onChange={handleChange}
           onBlur={handleBlur}
+          onFocus={handleFocus}
           aria-invalid={invalid || rest["aria-invalid"]}
           disabled={isDisabled}
           className={controlClassName}
@@ -182,20 +201,22 @@ export function CustomInput({
           "pointer-events-none absolute inset-0 z-0 min-w-0",
           radiusVariants[rounded],
           borderVariants[border],
-          invalid ? "peer-focus:ring-2 peer-focus:ring-danger-border-nomode" : "peer-focus:ring-2 peer-focus:ring-primary-border",
+          "peer-focus:border-2",
           motionVariants.smooth
         )}
         style={fieldsetStyle}
       >
-        <legend
-          className={cx(
-            "invisible h-3 max-w-0 overflow-hidden whitespace-nowrap px-0 text-[11px] font-bold leading-none text-primary transition-all duration-200",
-            shouldShowFloatingLabel && "max-w-[calc(100%-1.5rem)] px-1.5",
-            legendOffsetClass
-          )}
-        >
-          <span>{visibleLabel}</span>
-        </legend>
+        {visibleLabel ? (
+          <legend
+            className={cx(
+              "invisible h-3 max-w-0 overflow-hidden whitespace-nowrap px-0 text-[11px] font-bold leading-none text-primary transition-all duration-200",
+              shouldShowFloatingLabel && "max-w-[calc(100%-1.5rem)] px-1.5",
+              legendOffsetClass
+            )}
+          >
+            <span>{visibleLabel}</span>
+          </legend>
+        ) : null}
       </fieldset>
       {shouldShowFloatingLabel ? (
         <label
