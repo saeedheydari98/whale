@@ -1,9 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { apiOk, apiServerError } from "@/lib/api/response";
+import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getAuthUser, type AuthUser } from "@/lib/api/auth";
 import { validationError } from "@/lib/api/validation";
 import { profileSchema } from "@/lib/api/schemas";
+import { readWithRetry } from "@/lib/api/read-retry";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,12 +27,21 @@ type AppUserProfile = {
   isAdminUnlocked: boolean;
 };
 
+type AppUserCart = {
+  items: Array<{ quantity: number }>;
+};
+
+function normalizeThemeMode(value: unknown) {
+  return value === "dark" ? "dark" as const : "light" as const;
+}
+
 function appUserPayload(user: AuthUser, profile: AppUserProfile | null) {
   return {
     id: user.id,
     username: user.username,
     name: user.name,
     role: user.role,
+    themeMode: normalizeThemeMode(user.themeMode),
     profile,
   };
 }
@@ -41,20 +51,29 @@ export async function GET(request: Request) {
   if (limited) return limited;
 
   try {
-    const authUser = await getAuthUser(request);
+    const authUser = await readWithRetry(() => getAuthUser(request));
     const profilePromise = authUser
-      ? prisma.customerProfile.findFirst({
+      ? readWithRetry<AppUserProfile | null>(() => prisma.customerProfile.findFirst({
           where: { userId: authUser.id },
           select: appUserProfileSelect,
+        })).catch((error: unknown) => {
+          console.error("App user profile load error:", error);
+          return null;
         })
       : Promise.resolve(null);
     const cartPromise = authUser
-      ? prisma.cart.findFirst({
+      ? readWithRetry<AppUserCart | null>(() => prisma.cart.findFirst({
           where: { status: "active", profile: { userId: authUser.id } },
           select: { items: { select: { quantity: true } } },
+        })).catch((error: unknown) => {
+          console.error("App user cart load error:", error);
+          return null;
         })
       : Promise.resolve(null);
-    const [profile, cart] = await Promise.all([profilePromise, cartPromise]);
+    const [profile, cart] = await Promise.all([
+      profilePromise,
+      cartPromise,
+    ]);
     const cartItems = Array.isArray(cart?.items)
       ? cart.items as Array<{ quantity: number }>
       : [];
@@ -75,21 +94,52 @@ export async function PUT(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  return saveProfile(request);
+  const body = await request.json().catch(() => null);
+
+  if (body && typeof body === "object" && "themeMode" in body) {
+    return saveThemeMode(request, body.themeMode);
+  }
+
+  return saveProfile(request, body);
 }
 
-async function saveProfile(request: Request) {
+async function saveThemeMode(request: Request, value: unknown) {
+  const limited = rateLimit(request);
+  if (limited) return limited;
+  if (value !== "light" && value !== "dark") {
+    return apiFail("حالت نمایش نامعتبر است.", 400);
+  }
+
+  try {
+    const authUser = await readWithRetry(() => getAuthUser(request));
+    if (!authUser) return apiFail("برای ذخیره حالت نمایش باید وارد حساب شوید.", 401);
+
+    await prisma.$executeRaw`
+      UPDATE "User"
+      SET "themeMode" = ${value}, "updatedAt" = CURRENT_TIMESTAMP
+      WHERE "id" = ${authUser.id}
+    `;
+
+    return apiOk({ themeMode: normalizeThemeMode(value) });
+  } catch (error) {
+    console.error("User theme mode save error:", error);
+    return apiServerError();
+  }
+}
+
+async function saveProfile(request: Request, requestBody?: unknown) {
   const limited = rateLimit(request);
   if (limited) return limited;
 
-  const [body, authUser] = await Promise.all([
-    request.json().catch(() => null),
-    getAuthUser(request),
-  ]);
-  const parsed = profileSchema.safeParse(body?.profile ?? body);
-  if (!parsed.success) return validationError(parsed.error);
-
   try {
+    const [body, authUser] = await Promise.all([
+      requestBody === undefined ? request.json().catch(() => null) : Promise.resolve(requestBody),
+      readWithRetry(() => getAuthUser(request)),
+    ]);
+    const bodyValue = body && typeof body === "object" ? body as { profile?: unknown } : null;
+    const parsed = profileSchema.safeParse(bodyValue?.profile ?? body);
+    if (!parsed.success) return validationError(parsed.error);
+
     const profile = parsed.data;
     const existingProfile = authUser
       ? await prisma.customerProfile.findFirst({

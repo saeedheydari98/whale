@@ -354,6 +354,36 @@ textarea {
   text-align: inherit;
 }
 
+html[data-theme-ready="false"] [data-app-shell] {
+  visibility: hidden;
+}
+
+[data-theme-boot-loader] {
+  background-color: #f8fafc;
+  display: flex;
+}
+
+html[data-theme-ready="true"] [data-theme-boot-loader] {
+  display: none !important;
+}
+
+@keyframes themeBootBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.375rem); }
+}
+
+.theme-boot-dot {
+  animation: themeBootBounce 0.6s ease-in-out infinite;
+}
+
+.theme-boot-dot:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.theme-boot-dot:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
 .bg-primary-card {
   background-color: color-mix(in srgb, var(--primary-card) 78%, transparent);
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from "react";
 import { IoBagHandleOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 
 type ProductImageGalleryProps = {
@@ -17,6 +18,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false }: Pro
   const [activeIndex, setActiveIndex] = useState(0);
   const [snapDirection, setSnapDirection] = useState<GalleryMoveDirection | null>(null);
   const [isResettingRail, setIsResettingRail] = useState(false);
+  const [previewImage, setPreviewImage] = useState("");
   const resetFrameRef = useRef<number | null>(null);
   const images = useMemo(
     () => imageUrls.map((imageUrl) => String(imageUrl).trim()).filter(Boolean),
@@ -52,7 +54,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false }: Pro
     if (!direction) return;
     setSnapDirection((current) => current ?? direction);
   }, []);
-  const handleRailTransitionEnd = useCallback((event: TransitionEvent<HTMLDivElement>) => {
+  const handleRailTransitionEnd = useCallback((event: TransitionEvent<HTMLButtonElement>) => {
     if (event.target !== event.currentTarget || event.propertyName !== "transform" || !snapDirection) return;
 
     setIsResettingRail(true);
@@ -123,13 +125,18 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false }: Pro
         aria-roledescription="carousel"
         {...galleryDrag.dragHandlers}
       >
-        <div
+        <button
+          type="button"
           className={`flex h-full w-full will-change-transform ${shouldAnimateRail ? "transition-transform duration-300 ease-out" : ""}`}
           style={{
             direction: "ltr",
             transform: railTransform,
           }}
           onTransitionEnd={handleRailTransitionEnd}
+          onClick={() => {
+            if (!galleryDrag.shouldSuppressClick()) setPreviewImage(activeImage);
+          }}
+          aria-label="باز کردن تصویر محصول"
         >
           {visibleImages.map((imageUrl, index) => (
             <img
@@ -140,7 +147,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false }: Pro
               className="h-full w-full min-w-full flex-none object-cover"
             />
           ))}
-        </div>
+        </button>
       </div>
       {images.length > 1 ? (
         <div className="flex justify-center gap-2">
@@ -160,6 +167,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false }: Pro
           ))}
         </div>
       ) : null}
+      <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </div>
   );
 }

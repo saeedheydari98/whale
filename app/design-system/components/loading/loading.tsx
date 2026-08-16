@@ -141,24 +141,24 @@ export default function Loading({
         aria-busy="true"
         aria-live="polite"
         className={cx(
-          "fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col items-center justify-center text-primary-text",
+          "fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col items-center justify-center",
           loading === "fullscreen" ? "backdrop-blur-sm" : "",
           className
         )}
         style={{
-          backgroundColor: "var(--primary-base)",
+          backgroundColor: "#f8fafc",
         }}
       >
         <GiSpermWhale
           aria-label="وال"
           className="mb-4 h-24 w-24"
-          style={{ color: "color-mix(in srgb, var(--primary) 78%, var(--primary-text))" }}
+          style={{ color: "#0f6fbd" }}
         />
         <div className="flex items-center gap-2">
           {[
-            "color-mix(in srgb, var(--primary) 88%, var(--bg-base))",
-            "color-mix(in srgb, var(--primary) 68%, var(--bg-base))",
-            "color-mix(in srgb, var(--primary) 48%, var(--bg-base))",
+            "#0f6fbd",
+            "#4b93cc",
+            "#87b8de",
           ].map((color, i) => (
             <motion.div
               key={color}

@@ -5,6 +5,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
+import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import {
   EMPTY_PRODUCT_FILTERS,
@@ -196,20 +197,7 @@ export default function ShowcasePage() {
         </ProductListShell>
       </div>
 
-      {previewImage ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-0"
-          onClick={() => setPreviewImage("")}
-          aria-label="بستن تصویر"
-        >
-          <img
-            src={previewImage}
-            alt="تصویر"
-            className="max-h-screen max-w-full object-contain"
-          />
-        </button>
-      ) : null}
+      <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </main>
   );
 }

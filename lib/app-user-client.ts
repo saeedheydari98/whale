@@ -10,14 +10,14 @@ import {
   hasLocalCartSnapshot,
   readLocalCart,
 } from "@/lib/cart-client";
-import { fetchJsonDeduped } from "@/lib/fetch-json";
+import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
 export const APP_USER_UPDATED_EVENT = "app-user-updated";
 
 const APP_USER_CACHE_KEY = "app-user:v1";
 const LEGACY_APP_USER_CACHE_KEY = "app-global:v2";
 const APP_USER_CACHE_MS = Number.POSITIVE_INFINITY;
-const APP_USER_RETRY_DELAYS_MS = [200, 700] as const;
+const APP_USER_RETRY_DELAYS_MS = [250] as const;
 const APP_USER_SOFT_TIMEOUT_MS = 2500;
 
 export type AppClientProfile = {
@@ -30,6 +30,7 @@ export type AppClientProfile = {
 };
 
 export type AppClientUser = Omit<AuthClientUser, "avatarUrl" | "email" | "profile"> & {
+  themeMode: "light" | "dark";
   profile?: AppClientProfile | null;
 };
 
@@ -94,10 +95,12 @@ function normalizeAppUser(user: AuthClientUser | AppClientUser | null | undefine
     avatarUrl: _avatarUrl,
     email: _email,
     profile,
+    themeMode,
     ...safeUser
-  } = user as AuthClientUser & { avatarUrl?: unknown };
+  } = user as AuthClientUser & { avatarUrl?: unknown; themeMode?: unknown };
   return {
     ...safeUser,
+    themeMode: themeMode === "dark" ? "dark" : "light",
     profile: normalizeAppProfile(profile),
   };
 }
@@ -365,4 +368,39 @@ export function updateCachedAppUser(patch: Partial<AppUserData>) {
   writeUserCache(next);
   emitUserUpdated();
   return next;
+}
+
+export async function saveAppUserThemeMode(mode: "light" | "dark") {
+  const current = readAnyCachedUserData();
+  if (!current?.user) return;
+  const previousMode = current.user.themeMode;
+
+  updateCachedAppUser({
+    user: {
+      ...current.user,
+      themeMode: mode,
+    },
+  });
+
+  const response = await fetch("/api/app/user", {
+    method: "PATCH",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ themeMode: mode }),
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || payload?.ok === false) {
+    const latest = readAnyCachedUserData();
+    if (latest?.user) {
+      updateCachedAppUser({
+        user: {
+          ...latest.user,
+          themeMode: previousMode,
+        },
+      });
+    }
+    throw new Error(payload?.message || payload?.error || "ذخیره حالت نمایش ناموفق بود.");
+  }
+
+  invalidateFetchCache("/api/app/user");
 }

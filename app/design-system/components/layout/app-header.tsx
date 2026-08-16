@@ -131,7 +131,7 @@ function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount:
 export function AppHeader() {
   const { data: appUserData, refresh: refreshAppUser } = useAppUser();
   const { mode, setMode } = useTheme();
-  const hideHeader = useScrollHeaderHide(10);
+  const hideHeader = useScrollHeaderHide(24);
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -331,7 +331,7 @@ export function AppHeader() {
       className={`
         relative z-30 border-primary-border 
         bg-primary-panel backdrop-blur flex justify-center items-center 
-        w-full transition-all duration-300
+        w-full transition-[height,transform,opacity,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:duration-0
         ${hideHeader ? 'h-0 -translate-y-20 overflow-hidden border-b-0 border-transparent opacity-0' : 'h-20 translate-y-0 overflow-visible border-b opacity-100'}
       `}
     >

@@ -1,5 +1,6 @@
 import localFont from "next/font/local";
 import Script from "next/script";
+import { GiSpermWhale } from "react-icons/gi";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
 import { AppFooter } from "./design-system/components/layout/app-footer";
@@ -10,7 +11,12 @@ import { AppUserProvider } from "@/lib/app-user-context";
 import { AppThemeProvider } from "@/lib/app-theme-provider";
 import { createTheme } from "./design-system/theme/theme";
 import { generateCSSVariables } from "./design-system/theme/css-vars";
-import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./design-system/theme/storage";
+import {
+  APP_THEME_CACHE_TTL_MS,
+  APP_THEME_STORAGE_KEY,
+  DEVICE_THEME_MODE_STORAGE_KEY,
+  THEME_CSS_VARS_STORAGE_KEY,
+} from "./design-system/theme/storage";
 import { AppNotificationProvider } from "./design-system/components/feedback/notification-provider";
 
 const storeFont = localFont({
@@ -29,14 +35,14 @@ const storeFont = localFont({
 const initialThemeVariables = generateCSSVariables(
   createTheme(
     {
-      mode: "dark",
+      mode: "light",
       source: "developer",
       adminActive: true,
-      style: "dark",
+      style: "light",
     },
     {
       primary: "gray",
-      style: "dark",
+      style: "light",
     }
   )
 );
@@ -45,14 +51,23 @@ const initialThemeScript = `
 (function() {
   try {
     var root = document.documentElement;
+    var userCache = JSON.parse(localStorage.getItem("app-user:v1") || "null");
+    var cachedUser = userCache && userCache.data && userCache.data.user;
+    var themeCache = JSON.parse(localStorage.getItem("${APP_THEME_STORAGE_KEY}") || "null");
     var vars = JSON.parse(localStorage.getItem("${THEME_CSS_VARS_STORAGE_KEY}") || "{}");
-    if (vars && typeof vars === "object") {
-      Object.keys(vars).forEach(function(key) {
+    var variableKeys = vars && typeof vars === "object" ? Object.keys(vars) : [];
+    var themeCacheAge = themeCache && Number(themeCache.at) ? Date.now() - Number(themeCache.at) : Infinity;
+    var hasFreshTheme = themeCacheAge >= 0 && themeCacheAge < ${APP_THEME_CACHE_TTL_MS};
+    if (variableKeys.length > 0) {
+      variableKeys.forEach(function(key) {
         root.style.setProperty(key, String(vars[key]));
       });
+      if (hasFreshTheme) root.setAttribute("data-theme-ready", "true");
     }
-    var state = JSON.parse(localStorage.getItem("${THEME_STATE_STORAGE_KEY}") || "{}");
-    var mode = state && state.mode ? state.mode : localStorage.getItem("theme-mode");
+    var mode = cachedUser
+      ? (cachedUser.themeMode === "dark" ? "dark" : "light")
+      : localStorage.getItem("${DEVICE_THEME_MODE_STORAGE_KEY}");
+    if (mode !== "dark") mode = "light";
     root.classList.toggle("dark", mode === "dark");
   } catch (error) {}
 })();
@@ -64,17 +79,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className={storeFont.variable} style={initialThemeVariables} suppressHydrationWarning>
+    <html lang="fa" dir="rtl" className={storeFont.variable} style={initialThemeVariables} data-theme-ready="false" suppressHydrationWarning>
       <body className="h-[100dvh] overflow-hidden bg-primary-base text-right" dir="rtl">
         <Script id="theme-bootstrap" strategy="beforeInteractive">
           {initialThemeScript}
         </Script>
+        <div
+          data-theme-boot-loader
+          aria-busy="true"
+          aria-live="polite"
+          className="fixed inset-0 z-[10000] min-h-[100dvh] w-screen flex-col items-center justify-center gap-4"
+        >
+          <GiSpermWhale aria-label="وال" className="h-24 w-24 text-[#0f6fbd]" />
+          <div className="flex items-center gap-2" aria-hidden="true">
+            <span className="theme-boot-dot h-2 w-2 rounded-full bg-[#0f6fbd]" />
+            <span className="theme-boot-dot h-2 w-2 rounded-full bg-[#4b93cc]" />
+            <span className="theme-boot-dot h-2 w-2 rounded-full bg-[#87b8de]" />
+          </div>
+        </div>
         <AppThemeProvider>
           <AppUserProvider>
             <AppNotificationProvider>
               <CatalogQueryProvider>
                 <ProductsCatalogProvider>
-                  <div className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-primary-base text-primary-text">
+                  <div data-app-shell className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-primary-base text-primary-text">
                     <div className="shrink-0">
                       <AppHeader />
                     </div>

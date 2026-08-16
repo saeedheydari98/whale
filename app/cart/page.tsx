@@ -7,6 +7,7 @@ import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/i
 import { CustomButton } from "../design-system/components/ui/button";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { CustomInput } from "../design-system/components/ui/input";
+import { ImagePreview } from "../design-system/components/ui/image-preview";
 import { CustomModal } from "../design-system/components/ui/modal";
 import {
   CART_UPDATED_EVENT,
@@ -432,23 +433,7 @@ export default function CartPage() {
           </div>
         )}
 
-        <CustomModal
-          open={Boolean(previewImage)}
-          onClose={() => setPreviewImage("")}
-          title="تصویر محصول"
-          rounded="lg"
-          shadow="lg"
-        >
-          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-primary-base">
-            {previewImage && (
-              <img
-                src={previewImage}
-                alt="پیش‌نمایش تصویر محصول"
-                className="max-h-[75vh] w-full object-contain"
-              />
-            )}
-          </div>
-        </CustomModal>
+        <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
 
         <CustomModal
           open={isProfileModalOpen}

@@ -7,6 +7,7 @@ import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catal
 import { validationError } from "@/lib/api/validation";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 import { getProductDetail } from "@/lib/api/catalog-layer-service";
+import { readWithRetry } from "@/lib/api/read-retry";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,11 +15,14 @@ export const runtime = "nodejs";
 type Context = { params: Promise<{ id: string }> };
 
 async function getProductViewerState(productId: number, request: Request) {
-  const authUser = await getAuthUser(request);
+  const authUser = await readWithRetry(() => getAuthUser(request)).catch((error: unknown) => {
+    console.error("Product viewer auth load error:", error);
+    return null;
+  });
   if (!authUser) return { isPurchased: false, hasRated: false, userRating: null };
 
   const [purchased, previousRating] = await Promise.all([
-    prisma.orderItem.findFirst({
+    readWithRetry<{ id: string } | null>(() => prisma.orderItem.findFirst({
       where: {
         productId,
         order: {
@@ -27,14 +31,20 @@ async function getProductViewerState(productId: number, request: Request) {
         },
       },
       select: { id: true },
+    })).catch((error: unknown) => {
+      console.error("Product purchase state load error:", error);
+      return null;
     }),
-    prisma.comment.findFirst({
+    readWithRetry<{ id: string; rating: number | null } | null>(() => prisma.comment.findFirst({
       where: {
         productId,
         userId: authUser.id,
         rating: { not: null },
       },
       select: { id: true, rating: true },
+    })).catch((error: unknown) => {
+      console.error("Product rating state load error:", error);
+      return null;
     }),
   ]);
 

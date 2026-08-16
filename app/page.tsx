@@ -7,11 +7,14 @@ import CategoryOption from "./design-system/components/ui/category-option";
 import Loading from "./design-system/components/loading/loading";
 import { CustomEmptyState } from "./design-system/components/ui/empty-state";
 import { LazyViewportSection } from "./design-system/components/ui/lazy-viewport-section";
+import { ImagePreview } from "./design-system/components/ui/image-preview";
 import { BannerCarousel } from "./products/product-showcase/banner-carousel";
 import { getHomePageStructure, readCachedHomePageStructure, type ProductsCache } from "@/lib/products-client";
+import { useAppUser } from "@/lib/app-user-context";
 
 export default function Home() {
   const router = useRouter();
+  const { data: appUserData } = useAppUser();
   const structureQuery = useQuery({
     queryKey: ["catalog", "page-structure", "home"],
     queryFn: () => getHomePageStructure(),
@@ -62,12 +65,18 @@ export default function Home() {
   }, [banners, brandGroups, brands]);
   const loading = displaySections.length === 0 && structureLoading;
   const showWhaleLoading = loading && displaySections.length === 0;
+  const firstName = appUserData?.user?.profile?.firstName?.trim()
+    || appUserData?.user?.name?.trim().split(/\s+/)[0]
+    || "";
+  const welcomeText = firstName
+    ? `${firstName} عزیز به فروشگاه وال خوش آمدید`
+    : "به فروشگاه وال خوش آمدید";
 
   return (
     <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
-          <div className="text-3xl font-bold">به فروشگاه وال خوش آمدید</div>
+          <div className="text-3xl font-bold">{welcomeText}</div>
         </div>
 
         {showWhaleLoading ? (
@@ -161,16 +170,7 @@ export default function Home() {
         ) : null}
       </div>
 
-      {previewImage ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-0"
-          onClick={() => setPreviewImage("")}
-          aria-label="بستن تصویر بنر"
-        >
-          <img src={previewImage} alt="تصویر بنر" className="max-h-screen max-w-full object-contain" />
-        </button>
-      ) : null}
+      <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </main>
   );
 }

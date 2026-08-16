@@ -16,7 +16,7 @@ type ThemeConfig = {
 
 const defaultTheme: ThemeConfig = {
   primary: "gray",
-  style: "dark",
+  style: "light",
 };
 
 const THEME_SERVER_CACHE_MS = 30_000;

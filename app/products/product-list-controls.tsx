@@ -297,7 +297,7 @@ export function ProductListShell({
             <CustomInput
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="جست‌وجوی محصول…"
+              placeholder="جستجو..."
               aria-label="جست‌وجوی محصول"
               showLabel={false}
               fullWidth={false}

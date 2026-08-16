@@ -181,7 +181,7 @@ export function GlobalSearch() {
             type="text"
             value={value}
             onChange={handleSearchChange}
-            placeholder="جست‌وجوی محصول…"
+            placeholder="جستجو..."
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="none"

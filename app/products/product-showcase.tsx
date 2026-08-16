@@ -13,7 +13,7 @@ import { getProducts, getProductsPageStructure, getShowcaseProducts, isProductAv
 import { resolveLoadingItemCount, useLoadingViewportCount } from "../design-system/components/loading/loading-count";
 import Loading from "../design-system/components/loading/loading";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
-import { CustomModal } from "../design-system/components/ui/modal";
+import { ImagePreview } from "../design-system/components/ui/image-preview";
 import { LazyViewportSection } from "../design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
 import { ShowcaseSection } from "./product-showcase/showcase-section";
@@ -517,37 +517,8 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
         </div>
         ) : null}
 
-        <CustomModal
-          open={Boolean(previewImage)}
-          onClose={() => setPreviewImage("")}
-          title="تصویر محصول"
-          rounded="lg"
-          shadow="lg"
-        >
-          <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-primary-base">
-            {previewImage && (
-              <img
-                src={previewImage}
-                alt="پیش‌نمایش تصویر محصول"
-                className="max-h-[75vh] w-full object-contain"
-              />
-            )}
-          </div>
-        </CustomModal>
-        {bannerPreviewImage ? (
-          <button
-            type="button"
-            className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-0"
-            onClick={() => setBannerPreviewImage("")}
-            aria-label="بستن تصویر بنر"
-          >
-            <img
-              src={bannerPreviewImage}
-              alt="تصویر بنر"
-              className="max-h-screen max-w-full object-contain"
-            />
-          </button>
-        ) : null}
+        <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
+        <ImagePreview imageUrl={bannerPreviewImage} onClose={() => setBannerPreviewImage("")} />
       </section>
     </Root>
   );

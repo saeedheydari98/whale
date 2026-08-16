@@ -17,6 +17,7 @@ import {
   syncCachedCartCount,
   type AppUserData,
 } from "@/lib/app-user-client";
+import { useAppThemeReady } from "@/lib/app-theme-provider";
 
 type AppUserContextValue = {
   data: AppUserData | null;
@@ -27,6 +28,7 @@ type AppUserContextValue = {
 const AppUserContext = createContext<AppUserContextValue | null>(null);
 
 export function AppUserProvider({ children }: { children: ReactNode }) {
+  const themeReady = useAppThemeReady();
   const [data, setData] = useState<AppUserData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +41,8 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!themeReady) return;
+
     let cancelled = false;
     const cached = readCachedAppUser({ allowStale: true });
     if (cached) {
@@ -79,7 +83,7 @@ export function AppUserProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("storage", syncCached);
       window.removeEventListener(CART_UPDATED_EVENT, syncCartCount);
     };
-  }, []);
+  }, [themeReady]);
 
   const value = useMemo(() => ({ data, loading, refresh }), [data, loading, refresh]);
 

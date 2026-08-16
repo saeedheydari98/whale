@@ -1,15 +1,10 @@
 "use client";
 
-import { fetchAppUser } from "@/lib/app-user-client";
+import { fetchAppTheme } from "@/lib/app-theme-client";
 
 export async function getPageBootstrap<TPage>(
-  loadPageStructure: () => Promise<TPage>,
-  options?: { forceUser?: boolean }
+  loadPageStructure: () => Promise<TPage>
 ) {
-  const [user, page] = await Promise.all([
-    fetchAppUser({ force: options?.forceUser }),
-    loadPageStructure(),
-  ]);
-
-  return { user, page };
+  await fetchAppTheme();
+  return { page: await loadPageStructure() };
 }

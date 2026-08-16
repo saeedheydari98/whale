@@ -8,7 +8,9 @@ import {
   readCachedAppTheme,
   type AppThemeData,
 } from "@/lib/app-theme-client";
-import { useLayoutEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
+
+const AppThemeReadyContext = createContext(false);
 
 function hasSameTheme(first: AppThemeData, second: AppThemeData) {
   return first.primary === second.primary && first.style === second.style;
@@ -16,6 +18,7 @@ function hasSameTheme(first: AppThemeData, second: AppThemeData) {
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [adminTheme, setAdminTheme] = useState<AppThemeData>(() => fallbackAppTheme);
+  const [themeReady, setThemeReady] = useState(false);
 
   useLayoutEffect(() => {
     let cancelled = false;
@@ -26,9 +29,25 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     };
 
     const cached = readCachedAppTheme({ allowStale: true });
+    const fresh = readCachedAppTheme();
     if (cached) applyTheme(cached);
 
-    void fetchAppTheme({ force: !cached }).then((next) => applyTheme(next));
+    const revealTheme = () => {
+      if (cancelled) return;
+      window.requestAnimationFrame(() => {
+        if (cancelled) return;
+        document.documentElement.setAttribute("data-theme-ready", "true");
+        setThemeReady(true);
+      });
+    };
+
+    if (fresh) {
+      revealTheme();
+    } else {
+      void fetchAppTheme({ force: true, timeoutMs: 0 })
+        .then((next) => applyTheme(next))
+        .finally(revealTheme);
+    }
 
     const syncCachedTheme = () => {
       const next = readCachedAppTheme({ allowStale: true });
@@ -46,8 +65,14 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ThemeProvider initialAdminTheme={adminTheme}>
-      {children}
-    </ThemeProvider>
+    <AppThemeReadyContext.Provider value={themeReady}>
+      <ThemeProvider initialAdminTheme={adminTheme}>
+        {children}
+      </ThemeProvider>
+    </AppThemeReadyContext.Provider>
   );
+}
+
+export function useAppThemeReady() {
+  return useContext(AppThemeReadyContext);
 }

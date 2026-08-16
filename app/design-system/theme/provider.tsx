@@ -13,13 +13,23 @@ import React, {
 import { applyCSSVariables } from "./engine";
 import { generateCSSVariables } from "./css-vars";
 import { createTheme, ThemeStyle } from "./theme";
-import { THEME_CSS_VARS_STORAGE_KEY, THEME_STATE_STORAGE_KEY } from "./storage";
+import {
+  APP_THEME_STORAGE_KEY,
+  DEVICE_THEME_MODE_STORAGE_KEY,
+  THEME_CSS_VARS_STORAGE_KEY,
+  THEME_STATE_STORAGE_KEY,
+} from "./storage";
 import {
   fallbackAppTheme,
   normalizeAppTheme,
   saveAppTheme,
   type AppThemeData,
 } from "@/lib/app-theme-client";
+import {
+  APP_USER_UPDATED_EVENT,
+  readCachedAppUser,
+  saveAppUserThemeMode,
+} from "@/lib/app-user-client";
 
 type ThemeMode = "light" | "dark";
 
@@ -43,31 +53,29 @@ type ThemeContextType = {
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-const APP_THEME_CACHE_KEY = "app-theme:v1";
-
 function isThemeMode(value: unknown): value is ThemeMode {
   return value === "light" || value === "dark";
 }
 
 function readStoredMode(): ThemeMode {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
+
+  const cachedUser = readCachedAppUser({ allowStale: true });
+  if (cachedUser?.user) return cachedUser.user.themeMode;
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(THEME_STATE_STORAGE_KEY) || "null") as {
-      mode?: unknown;
-    } | null;
-    if (parsed?.mode && isThemeMode(parsed.mode)) return parsed.mode;
+    const deviceMode = localStorage.getItem(DEVICE_THEME_MODE_STORAGE_KEY);
+    if (isThemeMode(deviceMode)) return deviceMode;
   } catch {
   }
 
-  const legacyMode = localStorage.getItem("theme-mode");
-  return isThemeMode(legacyMode) ? legacyMode : "dark";
+  return "light";
 }
 
 function readCachedGlobalTheme(initialAdminTheme?: unknown): AdminThemeConfig {
   if (typeof window !== "undefined") {
     try {
-      const parsed = JSON.parse(localStorage.getItem(APP_THEME_CACHE_KEY) || "null") as {
+      const parsed = JSON.parse(localStorage.getItem(APP_THEME_STORAGE_KEY) || "null") as {
         data?: Partial<AdminThemeConfig>;
       } | null;
       if (parsed?.data) {
@@ -132,7 +140,7 @@ export function ThemeProvider({
 }) {
   const hydratedThemeRef = useRef(false);
   const skipThemeStateApplyRef = useRef(true);
-  const [mode, setModeState] = useState<ThemeMode>("dark");
+  const [mode, setModeState] = useState<ThemeMode>("light");
   const [style, setStyle] = useState<ThemeStyle>(fallbackAppTheme.style);
   const [adminTheme, setAdminTheme] = useState<AdminThemeConfig>(fallbackAppTheme);
 
@@ -175,23 +183,32 @@ export function ThemeProvider({
   }, [adminTheme, mode, style, theme]);
 
   useEffect(() => {
+    const syncUserMode = () => setModeState(readStoredMode());
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === "theme-mode" || event.key === THEME_STATE_STORAGE_KEY) {
+      if (
+        event.key === DEVICE_THEME_MODE_STORAGE_KEY
+        || event.key === "theme-mode"
+        || event.key === THEME_STATE_STORAGE_KEY
+      ) {
         setModeState(readStoredMode());
         return;
       }
 
-      if (event.key === APP_THEME_CACHE_KEY) {
+      if (event.key === APP_THEME_STORAGE_KEY) {
         const nextAdminTheme = readCachedGlobalTheme();
         setAdminTheme(nextAdminTheme);
         setStyle(nextAdminTheme.style);
       }
+
+      if (event.key === "app-user:v1") syncUserMode();
     };
 
     window.addEventListener("storage", handleStorage);
+    window.addEventListener(APP_USER_UPDATED_EVENT, syncUserMode);
 
     return () => {
       window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(APP_USER_UPDATED_EVENT, syncUserMode);
     };
   }, []);
 
@@ -215,6 +232,19 @@ export function ThemeProvider({
 
   const setMode = useCallback((next: ThemeMode) => {
     setModeState(next);
+    const cachedUser = readCachedAppUser({ allowStale: true });
+
+    if (cachedUser?.user) {
+      void saveAppUserThemeMode(next).catch((error) => {
+        console.error("Failed to save user theme mode:", error);
+      });
+      return;
+    }
+
+    try {
+      localStorage.setItem(DEVICE_THEME_MODE_STORAGE_KEY, next);
+    } catch {
+    }
   }, []);
 
   const contextValue = useMemo(

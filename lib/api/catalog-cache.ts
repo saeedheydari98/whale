@@ -1,4 +1,5 @@
 import { publishCatalogSyncEvent } from "@/lib/api/catalog-sync";
+import { readWithRetry } from "@/lib/api/read-retry";
 
 type CacheEntry = {
   value: unknown;
@@ -122,7 +123,7 @@ export async function withCatalogCache<T>(
   ttlSeconds: number,
   loader: () => Promise<T>
 ): Promise<T> {
-  if (ttlSeconds <= 0) return loader();
+  if (ttlSeconds <= 0) return readWithRetry(loader);
 
   const now = Date.now();
   const state = getCatalogCacheState();
@@ -167,7 +168,8 @@ export async function withCatalogCache<T>(
   const pending = state.inflight.get(key);
   if (pending) return pending as Promise<T>;
 
-  const task = loader()
+  const staleValue = memoryEntry?.value as T | undefined;
+  const task = readWithRetry(loader)
     .then(async (value) => {
       state.memory.set(key, {
         value,
@@ -176,6 +178,10 @@ export async function withCatalogCache<T>(
       });
       await redisCommand("SET", [key, JSON.stringify(value), "EX", String(ttlSeconds)]);
       return value;
+    })
+    .catch((error) => {
+      if (staleValue !== undefined) return staleValue;
+      throw error;
     })
     .finally(() => {
       state.inflight.delete(key);

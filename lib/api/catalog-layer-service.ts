@@ -787,7 +787,7 @@ async function findBrand(identifier: string) {
 async function findShowcase(identifier: string) {
   const decoded = decodeCatalogIdentifier(identifier);
   const slug = slugifyCatalogValue(decoded);
-  const showcases = await prisma.showcase.findMany({
+  const direct = await prisma.showcase.findFirst({
     where: {
       OR: [
         { id: decoded },
@@ -795,6 +795,9 @@ async function findShowcase(identifier: string) {
       ],
     },
   });
+  if (direct) return direct;
+
+  const showcases = await prisma.showcase.findMany();
 
   return showcases.find((showcase: { id: string; title: string | null }) =>
     showcase.id === decoded

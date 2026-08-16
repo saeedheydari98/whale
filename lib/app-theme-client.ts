@@ -1,14 +1,17 @@
 "use client";
 
 import type { ThemeColorKey, ThemeStyle } from "@/app/design-system/theme/theme";
+import {
+  APP_THEME_CACHE_TTL_MS,
+  APP_THEME_STORAGE_KEY,
+} from "@/app/design-system/theme/storage";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
 
 export const APP_THEME_UPDATED_EVENT = "app-theme-updated";
 
 const APP_THEME_API_URL = "/api/theme";
 const APP_THEME_ADMIN_API_URL = "/api/admin/theme";
-const APP_THEME_CACHE_KEY = "app-theme:v1";
-const APP_THEME_CACHE_MS = Number.POSITIVE_INFINITY;
+const APP_THEME_CACHE_MS = APP_THEME_CACHE_TTL_MS;
 const APP_THEME_RETRY_DELAYS_MS = [150] as const;
 const APP_THEME_SOFT_TIMEOUT_MS = 1500;
 
@@ -30,7 +33,7 @@ let pendingTheme: Promise<AppThemeData> | null = null;
 
 export const fallbackAppTheme: AppThemeData = {
   primary: "gray",
-  style: "dark",
+  style: "light",
 };
 
 function isThemeStyle(value: unknown): value is ThemeStyle {
@@ -83,7 +86,7 @@ function readStoredThemeFallback(): AppThemeData | null {
   if (typeof window === "undefined") return null;
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(APP_THEME_CACHE_KEY) || "null") as CachedThemeData | null;
+    const parsed = JSON.parse(localStorage.getItem(APP_THEME_STORAGE_KEY) || "null") as CachedThemeData | null;
     if (parsed?.data) return normalizeAppTheme(parsed.data);
   } catch {
   }
@@ -95,7 +98,7 @@ function readLocalThemeCache() {
   if (typeof window === "undefined") return null;
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(APP_THEME_CACHE_KEY) || "null") as CachedThemeData | null;
+    const parsed = JSON.parse(localStorage.getItem(APP_THEME_STORAGE_KEY) || "null") as CachedThemeData | null;
     if (!parsed || typeof parsed !== "object") return null;
     return {
       at: Number(parsed.at) || 0,
@@ -119,7 +122,7 @@ function writeThemeCache(data: AppThemeData) {
 
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(APP_THEME_CACHE_KEY, JSON.stringify(cached));
+    localStorage.setItem(APP_THEME_STORAGE_KEY, JSON.stringify(cached));
   } catch {
   }
 }
@@ -129,6 +132,8 @@ function fallbackFromCache() {
 }
 
 function withSoftTimeout<T>(task: Promise<T>, ms: number, fallback: () => T | Promise<T>) {
+  if (ms <= 0) return task;
+
   let timeout: ReturnType<typeof setTimeout> | null = null;
   const timer = new Promise<T>((resolve) => {
     timeout = setTimeout(() => {

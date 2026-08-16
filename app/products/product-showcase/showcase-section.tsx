@@ -5,6 +5,7 @@ import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import ProductRatingSummary from "@/app/design-system/components/ui/product-rating-summary";
+import { ProductCardBadge } from "@/app/design-system/components/ui/product-card-badge";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 import { CustomButton } from "../../design-system/components/ui/button";
 import ShowcaseLink from "../../design-system/components/ui/ShowcaseLink";
@@ -60,10 +61,11 @@ export function ProductShowcaseCard({
 
   return (
     <article
-      className={`flex min-h-40 min-w-72 max-w-72 shrink-0 flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
+      className={`relative flex min-h-40 min-w-72 max-w-72 shrink-0 flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
         isLoading ? "border-border-default" : "border-primary-border"
       }`}
     >
+      {!isLoading ? <ProductCardBadge label={product?.badge} /> : null}
       <div className="flex min-h-28 flex-1 gap-3 p-3">
         <button
           type="button"
@@ -86,13 +88,6 @@ export function ProductShowcaseCard({
               )}
             </div>
           </Loading>
-          {product?.badge && !isLoading ? (
-            <div className="absolute left-2 top-2">
-              <CustomTag size="xs" rounded="full">
-                <span>{product.badge}</span>
-              </CustomTag>
-            </div>
-          ) : null}
         </button>
 
         <div className="flex min-w-0 flex-1 flex-col gap-2">

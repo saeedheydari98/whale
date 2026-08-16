@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
-import { CustomModal } from "@/app/design-system/components/ui/modal";
+import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { addProductToCart } from "@/lib/cart-client";
 import { normalizeColorStock, type ProductRecord } from "@/lib/products-client";
 import {
@@ -128,23 +128,7 @@ export function ProductListingPage({
           />
         </ProductListShell>
       </div>
-      <CustomModal
-        open={Boolean(previewImage)}
-        onClose={() => setPreviewImage("")}
-        title="تصویر محصول"
-        rounded="lg"
-        shadow="lg"
-      >
-        <div className="flex max-h-[75vh] items-center justify-center overflow-hidden rounded-md bg-primary-base">
-          {previewImage ? (
-            <img
-              src={previewImage}
-              alt="پیش نمایش تصویر محصول"
-              className="max-h-[75vh] w-full object-contain"
-            />
-          ) : null}
-        </div>
-      </CustomModal>
+      <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </main>
   );
 }

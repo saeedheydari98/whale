@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { IoCheckmarkCircleOutline, IoPersonCircleOutline, IoReceiptOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
+import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
 import { AUTH_USER_UPDATED_EVENT } from "@/lib/auth-client";
 import { formatPlainPrice } from "@/lib/price-format";
@@ -69,6 +70,7 @@ function fetchUserOrdersOnce() {
 
 function UserOrdersPanel() {
   const [orders, setOrders] = useState<UserOrder[]>(() => cachedUserOrders ?? []);
+  const [previewImage, setPreviewImage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -117,13 +119,19 @@ function UserOrdersPanel() {
                 className="flex w-full max-w-sm flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                  <button
+                    type="button"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+                    onClick={() => item.imageUrl ? setPreviewImage(item.imageUrl) : undefined}
+                    disabled={!item.imageUrl}
+                    aria-label="باز کردن تصویر محصول"
+                  >
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-xs text-primary-text">بدون تصویر</span>
                     )}
-                  </div>
+                  </button>
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className="text-sm font-bold text-primary-text">{item.title}</span>
                     <span className="text-xs text-primary-text">
@@ -160,6 +168,7 @@ function UserOrdersPanel() {
           )}
         </div>
       )}
+      <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </section>
   );
 }

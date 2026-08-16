@@ -98,7 +98,7 @@ export function ProductsSection({
         <CustomInput
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="جستجو در محصولات"
+          placeholder="جستجو..."
           aria-label="جستجو در محصولات"
           showLabel={false}
           fullWidth={false}

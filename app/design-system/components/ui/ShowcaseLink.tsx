@@ -1,5 +1,5 @@
 import React from "react";
-import { slugifyCatalogValue } from "@/lib/products-client";
+import { encodeCatalogSegment } from "@/lib/products-client";
 import { CustomButton } from "./button";
 import type { UICommonVariant } from "../../variants/ui.variant";
 import {
@@ -26,7 +26,6 @@ type Props = {
 
 export default function ShowcaseLink({
   showcaseId,
-  showcaseTitle,
   children,
   variant = "primary",
   size = "sm",
@@ -37,8 +36,7 @@ export default function ShowcaseLink({
   fullWidth,
   className,
 }: Props) {
-  const slug = slugifyCatalogValue(showcaseTitle || showcaseId);
-  const href = `/products/showcase/${slug || showcaseId}`;
+  const href = `/products/showcase/${encodeCatalogSegment(showcaseId)}`;
 
   return (
     <CustomButton

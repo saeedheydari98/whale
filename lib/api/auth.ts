@@ -11,6 +11,7 @@ export type AuthUser = {
   name: string | null;
   role: string;
   avatarUrl: string | null;
+  themeMode?: string | null;
 };
 
 const ACCESS_COOKIE = "accessToken";
@@ -96,6 +97,7 @@ export function publicUser(user: AuthUser) {
     name: user.name,
     role: user.role,
     avatarUrl: user.avatarUrl,
+    themeMode: user.themeMode === "dark" ? "dark" : "light",
   };
 }
 
@@ -112,11 +114,16 @@ async function normalizeRole(user: AuthUser) {
 }
 
 async function findPublicUser(id: number) {
-  const user = await prisma.user.findUnique({
-    where: { id },
-    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
-  });
-  return user ? normalizeRole(user) : null;
+  const users = await prisma.$queryRaw<AuthUser[]>`
+    SELECT "id", "email", "username", "name", "role", "avatarUrl", "themeMode"
+    FROM "User"
+    WHERE "id" = ${id}
+    LIMIT 1
+  `;
+  const user = users[0];
+  if (!user) return null;
+
+  return normalizeRole(user);
 }
 
 function bearerToken(request: Request) {
@@ -144,10 +151,13 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
       return null;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: refreshUserId },
-      select: { id: true, email: true, username: true, name: true, role: true, refreshTokenHash: true, avatarUrl: true },
-    });
+    const users = await prisma.$queryRaw<Array<AuthUser & { refreshTokenHash: string | null }>>`
+      SELECT "id", "email", "username", "name", "role", "refreshTokenHash", "avatarUrl", "themeMode"
+      FROM "User"
+      WHERE "id" = ${refreshUserId}
+      LIMIT 1
+    `;
+    const user = users[0];
     if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return null;
 
     const normalizedUser = await normalizeRole(user);
@@ -161,6 +171,7 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
       name: normalizedUser.name,
       role: normalizedUser.role,
       avatarUrl: normalizedUser.avatarUrl,
+      themeMode: normalizedUser.themeMode,
     };
   } catch (error) {
     console.error("Auth user load error:", error);

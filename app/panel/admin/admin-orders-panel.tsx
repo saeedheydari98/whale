@@ -7,6 +7,7 @@ import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-s
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { formatPersianDate as formatDate } from "@/lib/date-format";
 import { formatPlainPrice, toLatinDigits } from "@/lib/price-format";
@@ -181,6 +182,7 @@ function getDateBound(value: string, endOfDay = false) {
 }
 
 export function AdminOrdersPanel() {
+  const [previewImage, setPreviewImage] = useState("");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -306,7 +308,7 @@ export function AdminOrdersPanel() {
           <CustomInput
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="جستجو در خریدها"
+            placeholder="جستجو..."
             aria-label="جستجو در خریدها"
             showLabel={false}
             fullWidth={false}
@@ -369,13 +371,19 @@ export function AdminOrdersPanel() {
               >
                 <div className="flex items-center gap-2.5">
                   <Loading loading="skeleton-item" isLoading={loading} className="h-12 w-12 shrink-0">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                    <button
+                      type="button"
+                      className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+                      onClick={() => item.imageUrl ? setPreviewImage(item.imageUrl) : undefined}
+                      disabled={loading || !item.imageUrl}
+                      aria-label="باز کردن تصویر محصول"
+                    >
                       {item.imageUrl ? (
                         <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
                       ) : (
                         <span className="text-[10px] text-secondary-text">بدون تصویر</span>
                       )}
-                    </div>
+                    </button>
                   </Loading>
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <Loading loading="skeleton-item" isLoading={loading}>
@@ -465,6 +473,7 @@ export function AdminOrdersPanel() {
           })}
         </div>
       ) : null}
+      <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </section>
   );
 }

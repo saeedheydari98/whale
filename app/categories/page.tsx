@@ -7,6 +7,7 @@ import CategoryOption from "@/app/design-system/components/ui/category-option";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { LazyViewportSection } from "@/app/design-system/components/ui/lazy-viewport-section";
+import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import { getCategoriesPageStructure, readCachedCategoriesPageStructure, slugifyCatalogValue, type ProductsCache } from "@/lib/products-client";
 
@@ -175,16 +176,7 @@ export default function CategoriesPage() {
         ) : null}
       </div>
 
-      {previewImage ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/80 p-0"
-          onClick={() => setPreviewImage("")}
-          aria-label="بستن تصویر بنر"
-        >
-          <img src={previewImage} alt="تصویر بنر" className="max-h-screen max-w-full object-contain" />
-        </button>
-      ) : null}
+      <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </main>
   );
 }

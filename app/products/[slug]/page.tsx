@@ -21,6 +21,7 @@ import Loading from "@/app/design-system/components/loading/loading";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import { ProductImageGallery } from "./product-image-gallery";
 import ColorStockDots from "@/app/design-system/components/ui/color-stock-dots";
+import { ProductCardBadge } from "@/app/design-system/components/ui/product-card-badge";
 
 const LOADING_PRODUCT: ProductRecord = {
   id: "loading-product",
@@ -359,23 +360,14 @@ export default function ProductPage() {
         ) : null}
 
         <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
-          <section className="flex w-full flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:w-[42rem] lg:max-w-[42rem] lg:shrink-0">
+          <section className="relative flex w-full flex-col gap-6 overflow-hidden rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:w-[42rem] lg:max-w-[42rem] lg:shrink-0">
+            {!catalogLoading ? <ProductCardBadge label={product.badge} /> : null}
             <div className="flex w-full flex-col gap-4">
               <ProductImageGallery imageUrls={productGalleryImages} title={product.title} isLoading={catalogLoading} />
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
               <div className="flex flex-col gap-3">
-                {product.badge || catalogLoading ? (
-                  <div>
-                    <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                      <CustomTag size="xs" rounded="full" >
-                        <span>{product.badge || "ویژه"}</span>
-                      </CustomTag>
-                    </Loading>
-                  </div>
-                ) : null}
-
               <Loading loading="skeleton-item" isLoading={catalogLoading}>
                 <div className="text-3xl font-bold leading-tight text-primary-text">{product.title}</div>
               </Loading>
