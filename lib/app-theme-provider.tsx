@@ -18,6 +18,7 @@ function hasSameTheme(first: AppThemeData, second: AppThemeData) {
 
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [adminTheme, setAdminTheme] = useState<AppThemeData>(() => fallbackAppTheme);
+  const [themeResolved, setThemeResolved] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
 
   useLayoutEffect(() => {
@@ -32,21 +33,14 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     const fresh = readCachedAppTheme();
     if (cached) applyTheme(cached);
 
-    const revealTheme = () => {
-      if (cancelled) return;
-      window.requestAnimationFrame(() => {
-        if (cancelled) return;
-        document.documentElement.setAttribute("data-theme-ready", "true");
-        setThemeReady(true);
-      });
-    };
-
     if (fresh) {
-      revealTheme();
+      setThemeResolved(true);
     } else {
       void fetchAppTheme({ force: true, timeoutMs: 0 })
-        .then((next) => applyTheme(next))
-        .finally(revealTheme);
+        .then((next) => {
+          applyTheme(next);
+          if (!cancelled) setThemeResolved(true);
+        });
     }
 
     const syncCachedTheme = () => {
@@ -63,6 +57,16 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("storage", syncCachedTheme);
     };
   }, []);
+
+  useLayoutEffect(() => {
+    if (!themeResolved) return;
+
+    // This parent layout effect runs after ThemeProvider has synchronously
+    // applied the resolved palette, so no fallback-colored frame is revealed.
+    document.documentElement.setAttribute("data-theme-color-ready", "true");
+    document.documentElement.setAttribute("data-theme-ready", "true");
+    setThemeReady(true);
+  }, [themeResolved]);
 
   return (
     <AppThemeReadyContext.Provider value={themeReady}>

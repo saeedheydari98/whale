@@ -361,6 +361,11 @@ html[data-theme-ready="false"] [data-app-shell] {
 [data-theme-boot-loader] {
   background-color: var(--bg-base);
   display: flex;
+  visibility: hidden;
+}
+
+html[data-theme-color-ready="true"] [data-theme-boot-loader] {
+  visibility: visible;
 }
 
 .whale-loader-surface {

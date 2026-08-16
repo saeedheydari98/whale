@@ -58,11 +58,12 @@ const initialThemeScript = `
     var variableKeys = vars && typeof vars === "object" ? Object.keys(vars) : [];
     var themeCacheAge = themeCache && Number(themeCache.at) ? Date.now() - Number(themeCache.at) : Infinity;
     var hasFreshTheme = themeCacheAge >= 0 && themeCacheAge < ${APP_THEME_CACHE_TTL_MS};
-    if (variableKeys.length > 0) {
+    if (hasFreshTheme && variableKeys.length > 0) {
       variableKeys.forEach(function(key) {
         root.style.setProperty(key, String(vars[key]));
       });
-      if (hasFreshTheme) root.setAttribute("data-theme-ready", "true");
+      root.setAttribute("data-theme-color-ready", "true");
+      root.setAttribute("data-theme-ready", "true");
     }
     var mode = cachedUser
       ? (cachedUser.themeMode === "dark" ? "dark" : "light")
@@ -79,7 +80,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fa" dir="rtl" className={storeFont.variable} style={initialThemeVariables} data-theme-ready="false" suppressHydrationWarning>
+    <html
+      lang="fa"
+      dir="rtl"
+      className={storeFont.variable}
+      style={initialThemeVariables}
+      data-theme-color-ready="false"
+      data-theme-ready="false"
+      suppressHydrationWarning
+    >
       <body className="h-[100dvh] overflow-hidden bg-primary-base text-right" dir="rtl">
         <Script id="theme-bootstrap" strategy="beforeInteractive">
           {initialThemeScript}
