@@ -359,8 +359,28 @@ html[data-theme-ready="false"] [data-app-shell] {
 }
 
 [data-theme-boot-loader] {
-  background-color: #f8fafc;
+  background-color: var(--bg-base);
   display: flex;
+}
+
+.whale-loader-surface {
+  background-color: var(--bg-base);
+}
+
+.whale-loader-icon {
+  color: var(--primary);
+}
+
+.whale-loader-dot {
+  background-color: var(--primary);
+}
+
+.whale-loader-dot:nth-child(2) {
+  background-color: color-mix(in srgb, var(--primary) 72%, var(--bg-base));
+}
+
+.whale-loader-dot:nth-child(3) {
+  background-color: color-mix(in srgb, var(--primary) 44%, var(--bg-base));
 }
 
 html[data-theme-ready="true"] [data-theme-boot-loader] {

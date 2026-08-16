@@ -141,29 +141,21 @@ export default function Loading({
         aria-busy="true"
         aria-live="polite"
         className={cx(
-          "fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col items-center justify-center",
+          "whale-loader-surface fixed inset-0 z-[9999] flex min-h-screen w-screen flex-col items-center justify-center",
           loading === "fullscreen" ? "backdrop-blur-sm" : "",
           className
         )}
-        style={{
-          backgroundColor: "#f8fafc",
-        }}
       >
         <GiSpermWhale
           aria-label="وال"
-          className="mb-4 h-24 w-24"
-          style={{ color: "#0f6fbd" }}
+          className="whale-loader-icon mb-4 h-24 w-24"
         />
         <div className="flex items-center gap-2">
-          {[
-            "#0f6fbd",
-            "#4b93cc",
-            "#87b8de",
-          ].map((color, i) => (
+          {[0, 1, 2].map((i) => (
             <motion.div
-              key={color}
-              className="rounded-full"
-              style={{ width: resolvedSize / 2.5, height: resolvedSize / 2.5, backgroundColor: color }}
+              key={i}
+              className="whale-loader-dot rounded-full"
+              style={{ width: resolvedSize / 2.5, height: resolvedSize / 2.5 }}
               animate={{ y: [0, -6, 0] }}
               transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.12 }}
             />

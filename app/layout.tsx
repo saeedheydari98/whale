@@ -90,11 +90,11 @@ export default function RootLayout({
           aria-live="polite"
           className="fixed inset-0 z-[10000] min-h-[100dvh] w-screen flex-col items-center justify-center gap-4"
         >
-          <GiSpermWhale aria-label="وال" className="h-24 w-24 text-[#0f6fbd]" />
+          <GiSpermWhale aria-label="وال" className="whale-loader-icon h-24 w-24" />
           <div className="flex items-center gap-2" aria-hidden="true">
-            <span className="theme-boot-dot h-2 w-2 rounded-full bg-[#0f6fbd]" />
-            <span className="theme-boot-dot h-2 w-2 rounded-full bg-[#4b93cc]" />
-            <span className="theme-boot-dot h-2 w-2 rounded-full bg-[#87b8de]" />
+            <span className="theme-boot-dot whale-loader-dot h-2 w-2 rounded-full" />
+            <span className="theme-boot-dot whale-loader-dot h-2 w-2 rounded-full" />
+            <span className="theme-boot-dot whale-loader-dot h-2 w-2 rounded-full" />
           </div>
         </div>
         <AppThemeProvider>
