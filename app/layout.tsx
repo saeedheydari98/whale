@@ -103,15 +103,11 @@ export default function RootLayout({
               <CatalogQueryProvider>
                 <ProductsCatalogProvider>
                   <div data-app-shell className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-primary-base text-primary-text">
-                    <div className="shrink-0">
+                    <main data-app-scroll-container className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-14 md:pb-0">
                       <AppHeader />
-                    </div>
-                    <main data-app-scroll-container className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                       {children}
-                    </main>
-                    <div className="shrink-0">
                       <AppFooter />
-                    </div>
+                    </main>
                   </div>
                   <AdminPanelFloatButton />
                 </ProductsCatalogProvider>

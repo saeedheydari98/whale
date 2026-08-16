@@ -194,7 +194,7 @@ export function GlobalSearch() {
             showLabel={false}
             fullWidth={isOpen}
             rounded="full"
-            border="base"
+            border="none"
             className={
               isOpen
                 ? "h-10 px-7 text-sm"

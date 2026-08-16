@@ -131,7 +131,8 @@ function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount:
 export function AppHeader() {
   const { data: appUserData, refresh: refreshAppUser } = useAppUser();
   const { mode, setMode } = useTheme();
-  const hideHeader = useScrollHeaderHide(24);
+  const pathname = usePathname();
+  const headerRef = useScrollHeaderHide({ resetKey: pathname });
   const isMobile = useIsMobile();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
@@ -147,7 +148,6 @@ export function AppHeader() {
   const [authStatus, setAuthStatus] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const router = useRouter();
-  const pathname = usePathname();
   const showMobileBack = isMobile && pathname !== "/";
   const accountLabel = getProfileFullName(accountProfile ?? getUserProfile(authUser)) || getUserPhone(authUser, accountProfile);
   const accountInitial = accountLabel.trim().charAt(0).toUpperCase() || "?";
@@ -328,11 +328,11 @@ export function AppHeader() {
 
   return (
     <header
+      ref={headerRef}
       className={`
-        relative z-30 border-primary-border 
+        sticky top-0 z-30 h-20 shrink-0 border-b border-primary-border
         bg-primary-panel backdrop-blur flex justify-center items-center 
-        w-full transition-[height,transform,opacity,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:duration-0
-        ${hideHeader ? 'h-0 -translate-y-20 overflow-hidden border-b-0 border-transparent opacity-0' : 'h-20 translate-y-0 overflow-visible border-b opacity-100'}
+        w-full will-change-transform
       `}
     >
       <div className="relative flex justify-between items-center w-full gap-3 px-4">
