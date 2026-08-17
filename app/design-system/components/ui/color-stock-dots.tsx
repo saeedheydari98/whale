@@ -35,6 +35,7 @@ type ColorStockDotsProps = {
   selectedColor?: string;
   onSelect?: (color: string) => void;
   disabledUnavailable?: boolean;
+  minimumCount?: number;
   showCount?: boolean;
   size?: "sm" | "md";
   className?: string;
@@ -45,6 +46,7 @@ export function ColorStockDots({
   selectedColor,
   onSelect,
   disabledUnavailable = false,
+  minimumCount = 1,
   showCount = true,
   size = "sm",
   className,
@@ -56,7 +58,7 @@ export function ColorStockDots({
     <div className={cx("flex flex-wrap items-center gap-2", className)}>
       {entries.map(({ color, count }) => {
         const selected = selectedColor === color;
-        const disabled = disabledUnavailable && count <= 0;
+        const disabled = disabledUnavailable && count < Math.max(1, minimumCount);
         const available = count > 0;
         const label = count > 10 ? "+10" : String(count);
         const dotSize = size === "md" ? "h-9 w-9" : "h-7 w-7";
@@ -67,18 +69,23 @@ export function ColorStockDots({
             key={color}
             type="button"
             disabled={!onSelect || disabled}
-            aria-label={`رنگ ${color} ${available ? "موجود" : "ناموجود"}`}
+            aria-label={`رنگ ${color} ${selected ? "انتخاب شده" : available ? "موجود" : "ناموجود"}`}
+            aria-pressed={selected}
             title={`رنگ ${color} ${available ? "موجود" : "ناموجود"}`}
             onClick={() => onSelect?.(color)}
             className={cx(
               "inline-flex shrink-0 items-center justify-center rounded-full border font-black tabular-nums shadow-sm transition",
               dotSize,
-              selected ? "border-primary text-primary-text ring-2 ring-primary-border" : "border-primary-border text-primary-text",
+              selected ? "scale-110 border-primary text-primary-text ring-4 ring-primary/30 shadow-md" : "border-primary-border text-primary-text",
               disabled ? "opacity-40" : onSelect ? "hover:scale-105" : "cursor-default"
             )}
             style={{ backgroundColor: getStockColorValue(color) }}
           >
-            {showCount ? (
+            {selected ? (
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-primary-border bg-primary-base text-sm font-black text-primary shadow-sm">
+                ✓
+              </span>
+            ) : showCount ? (
               <span className={cx(
                 "inline-flex items-center justify-center rounded-full border border-primary-border bg-primary-base/90 px-1 text-center shadow-sm backdrop-blur-sm",
                 labelSize

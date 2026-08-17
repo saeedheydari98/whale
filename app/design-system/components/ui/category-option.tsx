@@ -10,6 +10,7 @@ type CategoryOptionProps = {
   selected?: boolean;
   disabled?: boolean;
   size?: "sm" | "md" | "lg";
+  shape?: "circle" | "rounded";
   className?: string;
   onClick?: () => void;
   onImageClick?: () => void;
@@ -36,6 +37,7 @@ export function CategoryOption({
   selected = false,
   disabled = false,
   size = "md",
+  shape = "circle",
   className,
   onClick,
   onImageClick,
@@ -43,8 +45,9 @@ export function CategoryOption({
   const imageContent = (
     <span
       className={cx(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-full border bg-primary-media text-primary transition",
-        selected ? "border-primary bg-primary-soft ring-2 ring-primary-border" : "border-primary-border grayscale opacity-75",
+        "flex shrink-0 items-center justify-center overflow-hidden border bg-primary-media text-primary transition",
+        shape === "circle" ? "rounded-full" : "rounded-xl",
+        selected ? "border-primary bg-primary-soft ring-2 ring-primary-border" : "border-primary-border",
         sizeClasses[size].image
       )}
     >
@@ -58,7 +61,7 @@ export function CategoryOption({
   const content = (
     <>
       {onImageClick && !onClick && imageUrl ? (
-        <button type="button" className="rounded-full" onClick={onImageClick} aria-label="باز کردن تصویر">
+        <button type="button" className={shape === "circle" ? "rounded-full" : "rounded-xl"} onClick={onImageClick} aria-label="باز کردن تصویر">
           {imageContent}
         </button>
       ) : imageContent}

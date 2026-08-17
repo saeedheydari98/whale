@@ -9,6 +9,7 @@ import {
 import { NOTIFICATION_SILENT_HEADER, notifyApp } from "@/lib/app-notifications";
 import type { ProductRecord } from "@/lib/products-client";
 import {
+  fetchCurrentUser,
   readCachedAuthUser,
   type AuthClientUser,
 } from "@/lib/auth-client";
@@ -55,18 +56,49 @@ export type CartSnapshot = {
 
 let pendingCartLoad: Promise<CartSnapshot> | null = null;
 let pendingCartLoadKey = "";
+let cartMutationVersion = 0;
+let cartApiMutationQueue: Promise<void> = Promise.resolve();
+const pendingLocalCartKeys = new Set<string>();
 
 function clearPendingCartLoad() {
   pendingCartLoad = null;
   pendingCartLoadKey = "";
 }
 
-function readCartItemsFromApiData(data: any) {
-  return data?.data?.cart?.items ?? data?.data?.items ?? [];
+function beginCartMutation(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
+  cartMutationVersion += 1;
+  pendingLocalCartKeys.add(getCartStorageKey(user));
+  clearPendingCartLoad();
+  return cartMutationVersion;
 }
 
-function readCartProfileFromApiData(data: any) {
-  const profileData = data?.data?.user?.profile ?? data?.data?.profile ?? null;
+function markCartSynchronized(user: AuthClientUser | null | undefined) {
+  pendingLocalCartKeys.delete(getCartStorageKey(user));
+}
+
+function enqueueCartApiMutation<T>(mutation: () => Promise<T>) {
+  const result = cartApiMutationQueue.then(mutation, mutation);
+  cartApiMutationQueue = result.then(() => undefined, () => undefined);
+  return result;
+}
+
+type CartApiData = {
+  data?: {
+    cart?: { items?: unknown };
+    items?: unknown;
+    user?: { profile?: unknown };
+    profile?: unknown;
+  };
+};
+
+function readCartItemsFromApiData(data: unknown) {
+  const response = data as CartApiData | null;
+  return response?.data?.cart?.items ?? response?.data?.items ?? [];
+}
+
+function readCartProfileFromApiData(data: unknown) {
+  const response = data as CartApiData | null;
+  const profileData = response?.data?.user?.profile ?? response?.data?.profile ?? null;
   if (!profileData || typeof profileData !== "object") return null;
   const profile = normalizeUserProfile(profileData as Partial<UserProfile>);
   return isUserProfileComplete(profile) ? profile : null;
@@ -126,10 +158,6 @@ export function getCartItemColorSelection(item: Partial<CartItemRecord>): CartCo
   const fromObject = normalizeColorSelection(item.selectedColors);
   if (Object.keys(fromObject).length > 0) return fromObject;
   return parseSerializedColorSelection(item.selectedColor, quantity);
-}
-
-function getFirstAvailableColor(colorStock: Record<string, number>) {
-  return Object.entries(colorStock).find(([, count]) => count > 0)?.[0] ?? "";
 }
 
 function getItemKey(item: Partial<CartItemRecord>) {
@@ -246,9 +274,25 @@ export function writeLocalCart(items: CartItemRecord[], user: AuthClientUser | n
   emitCartUpdated();
 }
 
+export function claimGuestCartForUser(user: AuthClientUser | null | undefined) {
+  if (typeof window === "undefined" || !canUseAccountCart(user)) return null;
+  if (localStorage.getItem(GUEST_CART_STORAGE_KEY) === null) return null;
+
+  const guestItems = readLocalCart(null);
+  localStorage.removeItem(GUEST_CART_STORAGE_KEY);
+  if (guestItems.length === 0) return null;
+
+  const accountItems = readLocalCart(user);
+  const mergedItems = dedupeCartItems([...accountItems, ...guestItems]);
+  beginCartMutation(user);
+  localStorage.setItem(getCartStorageKey(user), JSON.stringify(mergedItems));
+  localStorage.removeItem(CART_STORAGE_KEY);
+  return mergedItems;
+}
+
 export function clearLocalCartSnapshot(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
   if (typeof window === "undefined") return;
-  clearPendingCartLoad();
+  beginCartMutation(user);
   localStorage.removeItem(getCartStorageKey(user));
   localStorage.removeItem(CART_STORAGE_KEY);
   emitCartUpdated();
@@ -312,11 +356,16 @@ export async function getCart(user: AuthClientUser | null | undefined = readCach
 
   if (canUseAccountCart(user)) {
     const loadKey = getCartStorageKey(user);
+    if (pendingLocalCartKeys.has(loadKey)) return { items: readLocalCart(user), profile };
     if (pendingCartLoad && pendingCartLoadKey === loadKey) return pendingCartLoad;
 
+    const loadVersion = cartMutationVersion;
     pendingCartLoadKey = loadKey;
-    pendingCartLoad = loadCartFromApi({ silent: true })
+    const request: Promise<CartSnapshot> = loadCartFromApi({ silent: true })
       .then((apiCart) => {
+        if (loadVersion !== cartMutationVersion) {
+          return { items: readLocalCart(user), profile };
+        }
         writeLocalCart(apiCart.items, user);
         return { items: apiCart.items, profile: apiCart.profile ?? profile };
       })
@@ -325,24 +374,27 @@ export async function getCart(user: AuthClientUser | null | undefined = readCach
         return { items: readLocalCart(user), profile };
       })
       .finally(() => {
-        if (pendingCartLoadKey === loadKey) clearPendingCartLoad();
+        if (pendingCartLoad === request) clearPendingCartLoad();
       });
+    pendingCartLoad = request;
 
-    return pendingCartLoad;
+    return request;
   }
 
   return { items: readLocalCart(user), profile };
 }
 
 export async function persistCart(items: CartItemRecord[], profile = readUserProfile()) {
-  clearPendingCartLoad();
   const user = readCachedAuthUser();
+  const mutationVersion = beginCartMutation(user);
   const nextItems = dedupeCartItems(items);
   writeLocalCart(nextItems, user);
 
   if (nextItems.length === 0) {
     if (canUseApiCart(profile, user)) {
-      await clearCartFromApi(profile, { silent: true }).catch(() => undefined);
+      const cleared = await enqueueCartApiMutation(() => clearCartFromApi(profile, { silent: true }))
+        .then(() => true, () => false);
+      if (cleared && mutationVersion === cartMutationVersion) markCartSynchronized(user);
     }
     return nextItems;
   }
@@ -352,10 +404,12 @@ export async function persistCart(items: CartItemRecord[], profile = readUserPro
   }
 
   try {
-    const savedItems = await saveCartToApi(nextItems, profile, { silent: true });
+    const savedItems = await enqueueCartApiMutation(() => saveCartToApi(nextItems, profile, { silent: true }));
+    if (mutationVersion !== cartMutationVersion) return readLocalCart(user);
+    markCartSynchronized(user);
     writeLocalCart(savedItems, user);
     return savedItems;
-  } catch (error) {
+  } catch {
     console.warn("Cart API save failed; using local cart.");
     return nextItems;
   }
@@ -373,19 +427,15 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
   const key = String(productId ?? `${product.title}-${product.description}-${product.price}`);
   const colorStock = normalizeCartColorStock(product.colorStock);
   const hasColorStock = Object.keys(colorStock).length > 0;
-  const cartColor = selectedColor || getFirstAvailableColor(colorStock);
+  const cartColor = selectedColor.trim();
   const requestedQuantity = Math.max(1, Math.round(Number(quantity) || 1));
 
-  if (hasColorStock && !cartColor) {
-    const message = "برای این محصول باید یک رنگ موجود انتخاب کنید.";
-    notifyCartError(message);
-    throw new Error(message);
-  }
-
-  const currentCart = readLocalCart();
+  const cartUser = readCachedAuthUser() ?? await fetchCurrentUser({ allowStaleOnError: true });
+  claimGuestCartForUser(cartUser);
+  const currentCart = readLocalCart(cartUser);
   const existing = currentCart.find((item) => getItemKey(item) === key);
   const existingSelection = existing ? getCartItemColorSelection(existing) : {};
-  const nextSelection = { ...existingSelection };
+  const nextSelection = hasColorStock && !cartColor ? {} : { ...existingSelection };
 
   if (hasColorStock && cartColor) {
     const nextColorQuantity = (nextSelection[cartColor] ?? 0) + requestedQuantity;
@@ -399,7 +449,7 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
   }
 
   const nextQuantity = hasColorStock
-    ? colorSelectionTotal(nextSelection)
+    ? colorSelectionTotal(nextSelection) || clampCartQuantity(product, (existing?.quantity ?? 0) + requestedQuantity)
     : clampCartQuantity(product, (existing?.quantity ?? 0) + requestedQuantity);
 
   if (nextQuantity <= 0) {
@@ -516,6 +566,32 @@ export async function removeCartItem(target: CartItemRecord) {
   return updateCartQuantity(target, 0);
 }
 
+export function selectCartItemColor(target: CartItemRecord, color: string) {
+  const user = readCachedAuthUser();
+  const key = getItemKey(target);
+  const colorName = String(color ?? "").trim();
+  const currentCart = readLocalCart(user);
+  if (!colorName) return currentCart;
+
+  const nextCart = currentCart.map((item) => {
+    if (getItemKey(item) !== key) return item;
+
+    const colorStock = normalizeCartColorStock(item.colorStock || target.colorStock);
+    if ((colorStock[colorName] ?? 0) < item.quantity) return item;
+
+    const selectedColors = { [colorName]: item.quantity };
+    return {
+      ...item,
+      selectedColors,
+      selectedColor: serializeColorSelection(selectedColors),
+    };
+  });
+
+  beginCartMutation(user);
+  writeLocalCart(nextCart, user);
+  return nextCart;
+}
+
 export async function clearCart() {
   const savedItems = await persistCart([]);
   notifyCartSuccess("سبد خرید خالی شد.");
@@ -523,7 +599,8 @@ export async function clearCart() {
 }
 
 export async function checkoutCart(profile = readUserProfile()) {
-  clearPendingCartLoad();
+  const user = readCachedAuthUser();
+  beginCartMutation(user);
   if (!profile || !isUserProfileComplete(profile)) {
     const message = "برای این عملیات اطلاعات پروفایل باید کامل باشد.";
     notifyCartError(message);
@@ -540,7 +617,8 @@ export async function checkoutCart(profile = readUserProfile()) {
     throw new Error(data?.message || data?.error || "ثبت سفارش ناموفق بود.");
   }
 
-  writeLocalCart([]);
+  markCartSynchronized(user);
+  writeLocalCart([], user);
   return [];
 }
 

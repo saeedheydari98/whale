@@ -34,6 +34,8 @@ type ProductUpdatePlan = {
   colorStock: Record<string, number>;
 };
 
+class CheckoutValidationError extends Error {}
+
 export async function POST(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
@@ -61,18 +63,18 @@ export async function POST(request: Request) {
       const product = productsById.get(item.productId) as
         | { id: number; stockQuantity: number; colorStock: unknown }
         | undefined;
-      if (!product || product.stockQuantity < item.quantity) throw new Error("موجودی محصول کافی نیست.");
+      if (!product || product.stockQuantity < item.quantity) throw new CheckoutValidationError("موجودی محصول کافی نیست.");
 
       const colorStock = normalizeColorStock(product.colorStock);
       if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
-        throw new Error("برای محصول رنگ‌دار باید یک رنگ انتخاب شود.");
+        throw new CheckoutValidationError("برای محصول رنگ‌دار باید یک رنگ انتخاب شود.");
       }
       if (Object.keys(colorStock).length > 0) {
         const selectedColors = readColorSelection(item.selectedColor, item.quantity);
         const selectedTotal = colorSelectionTotal(selectedColors);
-        if (selectedTotal !== item.quantity) throw new Error("تعداد رنگ‌های انتخاب‌شده با تعداد سبد خرید هماهنگ نیست.");
+        if (selectedTotal !== item.quantity) throw new CheckoutValidationError("تعداد رنگ‌های انتخاب‌شده با تعداد سبد خرید هماهنگ نیست.");
         for (const [color, count] of Object.entries(selectedColors)) {
-          if ((colorStock[color] ?? 0) < count) throw new Error("موجودی رنگ انتخاب‌شده کافی نیست.");
+          if ((colorStock[color] ?? 0) < count) throw new CheckoutValidationError("موجودی رنگ انتخاب‌شده کافی نیست.");
           colorStock[color] -= count;
         }
       }
@@ -91,7 +93,11 @@ export async function POST(request: Request) {
           userId: auth.user.id,
           profileId: cart.profileId,
           status: "paid",
+          fulfillmentStatus: "pending_approval",
           total: "0",
+          statusHistory: {
+            create: { status: "pending_approval" },
+          },
         },
       });
 
@@ -131,6 +137,7 @@ export async function POST(request: Request) {
     return apiOk({ checkedOut: true });
   } catch (error) {
     console.error("Checkout error:", error);
-    return apiServerError(error instanceof Error ? error.message : "خطای سرور رخ داد.");
+    if (error instanceof CheckoutValidationError) return apiFail(error.message, 409);
+    return apiServerError("ثبت سفارش انجام نشد. لطفاً دوباره تلاش کنید.");
   }
 }

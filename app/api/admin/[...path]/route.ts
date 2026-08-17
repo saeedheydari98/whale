@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
@@ -7,6 +8,7 @@ import { bannerSchema, productSchema, showcaseSchema } from "@/lib/api/schemas";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
 import { readImageMetaRecord as readImageMeta, readStoredImageUrls } from "@/lib/catalog-utils";
+import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUSES } from "@/lib/order-status";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -39,6 +41,9 @@ async function readAdminOrders() {
       items: {
         orderBy: { createdAt: "desc" },
       },
+      statusHistory: {
+        orderBy: { createdAt: "asc" },
+      },
     },
   });
   const profileIds = orders.map((order: any) => order.profileId).filter((id: unknown): id is string => Boolean(id));
@@ -63,6 +68,7 @@ async function readAdminOrders() {
     fulfillmentStatus: order.fulfillmentStatus,
     trackingCode: order.trackingCode,
     shippedAt: order.shippedAt,
+    statusHistory: order.statusHistory,
     total: order.total,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
@@ -823,20 +829,43 @@ async function updateEntity(request: Request, context: Context, partial: boolean
       const body = await request.json().catch(() => null);
       const trackingCode = String(body?.trackingCode ?? "").trim();
       const requestedStatus = String(body?.fulfillmentStatus ?? "").trim();
-      const fulfillmentStatus = requestedStatus === "pending"
-        ? "pending"
-        : requestedStatus === "posted" || trackingCode
-          ? "posted"
-          : "pending";
-      if (fulfillmentStatus === "posted" && !trackingCode) return apiFail("کد پیگیری پست الزامی است.", 422);
+      if (!ORDER_STATUSES.includes(requestedStatus as (typeof ORDER_STATUSES)[number])) {
+        return apiFail("وضعیت سفارش معتبر نیست.", 422);
+      }
 
-      await prisma.order.update({
+      const existingOrder = await prisma.order.findUnique({
         where: { id: path[1] },
-        data: {
-          fulfillmentStatus,
-          trackingCode: fulfillmentStatus === "posted" ? trackingCode || null : null,
-          shippedAt: fulfillmentStatus === "posted" ? new Date() : null,
-        },
+        select: { fulfillmentStatus: true, trackingCode: true, shippedAt: true },
+      });
+      if (!existingOrder) return apiFail("سفارش پیدا نشد.", 404);
+
+      const currentStatus = normalizeOrderStatus(existingOrder.fulfillmentStatus);
+      const fulfillmentStatus = normalizeOrderStatus(requestedStatus);
+      const allowedNextStatus = nextOrderStatus(currentStatus);
+      if (fulfillmentStatus !== currentStatus && fulfillmentStatus !== allowedNextStatus) {
+        return apiFail("وضعیت سفارش باید مرحله‌به‌مرحله تغییر کند.", 422);
+      }
+      if (fulfillmentStatus === "shipped" && !trackingCode) {
+        return apiFail("برای ثبت وضعیت ارسال‌شده، کد پیگیری الزامی است.", 422);
+      }
+
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const statusChanged = fulfillmentStatus !== currentStatus;
+        await tx.order.update({
+          where: { id: path[1] },
+          data: {
+            fulfillmentStatus,
+            trackingCode: trackingCode || existingOrder.trackingCode,
+            shippedAt: fulfillmentStatus === "shipped"
+              ? existingOrder.shippedAt ?? new Date()
+              : existingOrder.shippedAt,
+          },
+        });
+        if (statusChanged) {
+          await tx.orderStatusEvent.create({
+            data: { orderId: path[1], status: fulfillmentStatus },
+          });
+        }
       });
 
       const orders = await readAdminOrders();

@@ -254,7 +254,7 @@ model Order {
   userId            Int
   profileId         String?
   status            String      @default("paid")
-  fulfillmentStatus String      @default("pending")
+  fulfillmentStatus String      @default("pending_approval")
   trackingCode      String?
   shippedAt         DateTime?
   total             String      @default("0")
@@ -262,9 +262,20 @@ model Order {
   updatedAt         DateTime    @updatedAt
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   items             OrderItem[]
+  statusHistory     OrderStatusEvent[]
 
   @@index([fulfillmentStatus])
   @@index([createdAt])
+}
+
+model OrderStatusEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  status    String
+  createdAt DateTime @default(now())
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
 }
 
 model OrderItem {

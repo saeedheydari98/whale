@@ -19,7 +19,10 @@ export async function GET(request: Request) {
         userId: authUser.id,
       },
       orderBy: { createdAt: "desc" },
-      include: { items: { orderBy: { createdAt: "desc" } } },
+      include: {
+        items: { orderBy: { createdAt: "desc" } },
+        statusHistory: { orderBy: { createdAt: "asc" } },
+      },
     });
     return apiOk({ orders });
   } catch (error) {

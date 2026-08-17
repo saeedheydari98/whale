@@ -159,7 +159,7 @@ export function CategoriesSection({
                   }`}
                 >
                   <Loading loading="skeleton-item" isLoading={isLoading} className="w-full">
-                    <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" onImageClick={() => onPreview(category.imageUrl)} />
+                    <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" shape="rounded" onImageClick={() => onPreview(category.imageUrl)} />
                   </Loading>
                   <div className="flex gap-2">
                     <Loading loading="skeleton-item" isLoading={isLoading}>

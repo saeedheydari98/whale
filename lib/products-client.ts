@@ -119,6 +119,7 @@ export type CatalogLinkGroupRecord = {
   title: string;
   active?: boolean;
   sortOrder?: number | string;
+  categoryCount?: number;
 };
 
 type GroupedCategoryRecord = CatalogLinkGroupRecord & {
@@ -1137,7 +1138,7 @@ export async function getProductPage(
 
 async function getSectionProducts<TSection>(
   url: string,
-  sectionKey: "showcase" | "category" | "brand",
+  sectionKey: "showcase" | "category" | "categoryGroup" | "brand",
   force = false
 ): Promise<SectionProductsResult<TSection>> {
   try {
@@ -1179,6 +1180,18 @@ export function getCategoryProducts(
   return getSectionProducts<CategoryRecord>(
     withQuery(`/api/category/${encodeCatalogSegment(id)}/products`, params),
     "category",
+    options?.force
+  );
+}
+
+export function getCategoryGroupProducts(
+  id: string | number,
+  params?: Record<string, string | number | boolean | null | undefined>,
+  options?: Pick<GetProductsOptions, "force">
+) {
+  return getSectionProducts<CatalogLinkGroupRecord>(
+    withQuery(`/api/category-group/${encodeCatalogSegment(id)}/products`, params),
+    "categoryGroup",
     options?.force
   );
 }
@@ -1324,6 +1337,7 @@ export function clearProductsCache() {
   invalidateFetchCache("/api/showcase");
   invalidateFetchCache("/api/showcases");
   invalidateFetchCache("/api/category");
+  invalidateFetchCache("/api/category-group");
   invalidateFetchCache("/api/brand");
   if (typeof window !== "undefined") {
     clearCachedPageStructures();
@@ -1331,4 +1345,4 @@ export function clearProductsCache() {
   }
 }
 
-export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };
+export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getCategoryGroupProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };

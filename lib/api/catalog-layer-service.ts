@@ -765,6 +765,18 @@ async function findCategory(identifier: string) {
   return categories[0] ?? null;
 }
 
+async function findCategoryGroup(identifier: string) {
+  const decoded = decodeCatalogIdentifier(identifier);
+  return prisma.categoryGroup.findFirst({
+    where: {
+      OR: [
+        { id: decoded },
+        { title: decoded },
+      ],
+    },
+  });
+}
+
 async function findBrand(identifier: string) {
   const decoded = decodeCatalogIdentifier(identifier);
   const slug = slugifyCatalogValue(decoded);
@@ -867,6 +879,41 @@ export async function getCategoryProducts(identifier: string, searchParams: URLS
 
     return {
       category: category ? toClientCategory(category) : null,
+      products: paginateProducts(sorted.map(toProductSummary), searchParams),
+    };
+  });
+}
+
+export async function getCategoryGroupProducts(identifier: string, searchParams: URLSearchParams) {
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("category-group-products", [normalizedIdentifier, searchParams], getTtl(searchParams), async () => {
+    const categoryGroup = await findCategoryGroup(normalizedIdentifier);
+    const categoryIds = categoryGroup
+      ? new Set((await prisma.category.findMany({
+          where: {
+            groupId: categoryGroup.id,
+            ...(getIncludeInactive(searchParams) ? {} : { active: true }),
+          },
+          select: { id: true },
+        })).map((category: { id: string }) => category.id))
+      : new Set<string>();
+    const products = await prisma.product.findMany({
+      where: getIncludeInactive(searchParams) ? {} : { active: true, isActive: true, deletedAt: null },
+      select: productSummarySelect,
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    });
+    const groupProducts = products.filter((product: ProductSummaryRecord) => {
+      const productCategoryIds = normalizeStringList(product.categoryIds, [String(product.categoryId ?? "")]);
+      return productCategoryIds.some((categoryId) => categoryIds.has(categoryId));
+    });
+    const filtered = filterProducts(groupProducts, searchParams);
+    const sorted = sortProductsBy(filtered, String(searchParams.get("sort") ?? "sortOrder"));
+
+    return {
+      categoryGroup: categoryGroup
+        ? { ...toClientLinkGroup(categoryGroup), categoryCount: categoryIds.size }
+        : null,
       products: paginateProducts(sorted.map(toProductSummary), searchParams),
     };
   });

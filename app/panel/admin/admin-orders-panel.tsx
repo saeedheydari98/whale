@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline, IoTimeOutline } from "react-icons/io5";
+import { IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
-import { CustomInput } from "@/app/design-system/components/ui/input";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
+import { CustomInput } from "@/app/design-system/components/ui/input";
+import { OrderStatusTag, OrderStatusTimeline } from "@/app/design-system/components/ui/order-status";
+import { formatPersianDate } from "@/lib/date-format";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
-import { formatPersianDate as formatDate } from "@/lib/date-format";
+import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUS_LABELS, type OrderStatusEventRecord } from "@/lib/order-status";
 import { formatPlainPrice, toLatinDigits } from "@/lib/price-format";
 
 type AdminOrderItem = {
@@ -31,442 +32,218 @@ type AdminOrder = {
   shippedAt?: string | null;
   total: string;
   createdAt: string;
-  user?: {
-    username?: string | null;
-    email?: string | null;
-    name?: string | null;
-  } | null;
-  profile?: {
-    firstName?: string | null;
-    lastName?: string | null;
-    phone?: string | null;
-    email?: string | null;
-    address?: string | null;
-  } | null;
+  statusHistory?: OrderStatusEventRecord[];
+  user?: { username?: string | null; email?: string | null; name?: string | null } | null;
+  profile?: { firstName?: string | null; lastName?: string | null; phone?: string | null; email?: string | null; address?: string | null } | null;
   items: AdminOrderItem[];
 };
 
-type AdminOrderCard = {
-  order: AdminOrder;
-  item: AdminOrderItem;
+type AdminOrdersResponse = {
+  ok?: boolean;
+  message?: string;
+  error?: string;
+  data?: { orders?: AdminOrder[]; order?: AdminOrder | null };
 };
 
 const ADMIN_ORDERS_URL = "/api/admin/orders";
-
-function createLoadingOrderCards(count: number): AdminOrderCard[] {
-  return Array.from({ length: count }, (_, index) => {
-    const orderId = `loading-order-${index + 1}`;
-    return {
-      order: {
-        id: orderId,
-        status: "paid",
-        fulfillmentStatus: "pending",
-        total: "۰ تومان",
-        createdAt: new Date(0).toISOString(),
-        user: { username: "کاربر" },
-        profile: {
-          firstName: "کاربر",
-          lastName: "فروشگاه",
-          phone: "۰۹۰۰۰۰۰۰۰۰۰",
-          address: "نشانی سفارش",
-        },
-        items: [],
-      },
-      item: {
-        id: `loading-item-${index + 1}`,
-        title: `محصول ${index + 1}`,
-        price: "۰ تومان",
-        discountPrice: null,
-        imageUrl: "",
-        selectedColor: "رنگ",
-        quantity: 1,
-      },
-    };
-  });
-}
 
 function customerName(order: AdminOrder) {
   const profileName = `${order.profile?.firstName ?? ""} ${order.profile?.lastName ?? ""}`.trim();
   return profileName || order.user?.name || order.user?.username || "کاربر بدون نام";
 }
 
-function orderSearchText(order: AdminOrder, item: AdminOrderItem) {
+function orderSearchText(order: AdminOrder) {
   return [
-    order.id,
-    order.status,
-    order.fulfillmentStatus,
-    order.trackingCode,
-    order.total,
-    order.createdAt,
-    order.user?.username,
-    order.user?.email,
-    order.user?.name,
-    order.profile?.firstName,
-    order.profile?.lastName,
-    order.profile?.phone,
-    order.profile?.email,
-    order.profile?.address,
-    item.id,
-    item.productId,
-    item.title,
-    item.price,
-    item.discountPrice,
-    item.selectedColor,
-    item.quantity,
+    order.id, order.fulfillmentStatus, order.trackingCode, order.total, order.createdAt,
+    order.user?.username, order.user?.email, order.user?.name,
+    order.profile?.firstName, order.profile?.lastName, order.profile?.phone, order.profile?.email, order.profile?.address,
+    ...order.items.flatMap((item) => [item.id, item.productId, item.title, item.selectedColor]),
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
 function jalaliToGregorian(jalaliYear: number, jalaliMonth: number, jalaliDay: number) {
-  let jy = jalaliYear + 1595;
+  const jy = jalaliYear + 1595;
   let days = -355668 + (365 * jy) + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jalaliDay;
   days += jalaliMonth < 7 ? (jalaliMonth - 1) * 31 : ((jalaliMonth - 7) * 30) + 186;
-
   let gy = 400 * Math.floor(days / 146097);
   days %= 146097;
-
   if (days > 36524) {
     gy += 100 * Math.floor(--days / 36524);
     days %= 36524;
     if (days >= 365) days += 1;
   }
-
   gy += 4 * Math.floor(days / 1461);
   days %= 1461;
-
   if (days > 365) {
     gy += Math.floor((days - 1) / 365);
     days = (days - 1) % 365;
   }
-
-  const gd = days + 1;
   const monthDays = [0, 31, ((gy % 4 === 0 && gy % 100 !== 0) || gy % 400 === 0) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   let gm = 1;
-  let day = gd;
+  let day = days + 1;
   while (gm <= 12 && day > monthDays[gm]) {
     day -= monthDays[gm];
     gm += 1;
   }
-
   return { year: gy, month: gm, day };
-}
-
-function parsePersianDate(value: string) {
-  const normalized = toLatinDigits(value.trim()).replace(/[.\-\s]+/g, "/");
-  const parts = normalized.split("/").filter(Boolean);
-  if (parts.length !== 3) return null;
-
-  const [year, month, day] = parts.map((part) => Number(part));
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
-  if (year < 1200 || year > 1600 || month < 1 || month > 12 || day < 1) return null;
-  const maxDay = month <= 6 ? 31 : month <= 11 ? 30 : 30;
-  if (day > maxDay) return null;
-
-  return jalaliToGregorian(year, month, day);
 }
 
 function getDateBound(value: string, endOfDay = false) {
   if (!value) return null;
-  const parsedDate = parsePersianDate(value);
-  if (!parsedDate) return null;
-  const date = new Date(
-    parsedDate.year,
-    parsedDate.month - 1,
-    parsedDate.day,
-    endOfDay ? 23 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 59 : 0,
-    endOfDay ? 999 : 0
-  );
-  const time = date.getTime();
-  return Number.isNaN(time) ? null : time;
+  const parts = toLatinDigits(value.trim()).replace(/[.\-\s]+/g, "/").split("/").filter(Boolean).map(Number);
+  if (parts.length !== 3) return null;
+  const [year, month, day] = parts;
+  if (!Number.isInteger(year) || year < 1200 || year > 1600 || month < 1 || month > 12 || day < 1 || day > (month <= 6 ? 31 : 30)) return null;
+  const parsed = jalaliToGregorian(year, month, day);
+  const date = new Date(parsed.year, parsed.month - 1, parsed.day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+  return Number.isNaN(date.getTime()) ? null : date.getTime();
 }
 
 export function AdminOrdersPanel() {
-  const [previewImage, setPreviewImage] = useState("");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({});
+  const [previewImage, setPreviewImage] = useState("");
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
-  const [status, setStatus] = useState("");
+  const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const viewportOrderCount = useLoadingViewportCount("admin-order-card");
 
-  const orderCards = useMemo<AdminOrderCard[]>(() => {
-    const normalizedSearch = searchQuery.trim().toLowerCase();
+  const visibleOrders = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     const fromTime = getDateBound(dateFrom);
     const toTime = getDateBound(dateTo, true);
-
-    return orders
-      .flatMap((order) => order.items.map((item) => ({ order, item })))
-      .filter(({ order, item }) => {
-        const orderTime = new Date(order.createdAt).getTime();
-        if (fromTime !== null && (!Number.isFinite(orderTime) || orderTime < fromTime)) return false;
-        if (toTime !== null && (!Number.isFinite(orderTime) || orderTime > toTime)) return false;
-        return !normalizedSearch || orderSearchText(order, item).includes(normalizedSearch);
-      });
+    return orders.filter((order) => {
+      const orderTime = new Date(order.createdAt).getTime();
+      if (fromTime !== null && orderTime < fromTime) return false;
+      if (toTime !== null && orderTime > toTime) return false;
+      return !query || orderSearchText(order).includes(query);
+    });
   }, [dateFrom, dateTo, orders, searchQuery]);
 
-  const hasFilters = Boolean(searchQuery.trim() || dateFrom || dateTo);
-  const loadingOrderCount = resolveLoadingItemCount(orderCards.length || undefined, viewportOrderCount);
-  const visibleOrderCards = loading
-    ? orderCards.length > 0
-      ? orderCards.slice(0, loadingOrderCount)
-      : createLoadingOrderCards(loadingOrderCount)
-    : orderCards;
-
-  const loadOrders = async (options?: { force?: boolean }) => {
+  const loadOrders = async (force = false) => {
     setLoading(true);
-    setStatus("");
+    setMessage("");
     try {
-      const data = await fetchJsonDeduped<any>(ADMIN_ORDERS_URL, { force: options?.force });
-      if (data?.ok === false) throw new Error(data?.message || data?.error || "دریافت سفارش‌ها ممکن نشد.");
-      const nextOrders = Array.isArray(data?.data?.orders) ? data.data.orders as AdminOrder[] : [];
+      const response = await fetchJsonDeduped<AdminOrdersResponse>(ADMIN_ORDERS_URL, { force });
+      if (response?.ok === false) throw new Error(response.message || response.error);
+      const nextOrders = Array.isArray(response?.data?.orders) ? response.data.orders : [];
       setOrders(nextOrders);
       setTrackingDrafts(Object.fromEntries(nextOrders.map((order) => [order.id, order.trackingCode ?? ""])));
     } catch {
       setOrders([]);
-      setStatus("دریافت خریدها ممکن نشد.");
+      setMessage("دریافت سفارش‌ها ممکن نشد.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadOrders();
+    const timer = window.setTimeout(() => void loadOrders(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
-  const updateOrderDelivery = async (orderId: string, fulfillmentStatus: "pending" | "posted") => {
-    const trackingCode = (trackingDrafts[orderId] ?? "").trim();
-    if (fulfillmentStatus === "posted" && !trackingCode) {
-      setStatus("برای تحویل به پست، کد پیگیری را وارد کنید.");
+  const advanceOrder = async (order: AdminOrder) => {
+    const nextStatus = nextOrderStatus(order.fulfillmentStatus);
+    if (!nextStatus) return;
+    const trackingCode = (trackingDrafts[order.id] ?? "").trim();
+    if (nextStatus === "shipped" && !trackingCode) {
+      setMessage("برای تغییر وضعیت به ارسال‌شده، کد پیگیری را وارد کنید.");
       return;
     }
-
-    setSavingId(orderId);
-    setStatus("");
+    setSavingId(order.id);
+    setMessage("");
     try {
-      const res = await fetch(`/api/admin/orders/${orderId}`, {
+      const response = await fetch(`/api/admin/orders/${order.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fulfillmentStatus, trackingCode }),
+        body: JSON.stringify({ fulfillmentStatus: nextStatus, trackingCode }),
       });
-      const data = await res.json().catch(() => null);
-      if (!res.ok || data?.ok === false) throw new Error(data?.message || "ثبت وضعیت سفارش ممکن نشد.");
+      const data = await response.json().catch(() => null) as AdminOrdersResponse | null;
+      if (!response.ok || data?.ok === false || !data?.data?.order) throw new Error(data?.message || data?.error || "ثبت وضعیت سفارش ممکن نشد.");
+      const updatedOrder = data.data.order;
       invalidateFetchCache(ADMIN_ORDERS_URL);
-      const updatedOrder = data?.data?.order as AdminOrder | null;
-      if (updatedOrder) {
-        setOrders((current) => current.map((order) => order.id === updatedOrder.id ? updatedOrder : order));
-        setTrackingDrafts((current) => ({ ...current, [updatedOrder.id]: updatedOrder.trackingCode ?? "" }));
-      }
-      setStatus(fulfillmentStatus === "posted" ? "کد پیگیری ثبت شد." : "سفارش به وضعیت در انتظار ارسال برگشت.");
+      setOrders((current) => current.map((item) => item.id === updatedOrder.id ? updatedOrder : item));
+      setTrackingDrafts((current) => ({ ...current, [updatedOrder.id]: updatedOrder.trackingCode ?? "" }));
+      setMessage(`وضعیت سفارش به «${ORDER_STATUS_LABELS[normalizeOrderStatus(updatedOrder.fulfillmentStatus)]}» تغییر کرد.`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "ثبت وضعیت سفارش ممکن نشد.");
+      setMessage(error instanceof Error ? error.message : "ثبت وضعیت سفارش ممکن نشد.");
     } finally {
       setSavingId("");
     }
   };
 
+  const hasFilters = Boolean(searchQuery.trim() || dateFrom || dateTo);
+
   return (
-    <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
+    <section className="flex w-full flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <div className="text-base font-bold text-primary-text">خریدها</div>
-          <Loading loading="skeleton-item" isLoading={loading}>
-            <span className="text-xs font-semibold text-secondary-text">{visibleOrderCards.length} کارت خرید</span>
-          </Loading>
+          <div className="text-base font-bold text-primary-text">سفارش‌ها</div>
+          <span className="text-xs font-semibold text-secondary-text">{visibleOrders.length} سفارش</span>
         </div>
-        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void loadOrders({ force: true })} isLoading={loading}>
-          <span>به‌روزرسانی</span>
-        </CustomButton>
+        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void loadOrders(true)} isLoading={loading}><span>به‌روزرسانی</span></CustomButton>
       </div>
 
       <div className="flex flex-col gap-3 border-t border-primary-border pt-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-col gap-1">
-            <div className="text-sm font-bold text-primary-text">فیلتر خریدها</div>
-            <span className="text-xs font-semibold text-secondary-text">نمونه تاریخ: ۱۴۰۳/۰۱/۰۱</span>
-          </div>
-          {hasFilters ? (
-            <CustomButton
-              size="sm"
-              variant="neutral"
-              rounded="full"
-              onClick={() => {
-                setSearchQuery("");
-                setDateFrom("");
-                setDateTo("");
-              }}
-            >
-              <span>پاک کردن</span>
-            </CustomButton>
-          ) : null}
-        </div>
-
         <div className="flex flex-col gap-2 xl:flex-row xl:items-end">
-          <CustomInput
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="جستجو..."
-            aria-label="جستجو در خریدها"
-            showLabel={false}
-            fullWidth={false}
-            size="sm"
-            rounded="full"
-            icon={<IoSearchOutline />}
-            className="min-w-64"
-          />
+          <CustomInput value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="جستجو..." aria-label="جستجو در سفارش‌ها" showLabel={false} fullWidth={false} size="sm" rounded="full" icon={<IoSearchOutline />} className="min-w-64" />
           <div className="flex flex-wrap items-end gap-2">
-            <CustomInput
-              value={dateFrom}
-              onChange={(event) => setDateFrom(event.target.value)}
-              label="از تاریخ"
-              placeholder="۱۴۰۳/۰۱/۰۱"
-              aria-label="از تاریخ"
-              inputMode="numeric"
-              fullWidth={false}
-              size="sm"
-              rounded="full"
-              className="min-w-40"
-            />
-            <CustomInput
-              value={dateTo}
-              onChange={(event) => setDateTo(event.target.value)}
-              label="تا تاریخ"
-              placeholder="۱۴۰۳/۱۲/۲۹"
-              aria-label="تا تاریخ"
-              inputMode="numeric"
-              fullWidth={false}
-              size="sm"
-              rounded="full"
-              className="min-w-40"
-            />
+            <CustomInput value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} label="از تاریخ" placeholder="۱۴۰۵/۰۱/۰۱" inputMode="numeric" fullWidth={false} size="sm" rounded="full" className="min-w-40" />
+            <CustomInput value={dateTo} onChange={(event) => setDateTo(event.target.value)} label="تا تاریخ" placeholder="۱۴۰۵/۱۲/۲۹" inputMode="numeric" fullWidth={false} size="sm" rounded="full" className="min-w-40" />
+            {hasFilters ? <CustomButton size="sm" variant="neutral" rounded="full" onClick={() => { setSearchQuery(""); setDateFrom(""); setDateTo(""); }}><span>پاک کردن</span></CustomButton> : null}
           </div>
         </div>
       </div>
 
-      {status ? (
-        <div className="rounded-md border border-primary-border bg-primary-card px-3 py-2 text-xs font-semibold text-primary-text">
-          {status}
-        </div>
-      ) : null}
+      {message ? <div className="rounded-md border border-primary-border bg-primary-card p-3 text-xs font-semibold text-primary-text">{message}</div> : null}
+      {loading ? <div className="flex min-h-48 items-center justify-center"><Loading loading="spinner" size="lg" /></div> : null}
+      {!loading && visibleOrders.length === 0 ? <CustomEmptyState description={hasFilters ? "نتیجه‌ای با این فیلترها پیدا نشد." : "هنوز سفارشی ثبت نشده است."} /> : null}
 
-      {!loading && orderCards.length === 0 ? (
-        <CustomEmptyState description={hasFilters ? "نتیجه‌ای با این فیلترها پیدا نشد." : "هنوز سفارشی ثبت نشده است."} />
-      ) : null}
-
-      {visibleOrderCards.length > 0 ? (
-        <div className="flex flex-wrap gap-3">
-          {visibleOrderCards.map(({ order, item }) => {
-            const posted = order.fulfillmentStatus === "posted";
-            const cardKey = `${order.id}-${item.id}`;
-
+      {!loading && visibleOrders.length > 0 ? (
+        <div className="flex flex-wrap items-start gap-3">
+          {visibleOrders.map((order) => {
+            const nextStatus = nextOrderStatus(order.fulfillmentStatus);
             return (
-              <div
-                key={cardKey}
-                className={`flex w-full max-w-80 flex-col gap-2 rounded-lg border bg-primary-card p-2.5 shadow-sm ${
-                  loading ? "border-border-default" : "border-primary-border"
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Loading loading="skeleton-item" isLoading={loading} className="h-12 w-12 shrink-0">
-                    <button
-                      type="button"
-                      className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
-                      onClick={() => item.imageUrl ? setPreviewImage(item.imageUrl) : undefined}
-                      disabled={loading || !item.imageUrl}
-                      aria-label="باز کردن تصویر محصول"
-                    >
-                      {item.imageUrl ? (
-                        <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="text-[10px] text-secondary-text">بدون تصویر</span>
-                      )}
-                    </button>
-                  </Loading>
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <Loading loading="skeleton-item" isLoading={loading}>
-                      <div className="line-clamp-1 text-sm font-bold text-primary-text">{item.title}</div>
-                    </Loading>
-                    <Loading loading="skeleton-item" isLoading={loading}>
-                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-secondary-text">
-                        <span>تعداد: {item.quantity}</span>
-                        {item.selectedColor ? <span>رنگ: {item.selectedColor}</span> : null}
+              <div key={order.id} className="flex w-full max-w-md flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3 shadow-sm">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <span className="truncate text-sm font-bold text-primary-text">{customerName(order)}</span>
+                    <span className="text-xs text-secondary-text">{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
+                    <span className="text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
+                  </div>
+                  <OrderStatusTag status={order.fulfillmentStatus} />
+                </div>
+
+                <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+                  {order.items.map((item) => (
+                    <div key={item.id} className="flex items-center gap-2.5">
+                      <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? setPreviewImage(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
+                        {item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
+                      </button>
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
+                        <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
+                        <span className="text-xs font-bold text-primary">{formatPlainPrice(item.discountPrice || item.price)}</span>
                       </div>
-                    </Loading>
-                    <Loading loading="skeleton-item" isLoading={loading}>
-                      <span className="text-xs font-bold text-primary">{formatPlainPrice(item.discountPrice || item.price)}</span>
-                    </Loading>
-                  </div>
+                    </div>
+                  ))}
                 </div>
 
-                <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-secondary-text">
-                  <Loading loading="skeleton-item" isLoading={loading}>
-                    <span className="max-w-full truncate font-semibold text-primary-text">{customerName(order)}</span>
-                  </Loading>
-                  <Loading loading="skeleton-item" isLoading={loading}>
-                    <span>{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
-                  </Loading>
-                  <Loading loading="skeleton-item" isLoading={loading}>
-                    <span>{formatDate(order.createdAt)}</span>
-                  </Loading>
-                </div>
-                {order.profile?.address ? (
-                  <Loading loading="skeleton-item" isLoading={loading}>
-                    <span className="line-clamp-1 text-xs text-secondary-text">{order.profile.address}</span>
-                  </Loading>
-                ) : null}
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Loading loading="skeleton-item" isLoading={loading}>
-                    <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold ${
-                      posted
-                        ? "border-success-border bg-success-bg text-success-text"
-                        : "border-warning-border bg-warning-bg text-warning-text"
-                    }`}>
-                      {posted ? <IoCheckmarkCircleOutline aria-hidden="true" /> : <IoTimeOutline aria-hidden="true" />}
-                      <span>{posted ? "تحویل پست شده" : "در انتظار تحویل پست"}</span>
-                    </span>
-                  </Loading>
+                {order.profile?.address ? <span className="text-xs text-secondary-text">نشانی: {order.profile.address}</span> : null}
+                <div className="rounded-md border border-primary-border bg-primary-base p-3">
+                  <OrderStatusTimeline status={order.fulfillmentStatus} history={order.statusHistory} createdAt={order.createdAt} />
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
-                  <Loading loading="skeleton-item" isLoading={loading} className="w-full">
-                    <CustomInput
-                      value={trackingDrafts[order.id] ?? ""}
-                      onChange={(event) => setTrackingDrafts((current) => ({ ...current, [order.id]: event.target.value }))}
-                      placeholder="کد پیگیری پست"
-                      aria-label="کد پیگیری پست"
-                      size="sm"
-                      rounded="md"
-                      disabled={loading}
-                    />
-                  </Loading>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Loading loading="skeleton-item" isLoading={loading}>
-                      <CustomButton
-                        size="sm"
-                        variant="success"
-                        icon={<IoCheckmarkCircleOutline />}
-                        isLoading={savingId === order.id}
-                        disabled={loading}
-                        onClick={() => void updateOrderDelivery(order.id, "posted")}
-                      >
-                        <span>تحویل پست شد</span>
-                      </CustomButton>
-                    </Loading>
-                    <Loading loading="skeleton-item" isLoading={loading}>
-                      <CustomButton
-                        size="sm"
-                        variant="neutral"
-                        disabled={loading || savingId === order.id}
-                        onClick={() => void updateOrderDelivery(order.id, "pending")}
-                      >
-                        <span>در انتظار ارسال</span>
-                      </CustomButton>
-                    </Loading>
-                  </div>
+                <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+                  <CustomInput value={trackingDrafts[order.id] ?? ""} onChange={(event) => setTrackingDrafts((current) => ({ ...current, [order.id]: event.target.value }))} placeholder="کد پیگیری مرسوله" size="sm" disabled={savingId === order.id} />
+                  {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری ثبت‌شده: {order.trackingCode}</span> : null}
+                  {nextStatus ? (
+                    <CustomButton size="sm" variant={nextStatus === "delivered" ? "success" : "primary"} icon={<IoCheckmarkCircleOutline />} isLoading={savingId === order.id} onClick={() => void advanceOrder(order)}>
+                      <span>ثبت مرحله: {ORDER_STATUS_LABELS[nextStatus]}</span>
+                    </CustomButton>
+                  ) : <span className="text-xs font-bold text-success-text">این سفارش تحویل داده شده است.</span>}
                 </div>
               </div>
             );

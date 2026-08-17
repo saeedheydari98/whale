@@ -753,6 +753,7 @@ export const openApiDocument = {
           title: { type: "string" },
           active: { type: "boolean" },
           sortOrder: { type: "integer" },
+          categoryCount: { type: "integer" },
         },
       },
       CatalogStructure: {
@@ -901,19 +902,30 @@ export const openApiDocument = {
         properties: {
           id: { type: "string" },
           status: { type: "string" },
-          fulfillmentStatus: { type: "string", enum: ["pending", "posted"] },
+          fulfillmentStatus: { type: "string", enum: ["pending_approval", "processing", "in_transit", "shipped", "delivered"] },
           trackingCode: { type: "string", nullable: true },
           shippedAt: { type: "string", format: "date-time", nullable: true },
           total: { type: "string" },
           createdAt: { type: "string", format: "date-time" },
           updatedAt: { type: "string", format: "date-time" },
           items: { type: "array", items: ref("CartItem") },
+          statusHistory: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                status: { type: "string", enum: ["pending_approval", "processing", "in_transit", "shipped", "delivered"] },
+                createdAt: { type: "string", format: "date-time" },
+              },
+            },
+          },
         },
       },
       OrderUpdateInput: {
         type: "object",
         properties: {
-          fulfillmentStatus: { type: "string", enum: ["pending", "posted"] },
+          fulfillmentStatus: { type: "string", enum: ["pending_approval", "processing", "in_transit", "shipped", "delivered"] },
           trackingCode: { type: "string" },
         },
       },
@@ -1250,6 +1262,22 @@ export const openApiDocument = {
           type: "object",
           properties: {
             category: nullableRef("Category"),
+            products: ref("ProductPage"),
+          },
+          required: ["products"],
+        },
+      }),
+    },
+    "/api/category-group/{id}/products": {
+      get: operation({
+        tags: ["Products"],
+        summary: "Get products for all categories in a category group",
+        operationId: "getCategoryGroupProducts",
+        parameters: [pathParam("id", "Category group id or title."), ...productFilterParams],
+        data: {
+          type: "object",
+          properties: {
+            categoryGroup: nullableRef("LinkGroup"),
             products: ref("ProductPage"),
           },
           required: ["products"],

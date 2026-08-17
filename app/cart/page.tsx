@@ -18,7 +18,7 @@ import {
   persistCart,
   readLocalCart,
   removeCartItem,
-  updateCartColorQuantity,
+  selectCartItemColor,
   updateCartQuantity,
   type CartItemRecord,
 } from "@/lib/cart-client";
@@ -32,7 +32,7 @@ import {
   type UserProfile,
 } from "@/lib/user-profile";
 import { useAppUser } from "@/lib/app-user-context";
-import { readCachedAuthUser } from "@/lib/auth-client";
+import { readCachedAuthUser, type AuthClientUser } from "@/lib/auth-client";
 import {
   formatCurrencyWithCommas as formatPrice,
   getDiscountPercentValue as getDiscountPercent,
@@ -40,7 +40,7 @@ import {
   readFormattedPriceNumber as readPriceNumber,
 } from "@/lib/price-format";
 import { getProductDetail } from "@/lib/products-client";
-import { getStockColorValue, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
+import { ColorStockDots, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
 
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
 const PHONE_PATTERN = /^09\d{9}$/;
@@ -57,7 +57,7 @@ export default function CartPage() {
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isCheckoutSuccessOpen, setIsCheckoutSuccessOpen] = useState(false);
-  const [authUser, setAuthUser] = useState<any>(null);
+  const [authUser, setAuthUser] = useState<AuthClientUser | null>(null);
   const profileFormRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const { data: appUserData } = useAppUser();
@@ -126,6 +126,19 @@ export default function CartPage() {
     () => items.reduce((sum, item) => sum + readPriceNumber(getFinalPrice(item)) * item.quantity, 0),
     [items]
   );
+  const hasIncompleteColorSelection = useMemo(() => items.some((item) => {
+    const product = products.find((entry) => String(entry.id) === String(item.productId ?? item.id));
+    const colorEntries = normalizeStockEntries(product?.colorStock ?? item.colorStock);
+    if (colorEntries.length === 0) return false;
+
+    const selectedEntries = Object.entries(getCartItemColorSelection(item))
+      .filter(([, count]) => count > 0);
+    if (selectedEntries.length !== 1) return true;
+
+    const [selectedColor, selectedCount] = selectedEntries[0];
+    const availableCount = colorEntries.find((entry) => entry.color === selectedColor)?.count ?? 0;
+    return selectedCount !== item.quantity || availableCount < item.quantity;
+  }), [items, products]);
 
   const removeItem = async (target: CartItemRecord) => {
     const nextItems = await removeCartItem(target);
@@ -137,9 +150,8 @@ export default function CartPage() {
     setItems(nextItems);
   };
 
-  const updateItemColorQuantity = async (target: CartItemRecord, color: string, nextQuantity: number) => {
-    const savedItems = await updateCartColorQuantity(target, color, nextQuantity, { notify: false });
-    setItems(savedItems);
+  const selectItemColor = (target: CartItemRecord, color: string) => {
+    setItems(selectCartItemColor(target, color));
   };
 
   const clearCart = async () => {
@@ -259,6 +271,7 @@ export default function CartPage() {
                 icon={<IoCardOutline />}
                 isLoading={isCheckoutLoading}
                 loadingText="در حال پرداخت"
+                disabled={isCheckoutLoading || hasIncompleteColorSelection}
                 onClick={continueCheckout}
               >
                 پرداخت
@@ -266,6 +279,11 @@ export default function CartPage() {
               <CustomButton variant="danger" size="sm" disabled={isCheckoutLoading} onClick={clearCart}>
                 خالی کردن سبد
               </CustomButton>
+              {hasIncompleteColorSelection ? (
+                <span className="text-xs font-semibold text-danger-text-nomode">
+                  برای پرداخت، رنگ هر محصول را انتخاب کنید.
+                </span>
+              ) : null}
             </div>
           )}
         </div>
@@ -290,9 +308,11 @@ export default function CartPage() {
               const colorEntries = normalizeStockEntries(productColorStock);
               const hasColorStock = colorEntries.length > 0;
               const colorSelection = getCartItemColorSelection({ ...item, colorStock: productColorStock });
-              const colorSelectionText = Object.entries(colorSelection)
-                .map(([color, count]) => `${color} (${count})`)
-                .join("، ");
+              const selectedColorEntries = Object.entries(colorSelection).filter(([, count]) => count > 0);
+              const activeColor = selectedColorEntries.length === 1
+                && selectedColorEntries[0][1] === item.quantity
+                ? selectedColorEntries[0][0]
+                : "";
               const isAvailable = (product?.isAvailable ?? item.isAvailable) !== false
                 && normalizedStockLimit > 0;
               const syncedItem = {
@@ -325,61 +345,21 @@ export default function CartPage() {
                       <IoBagHandleOutline className="text-4xl text-primary" aria-hidden="true" />
                     )}
                   </button>
-                  <div className="grid gap-2">
+                    <div className="grid gap-2">
                     <div className="text-lg font-bold">{item.title}</div>
                     <div className="text-sm text-secondary-text">{item.description}</div>
-                    {colorSelectionText ? (
-                      <span className="text-xs font-semibold text-secondary-text">
-                        رنگ‌ها: {colorSelectionText}
-                      </span>
-                    ) : null}
                     {hasColorStock ? (
                       <div className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold text-secondary-text">انتخاب رنگ‌ها</span>
-                        <div className="flex flex-col gap-2">
-                          {colorEntries.map(({ color, count }) => {
-                            const selectedCount = colorSelection[color] ?? 0;
-                            const totalWithoutColor = item.quantity - selectedCount;
-                            const canAddColor = !isCheckoutLoading
-                              && isAvailable
-                              && count > selectedCount
-                              && totalWithoutColor < normalizedStockLimit;
-
-                            return (
-                              <div key={color} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary-border bg-primary-soft p-2">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="h-5 w-5 rounded-full border border-primary-border shadow-sm"
-                                    style={{ backgroundColor: getStockColorValue(color) }}
-                                  />
-                                  <span className="text-xs font-bold text-primary-text">{color}</span>
-                                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${count > 0 ? "bg-success-bg-nomode text-success-text-nomode" : "bg-danger-bg-nomode text-danger-text-nomode"}`}>
-                                    {count > 0 ? "موجود" : "ناموجود"}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <CustomButton
-                                    variant="neutral"
-                                    size="xs"
-                                    disabled={isCheckoutLoading || selectedCount <= 0}
-                                    onClick={() => updateItemColorQuantity(syncedItem, color, selectedCount - 1)}
-                                  >
-                                    -
-                                  </CustomButton>
-                                  <span className="min-w-6 text-center text-xs font-bold">{selectedCount}</span>
-                                  <CustomButton
-                                    variant="neutral"
-                                    size="xs"
-                                    disabled={!canAddColor}
-                                    onClick={() => updateItemColorQuantity(syncedItem, color, selectedCount + 1)}
-                                  >
-                                    +
-                                  </CustomButton>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                        <span className="text-xs font-semibold text-secondary-text">انتخاب رنگ</span>
+                        <ColorStockDots
+                          value={productColorStock}
+                          selectedColor={activeColor}
+                          onSelect={(color) => selectItemColor(syncedItem, color)}
+                          disabledUnavailable
+                          minimumCount={item.quantity}
+                          showCount={false}
+                          size="md"
+                        />
                       </div>
                     ) : null}
                     <div className="text-sm font-semibold text-primary">

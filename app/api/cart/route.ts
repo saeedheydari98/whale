@@ -68,6 +68,8 @@ type CartProductSnapshot = {
   isActive: boolean;
 };
 
+class CheckoutValidationError extends Error {}
+
 function normalizeProfile(value: ProfilePayload) {
   return {
     firstName: String(value.firstName ?? "").trim(),
@@ -253,6 +255,7 @@ export async function POST(request: Request) {
         })
       : [];
     const productsById = new Map(products.map((product) => [product.id, product]));
+    let rejectedItemTitle = "";
     const safeItems = mergeCartItems(
       items
         .map((item) => {
@@ -262,7 +265,10 @@ export async function POST(request: Request) {
           const colorStock = normalizeColorStock(product.colorStock);
           const hasColorStock = Object.keys(colorStock).length > 0;
           const productStock = Math.max(0, Math.round(Number(product.stockQuantity) || 0));
-          if (product.active === false || product.isActive === false || product.isAvailable === false || productStock <= 0) return null;
+          if (product.active === false || product.isActive === false || product.isAvailable === false || productStock <= 0) {
+            rejectedItemTitle ||= item.title;
+            return null;
+          }
 
           if (!hasColorStock) {
             return {
@@ -280,7 +286,10 @@ export async function POST(request: Request) {
               .filter(([, count]) => count > 0)
           );
           const selectedTotal = colorSelectionTotal(selectedColors);
-          if (selectedTotal <= 0) return null;
+          if (selectedTotal <= 0) {
+            rejectedItemTitle ||= item.title;
+            return null;
+          }
 
           return {
             ...item,
@@ -291,6 +300,10 @@ export async function POST(request: Request) {
         })
         .filter((item): item is ReturnType<typeof normalizeCartItem> => Boolean(item))
     );
+
+    if (rejectedItemTitle) {
+      return apiFail(`موجودی ${rejectedItemTitle} تغییر کرده است؛ لطفاً دوباره انتخاب کنید.`, 409);
+    }
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
@@ -354,22 +367,22 @@ export async function PATCH(request: Request) {
         | { id: number; stockQuantity: number; colorStock: unknown }
         | undefined;
       if (!product || product.stockQuantity < item.quantity) {
-        throw new Error(`${item.title} موجودی کافی ندارد.`);
+        throw new CheckoutValidationError(`${item.title} موجودی کافی ندارد.`);
       }
 
       const colorStock = normalizeColorStock(product.colorStock);
       if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
-        throw new Error(`برای ${item.title} یک رنگ انتخاب کنید.`);
+        throw new CheckoutValidationError(`برای ${item.title} یک رنگ انتخاب کنید.`);
       }
       if (Object.keys(colorStock).length > 0) {
         const selectedColors = readColorSelection(item.selectedColor, item.quantity);
         const selectedTotal = colorSelectionTotal(selectedColors);
         if (selectedTotal !== item.quantity) {
-          throw new Error(`تعداد رنگ‌های انتخاب‌شده برای ${item.title} با تعداد سبد خرید هماهنگ نیست.`);
+          throw new CheckoutValidationError(`تعداد رنگ‌های انتخاب‌شده برای ${item.title} با تعداد سبد خرید هماهنگ نیست.`);
         }
         for (const [color, count] of Object.entries(selectedColors)) {
           if ((colorStock[color] ?? 0) < count) {
-            throw new Error(`${item.title} با رنگ ${color} موجودی کافی ندارد.`);
+            throw new CheckoutValidationError(`${item.title} با رنگ ${color} موجودی کافی ندارد.`);
           }
           colorStock[color] -= count;
         }
@@ -390,7 +403,11 @@ export async function PATCH(request: Request) {
               userId: authUser.id,
               profileId: profile.id,
               status: "paid",
+              fulfillmentStatus: "pending_approval",
               total: "0",
+              statusHistory: {
+                create: { status: "pending_approval" },
+              },
             },
           })
         : null;
@@ -432,7 +449,8 @@ export async function PATCH(request: Request) {
     return apiOk({ user: { profile }, cart: { items: [] } });
   } catch (error) {
     console.error("Cart checkout error:", error);
-    return apiServerError(error instanceof Error ? error.message : "خطای سرور رخ داد.");
+    if (error instanceof CheckoutValidationError) return apiFail(error.message, 409);
+    return apiServerError("ثبت سفارش انجام نشد. لطفاً دوباره تلاش کنید.");
   }
 }
 

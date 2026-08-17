@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
+import { CustomButton } from "@/app/design-system/components/ui/button";
 import { LazyViewportSection } from "@/app/design-system/components/ui/lazy-viewport-section";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
@@ -19,14 +20,15 @@ export default function CategoriesPage() {
   });
   const [cachedStructure, setCachedStructure] = useState<ProductsCache | null>(null);
   const structure = structureQuery.data ?? cachedStructure;
-  const categories = structure?.categories ?? [];
-  const categoryGroups = structure?.categoryGroups ?? [];
-  const banners = structure?.banners ?? [];
+  const categories = useMemo(() => structure?.categories ?? [], [structure?.categories]);
+  const categoryGroups = useMemo(() => structure?.categoryGroups ?? [], [structure?.categoryGroups]);
+  const banners = useMemo(() => structure?.banners ?? [], [structure?.banners]);
   const structureLoading = structureQuery.isLoading;
   const [previewImage, setPreviewImage] = useState("");
 
   useEffect(() => {
-    setCachedStructure(readCachedCategoriesPageStructure());
+    const timer = window.setTimeout(() => setCachedStructure(readCachedCategoriesPageStructure()), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const visibleCategories = useMemo(
@@ -47,6 +49,7 @@ export default function CategoriesPage() {
       .filter((group) => group.active !== false)
       .map((group) => ({
         type: "categories" as const,
+        id: group.id,
         item: visibleCategories.filter((category) => (category.groupId || "default-categories") === group.id),
         title: group.title,
         sortOrder: Number(group.sortOrder ?? 1),
@@ -84,7 +87,7 @@ export default function CategoriesPage() {
                   <div className="flex flex-wrap gap-4">
                     {[0, 1, 2, 3].map((item) => (
                       <Loading key={item} loading="skeleton-item" isLoading>
-                        <CategoryOption label="دسته‌بندی" imageUrl="" size="lg" />
+                        <CategoryOption label="دسته‌بندی" imageUrl="" size="lg" shape="rounded" />
                       </Loading>
                     ))}
                   </div>
@@ -121,7 +124,7 @@ export default function CategoriesPage() {
                   <div className="flex w-full gap-4 overflow-x-auto overscroll-x-contain pb-1">
                     {(section.item.length > 0 ? section.item.slice(0, 4) : [0, 1, 2, 3]).map((category) => (
                       <Loading key={typeof category === "number" ? category : category.id} loading="skeleton-item" isLoading>
-                        <CategoryOption label={typeof category === "number" ? "دسته‌بندی" : category.title} imageUrl="" size="lg" className="min-w-28 shrink-0" />
+                        <CategoryOption label={typeof category === "number" ? "دسته‌بندی" : category.title} imageUrl="" size="lg" shape="rounded" className="min-w-28 shrink-0" />
                       </Loading>
                     ))}
                   </div>
@@ -129,7 +132,7 @@ export default function CategoriesPage() {
               );
 
               return (
-                <LazyViewportSection key={`${section.type}-${section.type === "banner" ? section.item.id : section.title}`} fallback={fallback}>
+                <LazyViewportSection key={`${section.type}-${section.type === "banner" ? section.item.id : section.id}`} fallback={fallback}>
                   {(() => {
               if (section.type === "banner") {
                 return (
@@ -149,7 +152,12 @@ export default function CategoriesPage() {
                 <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xl font-bold">{section.title}</div>
-                    <span className="text-xs font-semibold text-secondary-text">{section.item.length} دسته بندی</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-secondary-text">{section.item.length} دسته‌بندی</span>
+                      <CustomButton href={`/categories/group/${encodeURIComponent(section.id)}`} size="sm" rounded="full">
+                        <span>مشاهده همه</span>
+                      </CustomButton>
+                    </div>
                   </div>
                   <div className="flex w-full gap-4 overflow-x-auto overscroll-x-contain pb-1">
                     {section.item.map((category) => {
@@ -160,6 +168,7 @@ export default function CategoriesPage() {
                           label={category.title}
                           imageUrl={category.imageUrl}
                           size="lg"
+                          shape="rounded"
                           className="min-w-28 shrink-0"
                           onClick={() => router.push(`/categories/${slug || category.id}`)}
                         />

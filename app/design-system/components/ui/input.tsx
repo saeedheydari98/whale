@@ -109,11 +109,8 @@ export function CustomInput({
   };
   const handleChange = (event: React.ChangeEvent<CustomInputElement>) => {
     if (!hasControlledValue) setHasUncontrolledValue(hasInputValue(event.target.value));
-    if (isNumber && event.target.value === "") {
-      setNumberDraft("");
-      return;
-    }
-    if (isNumber) setNumberDraft(null);
+    if (isNumber) setNumberDraft(event.target.value);
+    if (isNumber && event.target.value === "") return;
     onChange?.(event);
   };
   const handleBlur = (event: React.FocusEvent<CustomInputElement>) => {
@@ -123,6 +120,10 @@ export function CustomInput({
   };
   const handleFocus = (event: React.FocusEvent<CustomInputElement>) => {
     setIsFocused(true);
+    if (isNumber) {
+      if (hasControlledValue) setNumberDraft(String(value ?? ""));
+      event.currentTarget.select();
+    }
     onFocus?.(event);
   };
   const resolvedIconAfter = iconAfter ?? (isPassword ? (
