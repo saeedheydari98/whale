@@ -129,7 +129,7 @@ export default function ShowcasePage() {
     <Loading loading="fullscreen" />
   ) : (
     <main className="min-h-full bg-primary-base text-primary-text">
-      <div className="flex w-full flex-col gap-4 p-4">
+      <div className="flex w-full flex-col gap-4 px-4 pb-4">
         <ProductListShell
           title={showcase?.title || `ویترین: ${showcaseId}`}
           count={hasKnownTotalProducts ? totalProductCount : (loading ? 0 : products.length)}

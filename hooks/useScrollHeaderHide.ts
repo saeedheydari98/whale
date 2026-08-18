@@ -21,6 +21,9 @@ export const useScrollHeaderHide = ({ resetKey }: ScrollHeaderHideOptions = {}) 
     const scrollContainer = document.querySelector<HTMLElement>(APP_SCROLL_CONTAINER_SELECTOR);
     const scrollTarget: HTMLElement | Window = scrollContainer ?? window;
     const readScrollY = () => scrollContainer?.scrollTop ?? window.scrollY;
+    const readMaxScrollY = () => scrollContainer
+      ? Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight)
+      : Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const readHeaderHeight = () => headerRef.current?.offsetHeight || FALLBACK_HEADER_HEIGHT;
     const applyOffset = (offset: number) => {
@@ -62,13 +65,14 @@ export const useScrollHeaderHide = ({ resetKey }: ScrollHeaderHideOptions = {}) 
     const handleScroll = () => {
       const currentScrollY = Math.max(0, readScrollY());
       const headerHeight = readHeaderHeight();
+      const availableHideScroll = Math.max(0, readMaxScrollY() - headerHeight);
       const previousActiveScroll = Math.max(0, lastScrollY.current - headerHeight);
       const currentActiveScroll = Math.max(0, currentScrollY - headerHeight);
       const activeScrollDelta = currentActiveScroll - previousActiveScroll;
 
       lastScrollY.current = currentScrollY;
 
-      if (currentScrollY <= headerHeight) {
+      if (availableHideScroll < headerHeight || currentScrollY <= headerHeight) {
         moveToOffset(0);
         return;
       }

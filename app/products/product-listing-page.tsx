@@ -95,7 +95,7 @@ export function ProductListingPage({
     <Loading loading="fullscreen" />
   ) : (
     <main className="min-h-full bg-primary-base text-primary-text">
-      <div className="mx-auto flex w-full flex-col gap-5 px-4 py-6">
+      <div className="mx-auto flex w-full flex-col gap-5 px-4 pb-6">
         <ProductListShell
           title={title}
           count={resolvedTotalProducts}

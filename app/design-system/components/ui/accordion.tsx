@@ -9,6 +9,7 @@ export type CustomAccordionStatus = "neutral" | "complete" | "incomplete" | "opt
 type CustomAccordionProps = {
   title: string;
   children: ReactNode;
+  heading?: ReactNode;
   status?: CustomAccordionStatus;
   leading?: ReactNode;
   meta?: ReactNode;
@@ -61,6 +62,7 @@ function statusIconClasses(status: CustomAccordionStatus, invalid: boolean) {
 export function CustomAccordion({
   title,
   children,
+  heading,
   status = "neutral",
   leading,
   meta,
@@ -87,29 +89,32 @@ export function CustomAccordion({
   };
 
   return (
-    <div className={`flex flex-col gap-2 rounded-xl p-2 ${glassSurfaceClasses} ${shellClasses()} ${className}`}>
-      <button
-        type="button"
-        aria-controls={contentId}
-        aria-expanded={resolvedOpen}
-        className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-start transition hover:brightness-95 ${glassSurfaceClasses} ${statusClasses()}`}
-        onClick={toggleOpen}
-      >
-        <span className="flex min-w-0 flex-1 items-center gap-2">
-          {leading ? <span className="flex shrink-0 items-center">{leading}</span> : null}
-          {icon ? <span className={`text-base ${iconTone}`}>{icon}</span> : null}
-          <span className="truncate text-sm font-bold">{title}</span>
-          {meta ? <span className="hidden truncate text-[11px] font-semibold opacity-75 sm:inline">{meta}</span> : null}
-        </span>
-        <span className="flex shrink-0 items-center gap-2">
-          {showStatusLabel && label ? (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusTone}`}>{label}</span>
-          ) : null}
-          <IoChevronDown className={`text-lg transition ${resolvedOpen ? "rotate-180" : ""}`} aria-hidden="true" />
-        </span>
-      </button>
+    <div className={`flex flex-col gap-1 rounded-lg p-1 ${glassSurfaceClasses} ${shellClasses()} ${className}`}>
+      <div className="flex min-w-0 items-center gap-2">
+        {heading ? <div className="min-w-0 flex-1">{heading}</div> : null}
+        <button
+          type="button"
+          aria-controls={contentId}
+          aria-expanded={resolvedOpen}
+          className={`flex min-h-9 cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5 text-start outline-none transition hover:brightness-95 focus:outline-none focus-visible:brightness-90 ${heading ? "shrink-0" : "w-full flex-1"} ${glassSurfaceClasses} ${statusClasses()}`}
+          onClick={toggleOpen}
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-1.5">
+            {leading ? <span className="flex shrink-0 items-center">{leading}</span> : null}
+            {icon ? <span className={`text-base ${iconTone}`}>{icon}</span> : null}
+            <span className="truncate text-sm font-bold">{title}</span>
+            {meta ? <span className="hidden truncate text-[11px] font-semibold opacity-75 sm:inline">{meta}</span> : null}
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            {showStatusLabel && label ? (
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusTone}`}>{label}</span>
+            ) : null}
+            <IoChevronDown className={`text-base transition ${resolvedOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+          </span>
+        </button>
+      </div>
       {resolvedOpen ? (
-        <div id={contentId} className={`flex flex-col gap-2 ${contentClassName}`}>
+        <div id={contentId} className={`flex flex-col gap-1.5 ${contentClassName}`}>
           {children}
         </div>
       ) : null}

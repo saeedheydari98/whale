@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { FiSearch } from "react-icons/fi";
+import { FiDollarSign, FiSearch } from "react-icons/fi";
 import { IoOptionsOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
-import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { formatTomanPrice, numericTextValue as numericFilterValue, readPriceNumberWithFallback as readPriceNumber } from "@/lib/price-format";
 
 export type ProductFilterState = {
@@ -67,8 +67,7 @@ export function hasProductFilters(filters: ProductFilterState) {
 
 function productFilterCount(filters: ProductFilterState) {
   return [
-    filters.priceMin.trim(),
-    filters.priceMax.trim(),
+    filters.priceMin.trim() || filters.priceMax.trim(),
     filters.inStock,
     filters.discounted,
     filters.featured,
@@ -79,7 +78,6 @@ function productFilterCount(filters: ProductFilterState) {
 type ProductFilterFieldsProps = {
   filters: ProductFilterState;
   onChange: (filters: ProductFilterState) => void;
-  onClose?: () => void;
 };
 
 function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, "filters" | "onChange">) {
@@ -169,83 +167,61 @@ function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, 
           onChange={(event) => commitRange(minValue, Number(event.target.value))}
         />
       </div>
-      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-secondary-text">
-        <span>{formatTomanPrice(0)}</span>
-        <span>{formatTomanPrice(rangeMax)}</span>
+      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-secondary-text" dir="ltr">
+        <span dir="rtl">{formatTomanPrice(0)}</span>
+        <span dir="rtl">{formatTomanPrice(rangeMax)}</span>
       </div>
     </div>
   );
 }
 
-function ProductFilterFields({ filters, onChange, onClose }: ProductFilterFieldsProps) {
-  const activeCount = productFilterCount(filters);
+type ToggleFilterKey = "inStock" | "discounted" | "featured";
+
+const TOGGLE_FILTERS: Array<{ key: ToggleFilterKey; label: string }> = [
+  { key: "inStock", label: "فقط موجودها" },
+  { key: "discounted", label: "تخفیف‌دارها" },
+  { key: "featured", label: "محصولات ویژه" },
+];
+
+function ProductFilterBar({ filters, onChange }: Pick<ProductFilterFieldsProps, "filters" | "onChange">) {
   const patchFilters = (patch: Partial<ProductFilterState>) => {
     onChange({ ...filters, ...patch });
   };
 
   return (
-    <div className="flex w-full flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-base font-bold text-primary-text">فیلترها</div>
-        <span className="text-xs font-semibold text-secondary-text">{activeCount} فیلتر فعال</span>
-      </div>
+    <div className="flex min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-nowrap gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-primary-border bg-primary-soft p-1 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {TOGGLE_FILTERS.map((item) => {
+          const active = filters[item.key];
 
-      <div className="flex flex-col gap-3">
-        <PriceRangeSlider filters={filters} onChange={onChange} />
-        <div className="hidden">
-        <CustomInput
-          value={filters.priceMin}
-          onChange={(event) => patchFilters({ priceMin: event.target.value })}
-          label="حداقل قیمت"
-          placeholder=" ۵۰۰۰۰۰"
-          inputMode="numeric"
-          rounded="full"
-        />
-        <CustomInput
-          value={filters.priceMax}
-          onChange={(event) => patchFilters({ priceMax: event.target.value })}
-          label="حداکثر قیمت"
-          placeholder=" ۳۰۰۰۰۰۰"
-          inputMode="numeric"
-          rounded="full"
-        />
-        </div>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs font-bold text-secondary-text">حداقل امتیاز</span>
-          <CustomSelect
-            value={filters.minRating}
-            onChange={(event) => patchFilters({ minRating: event.target.value })}
-            aria-label="حداقل امتیاز"
-            rounded="full"
-          >
-            <option value="">همه امتیازها</option>
-            <option value="4">۴ ستاره به بالا</option>
-            <option value="3">۳ ستاره به بالا</option>
-          </CustomSelect>
-        </label>
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
-        <CustomSwitch checked={filters.inStock} onChange={(inStock) => patchFilters({ inStock })} label="فقط موجودها" size="sm" />
-        <CustomSwitch checked={filters.discounted} onChange={(discounted) => patchFilters({ discounted })} label="تخفیف دارها" size="sm" />
-        <CustomSwitch checked={filters.featured} onChange={(featured) => patchFilters({ featured })} label="محصولات ویژه" size="sm" />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <CustomButton
-          size="sm"
-          variant="neutral"
-          rounded="full"
-          disabled={!activeCount}
-          onClick={() => onChange(EMPTY_PRODUCT_FILTERS)}
+          return (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={active}
+              className={`flex h-10 shrink-0 items-center justify-center rounded-lg px-3 text-xs font-semibold transition hover:brightness-105 sm:text-sm ${
+                active
+                  ? "bg-primary text-primary-contrast shadow-sm"
+                  : "bg-primary-card text-primary-text hover:bg-primary-bg hover:text-primary"
+              }`}
+              onClick={() => patchFilters({ [item.key]: !active })}
+            >
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-pressed={filters.minRating === "4"}
+          className={`flex h-10 shrink-0 items-center justify-center rounded-lg px-3 text-xs font-semibold transition hover:brightness-105 sm:text-sm ${
+            filters.minRating === "4"
+              ? "bg-primary text-primary-contrast shadow-sm"
+              : "bg-primary-card text-primary-text hover:bg-primary-bg hover:text-primary"
+          }`}
+          onClick={() => patchFilters({ minRating: filters.minRating === "4" ? "" : "4" })}
         >
-          <span>پاک کردن فیلترها</span>
-        </CustomButton>
-        {onClose ? (
-          <CustomButton size="sm" variant="primary" rounded="full" onClick={onClose}>
-            <span>نمایش محصولات</span>
-          </CustomButton>
-        ) : null}
+          <span>محبوب‌ترین‌ها</span>
+        </button>
       </div>
     </div>
   );
@@ -278,87 +254,112 @@ export function ProductListShell({
   topContent,
   children,
 }: ProductListShellProps) {
-  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [priceModalOpen, setPriceModalOpen] = useState(false);
   const activeFilterCount = productFilterCount(filters);
+  const priceFilterActive = Boolean(filters.priceMin.trim() || filters.priceMax.trim());
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 border-b border-primary-border pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <Loading loading="skeleton-item" isLoading={headerLoading}>
-              <div className="text-2xl font-bold">{title || "محصولات"}</div>
-            </Loading>
-            <Loading loading="skeleton-item" isLoading={headerLoading}>
-              <span className="text-xs font-semibold text-secondary-text">{count} محصول</span>
-            </Loading>
+      <div className="sticky top-0 z-20 -mx-4 flex flex-col border-b border-primary-border bg-primary-panel p-2 shadow-sm backdrop-blur md:p-3">
+        <CustomAccordion
+          title={activeFilterCount ? `فیلترها (${activeFilterCount})` : "فیلترها"}
+          heading={(
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <Loading loading="skeleton-item" isLoading={headerLoading}>
+                <div className="truncate text-xl font-bold sm:text-2xl">{title || "محصولات"}</div>
+              </Loading>
+              <Loading loading="skeleton-item" isLoading={headerLoading}>
+                <span className="text-[11px] font-semibold text-secondary-text sm:text-xs">{count} محصول</span>
+              </Loading>
+            </div>
+          )}
+          leading={<IoOptionsOutline aria-hidden="true" />}
+          meta="جست‌وجو، مرتب‌سازی و فیلتر"
+          defaultOpen
+          showStatusLabel={false}
+          contentClassName="gap-3"
+        >
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="w-full sm:min-w-56 sm:flex-1 lg:w-64 lg:flex-none">
+              <CustomInput
+                value={searchQuery}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="جستجو..."
+                aria-label="جست‌وجوی محصول"
+                showLabel={false}
+                fullWidth
+                size="sm"
+                rounded="full"
+                icon={<FiSearch />}
+                className="min-w-0 bg-primary-media text-sm"
+                style={{ backgroundColor: "var(--primary-media)" }}
+              />
+            </div>
+            <div className="flex min-w-0 items-end gap-2">
+              <label className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-none">
+                <span className="text-xs font-semibold text-secondary-text">مرتب کردن بر اساس</span>
+                <CustomSelect
+                  value={sort}
+                  aria-label="مرتب کردن محصولات بر اساس"
+                  onChange={(event) => onSortChange(event.target.value)}
+                  fullWidth={false}
+                  size="sm"
+                  rounded="full"
+                >
+                  {PRODUCT_SORT_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </CustomSelect>
+              </label>
+              <CustomButton
+                type="button"
+                size="sm"
+                rounded="full"
+                variant={priceFilterActive ? "primary" : "neutral"}
+                icon={<FiDollarSign />}
+                onClick={() => setPriceModalOpen(true)}
+              >
+                <span>قیمت</span>
+              </CustomButton>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <CustomInput
-              value={searchQuery}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="جستجو..."
-              aria-label="جست‌وجوی محصول"
-              showLabel={false}
-              fullWidth={false}
-              size="sm"
-              rounded="full"
-              icon={<FiSearch />}
-              className="min-w-56 bg-primary-media text-sm"
-              style={{ backgroundColor: "var(--primary-media)" }}
-            />
-            <CustomSelect
-              value={sort}
-              aria-label="مرتب سازی محصولات"
-              onChange={(event) => onSortChange(event.target.value)}
-              fullWidth={false}
-              size="sm"
-              rounded="full"
-            >
-              {PRODUCT_SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </CustomSelect>
-            <CustomButton
-              type="button"
-              size="sm"
-              rounded="full"
-              variant={activeFilterCount ? "accent" : "neutral"}
-              icon={<IoOptionsOutline />}
-              className="lg:hidden"
-              onClick={() => setFilterModalOpen(true)}
-            >
-              <span>{activeFilterCount ? `فیلتر (${activeFilterCount})` : "فیلتر"}</span>
-            </CustomButton>
-          </div>
-        </div>
+          <ProductFilterBar filters={filters} onChange={onFiltersChange} />
+        </CustomAccordion>
       </div>
 
       {topContent}
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <div className="hidden shrink-0 lg:flex lg:w-1/4">
-          <ProductFilterFields filters={filters} onChange={onFiltersChange} />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-4 lg:w-3/4">
-          {children}
-        </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
+        {children}
       </div>
 
       <CustomModal
-        open={filterModalOpen}
-        onClose={() => setFilterModalOpen(false)}
-        title="فیلتر محصولات"
+        open={priceModalOpen}
+        onClose={() => setPriceModalOpen(false)}
+        title="انتخاب محدوده قیمت"
         rounded="lg"
         shadow="lg"
       >
-        <ProductFilterFields
-          filters={filters}
-          onChange={onFiltersChange}
-          onClose={() => setFilterModalOpen(false)}
-        />
+        <div className="flex flex-col gap-4">
+          <PriceRangeSlider filters={filters} onChange={onFiltersChange} />
+          <div className="flex flex-wrap justify-end gap-2">
+            <CustomButton
+              type="button"
+              size="sm"
+              variant="neutral"
+              rounded="full"
+              disabled={!priceFilterActive}
+              onClick={() => onFiltersChange({ ...filters, priceMin: "", priceMax: "" })}
+            >
+              <span>پاک کردن قیمت</span>
+            </CustomButton>
+            <CustomButton type="button" size="sm" rounded="full" onClick={() => setPriceModalOpen(false)}>
+              <span>نمایش محصولات</span>
+            </CustomButton>
+          </div>
+        </div>
       </CustomModal>
     </div>
   );
