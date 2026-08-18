@@ -275,7 +275,7 @@ export function ProductListShell({
           )}
           leading={<IoOptionsOutline aria-hidden="true" />}
           meta="جست‌وجو، مرتب‌سازی و فیلتر"
-          defaultOpen
+          defaultOpen={false}
           showStatusLabel={false}
           contentClassName="gap-3"
         >
