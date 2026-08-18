@@ -448,13 +448,13 @@ export default function ProductPage() {
           </section>
 
         <section id="product-tabs" className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex flex-wrap gap-2 border-b border-primary-border">
+          <div className="flex w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain border-b border-primary-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {PRODUCT_TABS.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors hover:bg-primary-soft ${
+                className={`min-w-max grow whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition-colors hover:bg-primary-soft sm:px-4 sm:text-sm ${
                   activeTab === tab.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
                 }`}
               >

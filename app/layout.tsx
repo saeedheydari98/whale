@@ -112,11 +112,11 @@ export default function RootLayout({
               <CatalogQueryProvider>
                 <ProductsCatalogProvider>
                   <div data-app-shell className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-primary-base text-primary-text">
-                    <div data-app-scroll-container className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pb-14 md:pb-0">
+                    <div data-app-scroll-container className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
                       <AppHeader />
-                      <div data-app-content className="flex min-h-0 flex-1 flex-col">
+                      <main data-app-content className="flex grow shrink-0 flex-col pb-14 md:pb-0">
                         {children}
-                      </div>
+                      </main>
                       <AppFooter />
                     </div>
                   </div>
