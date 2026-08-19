@@ -37,7 +37,7 @@ export function CustomInput({
   size = "md",
   rounded = "md",
   border = "base",
-  gradient = "btu",
+  gradient,
   shadow = "none",
   fullWidth = true,
   className,
@@ -91,7 +91,7 @@ export function CustomInput({
   const resolvedHeight = resolvedHeightProp ?? (multiline ? style?.height ?? "8rem" : undefined);
   const wrapperStyle = {
     backgroundColor: glassBackground,
-    ...resolveGradientStyle(glassBackground, gradient),
+    ...resolveGradientStyle(glassBackground, gradient, colorStyle.borderColor),
     ...style,
     ...(resolvedHeight !== undefined ? { height: resolvedHeight } : {}),
   };

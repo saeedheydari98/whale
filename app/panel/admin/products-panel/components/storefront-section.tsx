@@ -1,9 +1,8 @@
 "use client";
 
-import { IoSaveOutline } from "react-icons/io5";
+import { useEffect, useState } from "react";
 import Loading from "@/app/design-system/components/loading/loading";
 import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
-import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { STOREFRONT_TABS } from "../constants";
 import type { BannerForm, ShowcaseForm, StorefrontDisplayEntry, StorefrontLayoutTab } from "../types";
@@ -16,11 +15,10 @@ type StorefrontSectionProps = {
   setTab: (tab: StorefrontLayoutTab) => void;
   setDraggingKey: (key: string | null) => void;
   onReorder: (sourceKey: string, targetKey: string) => void;
-  onUpdateBannerPlacement: (banner: BannerForm, sortOrder: number) => void;
-  onUpdateShowcasePlacement: (showcase: ShowcaseForm, sortOrder: number) => void;
-  onUpdateCategoryGroupPlacement: (groupId: string, sortOrder: number) => void;
-  onUpdateBrandGroupPlacement: (groupId: string, sortOrder: number) => void;
-  onSave: () => void;
+  onUpdateBannerPlacement: (banner: BannerForm, sortOrder: number) => void | Promise<void>;
+  onUpdateShowcasePlacement: (showcase: ShowcaseForm, sortOrder: number) => void | Promise<void>;
+  onUpdateCategoryGroupPlacement: (groupId: string, sortOrder: number) => void | Promise<void>;
+  onUpdateBrandGroupPlacement: (groupId: string, sortOrder: number) => void | Promise<void>;
   isLoading?: boolean;
   loadingCountHint?: number;
 };
@@ -111,7 +109,6 @@ export function StorefrontSection({
   onUpdateShowcasePlacement,
   onUpdateCategoryGroupPlacement,
   onUpdateBrandGroupPlacement,
-  onSave,
   isLoading = false,
   loadingCountHint,
 }: StorefrontSectionProps) {
@@ -187,18 +184,14 @@ export function StorefrontSection({
               </Loading>
             </div>
             <Loading loading="skeleton-item" isLoading={isLoading} className="w-full sm:w-auto">
-              <CustomInput
-                type="number"
+              <StorefrontOrderInput
                 value={entrySortOrder}
                 disabled={isLoading}
-                placeholder="ترتیب"
-                onChange={(event) => {
-                  if (isLoading) return;
-                  const sortOrder = Number(event.target.value);
-                  if (entry.type === "banner") onUpdateBannerPlacement(entry.item, sortOrder);
-                  else if (entry.type === "brandGroup") onUpdateBrandGroupPlacement(entry.item.id, sortOrder);
-                  else if (entry.type === "categoryGroup") onUpdateCategoryGroupPlacement(entry.item.id, sortOrder);
-                  else if (entry.type === "showcase") onUpdateShowcasePlacement(entry.item, sortOrder);
+                onCommit={(sortOrder) => {
+                  if (entry.type === "banner") return onUpdateBannerPlacement(entry.item, sortOrder);
+                  if (entry.type === "brandGroup") return onUpdateBrandGroupPlacement(entry.item.id, sortOrder);
+                  if (entry.type === "categoryGroup") return onUpdateCategoryGroupPlacement(entry.item.id, sortOrder);
+                  if (entry.type === "showcase") return onUpdateShowcasePlacement(entry.item, sortOrder);
                 }}
               />
             </Loading>
@@ -206,12 +199,50 @@ export function StorefrontSection({
         );
       })}
 
-      <Loading loading="skeleton-item" isLoading={isLoading}>
-        <CustomButton icon={<IoSaveOutline />} disabled={isLoading} onClick={() => void onSave()}>
-          <span>ذخیره چیدمان</span>
-        </CustomButton>
-      </Loading>
+      {!isLoading ? <span className="text-xs font-semibold text-secondary-text">تغییرات چیدمان به‌صورت خودکار ذخیره می‌شوند.</span> : null}
     </div>
+  );
+}
+
+type StorefrontOrderInputProps = {
+  value: number;
+  disabled: boolean;
+  onCommit: (value: number) => void | Promise<void>;
+};
+
+function StorefrontOrderInput({ value, disabled, onCommit }: StorefrontOrderInputProps) {
+  const [draftValue, setDraftValue] = useState(String(value));
+
+  useEffect(() => {
+    setDraftValue(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsedValue = Number(draftValue);
+    if (!Number.isFinite(parsedValue)) {
+      setDraftValue(String(value));
+      return;
+    }
+
+    const nextValue = Math.max(1, Math.round(parsedValue));
+    setDraftValue(String(nextValue));
+    if (nextValue !== value) void onCommit(nextValue);
+  };
+
+  return (
+    <CustomInput
+      type="number"
+      min={1}
+      step={1}
+      value={draftValue}
+      disabled={disabled}
+      placeholder="ترتیب"
+      onChange={(event) => setDraftValue(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+    />
   );
 }
 

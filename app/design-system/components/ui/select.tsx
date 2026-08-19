@@ -23,7 +23,7 @@ export function CustomSelect({
   size = "md",
   rounded = "md",
   border = "borderB",
-  gradient = "btu",
+  gradient,
   shadow = "none",
   fullWidth = true,
   className,
@@ -59,7 +59,7 @@ export function CustomSelect({
         )}
         style={{
           backgroundColor: glassBackground,
-          ...resolveGradientStyle(glassBackground, gradient),
+          ...resolveGradientStyle(glassBackground, gradient, colorStyle.borderColor),
           borderColor: colorStyle.borderColor,
           ...style,
         }}

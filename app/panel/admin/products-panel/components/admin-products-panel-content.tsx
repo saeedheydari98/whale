@@ -176,7 +176,6 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onUpdateShowcasePlacement={panel.updateShowcasePlacement}
           onUpdateCategoryGroupPlacement={panel.updateCategoryGroupPlacement}
           onUpdateBrandGroupPlacement={panel.updateBrandGroupPlacement}
-          onSave={panel.saveStorefrontPlacement}
           isLoading={contentLoading}
           loadingCountHint={panel.skeletonHints.storefront?.[panel.storefrontLayoutTab]}
         />

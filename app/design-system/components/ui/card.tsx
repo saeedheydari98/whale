@@ -28,7 +28,7 @@ export function CustomCard({
   size = "md",
   rounded = "lg",
   border = "base",
-  gradient = "btu",
+  gradient,
   shadow = "sm",
   className,
   hover = "lift",
@@ -55,7 +55,7 @@ export function CustomCard({
       )}
       style={{
         backgroundColor,
-        ...resolveGradientStyle(backgroundColor, gradient),
+        ...resolveGradientStyle(backgroundColor, gradient, colorStyle.borderColor),
         borderColor: colorStyle.borderColor,
         ...style,
       }}

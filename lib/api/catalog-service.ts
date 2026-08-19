@@ -242,7 +242,7 @@ export function productWhere(searchParams: URLSearchParams, extra: Record<string
   const isFeaturedParam = searchParams.get("isFeatured");
   const and: unknown[] = [];
   if (hasDiscount === "true") {
-    and.push({ OR: [{ discountPercent: { gt: 0 } }, { discountPrice: { not: null } }] });
+    and.push({ discountPercent: { gt: 0 } });
   }
   if (Number.isFinite(minPrice) || Number.isFinite(maxPrice)) {
     and.push({ price: { not: "" } });

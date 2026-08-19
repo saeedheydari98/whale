@@ -37,7 +37,7 @@ export function CustomModal({
   size = "md",
   rounded = "lg",
   border = "dashed",
-  gradient = "btu",
+  gradient,
   shadow = "lg",
   closeIcon = <HiMiniXMark size={24}/>,
   closeText = "",
@@ -73,7 +73,7 @@ export function CustomModal({
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto text-primary-text"
         style={{
           backgroundColor: cardBackgroundColor,
-          ...resolveGradientStyle(cardBackgroundColor, gradient),
+          ...resolveGradientStyle(cardBackgroundColor, gradient, `var(--${variant}-border)`),
           color: "var(--body-text)",
         }}
         shadow={shadow}

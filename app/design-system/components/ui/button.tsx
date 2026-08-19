@@ -42,7 +42,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   size = "md",
   rounded = "md",
   border = "borderB",
-  gradient = "btu",
+  gradient,
   shadow = "none",
   cursor = "pointer",
   fullWidth = false,
@@ -78,8 +78,9 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     if (token.startsWith("bg-")) {
       const tokenBackground = resolveGlassBackground(resolvedColor, 88);
       tokenStyle.backgroundColor = tokenBackground;
-      Object.assign(tokenStyle, resolveGradientStyle(tokenBackground, gradient));
-      tokenStyle.borderColor = strengthenBorderColor(resolvedColor);
+      const tokenBorderColor = strengthenBorderColor(resolvedColor);
+      Object.assign(tokenStyle, resolveGradientStyle(tokenBackground, gradient, tokenBorderColor));
+      tokenStyle.borderColor = tokenBorderColor;
       tokenStyle.color = resolveTokenTextColor(theme, token, 50);
     }
 
@@ -124,7 +125,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           ? {}
           : {
               backgroundColor: glassBackground,
-              ...resolveGradientStyle(glassBackground, gradient),
+              ...resolveGradientStyle(glassBackground, gradient, variantStyle.borderColor),
               color: variantStyle.color,
               borderColor: variantStyle.borderColor,
             }),
@@ -163,7 +164,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
           ? {}
           : {
               backgroundColor: glassBackground,
-              ...resolveGradientStyle(glassBackground, gradient),
+              ...resolveGradientStyle(glassBackground, gradient, variantStyle.borderColor),
               color: variantStyle.color,
               borderColor: variantStyle.borderColor,
             }),

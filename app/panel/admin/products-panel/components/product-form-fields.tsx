@@ -330,7 +330,7 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
       </span>
       <div className="flex flex-wrap gap-2">
         <CustomSwitch checked={product.isActive} onChange={(isActive) => onChange({ isActive, active: isActive })} label={product.isActive ? "فعال" : "مخفی"} size="sm" />
-        <CustomSwitch checked={product.isFeatured} onChange={(isFeatured) => onChange({ isFeatured })} label={product.isFeatured ? "ویژه" : "عادی"} size="sm" />
+        <CustomSwitch checked={product.isFeatured} onChange={(isFeatured) => onChange({ isFeatured })} label={product.isFeatured ? "منتخب فروشگاه" : "عادی"} size="sm" />
         <CustomSwitch checked={product.isAvailable} onChange={(isAvailable) => onChange({ isAvailable })} label={product.isAvailable ? "موجود" : "ناموجود"} size="sm" />
       </div>
     </div>

@@ -30,7 +30,7 @@ export function CustomSwitch({
   size = "md",
   rounded = "full",
   border = "base",
-  gradient = "btu",
+  gradient,
   shadow = "none",
   customColor,
   label,
@@ -64,7 +64,7 @@ export function CustomSwitch({
         )}
         style={{
           backgroundColor: switchBackgroundColor,
-          ...resolveGradientStyle(switchBackgroundColor, gradient),
+          ...resolveGradientStyle(switchBackgroundColor, gradient, borderColor),
           borderColor,
         }}
       >

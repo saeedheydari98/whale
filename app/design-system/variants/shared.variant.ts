@@ -130,11 +130,12 @@ export const cursorVariants = {
 export const gradientDirections = {
   ltr: "to right",
   rtl: "to left",
-  utb: "to bottom",
-  btu: "to top",
+  ttb: "to bottom",
+  btt: "to top",
 } as const;
 
 export type GradientDirection = keyof typeof gradientDirections;
+export const defaultGradientDirection: GradientDirection = "btt";
 
 export const glassSurfaceClasses = "backdrop-blur-xl backdrop-saturate-150";
 
@@ -144,12 +145,16 @@ export function resolveGlassBackground(backgroundColor: string, opacity = 82) {
 
 export function resolveGradientStyle(
   backgroundColor: string,
-  gradient: GradientDirection = "btu"
+  gradient?: GradientDirection,
+  depthColor = "#000000"
 ) {
-  const fadedColor = `color-mix(in srgb, ${backgroundColor} 72%, transparent)`;
+  const direction = gradient
+    ? gradientDirections[gradient]
+    : `var(--ui-gradient-direction, ${gradientDirections[defaultGradientDirection]})`;
+  const strongColor = `color-mix(in srgb, ${backgroundColor} var(--ui-gradient-surface-strength, 72%), ${depthColor})`;
 
   return {
-    backgroundImage: `linear-gradient(${gradientDirections[gradient]}, ${backgroundColor} 0%, ${fadedColor} 100%)`,
+    backgroundImage: `linear-gradient(${direction}, ${strongColor} 0%, ${backgroundColor} 100%)`,
   };
 }
 

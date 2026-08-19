@@ -48,7 +48,7 @@ export function productFilterParams(filters: ProductFilterState) {
     priceMin: numericFilterValue(filters.priceMin),
     priceMax: numericFilterValue(filters.priceMax),
     inStock: filters.inStock ? "true" : undefined,
-    discounted: filters.discounted ? "1" : undefined,
+    hasDiscount: filters.discounted ? "true" : undefined,
     isFeatured: filters.featured ? "true" : undefined,
     minRating: filters.minRating || undefined,
   };
@@ -180,7 +180,7 @@ type ToggleFilterKey = "inStock" | "discounted" | "featured";
 const TOGGLE_FILTERS: Array<{ key: ToggleFilterKey; label: string }> = [
   { key: "inStock", label: "فقط موجودها" },
   { key: "discounted", label: "تخفیف‌دارها" },
-  { key: "featured", label: "محصولات ویژه" },
+  { key: "featured", label: "منتخب فروشگاه" },
 ];
 
 function ProductFilterBar({ filters, onChange }: Pick<ProductFilterFieldsProps, "filters" | "onChange">) {

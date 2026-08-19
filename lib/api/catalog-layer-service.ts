@@ -392,7 +392,7 @@ function filterProducts(products: Array<Partial<ProductRecord>>, searchParams: U
     if (isFeaturedParam !== null && Boolean(product.isFeatured) !== (isFeaturedParam === "true")) return false;
     if (onlyDiscounted) {
       const percent = Number(product.discountPercent || 0);
-      if (!(percent > 0 || String(product.discountPrice || "").trim())) return false;
+      if (percent <= 0) return false;
     }
 
     const price = parseMoney(product.discountPrice || product.price);

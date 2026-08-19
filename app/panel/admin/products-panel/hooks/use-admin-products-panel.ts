@@ -1283,9 +1283,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         throw new Error(String(data.message));
       }
 
-      const layout = normalizeStorefrontLayout(data?.data?.storefront);
-      applySkeletonHints(storefrontLayoutToSkeletonHints(layout));
-      applyCatalogSectionSnapshot("storefront", storefrontLayoutToCatalog(layout));
+      applySkeletonHints(storefrontLayoutToSkeletonHints(storefrontPayload));
       clearProductsCache();
       invalidateFetchCache(ADMIN_CATALOG_SECTION_URL);
       if (showSavedStatus) {
@@ -1987,30 +1985,38 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     await persistProducts(nextProducts);
   };
 
-  const updateBannerPlacement = (banner: BannerForm, sortOrder: number) => {
-    setBanners((current) =>
-      current.map((item) => {
-        if (item.id !== banner.id) return item;
-        if (storefrontLayoutTab === "categories") return { ...item, categorySortOrder: sortOrder };
-        if (storefrontLayoutTab === "products") return { ...item, productSortOrder: sortOrder };
-        return { ...item, homeSortOrder: sortOrder, sortOrder };
-      })
-    );
+  const updateBannerPlacement = async (banner: BannerForm, sortOrder: number) => {
+    const nextBanners = banners.map((item) => {
+      if (item.id !== banner.id) return item;
+      if (storefrontLayoutTab === "categories") return { ...item, categorySortOrder: sortOrder };
+      if (storefrontLayoutTab === "products") return { ...item, productSortOrder: sortOrder };
+      return { ...item, homeSortOrder: sortOrder, sortOrder };
+    });
+    setBanners(nextBanners);
+    const saved = await persistStorefrontLayout(nextBanners, showcases, categoryGroups, brandGroups);
+    if (!saved) setBanners(banners);
   };
 
-  const updateShowcasePlacement = (showcase: ShowcaseForm, sortOrder: number) => {
-    setShowcases((current) => current.map((item) => (item.id === showcase.id ? { ...item, sortOrder } : item)));
+  const updateShowcasePlacement = async (showcase: ShowcaseForm, sortOrder: number) => {
+    const nextShowcases = showcases.map((item) => (item.id === showcase.id ? { ...item, sortOrder } : item));
+    setShowcases(nextShowcases);
+    const saved = await persistStorefrontLayout(banners, nextShowcases, categoryGroups, brandGroups);
+    if (!saved) setShowcases(showcases);
   };
 
-  const updateCategoryGroupPlacement = (groupId: string, sortOrder: number) => {
-    setCategoryGroups((current) => current.map((item) => (item.id === groupId ? { ...item, sortOrder } : item)));
+  const updateCategoryGroupPlacement = async (groupId: string, sortOrder: number) => {
+    const nextCategoryGroups = categoryGroups.map((item) => (item.id === groupId ? { ...item, sortOrder } : item));
+    setCategoryGroups(nextCategoryGroups);
+    const saved = await persistStorefrontLayout(banners, showcases, nextCategoryGroups, brandGroups);
+    if (!saved) setCategoryGroups(categoryGroups);
   };
 
-  const updateBrandGroupPlacement = (groupId: string, sortOrder: number) => {
-    setBrandGroups((current) => current.map((item) => (item.id === groupId ? { ...item, sortOrder } : item)));
+  const updateBrandGroupPlacement = async (groupId: string, sortOrder: number) => {
+    const nextBrandGroups = brandGroups.map((item) => (item.id === groupId ? { ...item, sortOrder } : item));
+    setBrandGroups(nextBrandGroups);
+    const saved = await persistStorefrontLayout(banners, showcases, categoryGroups, nextBrandGroups);
+    if (!saved) setBrandGroups(brandGroups);
   };
-
-  const saveStorefrontPlacement = () => persistStorefrontLayout();
 
   const reorderStorefrontSections = async (sourceKey: string, targetKey: string) => {
     if (!sourceKey || sourceKey === targetKey) return;
@@ -2050,7 +2056,15 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setCategoryGroups(nextCategoryGroups);
     setBrandGroups(nextBrandGroups);
     const saved = await persistStorefrontLayout(nextBanners, nextShowcases, nextCategoryGroups, nextBrandGroups, false);
-    if (!saved) return;
+    if (!saved) {
+      setBanners(banners);
+      setShowcases(showcases);
+      setCategories(categories);
+      setBrands(brands);
+      setCategoryGroups(categoryGroups);
+      setBrandGroups(brandGroups);
+      return;
+    }
     setStatus("چیدمان فروشگاه ذخیره شد.");
   };
 
@@ -2201,7 +2215,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     updateShowcasePlacement,
     updateCategoryGroupPlacement,
     updateBrandGroupPlacement,
-    saveStorefrontPlacement,
     reorderProducts,
     reorderCategories,
     reorderBrands,

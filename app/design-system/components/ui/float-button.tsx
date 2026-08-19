@@ -38,7 +38,7 @@ export function FloatButton({
   size = "md",
   rounded = "full",
   border = "strong",
-  gradient = "btu",
+  gradient,
   shadow = "lg",
   hover = "lift",
   cursor = "pointer",

@@ -16,6 +16,10 @@
   --ui-edit: #ff5722;
   --ui-accent: #e61cff;
 
+  /* Shared surface treatment: two opaque tones derived from the active theme. */
+  --ui-gradient-direction: to top;
+  --ui-gradient-surface-strength: 72%;
+
   --primary: var(--ui-primary);
   --primary-contrast: #111111;
   --primary-base: #ffffff;
@@ -410,63 +414,237 @@ html[data-theme-ready="true"] [data-theme-boot-loader] {
 }
 
 .bg-primary-card {
-  background-color: color-mix(in srgb, var(--primary-card) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--primary-card) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-secondary-card {
-  background-color: color-mix(in srgb, var(--secondary-card) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--secondary-card) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-primary-panel {
-  background-color: color-mix(in srgb, var(--primary-panel) 82%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--primary-panel) 82%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-secondary-panel {
-  background-color: color-mix(in srgb, var(--secondary-panel) 82%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--secondary-panel) 82%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-primary-bg {
-  background-color: color-mix(in srgb, var(--primary-bg) 72%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--primary-bg) 72%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-secondary-bg {
-  background-color: color-mix(in srgb, var(--secondary-bg) 72%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--secondary-bg) 72%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-primary-soft {
-  background-color: color-mix(in srgb, var(--primary-soft) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--primary-soft) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-secondary-soft {
-  background-color: color-mix(in srgb, var(--secondary-soft) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--secondary-soft) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-primary-media {
-  background-color: color-mix(in srgb, var(--primary-media) 82%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--primary-media) 82%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-secondary-media {
-  background-color: color-mix(in srgb, var(--secondary-media) 82%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--secondary-media) 82%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-success-bg {
-  background-color: color-mix(in srgb, var(--success-bg) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--success-bg) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-danger-bg {
-  background-color: color-mix(in srgb, var(--danger-bg) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--danger-bg) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-warning-bg {
-  background-color: color-mix(in srgb, var(--warning-bg) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--warning-bg) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-info-bg {
-  background-color: color-mix(in srgb, var(--info-bg) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--info-bg) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
 }
 
 .bg-neutral-bg {
-  background-color: color-mix(in srgb, var(--neutral-bg) 78%, transparent);
+  --ui-gradient-surface-color: color-mix(in srgb, var(--neutral-bg) 78%, transparent);
+  background-color: var(--ui-gradient-surface-color);
+}
+
+/* Semantic surfaces share one gradient contract. Tailwind still owns their base color. */
+.bg-primary { --ui-gradient-surface-color: var(--primary); }
+.bg-secondary { --ui-gradient-surface-color: var(--secondary); }
+.bg-success { --ui-gradient-surface-color: var(--success); }
+.bg-danger { --ui-gradient-surface-color: var(--danger); }
+.bg-warning { --ui-gradient-surface-color: var(--warning); }
+.bg-info { --ui-gradient-surface-color: var(--info); }
+.bg-neutral { --ui-gradient-surface-color: var(--neutral); }
+.bg-edit { --ui-gradient-surface-color: var(--edit); }
+.bg-accent { --ui-gradient-surface-color: var(--accent); }
+.bg-secondary-base { --ui-gradient-surface-color: var(--secondary-base); }
+.bg-success-base { --ui-gradient-surface-color: var(--success-base); }
+.bg-danger-base { --ui-gradient-surface-color: var(--danger-base); }
+.bg-warning-base { --ui-gradient-surface-color: var(--warning-base); }
+.bg-info-base { --ui-gradient-surface-color: var(--info-base); }
+.bg-neutral-base { --ui-gradient-surface-color: var(--neutral-base); }
+.bg-edit-base { --ui-gradient-surface-color: var(--edit-base); }
+.bg-accent-base { --ui-gradient-surface-color: var(--accent-base); }
+.bg-danger-nomode { --ui-gradient-surface-color: var(--danger-nomode); }
+.bg-success-bg-nomode { --ui-gradient-surface-color: var(--success-bg-nomode); }
+.bg-danger-bg-nomode { --ui-gradient-surface-color: var(--danger-bg-nomode); }
+.bg-primary-base\/85 { --ui-gradient-surface-color: color-mix(in srgb, var(--primary-base) 85%, transparent); }
+.bg-primary-base\/90 { --ui-gradient-surface-color: color-mix(in srgb, var(--primary-base) 90%, transparent); }
+.bg-primary-card\/70 { --ui-gradient-surface-color: color-mix(in srgb, var(--primary-card) 70%, transparent); }
+.bg-primary-panel\/95 { --ui-gradient-surface-color: color-mix(in srgb, var(--primary-panel) 95%, transparent); }
+
+.bg-primary { --ui-gradient-depth-color: var(--primary-border); }
+.bg-secondary { --ui-gradient-depth-color: var(--secondary-border); }
+.bg-success { --ui-gradient-depth-color: var(--success-border); }
+.bg-danger { --ui-gradient-depth-color: var(--danger-border); }
+.bg-warning { --ui-gradient-depth-color: var(--warning-border); }
+.bg-info { --ui-gradient-depth-color: var(--info-border); }
+.bg-neutral { --ui-gradient-depth-color: var(--neutral-border); }
+.bg-edit { --ui-gradient-depth-color: var(--edit-border); }
+.bg-accent { --ui-gradient-depth-color: var(--accent-border); }
+
+:where(
+  .bg-primary-card,
+  .bg-primary-panel,
+  .bg-primary-bg,
+  .bg-primary-soft,
+  .bg-primary-media,
+  .bg-primary-base\/85,
+  .bg-primary-base\/90,
+  .bg-primary-card\/70,
+  .bg-primary-panel\/95
+) { --ui-gradient-depth-color: var(--primary); }
+
+:where(
+  .bg-secondary-base,
+  .bg-secondary-card,
+  .bg-secondary-panel,
+  .bg-secondary-bg,
+  .bg-secondary-soft,
+  .bg-secondary-media
+) { --ui-gradient-depth-color: var(--secondary); }
+
+:where(.bg-success-base, .bg-success-bg, .bg-success-bg-nomode) { --ui-gradient-depth-color: var(--success); }
+:where(.bg-danger-base, .bg-danger-bg, .bg-danger-bg-nomode) { --ui-gradient-depth-color: var(--danger); }
+:where(.bg-warning-base, .bg-warning-bg) { --ui-gradient-depth-color: var(--warning); }
+:where(.bg-info-base, .bg-info-bg) { --ui-gradient-depth-color: var(--info); }
+:where(.bg-neutral-base, .bg-neutral-bg) { --ui-gradient-depth-color: var(--neutral); }
+:where(.bg-edit-base) { --ui-gradient-depth-color: var(--edit); }
+:where(.bg-accent-base) { --ui-gradient-depth-color: var(--accent); }
+.bg-danger-nomode { --ui-gradient-depth-color: var(--danger-border-nomode); }
+
+:where(
+  .bg-primary,
+  .bg-secondary,
+  .bg-success,
+  .bg-danger,
+  .bg-warning,
+  .bg-info,
+  .bg-neutral,
+  .bg-edit,
+  .bg-accent,
+  .bg-secondary-base,
+  .bg-success-base,
+  .bg-danger-base,
+  .bg-warning-base,
+  .bg-info-base,
+  .bg-neutral-base,
+  .bg-edit-base,
+  .bg-accent-base,
+  .bg-primary-card,
+  .bg-secondary-card,
+  .bg-primary-panel,
+  .bg-secondary-panel,
+  .bg-primary-bg,
+  .bg-secondary-bg,
+  .bg-primary-soft,
+  .bg-secondary-soft,
+  .bg-primary-media,
+  .bg-secondary-media,
+  .bg-success-bg,
+  .bg-danger-bg,
+  .bg-warning-bg,
+  .bg-info-bg,
+  .bg-neutral-bg,
+  .bg-danger-nomode,
+  .bg-success-bg-nomode,
+  .bg-danger-bg-nomode,
+  .bg-primary-base\/85,
+  .bg-primary-base\/90,
+  .bg-primary-card\/70,
+  .bg-primary-panel\/95
+) {
+  background-image: linear-gradient(
+    var(--ui-gradient-direction),
+    color-mix(
+      in srgb,
+      var(--ui-gradient-surface-color) var(--ui-gradient-surface-strength),
+      var(--ui-gradient-depth-color, #000000)
+    ) 0%,
+    var(--ui-gradient-surface-color) 100%
+  );
+}
+
+@media (hover: hover) {
+  .hover\:bg-primary:hover {
+    --ui-gradient-depth-color: var(--primary-border);
+    --ui-gradient-surface-color: var(--primary);
+  }
+  .hover\:bg-primary-base:hover {
+    --ui-gradient-depth-color: var(--primary);
+    --ui-gradient-surface-color: var(--primary-base);
+  }
+  .hover\:bg-primary-base\/60:hover {
+    --ui-gradient-depth-color: var(--primary);
+    --ui-gradient-surface-color: color-mix(in srgb, var(--primary-base) 60%, transparent);
+  }
+  .hover\:bg-primary-bg:hover {
+    --ui-gradient-depth-color: var(--primary);
+    --ui-gradient-surface-color: color-mix(in srgb, var(--primary-bg) 72%, transparent);
+  }
+  .hover\:bg-primary-soft:hover {
+    --ui-gradient-depth-color: var(--primary);
+    --ui-gradient-surface-color: color-mix(in srgb, var(--primary-soft) 78%, transparent);
+  }
+
+  :where(
+    .hover\:bg-primary:hover,
+    .hover\:bg-primary-base:hover,
+    .hover\:bg-primary-base\/60:hover,
+    .hover\:bg-primary-bg:hover,
+    .hover\:bg-primary-soft:hover
+  ) {
+    background-image: linear-gradient(
+      var(--ui-gradient-direction),
+      color-mix(
+        in srgb,
+        var(--ui-gradient-surface-color) var(--ui-gradient-surface-strength),
+        var(--ui-gradient-depth-color, #000000)
+      ) 0%,
+      var(--ui-gradient-surface-color) 100%
+    );
+  }
 }
 
 .bg-primary-card,

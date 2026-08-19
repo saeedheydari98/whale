@@ -34,7 +34,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
   size = "md",
   rounded = "md",
   border = "base",
-  gradient = "btu",
+  gradient,
   shadow = "none",
   fullWidth = false,
   icon,
@@ -60,8 +60,9 @@ export const CustomTag: React.FC<CustomTagProps> = ({
     if (token.startsWith("bg-")) {
       const tokenBackground = resolveGlassBackground(resolvedColor, 84);
       tokenStyle.backgroundColor = tokenBackground;
-      Object.assign(tokenStyle, resolveGradientStyle(tokenBackground, gradient));
-      tokenStyle.borderColor = strengthenBorderColor(resolvedColor);
+      const tokenBorderColor = strengthenBorderColor(resolvedColor);
+      Object.assign(tokenStyle, resolveGradientStyle(tokenBackground, gradient, tokenBorderColor));
+      tokenStyle.borderColor = tokenBorderColor;
       tokenStyle.color = resolveTokenTextColor(theme, token, 50);
     }
 
@@ -75,7 +76,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
       {...rest}
       style={{
         backgroundColor: glassBackground,
-        ...resolveGradientStyle(glassBackground, gradient),
+        ...resolveGradientStyle(glassBackground, gradient, variantStyle.borderColor),
         color: variantStyle.color,
         borderColor: variantStyle.borderColor,
         ...style,
