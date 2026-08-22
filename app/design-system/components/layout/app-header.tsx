@@ -12,7 +12,7 @@ import { useIsMobile } from "@/hooks/useIsMobile";
 import { RiShoppingCartFill } from "react-icons/ri";
 import { BiCategoryAlt } from "react-icons/bi";
 import { CustomButton } from "../ui/button";
-import { CustomInput } from "../ui/input";
+import { EmailOtpAuthForm } from "../ui/email-otp-auth-form";
 import { CustomModal } from "../ui/modal";
 import HeaderNavLink from "../ui/header-nav-link";
 import {
@@ -139,25 +139,13 @@ export function AppHeader() {
   const [authUser, setAuthUser] = useState<HeaderUser | null>(null);
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
-  const [authMode, setAuthMode] = useState<"choice" | "login">("choice");
-  const [authLoginMethod, setAuthLoginMethod] = useState<"password" | "otp">("password");
-  const [authPhone, setAuthPhone] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authOtpCode, setAuthOtpCode] = useState("");
-  const [authOtpSent, setAuthOtpSent] = useState(false);
-  const [authStatus, setAuthStatus] = useState("");
-  const [authLoading, setAuthLoading] = useState(false);
   const router = useRouter();
   const showMobileBack = isMobile && pathname !== "/";
   const accountLabel = getProfileFullName(accountProfile ?? getUserProfile(authUser)) || getUserPhone(authUser, accountProfile);
   const accountInitial = accountLabel.trim().charAt(0).toUpperCase() || "?";
   const accountPhone = getUserPhone(authUser, accountProfile);
   const accountEmail = getProfileMarketingEmail(accountProfile ?? getUserProfile(authUser));
-  const authModalTitle = authUser
-    ? "حساب کاربری"
-    : authMode === "choice"
-      ? "حساب کاربری"
-      : "ورود به حساب";
+  const authModalTitle = authUser ? "حساب کاربری" : "ورود یا ساخت حساب";
 
   useEffect(() => {
     if (!appUserData) return;
@@ -214,100 +202,6 @@ export function AppHeader() {
   const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
   const closeMenu = () => setIsMenuOpen(false);
   const visibleNavItems = navItems;
-
-  const submitAuth = async () => {
-    if (!authPhone.trim() || !authPassword.trim()) {
-      setAuthStatus("شماره موبایل و رمز عبور الزامی است.");
-      return;
-    }
-
-    setAuthLoading(true);
-    setAuthStatus("");
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: authPhone.trim(), password: authPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "ورود ناموفق بود.");
-      const user = data?.data?.user ?? null;
-      setCachedAuthUser(user, { emit: false });
-      setAuthUser(user);
-      setAuthOpen(false);
-      setAuthPassword("");
-      setAuthStatus("");
-      const nextUserData = await refreshAppUser({ force: true });
-      setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
-      const accountCart = await getCart();
-      setCartCount(getCartCount(accountCart.items));
-      router.refresh();
-    } catch (error) {
-      setAuthStatus(error instanceof Error ? error.message : "ورود ناموفق بود.");
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const requestOtp = async () => {
-    if (!authPhone.trim()) {
-      setAuthStatus("شماره موبایل الزامی است.");
-      return;
-    }
-
-    setAuthLoading(true);
-    setAuthStatus("");
-    try {
-      const res = await fetch("/api/auth/request-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: authPhone.trim(), purpose: "login" }),
-      });
-      const data = await res.json();
-      if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "ارسال کد ناموفق بود.");
-      setAuthOtpSent(true);
-      setAuthStatus(data?.data?.developmentCode ? `کد توسعه: ${data.data.developmentCode}` : "کد ورود ارسال شد.");
-    } catch (error) {
-      setAuthStatus(error instanceof Error ? error.message : "ارسال کد ناموفق بود.");
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const submitOtp = async () => {
-    if (!authPhone.trim() || !authOtpCode.trim()) {
-      setAuthStatus("شماره موبایل و کد پیامک الزامی است.");
-      return;
-    }
-
-    setAuthLoading(true);
-    setAuthStatus("");
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: authPhone.trim(), code: authOtpCode.trim(), purpose: "login" }),
-      });
-      const data = await res.json();
-      if (!res.ok || data?.ok === false) throw new Error(data?.error || data?.message || "ورود پیامکی ناموفق بود.");
-      const user = data?.data?.user ?? null;
-      setCachedAuthUser(user, { emit: false });
-      setAuthUser(user);
-      setAuthOpen(false);
-      setAuthPassword("");
-      setAuthOtpCode("");
-      setAuthOtpSent(false);
-      const nextUserData = await refreshAppUser({ force: true });
-      setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
-      const accountCart = await getCart();
-      setCartCount(getCartCount(accountCart.items));
-      router.refresh();
-    } catch (error) {
-      setAuthStatus(error instanceof Error ? error.message : "ورود پیامکی ناموفق بود.");
-    } finally {
-      setAuthLoading(false);
-    }
-  };
 
   const logout = async () => {
     const currentUser = authUser;
@@ -376,8 +270,6 @@ export function AppHeader() {
             user={authUser}
             profile={accountProfile}
             onOpen={() => {
-              setAuthMode("choice");
-              setAuthStatus("");
               setAuthOpen(true);
             }}
           />
@@ -433,8 +325,6 @@ export function AppHeader() {
                 fullWidth
                 onClick={() => {
                   closeMenu();
-                  setAuthMode("choice");
-                  setAuthStatus("");
                   setAuthOpen(true);
                 }}
               >
@@ -497,118 +387,20 @@ export function AppHeader() {
                 </CustomButton>
               </div>
             </div>
-          ) : authMode === "choice" ? (
-            <div className="flex flex-col gap-2">
-              <CustomButton
-                fullWidth
-                onClick={() => {
-                  setAuthMode("login");
-                  setAuthStatus("");
-                }}
-              >
-                <span>ورود به حساب</span>
-              </CustomButton>
-              <CustomButton
-                variant="neutral"
-                fullWidth
-                onClick={() => {
-                  setAuthOpen(false);
-                  router.push("/panel/user?auth=register");
-                }}
-              >
-                <span>ساخت حساب کاربری</span>
-              </CustomButton>
-            </div>
           ) : (
-            <>
-              <div className="flex gap-2 rounded-md border border-primary-border bg-primary-bg p-1">
-                <button
-                  type="button"
-                  className={`flex h-9 flex-1 items-center justify-center rounded-md text-sm font-semibold ${authLoginMethod === "password" ? "bg-primary text-primary-contrast" : "text-primary-text"}`}
-                  onClick={() => {
-                    setAuthLoginMethod("password");
-                    setAuthStatus("");
-                  }}
-                >
-                  <span>ورود با رمز</span>
-                </button>
-                <button
-                  type="button"
-                  className={`flex h-9 flex-1 items-center justify-center rounded-md text-sm font-semibold ${authLoginMethod === "otp" ? "bg-primary text-primary-contrast" : "text-primary-text"}`}
-                  onClick={() => {
-                    setAuthLoginMethod("otp");
-                    setAuthStatus("");
-                  }}
-                >
-                  <span>ورود با پیامک</span>
-                </button>
-              </div>
-              <CustomInput
-                name="login-phone"
-                value={authPhone}
-                placeholder="شماره موبایل"
-                autoComplete="tel"
-                inputMode="tel"
-                maxLength={11}
-                pattern="09\d{9}"
-                aria-label="شماره موبایل"
-                onChange={(event) => {
-                  setAuthPhone(event.target.value);
-                  setAuthOtpSent(false);
-                  setAuthOtpCode("");
-                }}
-              />
-              {authLoginMethod === "password" ? (
-                <CustomInput
-                  name="login-password"
-                  value={authPassword}
-                  type="password"
-                  placeholder="رمز عبور"
-                  autoComplete="current-password"
-                  aria-label="رمز عبور"
-                  onChange={(event) => setAuthPassword(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") void submitAuth();
-                  }}
-                />
-              ) : (
-                <CustomInput
-                  name="login-otp"
-                  value={authOtpCode}
-                  placeholder="کد پیامک"
-                  inputMode="numeric"
-                  maxLength={6}
-                  pattern="\d{6}"
-                  aria-label="کد پیامک"
-                  disabled={!authOtpSent}
-                  onChange={(event) => setAuthOtpCode(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && authOtpSent) void submitOtp();
-                  }}
-                />
-              )}
-              {authStatus ? (
-                <div className="rounded-md border border-primary-border bg-primary-bg px-3 py-2 text-sm font-semibold text-primary-text">{authStatus}</div>
-              ) : null}
-              <div className="flex gap-2">
-                {authLoginMethod === "password" ? (
-                  <CustomButton fullWidth isLoading={authLoading} onClick={submitAuth}>
-                    <span>ورود</span>
-                  </CustomButton>
-                ) : authOtpSent ? (
-                  <CustomButton fullWidth isLoading={authLoading} onClick={submitOtp}>
-                    <span>تایید کد</span>
-                  </CustomButton>
-                ) : (
-                  <CustomButton fullWidth isLoading={authLoading} onClick={requestOtp}>
-                    <span>ارسال کد</span>
-                  </CustomButton>
-                )}
-                <CustomButton variant="neutral" fullWidth onClick={() => setAuthMode("choice")}>
-                  <span>بازگشت</span>
-                </CustomButton> 
-              </div>
-            </>
+            <EmailOtpAuthForm
+              onSuccess={async ({ user, profileComplete }) => {
+                setCachedAuthUser(user, { emit: false });
+                setAuthUser(user);
+                setAuthOpen(false);
+                const nextUserData = await refreshAppUser({ force: true });
+                setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
+                const accountCart = await getCart();
+                setCartCount(getCartCount(accountCart.items));
+                if (!profileComplete) router.push("/panel/user");
+                router.refresh();
+              }}
+            />
           )}
         </div>
       </CustomModal>

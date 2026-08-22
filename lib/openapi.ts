@@ -194,14 +194,6 @@ const deletedData = {
   required: ["deleted"],
 };
 
-const changedData = {
-  type: "object",
-  properties: {
-    changed: { type: "boolean" },
-  },
-  required: ["changed"],
-};
-
 const okFlagData = (name: string) => ({
   type: "object",
   properties: {
@@ -235,6 +227,7 @@ const authResultData = {
     user: ref("PublicUser"),
     accessToken: { type: "string" },
     refreshToken: { type: "string" },
+    profileComplete: { type: "boolean" },
   },
   required: ["user", "accessToken", "refreshToken"],
 };
@@ -387,37 +380,14 @@ export const openApiDocument = {
         },
         required: ["firstName", "lastName", "phone", "address"],
       },
-      RegisterInput: {
-        type: "object",
-        properties: {
-          email: { type: "string", format: "email" },
-          username: { type: "string", minLength: 3, maxLength: 32, pattern: "^[a-z0-9._-]+$" },
-          phone: { type: "string", pattern: "^09\\d{9}$" },
-          password: { type: "string", minLength: 8, maxLength: 72 },
-          passwordConfirm: { type: "string", minLength: 8, maxLength: 72 },
-          name: { type: "string" },
-          profile: ref("CustomerProfileInput"),
-        },
-        required: ["password"],
-      },
-      LoginInput: {
-        type: "object",
-        properties: {
-          email: { type: "string", format: "email" },
-          username: { type: "string" },
-          phone: { type: "string", pattern: "^09\\d{9}$" },
-          identifier: { type: "string" },
-          password: { type: "string", minLength: 1 },
-        },
-        required: ["password"],
-      },
       OtpRequestInput: {
         type: "object",
         properties: {
           phone: { type: "string", pattern: "^09\\d{9}$" },
+          email: { type: "string", format: "email" },
           purpose: { type: "string", enum: ["login", "admin"], default: "login" },
         },
-        required: ["phone"],
+        required: ["phone", "email"],
       },
       OtpVerifyInput: {
         allOf: [
@@ -430,29 +400,6 @@ export const openApiDocument = {
             required: ["code"],
           },
         ],
-      },
-      ResetRequestInput: {
-        type: "object",
-        properties: {
-          email: { type: "string", format: "email" },
-        },
-        required: ["email"],
-      },
-      ResetPasswordInput: {
-        type: "object",
-        properties: {
-          token: { type: "string", minLength: 16 },
-          password: { type: "string", minLength: 8, maxLength: 72 },
-        },
-        required: ["token", "password"],
-      },
-      ChangePasswordInput: {
-        type: "object",
-        properties: {
-          currentPassword: { type: "string", minLength: 1 },
-          password: { type: "string", minLength: 8, maxLength: 72 },
-        },
-        required: ["currentPassword", "password"],
       },
       AvatarInput: {
         type: "object",
@@ -902,7 +849,7 @@ export const openApiDocument = {
         properties: {
           id: { type: "string" },
           status: { type: "string" },
-          fulfillmentStatus: { type: "string", enum: ["pending_approval", "processing", "in_transit", "shipped", "delivered"] },
+          fulfillmentStatus: { type: "string", enum: ["pending_approval", "processing", "shipped", "delivered"] },
           trackingCode: { type: "string", nullable: true },
           shippedAt: { type: "string", format: "date-time", nullable: true },
           total: { type: "string" },
@@ -915,7 +862,7 @@ export const openApiDocument = {
               type: "object",
               properties: {
                 id: { type: "string" },
-                status: { type: "string", enum: ["pending_approval", "processing", "in_transit", "shipped", "delivered"] },
+                status: { type: "string", enum: ["pending_approval", "processing", "shipped", "delivered"] },
                 createdAt: { type: "string", format: "date-time" },
               },
             },
@@ -925,7 +872,7 @@ export const openApiDocument = {
       OrderUpdateInput: {
         type: "object",
         properties: {
-          fulfillmentStatus: { type: "string", enum: ["pending_approval", "processing", "in_transit", "shipped", "delivered"] },
+          fulfillmentStatus: { type: "string", enum: ["pending_approval", "processing", "shipped", "delivered"] },
           trackingCode: { type: "string" },
         },
       },
@@ -1103,35 +1050,18 @@ export const openApiDocument = {
         security: authSecurity,
       }),
     },
-    "/api/auth/register": {
-      post: operation({
-        tags: ["Auth"],
-        summary: "Register a user",
-        operationId: "registerUser",
-        body: ref("RegisterInput"),
-        data: authResultData,
-        successStatus: "201",
-      }),
-    },
-    "/api/auth/login": {
-      post: operation({
-        tags: ["Auth"],
-        summary: "Log in",
-        operationId: "loginUser",
-        body: ref("LoginInput"),
-        data: authResultData,
-      }),
-    },
     "/api/auth/request-otp": {
       post: operation({
         tags: ["Auth"],
-        summary: "Request an OTP code",
+        summary: "Send a login OTP to the verified email identity",
         operationId: "requestOtp",
         body: ref("OtpRequestInput"),
         data: {
           type: "object",
           properties: {
             sent: { type: "boolean" },
+            retryAfterSeconds: { type: "integer" },
+            expiresInSeconds: { type: "integer" },
             developmentCode: { type: "string" },
           },
           required: ["sent"],
@@ -1163,30 +1093,6 @@ export const openApiDocument = {
         operationId: "refreshToken",
         data: authResultData,
         security: authSecurity,
-      }),
-    },
-    "/api/auth/forgot-password": {
-      post: operation({
-        tags: ["Auth"],
-        summary: "Create a password reset token",
-        operationId: "forgotPassword",
-        body: ref("ResetRequestInput"),
-        data: {
-          type: "object",
-          properties: {
-            resetToken: { type: "string" },
-          },
-          required: ["resetToken"],
-        },
-      }),
-    },
-    "/api/auth/reset-password": {
-      post: operation({
-        tags: ["Auth"],
-        summary: "Reset password with token",
-        operationId: "resetPassword",
-        body: ref("ResetPasswordInput"),
-        data: okFlagData("reset"),
       }),
     },
     "/api/catalog/structure": {
@@ -1764,16 +1670,6 @@ export const openApiDocument = {
         operationId: "updateUserAvatar",
         body: ref("AvatarInput"),
         data: singleData("user", "PublicUser"),
-        security: authSecurity,
-      }),
-    },
-    "/api/user/change-password": {
-      post: operation({
-        tags: ["Profile"],
-        summary: "Change current user's password",
-        operationId: "changePassword",
-        body: ref("ChangePasswordInput"),
-        data: changedData,
         security: authSecurity,
       }),
     },

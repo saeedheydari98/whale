@@ -38,6 +38,7 @@ function normalizeThemeMode(value: unknown) {
 function appUserPayload(user: AuthUser, profile: AppUserProfile | null) {
   return {
     id: user.id,
+    email: user.email,
     username: user.username,
     name: user.name,
     role: user.role,
@@ -141,6 +142,12 @@ async function saveProfile(request: Request, requestBody?: unknown) {
     if (!parsed.success) return validationError(parsed.error);
 
     const profile = parsed.data;
+    const verifiedPhone = authUser?.username && /^09\d{9}$/.test(authUser.username)
+      ? authUser.username
+      : profile.phone;
+    const verifiedEmail = authUser?.email && !authUser.email.endsWith("@local.user")
+      ? authUser.email
+      : profile.email;
     const existingProfile = authUser
       ? await prisma.customerProfile.findFirst({
           where: { userId: authUser.id },
@@ -150,8 +157,8 @@ async function saveProfile(request: Request, requestBody?: unknown) {
     const profileData = {
       firstName: profile.firstName,
       lastName: profile.lastName,
-      phone: profile.phone,
-      email: profile.email || null,
+      phone: verifiedPhone,
+      email: verifiedEmail || null,
       address: profile.address,
       ...(profile.isAdminUnlocked !== undefined
         ? { isAdminUnlocked: profile.isAdminUnlocked }
@@ -162,7 +169,7 @@ async function saveProfile(request: Request, requestBody?: unknown) {
       ? null
       : await prisma.customerProfile.findFirst({
           where: {
-            phone: profile.phone,
+            phone: verifiedPhone,
             OR: [
               { userId: null },
               ...(authUser ? [{ userId: authUser.id }] : []),

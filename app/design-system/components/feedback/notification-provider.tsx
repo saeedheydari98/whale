@@ -62,7 +62,7 @@ function hasSilentHeader(input: RequestInfo | URL, init?: RequestInit) {
 
 function getSuccessMessage(method: string, url: string) {
   if (url.includes("/api/theme")) return "ظاهر فروشگاه با موفقیت ذخیره شد.";
-  if (url.includes("/api/auth/login")) return "ورود با موفقیت انجام شد.";
+  if (url.includes("/api/auth/verify-otp")) return "ورود با موفقیت انجام شد.";
   if (url.includes("/api/auth/logout")) return "خروج با موفقیت انجام شد.";
   if (url.includes("/comments")) {
     if (method === "DELETE") return "دیدگاه با موفقیت حذف شد.";
@@ -73,7 +73,6 @@ function getSuccessMessage(method: string, url: string) {
   if (url.includes("/api/cart") && method === "DELETE") return "سبد خرید خالی شد.";
   if (url.includes("/api/cart")) return "سبد خرید به‌روزرسانی شد.";
   if (url.includes("/api/profile") || url.includes("/api/user/profile") || url.includes("/api/app/user")) return "پروفایل با موفقیت ذخیره شد.";
-  if (url.includes("/api/user/change-password")) return "رمز عبور با موفقیت تغییر کرد.";
   if (url.includes("/api/admin/security")) return "تنظیمات امنیتی با موفقیت ذخیره شد.";
   if (url.includes("/api/admin/theme") || url.includes("/api/theme/admin")) return "ظاهر فروشگاه با موفقیت ذخیره شد.";
   if (url.includes("/api/banners")) return method === "DELETE" ? "بنر با موفقیت حذف شد." : "بنر با موفقیت ذخیره شد.";

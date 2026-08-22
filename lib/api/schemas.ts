@@ -18,15 +18,8 @@ const optionalNullableWebpImageValueSchema = z
   .nullable()
   .refine((value) => value == null || isAllowedWebpImageValue(value), { message: WEBP_ONLY_ERROR });
 
-const USERNAME_REGEX = /^[a-z0-9._-]+$/;
 const NAME_REGEX = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
 const PHONE_REGEX = /^09\d{9}$/;
-const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d)\S{8,72}$/;
-
-const passwordSchema = z.string()
-  .min(8)
-  .max(72)
-  .regex(PASSWORD_REGEX, "رمز عبور باید حداقل یک حرف و یک عدد داشته باشد و شامل فاصله نباشد.");
 
 const customerProfileSchema = z.object({
   firstName: z.string().trim().regex(NAME_REGEX),
@@ -40,54 +33,14 @@ export const idParamSchema = z.object({
   id: z.string().min(1),
 });
 
-export const authRegisterSchema = z.object({
-  email: z.email().trim().toLowerCase().optional(),
-  username: z.string().trim().toLowerCase().min(3).max(32).regex(USERNAME_REGEX).optional(),
-  phone: z.string().trim().regex(PHONE_REGEX).optional(),
-  password: passwordSchema,
-  passwordConfirm: passwordSchema.optional(),
-  name: z.string().trim().min(1).optional(),
-  profile: customerProfileSchema.optional(),
-}).refine((value) => Boolean(value.phone || value.email || value.username || value.profile?.phone), {
-  message: "شماره موبایل الزامی است.",
-  path: ["phone"],
-}).refine((value) => !value.passwordConfirm || value.password === value.passwordConfirm, {
-  message: "تکرار رمز عبور با رمز عبور یکسان نیست.",
-  path: ["passwordConfirm"],
-});
-
-export const authLoginSchema = z.object({
-  email: z.email().trim().toLowerCase().optional(),
-  username: z.string().trim().toLowerCase().optional(),
-  phone: z.string().trim().regex(PHONE_REGEX).optional(),
-  identifier: z.string().trim().toLowerCase().optional(),
-  password: z.string().min(1),
-}).refine((value) => Boolean(value.phone || value.email || value.username || value.identifier), {
-  message: "شماره موبایل الزامی است.",
-  path: ["phone"],
-});
-
 export const authOtpRequestSchema = z.object({
   phone: z.string().trim().regex(PHONE_REGEX),
+  email: z.email().trim().toLowerCase(),
   purpose: z.enum(["login", "admin"]).optional().default("login"),
 });
 
 export const authOtpVerifySchema = authOtpRequestSchema.extend({
   code: z.string().trim().regex(/^\d{6}$/),
-});
-
-export const resetRequestSchema = z.object({
-  email: z.email().trim().toLowerCase(),
-});
-
-export const resetPasswordSchema = z.object({
-  token: z.string().min(16),
-  password: passwordSchema,
-});
-
-export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
-  password: passwordSchema,
 });
 
 export const profileSchema = customerProfileSchema.extend({

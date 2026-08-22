@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline } from "react-icons/io5";
-import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { CustomInput } from "@/app/design-system/components/ui/input";
@@ -12,6 +12,7 @@ import { formatPersianDate } from "@/lib/date-format";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUS_LABELS, type OrderStatusEventRecord } from "@/lib/order-status";
 import { formatPlainPrice, toLatinDigits } from "@/lib/price-format";
+import { AdminOrderCardsSkeleton, writeAdminOrdersSkeletonCount } from "./admin-orders-skeleton";
 
 type AdminOrderItem = {
   id: string;
@@ -130,6 +131,7 @@ export function AdminOrdersPanel() {
       if (response?.ok === false) throw new Error(response.message || response.error);
       const nextOrders = Array.isArray(response?.data?.orders) ? response.data.orders : [];
       setOrders(nextOrders);
+      writeAdminOrdersSkeletonCount(nextOrders.length);
       setTrackingDrafts(Object.fromEntries(nextOrders.map((order) => [order.id, order.trackingCode ?? ""])));
     } catch {
       setOrders([]);
@@ -198,7 +200,7 @@ export function AdminOrdersPanel() {
       </div>
 
       {message ? <div className="rounded-md border border-primary-border bg-primary-card p-3 text-xs font-semibold text-primary-text">{message}</div> : null}
-      {loading ? <div className="flex min-h-48 items-center justify-center"><Loading loading="spinner" size="lg" /></div> : null}
+      {loading ? <AdminOrderCardsSkeleton count={orders.length || undefined} /> : null}
       {!loading && visibleOrders.length === 0 ? <CustomEmptyState description={hasFilters ? "نتیجه‌ای با این فیلترها پیدا نشد." : "هنوز سفارشی ثبت نشده است."} /> : null}
 
       {!loading && visibleOrders.length > 0 ? (
@@ -206,7 +208,7 @@ export function AdminOrdersPanel() {
           {visibleOrders.map((order) => {
             const nextStatus = nextOrderStatus(order.fulfillmentStatus);
             return (
-              <div key={order.id} className="flex w-full max-w-md flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3 shadow-sm">
+              <div key={order.id} className="flex w-full max-w-sm flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="flex min-w-0 flex-col gap-1">
                     <span className="truncate text-sm font-bold text-primary-text">{customerName(order)}</span>
@@ -216,10 +218,10 @@ export function AdminOrdersPanel() {
                   <OrderStatusTag status={order.fulfillmentStatus} />
                 </div>
 
-                <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+                <div className="flex flex-col gap-1.5 border-t border-primary-border pt-2">
                   {order.items.map((item) => (
                     <div key={item.id} className="flex items-center gap-2.5">
-                      <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? setPreviewImage(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
+                      <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? setPreviewImage(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
                         {item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
                       </button>
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -232,11 +234,18 @@ export function AdminOrdersPanel() {
                 </div>
 
                 {order.profile?.address ? <span className="text-xs text-secondary-text">نشانی: {order.profile.address}</span> : null}
-                <div className="rounded-md border border-primary-border bg-primary-base p-3">
+                <CustomAccordion
+                  title="مسیر وضعیت سفارش"
+                  meta={ORDER_STATUS_LABELS[normalizeOrderStatus(order.fulfillmentStatus)]}
+                  defaultOpen={false}
+                  showStatusLabel={false}
+                  className="rounded-md"
+                  contentClassName="p-2"
+                >
                   <OrderStatusTimeline status={order.fulfillmentStatus} history={order.statusHistory} createdAt={order.createdAt} />
-                </div>
+                </CustomAccordion>
 
-                <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+                <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
                   <CustomInput value={trackingDrafts[order.id] ?? ""} onChange={(event) => setTrackingDrafts((current) => ({ ...current, [order.id]: event.target.value }))} placeholder="کد پیگیری مرسوله" size="sm" disabled={savingId === order.id} />
                   {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری ثبت‌شده: {order.trackingCode}</span> : null}
                   {nextStatus ? (

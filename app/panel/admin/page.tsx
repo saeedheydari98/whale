@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   IoAlbumsOutline,
   IoColorPaletteOutline,
@@ -17,12 +18,17 @@ import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/u
 import { AdminAccessPanel } from "@/app/panel/admin/admin-access-panel";
 import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
-import { AdminOrdersPanel } from "@/app/panel/admin/admin-orders-panel";
+import { AdminOrdersPanelSkeleton } from "@/app/panel/admin/admin-orders-skeleton";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
 import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
 import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
+
+const AdminOrdersPanel = dynamic(
+  () => import("@/app/panel/admin/admin-orders-panel").then((module) => module.AdminOrdersPanel),
+  { loading: () => <AdminOrdersPanelSkeleton /> }
+);
 
 type AdminPanelUser = {
   username?: string | null;
@@ -95,7 +101,7 @@ export default function AdminPanelPage() {
     { id: "theme", label: "ظاهر", icon: <IoColorPaletteOutline /> },
     ...(isSuperadmin ? [{ id: "security" as const, label: "دسترسی‌ها", icon: <IoShieldCheckmarkOutline /> }] : []),
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
-    { id: "orders", label: "خریدها", icon: <IoReceiptOutline /> },
+    { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
     { id: "showcases", label: "ویترین‌ها", icon: <IoAlbumsOutline /> },
     { id: "categories", label: "دسته‌بندی‌ها", icon: <IoPricetagsOutline /> },

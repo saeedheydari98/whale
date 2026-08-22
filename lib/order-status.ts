@@ -1,7 +1,6 @@
 export const ORDER_STATUSES = [
   "pending_approval",
   "processing",
-  "in_transit",
   "shipped",
   "delivered",
 ] as const;
@@ -17,7 +16,6 @@ export type OrderStatusEventRecord = {
 export const ORDER_STATUS_LABELS: Record<OrderFulfillmentStatus, string> = {
   pending_approval: "در انتظار تأیید",
   processing: "در حال جمع‌آوری یا بسته‌بندی",
-  in_transit: "در حال ارسال",
   shipped: "ارسال شده",
   delivered: "تحویل داده شده",
 };
@@ -25,6 +23,7 @@ export const ORDER_STATUS_LABELS: Record<OrderFulfillmentStatus, string> = {
 export function normalizeOrderStatus(value?: string | null): OrderFulfillmentStatus {
   if (value === "posted") return "shipped";
   if (value === "pending") return "pending_approval";
+  if (value === "in_transit") return "processing";
   return ORDER_STATUSES.includes(value as OrderFulfillmentStatus)
     ? value as OrderFulfillmentStatus
     : "pending_approval";

@@ -13,11 +13,8 @@ model User {
   email              String            @unique
   username           String?           @unique
   name               String?
-  passwordHash       String?
   role               String            @default("user")
   refreshTokenHash   String?
-  resetTokenHash     String?
-  resetTokenExpiresAt DateTime?
   avatarUrl          String?
   themeMode          String            @default("light")
   createdAt          DateTime          @default(now())
@@ -309,11 +306,13 @@ model AdminAccessRequest {
 model AuthOtp {
   id         String    @id @default(cuid())
   phone      String
+  email      String
   codeHash   String
   purpose    String    @default("login")
+  attempts   Int       @default(0)
   consumedAt DateTime?
   expiresAt  DateTime
   createdAt  DateTime  @default(now())
 
-  @@index([phone, purpose, consumedAt, expiresAt])
+  @@index([phone, email, purpose, consumedAt, expiresAt])
 }

@@ -110,7 +110,7 @@ function UserOrdersPanel() {
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-col gap-1">
-        <div className="text-base font-bold text-primary-text">خریدها</div>
+        <div className="text-base font-bold text-primary-text">سفارش ها</div>
         <span className="text-sm text-primary-text">
           برای ثبت دیدگاه و امتیاز، وارد صفحه محصول شوید.
         </span>
@@ -199,7 +199,7 @@ export default function UserPanelPage() {
   const [activeTab, setActiveTab] = useState<"profile" | "orders">("profile");
   const tabs: Array<CustomTabItem<typeof activeTab>> = [
     { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
-    { id: "orders", label: "خریدها", icon: <IoReceiptOutline /> },
+    { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
   ];
 
   return (

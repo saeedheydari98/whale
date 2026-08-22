@@ -529,7 +529,10 @@ export async function updateCartColorQuantity(
   const nextCart = currentCart.flatMap((item) => {
     if (getItemKey(item) !== key) return [item];
 
-    const colorStock = normalizeCartColorStock(item.colorStock || target.colorStock);
+    const targetColorStock = normalizeCartColorStock(target.colorStock);
+    const colorStock = Object.keys(targetColorStock).length > 0
+      ? targetColorStock
+      : normalizeCartColorStock(item.colorStock);
     const stockLimit = getStockLimit(item);
     const currentSelection = getCartItemColorSelection(item);
     const nextSelection = { ...currentSelection };
@@ -566,17 +569,29 @@ export async function removeCartItem(target: CartItemRecord) {
   return updateCartQuantity(target, 0);
 }
 
-export function selectCartItemColor(target: CartItemRecord, color: string) {
-  const user = readCachedAuthUser();
+type SelectCartItemColorOptions = {
+  items?: CartItemRecord[];
+  user?: AuthClientUser | null;
+};
+
+export function selectCartItemColor(
+  target: CartItemRecord,
+  color: string,
+  options?: SelectCartItemColorOptions
+) {
+  const user = options && "user" in options ? options.user : readCachedAuthUser();
   const key = getItemKey(target);
   const colorName = String(color ?? "").trim();
-  const currentCart = readLocalCart(user);
+  const currentCart = options?.items ?? readLocalCart(user);
   if (!colorName) return currentCart;
 
   const nextCart = currentCart.map((item) => {
     if (getItemKey(item) !== key) return item;
 
-    const colorStock = normalizeCartColorStock(item.colorStock || target.colorStock);
+    const targetColorStock = normalizeCartColorStock(target.colorStock);
+    const colorStock = Object.keys(targetColorStock).length > 0
+      ? targetColorStock
+      : normalizeCartColorStock(item.colorStock);
     if ((colorStock[colorName] ?? 0) < item.quantity) return item;
 
     const selectedColors = { [colorName]: item.quantity };

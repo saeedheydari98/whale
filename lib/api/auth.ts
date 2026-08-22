@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual, pbkdf2Sync } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { apiFail } from "@/lib/api/response";
@@ -69,24 +69,15 @@ export function verifyToken(token: string | undefined | null) {
   }
 }
 
-export function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("base64url");
-  const hash = pbkdf2Sync(password, salt, 120_000, 32, "sha256").toString("base64url");
-  return `${salt}.${hash}`;
-}
-
-export function verifyPassword(password: string, stored: string | null | undefined) {
-  if (!stored) return false;
-  const [salt, hash] = stored.split(".");
-  if (!salt || !hash) return false;
-  const nextHash = pbkdf2Sync(password, salt, 120_000, 32, "sha256").toString("base64url");
-  const given = Buffer.from(hash);
-  const wanted = Buffer.from(nextHash);
-  return given.length === wanted.length && timingSafeEqual(given, wanted);
-}
-
 export function hashToken(token: string) {
   return createHmac("sha256", secret()).update(token).digest("base64url");
+}
+
+export function verifyHashedToken(token: string, storedHash: string | null | undefined) {
+  if (!storedHash) return false;
+  const given = Buffer.from(storedHash);
+  const expected = Buffer.from(hashToken(token));
+  return given.length === expected.length && timingSafeEqual(given, expected);
 }
 
 export function publicUser(user: AuthUser) {

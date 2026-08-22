@@ -1,72 +1,39 @@
-import { randomBytes } from "crypto";
+import { randomInt } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { parseJsonBody } from "@/lib/api/validation";
-import {
-  authLoginSchema,
-  authOtpRequestSchema,
-  authOtpVerifySchema,
-  authRegisterSchema,
-  resetPasswordSchema,
-  resetRequestSchema,
-} from "@/lib/api/schemas";
-import {
-  accountEmailFromPhone,
-  SUPERADMIN_PHONE,
-} from "@/lib/auth-constants";
+import { authOtpRequestSchema, authOtpVerifySchema } from "@/lib/api/schemas";
+import { isLocalAccountEmail, SUPERADMIN_PHONE } from "@/lib/auth-constants";
 import {
   clearAuthCookies,
   createAccessToken,
   createRefreshToken,
   getAuthUser,
   getRefreshTokenFromRequest,
-  hashPassword,
   hashToken,
   publicUser,
   setAuthCookies,
-  verifyPassword,
+  verifyHashedToken,
   verifyToken,
 } from "@/lib/api/auth";
+import { sendAuthOtpEmail } from "@/lib/resend";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type Context = { params: Promise<{ path?: string[] }> };
-const SUPERADMIN_USERNAME = SUPERADMIN_PHONE;
+type AuthIdentity = { phone: string; email: string };
 
-function phoneUsername(phone: string) {
-  return phone.trim();
-}
+const OTP_EXPIRES_MINUTES = 5;
+const OTP_COOLDOWN_SECONDS = 60;
+const OTP_MAX_ATTEMPTS = 5;
 
-function phoneEmail(phone: string) {
-  return accountEmailFromPhone(phone);
-}
+class AuthIdentityConflictError extends Error {}
 
 function createOtpCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
-async function findUserByPhone(phone: string) {
-  return prisma.user.findFirst({
-    where: { OR: [{ username: phone }, { email: phoneEmail(phone) }] },
-    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
-  });
-}
-
-async function findOrCreateOtpUser(phone: string) {
-  const existing = await findUserByPhone(phone);
-  if (existing) return existing;
-
-  return prisma.user.create({
-    data: {
-      email: phoneEmail(phone),
-      username: phone,
-      role: phone === SUPERADMIN_USERNAME ? "superadmin" : "user",
-    },
-    select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
-  });
+  return String(randomInt(100_000, 1_000_000));
 }
 
 async function authTokens(user: { id: number; email: string; role: string }) {
@@ -80,197 +47,202 @@ async function authTokens(user: { id: number; email: string; role: string }) {
   return { accessToken, refreshToken };
 }
 
-async function normalizeRole(user: { id: number; username: string | null; role: string }) {
-  if (user.username === SUPERADMIN_USERNAME && user.role !== "superadmin") {
-    user.role = "superadmin";
-    await prisma.user.update({ where: { id: user.id }, data: { role: "superadmin" } });
-  }
-  if (user.username !== SUPERADMIN_USERNAME && user.role === "superadmin") {
-    user.role = "user";
-    await prisma.user.update({ where: { id: user.id }, data: { role: "user" } });
+async function normalizeRole<T extends { id: number; username: string | null; role: string }>(user: T) {
+  const expectedRole = user.username === SUPERADMIN_PHONE
+    ? "superadmin"
+    : user.role === "superadmin" ? "user" : user.role;
+  if (expectedRole !== user.role) {
+    user.role = expectedRole;
+    await prisma.user.update({ where: { id: user.id }, data: { role: expectedRole } });
   }
   return user;
 }
 
-async function getSessionUser(request: Request) {
-  const accessUser = await getAuthUser(request);
-  if (accessUser) return accessUser;
-
-  const refreshToken = await getRefreshTokenFromRequest(request);
-  const payload = verifyToken(refreshToken);
-  const userId = Number(payload?.sub);
-  if (!refreshToken || payload?.type !== "refresh" || !Number.isInteger(userId)) return null;
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, username: true, name: true, role: true, refreshTokenHash: true, avatarUrl: true },
-  });
-  if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return null;
-
-  await normalizeRole(user);
-  await authTokens(user);
+async function findIdentityUser(identity: AuthIdentity, tx: Prisma.TransactionClient | typeof prisma = prisma) {
+  const [phoneUser, emailUser] = await Promise.all([
+    tx.user.findUnique({ where: { username: identity.phone } }),
+    tx.user.findUnique({ where: { email: identity.email } }),
+  ]);
+  if (phoneUser && emailUser && phoneUser.id !== emailUser.id) {
+    throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
+  }
+  const user = phoneUser ?? emailUser;
+  if (!user) return null;
+  if (user.username && user.username !== identity.phone) {
+    throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
+  }
+  if (!isLocalAccountEmail(user.email) && user.email !== identity.email) {
+    throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
+  }
   return user;
+}
+
+async function findOrCreateVerifiedUser(identity: AuthIdentity) {
+  return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const existing = await findIdentityUser(identity, tx);
+    const role = identity.phone === SUPERADMIN_PHONE
+      ? "superadmin"
+      : existing?.role === "superadmin" ? "user" : existing?.role ?? "user";
+    const user = existing
+      ? await tx.user.update({
+          where: { id: existing.id },
+          data: { username: identity.phone, email: identity.email, role },
+        })
+      : await tx.user.create({ data: { username: identity.phone, email: identity.email, role } });
+
+    const linkedProfile = await tx.customerProfile.findFirst({ where: { userId: user.id }, select: { id: true } });
+    if (!linkedProfile) {
+      const guestProfile = await tx.customerProfile.findFirst({
+        where: { userId: null, phone: identity.phone },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true },
+      });
+      if (guestProfile) {
+        await tx.customerProfile.update({
+          where: { id: guestProfile.id },
+          data: { userId: user.id, email: identity.email },
+        });
+      }
+    }
+    return user;
+  });
+}
+
+async function isProfileComplete(userId: number) {
+  const profile = await prisma.customerProfile.findFirst({
+    where: { userId },
+    select: { firstName: true, lastName: true, phone: true, address: true },
+  });
+  return Boolean(
+    profile?.firstName.trim()
+      && profile.lastName.trim()
+      && /^09\d{9}$/.test(profile.phone.trim())
+      && profile.address.trim().length >= 5
+  );
+}
+
+function actionRateLimit(request: Request, action: string) {
+  if (action === "request-otp") return rateLimit(request, 5);
+  if (action === "verify-otp") return rateLimit(request, 15);
+  return rateLimit(request);
 }
 
 export async function GET(request: Request, context: Context) {
   const limited = rateLimit(request);
   if (limited) return limited;
-
   const action = (await context.params).path?.join("/") || "";
   if (action !== "me" && action !== "session") return apiFail("مسیر پیدا نشد.", 404);
-
-  const user = await getSessionUser(request);
+  const user = await getAuthUser(request);
   return apiOk({ user: user ? publicUser(user) : null });
 }
 
 export async function POST(request: Request, context: Context) {
-  const limited = rateLimit(request);
+  const action = (await context.params).path?.join("/") || "";
+  const limited = actionRateLimit(request, action);
   if (limited) return limited;
 
-  const action = (await context.params).path?.join("/") || "";
-
   try {
-    if (action === "register") {
-      const parsed = await parseJsonBody(request, authRegisterSchema);
-      if (!parsed.ok) return parsed.response;
-
-      const phone = parsed.data.phone || parsed.data.profile?.phone || "";
-      const username = parsed.data.username?.trim().toLowerCase() || (phone ? phoneUsername(phone) : null);
-      const email = parsed.data.email || (phone ? phoneEmail(phone) : username ? `${username}@local.user` : "");
-      const profile = parsed.data.profile;
-      const existing = await prisma.user.findFirst({
-        where: { OR: [{ email }, ...(username ? [{ username }] : [])] },
-      });
-      if (existing) return apiFail("این حساب قبلا ثبت شده است.", 400);
-
-      const user = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        const createdUser = await tx.user.create({
-          data: {
-            email,
-            username,
-            name: parsed.data.name ?? (profile ? `${profile.firstName} ${profile.lastName}` : null),
-            passwordHash: hashPassword(parsed.data.password),
-            role: username === SUPERADMIN_USERNAME ? "superadmin" : "user",
-          },
-          select: { id: true, email: true, username: true, name: true, role: true, avatarUrl: true },
-        });
-
-        if (profile) {
-          const existingProfile = await tx.customerProfile.findFirst({
-            where: {
-              phone: profile.phone,
-              OR: [
-                { userId: null },
-                { userId: createdUser.id },
-              ],
-            },
-          });
-          const profileData = {
-            userId: createdUser.id,
-            firstName: profile.firstName,
-            lastName: profile.lastName,
-            email: profile.email || null,
-            phone: profile.phone,
-            address: profile.address,
-          };
-
-          if (existingProfile) {
-            await tx.customerProfile.update({
-              where: { id: existingProfile.id },
-              data: profileData,
-            });
-          } else {
-            await tx.customerProfile.create({
-              data: {
-              userId: createdUser.id,
-              firstName: profile.firstName,
-              lastName: profile.lastName,
-              email: profile.email || null,
-              phone: profile.phone,
-              address: profile.address,
-              },
-            });
-          }
-        }
-
-        return createdUser;
-      });
-      const tokens = await authTokens(user);
-      return apiOk({ user: publicUser(user), ...tokens }, { status: 201 });
-    }
-
-    if (action === "login") {
-      const parsed = await parseJsonBody(request, authLoginSchema);
-      if (!parsed.ok) return parsed.response;
-
-      const identifier = (parsed.data.phone || parsed.data.identifier || parsed.data.username || parsed.data.email || "").trim().toLowerCase();
-      const identifierEmail = /^09\d{9}$/.test(identifier) ? phoneEmail(identifier) : identifier;
-      const user = await prisma.user.findFirst({
-        where: { OR: [{ email: identifierEmail }, { username: identifier }] },
-        select: { id: true, email: true, username: true, name: true, role: true, passwordHash: true, avatarUrl: true },
-      });
-      if (!user || !verifyPassword(parsed.data.password, user.passwordHash)) {
-        return apiFail("شماره موبایل یا رمز عبور اشتباه است.", 401);
-      }
-      await normalizeRole(user);
-      const tokens = await authTokens(user);
-      return apiOk({ user: publicUser(user), ...tokens });
-    }
-
     if (action === "request-otp") {
       const parsed = await parseJsonBody(request, authOtpRequestSchema);
       if (!parsed.ok) return parsed.response;
+      const identity = { phone: parsed.data.phone, email: parsed.data.email };
+      const cooldownStart = new Date(Date.now() - OTP_COOLDOWN_SECONDS * 1000);
+      const [, latestOtp] = await Promise.all([
+        findIdentityUser(identity),
+        prisma.authOtp.findFirst({
+          where: { ...identity, purpose: parsed.data.purpose },
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+      if (latestOtp && latestOtp.createdAt > cooldownStart) {
+        const retryAfterSeconds = Math.max(1, Math.ceil(
+          (latestOtp.createdAt.getTime() + OTP_COOLDOWN_SECONDS * 1000 - Date.now()) / 1000
+        ));
+        return apiFail("برای ارسال دوباره کد کمی صبر کنید.", 429, [], { retryAfterSeconds });
+      }
 
       const code = createOtpCode();
-      await prisma.authOtp.create({
+      const otp = await prisma.authOtp.create({
         data: {
-          phone: parsed.data.phone,
+          ...identity,
           purpose: parsed.data.purpose,
           codeHash: hashToken(code),
-          expiresAt: new Date(Date.now() + 2 * 60 * 1000),
+          expiresAt: new Date(Date.now() + OTP_EXPIRES_MINUTES * 60 * 1000),
         },
       });
-
+      try {
+        await sendAuthOtpEmail({
+          email: identity.email,
+          code,
+          expiresInMinutes: OTP_EXPIRES_MINUTES,
+          idempotencyKey: `auth-otp-${otp.id}`,
+        });
+      } catch (error) {
+        await prisma.authOtp.delete({ where: { id: otp.id } }).catch(() => undefined);
+        console.error("Resend OTP delivery error:", error);
+        return apiFail("ارسال ایمیل ورود انجام نشد. تنظیمات Resend را بررسی کنید.", 503);
+      }
+      await prisma.authOtp.updateMany({
+        where: {
+          ...identity,
+          purpose: parsed.data.purpose,
+          id: { not: otp.id },
+          consumedAt: null,
+        },
+        data: { consumedAt: new Date() },
+      });
       return apiOk({
         sent: true,
-        developmentCode: process.env.NODE_ENV === "production" ? undefined : code,
+        retryAfterSeconds: OTP_COOLDOWN_SECONDS,
+        expiresInSeconds: OTP_EXPIRES_MINUTES * 60,
+        developmentCode: process.env.AUTH_OTP_EXPOSE_CODE === "true" ? code : undefined,
       });
     }
 
     if (action === "verify-otp") {
       const parsed = await parseJsonBody(request, authOtpVerifySchema);
       if (!parsed.ok) return parsed.response;
-
+      const identity = { phone: parsed.data.phone, email: parsed.data.email };
       const otp = await prisma.authOtp.findFirst({
         where: {
-          phone: parsed.data.phone,
+          ...identity,
           purpose: parsed.data.purpose,
           consumedAt: null,
           expiresAt: { gt: new Date() },
         },
         orderBy: { createdAt: "desc" },
       });
-      if (!otp || otp.codeHash !== hashToken(parsed.data.code)) {
-        return apiFail("کد پیامکی معتبر نیست.", 401);
+      if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) {
+        return apiFail("کد ورود معتبر نیست یا منقضی شده است.", 401);
+      }
+      if (!verifyHashedToken(parsed.data.code, otp.codeHash)) {
+        const attempts = otp.attempts + 1;
+        await prisma.authOtp.update({
+          where: { id: otp.id },
+          data: { attempts, ...(attempts >= OTP_MAX_ATTEMPTS ? { consumedAt: new Date() } : {}) },
+        });
+        return apiFail(
+          "کد ورود معتبر نیست یا منقضی شده است.",
+          401,
+          [],
+          { remainingAttempts: Math.max(0, OTP_MAX_ATTEMPTS - attempts) }
+        );
       }
 
-      await prisma.authOtp.update({
-        where: { id: otp.id },
+      const consumed = await prisma.authOtp.updateMany({
+        where: { id: otp.id, consumedAt: null },
         data: { consumedAt: new Date() },
       });
+      if (consumed.count !== 1) return apiFail("این کد قبلاً استفاده شده است.", 401);
 
-      const user = await findOrCreateOtpUser(parsed.data.phone);
-      await normalizeRole(user);
-
-      const tokens = await authTokens(user);
-      return apiOk({ user: publicUser(user), ...tokens });
+      const user = await normalizeRole(await findOrCreateVerifiedUser(identity));
+      const [tokens, profileComplete] = await Promise.all([authTokens(user), isProfileComplete(user.id)]);
+      return apiOk({ user: publicUser(user), profileComplete, ...tokens });
     }
 
     if (action === "logout") {
       const user = await getAuthUser(request);
-      if (user) {
-        await prisma.user.update({ where: { id: user.id }, data: { refreshTokenHash: null } });
-      }
+      if (user) await prisma.user.update({ where: { id: user.id }, data: { refreshTokenHash: null } });
       await clearAuthCookies();
       return apiOk({ loggedOut: true });
     }
@@ -282,54 +254,21 @@ export async function POST(request: Request, context: Context) {
       if (!refreshToken || payload?.type !== "refresh" || !Number.isInteger(userId)) {
         return apiFail("برای ادامه باید وارد حساب شوید.", 401);
       }
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, email: true, username: true, name: true, role: true, refreshTokenHash: true, avatarUrl: true },
-      });
-      if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return apiFail("برای ادامه باید وارد حساب شوید.", 401);
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user || user.refreshTokenHash !== hashToken(refreshToken)) {
+        return apiFail("برای ادامه باید وارد حساب شوید.", 401);
+      }
       await normalizeRole(user);
       const tokens = await authTokens(user);
       return apiOk({ user: publicUser(user), ...tokens });
     }
 
-    if (action === "forgot-password") {
-      const parsed = await parseJsonBody(request, resetRequestSchema);
-      if (!parsed.ok) return parsed.response;
-      const token = randomBytes(32).toString("base64url");
-      await prisma.user.updateMany({
-        where: { email: parsed.data.email },
-        data: {
-          resetTokenHash: hashToken(token),
-          resetTokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
-        },
-      });
-      return apiOk({ resetToken: token });
-    }
-
-    if (action === "reset-password") {
-      const parsed = await parseJsonBody(request, resetPasswordSchema);
-      if (!parsed.ok) return parsed.response;
-      const user = await prisma.user.findFirst({
-        where: {
-          resetTokenHash: hashToken(parsed.data.token),
-          resetTokenExpiresAt: { gt: new Date() },
-        },
-      });
-      if (!user) return apiFail("لینک بازیابی رمز عبور معتبر نیست.", 400);
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          passwordHash: hashPassword(parsed.data.password),
-          resetTokenHash: null,
-          resetTokenExpiresAt: null,
-          refreshTokenHash: null,
-        },
-      });
-      return apiOk({ reset: true });
-    }
-
     return apiFail("مسیر پیدا نشد.", 404);
   } catch (error) {
+    if (error instanceof AuthIdentityConflictError) return apiFail(error.message, 409);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return apiFail("شماره موبایل یا ایمیل قبلاً به حساب دیگری متصل شده است.", 409);
+    }
     console.error("Auth API error:", error);
     return apiServerError();
   }

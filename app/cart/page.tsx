@@ -19,6 +19,7 @@ import {
   readLocalCart,
   removeCartItem,
   selectCartItemColor,
+  updateCartColorQuantity,
   updateCartQuantity,
   type CartItemRecord,
 } from "@/lib/cart-client";
@@ -111,12 +112,12 @@ export default function CartPage() {
   }, [appUserKey]);
 
   useEffect(() => {
-    const syncLocalCart = () => setItems(readLocalCart());
+    const syncLocalCart = () => setItems(readLocalCart(authUser));
     window.addEventListener(CART_UPDATED_EVENT, syncLocalCart);
     return () => {
       window.removeEventListener(CART_UPDATED_EVENT, syncLocalCart);
     };
-  }, []);
+  }, [authUser]);
 
   const totalItems = useMemo(
     () => items.reduce((sum, item) => sum + item.quantity, 0),
@@ -146,12 +147,22 @@ export default function CartPage() {
   };
 
   const updateQuantity = async (target: CartItemRecord, nextQuantity: number) => {
-    const nextItems = await updateCartQuantity(target, nextQuantity);
+    const colorEntries = Object.entries(getCartItemColorSelection(target))
+      .filter(([, count]) => count > 0);
+    const hasColorStock = normalizeStockEntries(target.colorStock).length > 0;
+    const activeColor = colorEntries.length === 1 && colorEntries[0][1] === target.quantity
+      ? colorEntries[0][0]
+      : "";
+    if (hasColorStock && !activeColor) return;
+
+    const nextItems = hasColorStock
+      ? await updateCartColorQuantity(target, activeColor, nextQuantity)
+      : await updateCartQuantity(target, nextQuantity);
     setItems(nextItems);
   };
 
   const selectItemColor = (target: CartItemRecord, color: string) => {
-    setItems(selectCartItemColor(target, color));
+    setItems(selectCartItemColor(target, color, { items, user: authUser }));
   };
 
   const clearCart = async () => {
@@ -297,7 +308,7 @@ export default function CartPage() {
         {items.length === 0 ? (
           <CustomEmptyState description="سبد خرید شما خالی است." />
         ) : (
-          <div className="grid gap-4">
+          <div className="grid w-full max-w-5xl self-center grid-cols-1 gap-3 lg:grid-cols-2">
             {items.map((item, index) => {
               const product = products.find((entry) => String(entry.id) === String(item.productId ?? item.id));
               const stockValue = product?.stockQuantity ?? item.stockQuantity;
@@ -315,6 +326,7 @@ export default function CartPage() {
                 : "";
               const isAvailable = (product?.isAvailable ?? item.isAvailable) !== false
                 && normalizedStockLimit > 0;
+              const activeColorStock = colorEntries.find((entry) => entry.color === activeColor)?.count ?? 0;
               const syncedItem = {
                 ...item,
                 selectedColors: colorSelection,
@@ -325,16 +337,16 @@ export default function CartPage() {
               };
               const canIncrease = !isCheckoutLoading
                 && isAvailable
-                && !hasColorStock
-                && item.quantity < normalizedStockLimit;
+                && item.quantity < normalizedStockLimit
+                && (!hasColorStock || (Boolean(activeColor) && item.quantity < activeColorStock));
               return (
                 <article
                   key={String(item.id ?? `${item.title}-${index}-${item.selectedColor ?? ""}`)}
-                  className="grid gap-4 rounded-lg border border-primary-border bg-primary-card p-4 sm:grid-cols-[120px_1fr_auto]"
+                  className="flex w-full max-w-xl justify-self-center items-center gap-3 rounded-md border border-primary-border bg-primary-card p-2 lg:max-w-none"
                 >
                   <button
                     type="button"
-                    className="flex h-28 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
                     onClick={() => openImagePreview(item.imageUrl || undefined)}
                     disabled={!item.imageUrl}
                     aria-label="باز کردن تصویر محصول"
@@ -342,15 +354,13 @@ export default function CartPage() {
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
                     ) : (
-                      <IoBagHandleOutline className="text-4xl text-primary" aria-hidden="true" />
+                      <IoBagHandleOutline className="text-2xl text-primary" aria-hidden="true" />
                     )}
                   </button>
-                    <div className="grid gap-2">
-                    <div className="text-lg font-bold">{item.title}</div>
-                    <div className="text-sm text-secondary-text">{item.description}</div>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <div className="truncate text-sm font-bold">{item.title}</div>
                     {hasColorStock ? (
-                      <div className="flex flex-col gap-2">
-                        <span className="text-xs font-semibold text-secondary-text">انتخاب رنگ</span>
+                      <div className="flex items-center gap-1.5">
                         <ColorStockDots
                           value={productColorStock}
                           selectedColor={activeColor}
@@ -358,11 +368,11 @@ export default function CartPage() {
                           disabledUnavailable
                           minimumCount={item.quantity}
                           showCount={false}
-                          size="md"
+                          size="sm"
                         />
                       </div>
                     ) : null}
-                    <div className="text-sm font-semibold text-primary">
+                    <div className="truncate text-xs font-semibold text-primary">
                       {item.originalPrice && getDiscountPercent(item) > 0 && (
                         <span className="mr-2 text-danger-text-nomode line-through">
                           {formatPrice(item.originalPrice)}
@@ -371,38 +381,37 @@ export default function CartPage() {
                       {formatPrice(getFinalPrice(item))} × {item.quantity}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    {hasColorStock ? (
-                      <div className="rounded-md border border-primary-border bg-primary-soft px-3 py-2 text-center text-sm font-bold">
-                        {item.quantity}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <CustomButton
-                          variant="neutral"
-                          size="sm"
-                          disabled={!canIncrease}
-                          onClick={() => updateQuantity(syncedItem, item.quantity + 1)}
-                        >
-                          +
-                        </CustomButton>
-                        <span className="min-w-8 text-center text-sm font-bold">{item.quantity}</span>
-                        <CustomButton
-                          variant="neutral"
-                          size="sm"
-                          disabled={isCheckoutLoading}
-                          onClick={() => updateQuantity(syncedItem, item.quantity - 1)}
-                        >
-                          -
-                        </CustomButton>
-                      </div>
-                    )}
+                  <div className="flex shrink-0 flex-col items-stretch gap-1">
+                    <div className="flex items-center gap-1">
+                      <CustomButton
+                        variant="neutral"
+                        size="sm"
+                        className="h-8 min-w-8 p-0"
+                        disabled={!canIncrease}
+                        onClick={() => updateQuantity(syncedItem, item.quantity + 1)}
+                      >
+                        +
+                      </CustomButton>
+                      <span className="min-w-6 text-center text-sm font-bold">{item.quantity}</span>
+                      <CustomButton
+                        variant="neutral"
+                        size="sm"
+                        className="h-8 min-w-8 p-0"
+                        disabled={isCheckoutLoading || (hasColorStock && !activeColor)}
+                        onClick={() => updateQuantity(syncedItem, item.quantity - 1)}
+                      >
+                        -
+                      </CustomButton>
+                    </div>
                     <CustomButton
                       variant="danger"
                       size="sm"
                       icon={<IoTrashOutline />}
+                      className="h-8"
+                      fullWidth
                       disabled={isCheckoutLoading}
                       onClick={() => removeItem(item)}
+                      aria-label="حذف محصول"
                     >
                       حذف
                     </CustomButton>
