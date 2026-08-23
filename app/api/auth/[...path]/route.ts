@@ -18,7 +18,8 @@ import {
   verifyHashedToken,
   verifyToken,
 } from "@/lib/api/auth";
-import { sendAuthOtpEmail } from "@/lib/resend";
+import { sendAuthOtpEmail } from "@/lib/gmail";
+import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -91,7 +92,12 @@ async function findOrCreateVerifiedUser(identity: AuthIdentity) {
       : await tx.user.create({ data: { username: identity.phone, email: identity.email, role } });
 
     const linkedProfile = await tx.customerProfile.findFirst({ where: { userId: user.id }, select: { id: true } });
-    if (!linkedProfile) {
+    if (linkedProfile) {
+      await tx.customerProfile.update({
+        where: { id: linkedProfile.id },
+        data: { phone: identity.phone, email: identity.email },
+      });
+    } else {
       const guestProfile = await tx.customerProfile.findFirst({
         where: { userId: null, phone: identity.phone },
         orderBy: { updatedAt: "desc" },
@@ -111,12 +117,14 @@ async function findOrCreateVerifiedUser(identity: AuthIdentity) {
 async function isProfileComplete(userId: number) {
   const profile = await prisma.customerProfile.findFirst({
     where: { userId },
-    select: { firstName: true, lastName: true, phone: true, address: true },
+    select: { firstName: true, lastName: true, phone: true, email: true, address: true },
   });
   return Boolean(
-    profile?.firstName.trim()
-      && profile.lastName.trim()
-      && /^09\d{9}$/.test(profile.phone.trim())
+    profile
+      && PERSIAN_NAME_PATTERN.test(profile.firstName.trim())
+      && PERSIAN_NAME_PATTERN.test(profile.lastName.trim())
+      && PHONE_PATTERN.test(profile.phone.trim())
+      && EMAIL_PATTERN.test(String(profile.email ?? "").trim().toLowerCase())
       && profile.address.trim().length >= 5
   );
 }
@@ -175,12 +183,11 @@ export async function POST(request: Request, context: Context) {
           email: identity.email,
           code,
           expiresInMinutes: OTP_EXPIRES_MINUTES,
-          idempotencyKey: `auth-otp-${otp.id}`,
         });
       } catch (error) {
         await prisma.authOtp.delete({ where: { id: otp.id } }).catch(() => undefined);
-        console.error("Resend OTP delivery error:", error);
-        return apiFail("ارسال ایمیل ورود انجام نشد. تنظیمات Resend را بررسی کنید.", 503);
+        console.error("Gmail SMTP OTP delivery error:", error);
+        return apiFail("ارسال ایمیل ورود انجام نشد. تنظیمات Gmail SMTP را بررسی کنید.", 503);
       }
       await prisma.authOtp.updateMany({
         where: {

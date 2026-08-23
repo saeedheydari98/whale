@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../design-system/components/ui/button";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
-import { CustomInput } from "../design-system/components/ui/input";
+import { EmailOtpAuthForm } from "../design-system/components/ui/email-otp-auth-form";
 import { ImagePreview } from "../design-system/components/ui/image-preview";
 import { CustomModal } from "../design-system/components/ui/modal";
 import {
@@ -23,17 +23,15 @@ import {
   updateCartQuantity,
   type CartItemRecord,
 } from "@/lib/cart-client";
-import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import {
-  EMPTY_USER_PROFILE,
+  fetchUserProfile,
   isUserProfileComplete,
   readUserProfile,
-  saveUserProfile,
   writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
 import { useAppUser } from "@/lib/app-user-context";
-import { readCachedAuthUser, type AuthClientUser } from "@/lib/auth-client";
+import { readCachedAuthUser, setCachedAuthUser, type AuthClientUser } from "@/lib/auth-client";
 import {
   formatCurrencyWithCommas as formatPrice,
   getDiscountPercentValue as getDiscountPercent,
@@ -43,25 +41,17 @@ import {
 import { getProductDetail } from "@/lib/products-client";
 import { ColorStockDots, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
 
-const NAME_PATTERN = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
-const PHONE_PATTERN = /^09\d{9}$/;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 export default function CartPage() {
   const [items, setItems] = useState<CartItemRecord[]>([]);
   const [previewImage, setPreviewImage] = useState("");
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [profileDraft, setProfileDraft] = useState<UserProfile>(EMPTY_USER_PROFILE);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [profileError, setProfileError] = useState("");
-  const [showProfileRequiredErrors, setShowProfileRequiredErrors] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
   const [isCheckoutSuccessOpen, setIsCheckoutSuccessOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthClientUser | null>(null);
-  const profileFormRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { data: appUserData } = useAppUser();
+  const { data: appUserData, refresh: refreshAppUser } = useAppUser();
   const appUser = appUserData?.user ?? null;
   const appUserKey = useMemo(
     () => [
@@ -102,7 +92,6 @@ export default function CartPage() {
       if (snapshot.profile) writeUserProfile(snapshot.profile, { emit: false });
       setItems(snapshot.items);
       setProfile(savedProfile);
-      setProfileDraft(savedProfile ?? snapshot.profile ?? EMPTY_USER_PROFILE);
       setAuthUser(user);
     })();
 
@@ -176,89 +165,85 @@ export default function CartPage() {
     setPreviewImage(imageUrl);
   };
 
-  const updateProfileDraft = (patch: Partial<UserProfile>) => {
-    setProfileDraft((current) => ({ ...current, ...patch }));
-    setProfileError("");
-  };
-
-  const isProfileDraftValid = () => (
-    isUserProfileComplete(profileDraft) &&
-    NAME_PATTERN.test(profileDraft.firstName.trim()) &&
-    NAME_PATTERN.test(profileDraft.lastName.trim()) &&
-    PHONE_PATTERN.test(profileDraft.phone.trim()) &&
-    (!profileDraft.email.trim() || EMAIL_PATTERN.test(profileDraft.email.trim())) &&
-    profileDraft.address.trim().length >= 5 &&
-    profileDraft.address.trim().length <= 200
-  );
-
-  const saveProfileDraft = () => {
-    if (!isProfileDraftValid()) {
-      setShowProfileRequiredErrors(true);
-      setProfileError("لطفا اطلاعات پروفایل را به‌درستی وارد کنید.");
-      window.setTimeout(() => scrollToFirstInvalidField(profileFormRef.current), 0);
-      return;
-    }
-
-    const nextProfile = {
-      firstName: profileDraft.firstName.trim(),
-      lastName: profileDraft.lastName.trim(),
-      phone: profileDraft.phone.trim(),
-      email: profileDraft.email.trim().toLowerCase(),
-      address: profileDraft.address.trim(),
-      isAdminUnlocked: profileDraft.isAdminUnlocked,
-    };
-
-    void saveUserProfile(nextProfile)
-      .then((savedProfile) => {
-        writeUserProfile(savedProfile);
-        void persistCart(items, savedProfile).then(setItems);
-        setProfile(savedProfile);
-        setProfileDraft(savedProfile);
-        setShowProfileRequiredErrors(false);
-        setIsProfileModalOpen(false);
-        setCheckoutMessage("اطلاعات شما ذخیره شد و سبد خرید همگام‌سازی شد.");
-      })
-      .catch(() => setProfileError("ذخیره اطلاعات پروفایل ناموفق بود."));
-  };
-
-  const continueCheckout = () => {
-    if (isCheckoutLoading) return;
-    if (!authUser) {
-      router.push("/panel/user?auth=register");
-      return;
-    }
-
-    const savedProfile = readUserProfile() ?? profile;
-
-    if (!savedProfile) {
-      setProfileDraft(profile ?? EMPTY_USER_PROFILE);
-      setProfileError("");
-      setIsProfileModalOpen(true);
-      return;
-    }
-
+  const completeCheckout = async (checkoutItems: CartItemRecord[], savedProfile: UserProfile) => {
     setProfile(savedProfile);
-    const purchasedItems = [...items];
+    const purchasedItems = [...checkoutItems];
     setIsCheckoutLoading(true);
     setCheckoutMessage("");
-    void persistCart(items, savedProfile)
-      .then(() => checkoutCart(savedProfile))
-      .then((nextItems) => {
-        purchasedItems.forEach((item) => {
-          if (item.productId) {
-            localStorage.setItem(`purchased:${item.productId}`, "1");
-          }
-        });
-        setItems(nextItems);
-        setCheckoutMessage("پرداخت با موفقیت انجام شد.");
-        setIsCheckoutSuccessOpen(true);
-      })
-      .catch((error) => {
-        setCheckoutMessage(error instanceof Error ? error.message : "پرداخت ناموفق بود.");
-      })
-      .finally(() => {
-        setIsCheckoutLoading(false);
+    try {
+      await persistCart(checkoutItems, savedProfile);
+      const nextItems = await checkoutCart(savedProfile);
+      purchasedItems.forEach((item) => {
+        if (item.productId) {
+          localStorage.setItem(`purchased:${item.productId}`, "1");
+        }
       });
+      setItems(nextItems);
+      setCheckoutMessage("پرداخت با موفقیت انجام شد.");
+      setIsCheckoutSuccessOpen(true);
+    } catch (error) {
+      setCheckoutMessage(error instanceof Error ? error.message : "پرداخت ناموفق بود.");
+    } finally {
+      setIsCheckoutLoading(false);
+    }
+  };
+
+  const continueCheckout = async () => {
+    if (isCheckoutLoading) return;
+    if (!authUser) {
+      setIsAuthModalOpen(true);
+      return;
+    }
+
+    let savedProfile = readUserProfile() ?? profile;
+    if (!isUserProfileComplete(savedProfile)) {
+      setIsCheckoutLoading(true);
+      savedProfile = await fetchUserProfile({ force: true }).catch(() => null);
+      setIsCheckoutLoading(false);
+    }
+
+    if (!savedProfile || !isUserProfileComplete(savedProfile)) {
+      router.push("/panel/user");
+      return;
+    }
+
+    await completeCheckout(items, savedProfile);
+  };
+
+  const handleAuthSuccess = async ({
+    user,
+    profileComplete,
+  }: {
+    user: AuthClientUser;
+    profileComplete: boolean;
+  }) => {
+    setCachedAuthUser(user, { emit: false });
+    setAuthUser(user);
+    setIsAuthModalOpen(false);
+
+    const nextUserData = await refreshAppUser({ force: true });
+    const verifiedUser = nextUserData.user ?? user;
+    setAuthUser(verifiedUser);
+
+    if (!profileComplete) {
+      router.push("/panel/user");
+      return;
+    }
+
+    const [savedProfile, accountCart] = await Promise.all([
+      fetchUserProfile({ force: true }).catch(() => null),
+      getCart(verifiedUser),
+    ]);
+    setItems(accountCart.items);
+    const checkoutProfile = savedProfile ?? accountCart.profile;
+
+    if (!checkoutProfile || !isUserProfileComplete(checkoutProfile)) {
+      router.push("/panel/user");
+      return;
+    }
+
+    setProfile(checkoutProfile);
+    await completeCheckout(accountCart.items, checkoutProfile);
   };
 
   return (
@@ -283,7 +268,7 @@ export default function CartPage() {
                 isLoading={isCheckoutLoading}
                 loadingText="در حال پرداخت"
                 disabled={isCheckoutLoading || hasIncompleteColorSelection}
-                onClick={continueCheckout}
+                onClick={() => void continueCheckout()}
               >
                 پرداخت
               </CustomButton>
@@ -425,84 +410,14 @@ export default function CartPage() {
         <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
 
         <CustomModal
-          open={isProfileModalOpen}
-          onClose={() => setIsProfileModalOpen(false)}
-          title="اطلاعات تحویل سفارش"
+          open={isAuthModalOpen && !authUser}
+          onClose={() => setIsAuthModalOpen(false)}
+          title="ورود یا ساخت حساب"
           rounded="lg"
           shadow="lg"
         >
           <div className="flex flex-col gap-3">
-            <div className="text-sm text-secondary-text">
-              اطلاعات تحویل سفارش را وارد کنید.
-            </div>
-            <div ref={profileFormRef} className="grid gap-3 md:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <CustomInput
-                  value={profileDraft.firstName}
-                  pattern="[\p{L}][\p{L}\s'-]{1,49}"
-                  placeholder="نام"
-                  required
-                  invalid={showProfileRequiredErrors && !NAME_PATTERN.test(profileDraft.firstName.trim())}
-                  aria-label="نام"
-                  onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <CustomInput
-                  value={profileDraft.lastName}
-                  pattern="[\p{L}][\p{L}\s'-]{1,49}"
-                  placeholder="نام خانوادگی"
-                  required
-                  invalid={showProfileRequiredErrors && !NAME_PATTERN.test(profileDraft.lastName.trim())}
-                  aria-label="نام خانوادگی"
-                  onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <CustomInput
-                  value={profileDraft.phone}
-                  pattern="09\d{9}"
-                  maxLength={11}
-                  placeholder="شماره تماس"
-                  required
-                  invalid={showProfileRequiredErrors && !PHONE_PATTERN.test(profileDraft.phone.trim())}
-                  inputMode="tel"
-                  aria-label="شماره تماس"
-                  onChange={(event) => updateProfileDraft({ phone: event.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <CustomInput
-                  value={profileDraft.email}
-                  type="email"
-                  pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
-                  placeholder="ایمیل اختیاری"
-                  invalid={showProfileRequiredErrors && Boolean(profileDraft.email.trim()) && !EMAIL_PATTERN.test(profileDraft.email.trim())}
-                  aria-label="ایمیل"
-                  onChange={(event) => updateProfileDraft({ email: event.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-2 md:col-span-2">
-                <CustomInput
-                  value={profileDraft.address}
-                  placeholder="آدرس کامل"
-                  minLength={5}
-                  maxLength={200}
-                  required
-                  invalid={showProfileRequiredErrors && (profileDraft.address.trim().length < 5 || profileDraft.address.trim().length > 200)}
-                  aria-label="آدرس"
-                  onChange={(event) => updateProfileDraft({ address: event.target.value })}
-                />
-              </div>
-            </div>
-            {profileError ? (
-              <div className="rounded-md border border-danger-border-nomode bg-primary-base px-3 py-2 text-sm font-semibold text-danger-text-nomode">
-                {profileError}
-              </div>
-            ) : null}
-            <CustomButton fullWidth icon={<IoCardOutline />} onClick={saveProfileDraft}>
-              ذخیره و ادامه
-            </CustomButton>
+            <EmailOtpAuthForm onSuccess={handleAuthSuccess} />
           </div>
         </CustomModal>
 

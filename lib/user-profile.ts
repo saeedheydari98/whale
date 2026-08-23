@@ -5,6 +5,7 @@ import {
   type AuthClientUser,
 } from "@/lib/auth-client";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
+import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
 
 export type UserProfile = {
   firstName: string;
@@ -28,7 +29,6 @@ export const EMPTY_USER_PROFILE: UserProfile = {
   isAdminUnlocked: false,
 };
 
-const PHONE_PATTERN = /^09\d{9}$/;
 const USER_PROFILE_API_URL = "/api/app/user";
 
 function readProfileFromApiData(data: any) {
@@ -94,9 +94,10 @@ export function isUserProfileComplete(profile: Partial<UserProfile> | null | und
   const normalized = normalizeUserProfile(profile);
 
   return Boolean(
-    normalized.firstName.trim() &&
-      normalized.lastName.trim() &&
+    PERSIAN_NAME_PATTERN.test(normalized.firstName.trim()) &&
+      PERSIAN_NAME_PATTERN.test(normalized.lastName.trim()) &&
       PHONE_PATTERN.test(normalized.phone.trim()) &&
+      EMAIL_PATTERN.test(normalized.email.trim().toLowerCase()) &&
       normalized.address.trim().length >= 5
   );
 }

@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { isAllowedWebpImageValue, WEBP_ONLY_ERROR } from "@/lib/image-upload";
+import {
+  EMAIL_PATTERN,
+  OTP_CODE_PATTERN,
+  PERSIAN_NAME_PATTERN,
+  PHONE_PATTERN,
+} from "@/lib/validation-patterns";
 
 const webpImageValueSchema = z
   .string()
@@ -18,14 +24,11 @@ const optionalNullableWebpImageValueSchema = z
   .nullable()
   .refine((value) => value == null || isAllowedWebpImageValue(value), { message: WEBP_ONLY_ERROR });
 
-const NAME_REGEX = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
-const PHONE_REGEX = /^09\d{9}$/;
-
 const customerProfileSchema = z.object({
-  firstName: z.string().trim().regex(NAME_REGEX),
-  lastName: z.string().trim().regex(NAME_REGEX),
-  phone: z.string().trim().regex(PHONE_REGEX),
-  email: z.email().trim().toLowerCase().optional().or(z.literal("")).default(""),
+  firstName: z.string().trim().regex(PERSIAN_NAME_PATTERN),
+  lastName: z.string().trim().regex(PERSIAN_NAME_PATTERN),
+  phone: z.string().trim().regex(PHONE_PATTERN),
+  email: z.string().trim().toLowerCase().regex(EMAIL_PATTERN).optional().or(z.literal("")).default(""),
   address: z.string().trim().min(5).max(200),
 });
 
@@ -34,13 +37,13 @@ export const idParamSchema = z.object({
 });
 
 export const authOtpRequestSchema = z.object({
-  phone: z.string().trim().regex(PHONE_REGEX),
-  email: z.email().trim().toLowerCase(),
+  phone: z.string().trim().regex(PHONE_PATTERN),
+  email: z.string().trim().toLowerCase().regex(EMAIL_PATTERN),
   purpose: z.enum(["login", "admin"]).optional().default("login"),
 });
 
 export const authOtpVerifySchema = authOtpRequestSchema.extend({
-  code: z.string().trim().regex(/^\d{6}$/),
+  code: z.string().trim().regex(OTP_CODE_PATTERN),
 });
 
 export const profileSchema = customerProfileSchema.extend({

@@ -4,14 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BiCategoryAlt } from "react-icons/bi";
 import { GiSpermWhale } from "react-icons/gi";
-import { IoHomeOutline, IoPersonCircleOutline, IoStorefrontOutline } from "react-icons/io5";
+import { IoHomeOutline, IoStorefrontOutline } from "react-icons/io5";
 import { useIsMobile } from "@/hooks/useIsMobile";
 
 const mobileNavItems = [
   { href: "/", label: "خانه", icon: <IoHomeOutline /> },
   { href: "/categories", label: "دسته بندی", icon: <BiCategoryAlt /> },
   { href: "/products", label: "ویترین", icon: <IoStorefrontOutline /> },
-  { href: "/panel/user", label: "حساب کاربری", icon: <IoPersonCircleOutline /> },
 ];
 
 export function AppFooter() {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { IoArrowForward, IoClose, IoHomeOutline, IoMenu, IoPersonCircleOutline, IoStorefrontOutline } from "react-icons/io5";
+import { IoArrowForward, IoHomeOutline, IoPersonCircleOutline, IoStorefrontOutline } from "react-icons/io5";
 import { usePathname, useRouter } from "next/navigation";
 import Toggle from "../shared/toggle";
 import GlobalSearch from "../ui/global-search";
@@ -11,28 +11,24 @@ import { useScrollHeaderHide } from "@/hooks/useScrollHeaderHide";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { RiShoppingCartFill } from "react-icons/ri";
 import { BiCategoryAlt } from "react-icons/bi";
-import { CustomButton } from "../ui/button";
 import { EmailOtpAuthForm } from "../ui/email-otp-auth-form";
 import { CustomModal } from "../ui/modal";
 import HeaderNavLink from "../ui/header-nav-link";
 import {
   CART_UPDATED_EVENT,
-  clearLocalCartSnapshot,
   getCart,
   getCartCount,
   hasLocalCartSnapshot,
   readLocalCart,
 } from "@/lib/cart-client";
 import {
-  clearCachedAuthUser,
   readCachedAuthUser,
   setCachedAuthUser,
   subscribeAuthUser,
 } from "@/lib/auth-client";
-import { clearCachedAppUser, readCachedAppUser } from "@/lib/app-user-client";
+import { readCachedAppUser } from "@/lib/app-user-client";
 import { useAppUser } from "@/lib/app-user-context";
 import {
-  clearUserProfile,
   isUserProfileComplete,
   normalizeUserProfile,
   readUserProfile,
@@ -40,7 +36,7 @@ import {
   writeUserProfile,
   type UserProfile,
 } from "@/lib/user-profile";
-import { getProfileFullName, getProfileMarketingEmail, getUserPhone } from "@/lib/user-display";
+import { getProfileFullName, getUserPhone } from "@/lib/user-display";
 import { GiSpermWhale } from "react-icons/gi";
 
 type HeaderUser = {
@@ -65,7 +61,6 @@ const navItems = [
   { href: "/", label: "خانه", icon: <IoHomeOutline /> },
   { href: "/categories", label: "دسته بندی", icon: <BiCategoryAlt /> },
   { href: "/products", label: "ویترین", icon: <IoStorefrontOutline /> },
-  { href: "/panel/user", label: "حساب کاربری", icon: <IoPersonCircleOutline /> },
 ];
 
 function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
@@ -86,19 +81,50 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
   );
 }
 
-function AccountButton({ user, profile, onOpen }: { user: HeaderUser | null; profile: UserProfile | null; onOpen: () => void }) {
+function AccountButton({
+  user,
+  profile,
+  active = false,
+  compact = false,
+  onOpen,
+}: {
+  user: HeaderUser | null;
+  profile: UserProfile | null;
+  active?: boolean;
+  compact?: boolean;
+  onOpen: () => void;
+}) {
   const [mounted, setMounted] = useState(false);
   const label = getProfileFullName(profile ?? getUserProfile(user)) || getUserPhone(user, profile) || "";
   const initial = label.trim().charAt(0).toUpperCase();
-  const className = "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-base font-bold text-primary-text transition-colors hover:bg-primary-soft hover:text-primary";
+  const showsInitial = Boolean(mounted && user && initial);
+  const className = compact
+    ? "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-base font-bold text-primary-text transition-colors hover:bg-primary-soft hover:text-primary"
+    : `flex h-20 shrink-0 items-center justify-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${active ? "text-primary-text" : "border-transparent text-primary-text hover:text-primary"}`;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   return (
-    <button type="button" className={className} aria-label="Account" onClick={onOpen}>
-      {mounted && user && initial ? <span>{initial}</span> : <IoPersonCircleOutline />}
+    <button
+      type="button"
+      className={className}
+      aria-label="حساب کاربری"
+      aria-current={active ? "page" : undefined}
+      style={!compact && active ? { borderBottomColor: "color-mix(in srgb, var(--primary-border) 58%, var(--primary-text))" } : undefined}
+      onClick={onOpen}
+    >
+      {showsInitial ? (
+        <span className={compact ? "flex items-center justify-center" : "flex h-7 w-7 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-xs font-bold"}>
+          <span>{initial}</span>
+        </span>
+      ) : (
+        <span className={compact ? "flex items-center justify-center" : "flex items-center justify-center text-lg"}>
+          <IoPersonCircleOutline />
+        </span>
+      )}
+      {compact ? null : <span>حساب کاربری</span>}
     </button>
   );
 }
@@ -134,18 +160,12 @@ export function AppHeader() {
   const pathname = usePathname();
   const headerRef = useScrollHeaderHide({ resetKey: pathname });
   const isMobile = useIsMobile();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [authUser, setAuthUser] = useState<HeaderUser | null>(null);
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const router = useRouter();
   const showMobileBack = isMobile && pathname !== "/";
-  const accountLabel = getProfileFullName(accountProfile ?? getUserProfile(authUser)) || getUserPhone(authUser, accountProfile);
-  const accountInitial = accountLabel.trim().charAt(0).toUpperCase() || "?";
-  const accountPhone = getUserPhone(authUser, accountProfile);
-  const accountEmail = getProfileMarketingEmail(accountProfile ?? getUserProfile(authUser));
-  const authModalTitle = authUser ? "حساب کاربری" : "ورود یا ساخت حساب";
 
   useEffect(() => {
     if (!appUserData) return;
@@ -199,25 +219,13 @@ export function AppHeader() {
     };
   }, [refreshAppUser]);
 
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen);
-  const closeMenu = () => setIsMenuOpen(false);
   const visibleNavItems = navItems;
-
-  const logout = async () => {
-    const currentUser = authUser;
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    clearLocalCartSnapshot(currentUser);
-    clearLocalCartSnapshot(null);
-    clearUserProfile(currentUser);
-    clearCachedAuthUser({ emit: false });
-    clearCachedAppUser();
-    setAuthUser(null);
-    setCartCount(0);
-    setAuthOpen(false);
-    void refreshAppUser({ force: true }).then((nextUserData) => {
-      setCartCount(getVisibleCartCount(null, nextUserData.cart.count));
-    });
-    router.refresh();
+  const openAccount = () => {
+    if (authUser ?? readCachedAuthUser()) {
+      router.push("/panel/user");
+      return;
+    }
+    setAuthOpen(true);
   };
 
   return (
@@ -261,147 +269,49 @@ export function AppHeader() {
                 {item.label}
               </HeaderNavLink>
             ))}
+            <AccountButton
+              user={authUser}
+              profile={accountProfile}
+              active={pathname === "/panel/user" || pathname.startsWith("/panel/user/")}
+              onOpen={openAccount}
+            />
           </nav>
         )}
 
         {/* Right: cart and mobile menu */}
         <div className="flex shrink-0 items-center gap-3">
-          <AccountButton
-            user={authUser}
-            profile={accountProfile}
-            onOpen={() => {
-              setAuthOpen(true);
-            }}
-          />
+          {isMobile ? (
+            <AccountButton
+              user={authUser}
+              profile={accountProfile}
+              compact
+              onOpen={openAccount}
+            />
+          ) : null}
           <CartLink count={cartCount} />
-          {false && isMobile && (
-            <button
-              onClick={toggleMenu}
-              className="text-2xl text-primary-text p-1 rounded-md hover:bg-primary-bg transition-colors"
-              aria-label={isMenuOpen ? "بستن منو" : "باز کردن منو"}
-            >
-              {isMenuOpen ? <IoClose /> : <IoMenu />}
-            </button>
-          )}
         </div>
       </div>
-
-      {/* Mobile Menu Dropdown - Glassmorphic Background */}
-      {false && isMobile && (
-        <div
-          className={`absolute left-0 top-20 z-20 w-1/2 origin-top border border-primary-border/70 bg-primary-card/70 shadow-lg backdrop-blur-xl transition-all duration-300 ease-out ${
-            isMenuOpen
-              ? "translate-y-0 scale-y-100 opacity-100"
-              : "pointer-events-none -translate-y-2 scale-y-0 opacity-0"
-          }`}
-          aria-hidden={!isMenuOpen}
-        >
-          <div className="flex flex-col p-4 gap-2 w-full">
-            {visibleNavItems.map((item) => (
-              <HeaderNavLink
-                key={item.href}
-                href={item.href}
-                onClick={closeMenu}
-                className="h-auto rounded-md border border-primary-border bg-transparent py-3 text-center backdrop-blur-md"
-              >
-                {item.label}
-              </HeaderNavLink>
-            ))}
-            {authUser ? (
-              <CustomButton
-                size="sm"
-                variant="danger"
-                fullWidth
-                onClick={() => {
-                  closeMenu();
-                  void logout();
-                }}
-              >
-                خروج
-              </CustomButton>
-            ) : (
-              <CustomButton
-                size="sm"
-                fullWidth
-                onClick={() => {
-                  closeMenu();
-                  setAuthOpen(true);
-                }}
-              >
-                حساب کاربری
-              </CustomButton>
-            )}
-          </div>
-        </div>
-      )}
       <CustomModal
-        open={authOpen}
+        open={authOpen && !authUser}
         onClose={() => setAuthOpen(false)}
-        title={authModalTitle}
+        title="ورود یا ساخت حساب"
         rounded="lg"
         shadow="lg"
       >
         <div className="flex flex-col gap-3">
-          {authUser ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-lg font-bold text-primary-text">
-                  <span>{accountInitial}</span>
-                </div>
-                <div className="flex min-w-0 flex-col gap-1">
-                  <div className="truncate text-sm font-bold text-primary-text">
-                    <span>{accountLabel || "حساب کاربری"}</span>
-                  </div>
-                  <div className="truncate text-xs font-semibold text-secondary-text">
-                    <span>{accountPhone || "شماره ثبت نشده"}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-2 rounded-lg border border-primary-border bg-primary-bg p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-secondary-text">شماره موبایل</span>
-                  <span className="min-w-0 truncate text-sm font-bold text-primary-text">{accountPhone || "-"}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-secondary-text">ایمیل</span>
-                  <span className="min-w-0 truncate text-sm font-bold text-primary-text">{accountEmail || "-"}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold text-secondary-text">نام</span>
-                  <span className="min-w-0 truncate text-sm font-bold text-primary-text">{accountLabel || "-"}</span>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <CustomButton
-                  variant="neutral"
-                  fullWidth
-                  onClick={() => {
-                    setAuthOpen(false);
-                    router.push("/panel/user");
-                  }}
-                >
-                  <span>پنل کاربری</span>
-                </CustomButton>
-                <CustomButton variant="danger" fullWidth onClick={() => void logout()}>
-                  <span>خروج از حساب</span>
-                </CustomButton>
-              </div>
-            </div>
-          ) : (
-            <EmailOtpAuthForm
-              onSuccess={async ({ user, profileComplete }) => {
-                setCachedAuthUser(user, { emit: false });
-                setAuthUser(user);
-                setAuthOpen(false);
-                const nextUserData = await refreshAppUser({ force: true });
-                setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
-                const accountCart = await getCart();
-                setCartCount(getCartCount(accountCart.items));
-                if (!profileComplete) router.push("/panel/user");
-                router.refresh();
-              }}
-            />
-          )}
+          <EmailOtpAuthForm
+            onSuccess={async ({ user, profileComplete }) => {
+              setCachedAuthUser(user, { emit: false });
+              setAuthUser(user);
+              setAuthOpen(false);
+              const nextUserData = await refreshAppUser({ force: true });
+              setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
+              const accountCart = await getCart();
+              setCartCount(getCartCount(accountCart.items));
+              if (!profileComplete) router.push("/panel/user");
+              router.refresh();
+            }}
+          />
         </div>
       </CustomModal>
     </header>

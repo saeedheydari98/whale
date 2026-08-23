@@ -11,6 +11,11 @@ import { APP_USER_UPDATED_EVENT } from "@/lib/app-user-client";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
 import { formatNumberWithCommas, toLatinDigits } from "@/lib/price-format";
 import { productSlug, type ProductRecord } from "@/lib/products-client";
+import {
+  IRAN_PHONE_WITH_COUNTRY_CODE_PATTERN,
+  NON_ASCII_DIGIT_PATTERN,
+  PHONE_PATTERN,
+} from "@/lib/validation-patterns";
 
 type SearchPayload = {
   ok?: boolean;
@@ -24,8 +29,8 @@ type SearchPayload = {
 const INPUT_ID = "global-search-input";
 
 function isLikelyPhoneAutofill(value: string) {
-  const digits = toLatinDigits(value).replace(/\D/g, "");
-  return /^09\d{9}$/.test(digits) || /^989\d{9}$/.test(digits);
+  const digits = toLatinDigits(value).replace(NON_ASCII_DIGIT_PATTERN, "");
+  return PHONE_PATTERN.test(digits) || IRAN_PHONE_WITH_COUNTRY_CODE_PATTERN.test(digits);
 }
 
 export function GlobalSearch() {

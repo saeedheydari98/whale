@@ -24,9 +24,9 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mydb
       - JWT_SECRET=${JWT_SECRET}
-      - RESEND_API_KEY=${RESEND_API_KEY}
-      - RESEND_FROM_EMAIL=${RESEND_FROM_EMAIL}
-      - RESEND_FROM_NAME=${RESEND_FROM_NAME:-Whale}
+      - GMAIL_SMTP_USER=${GMAIL_SMTP_USER}
+      - GMAIL_SMTP_APP_PASSWORD=${GMAIL_SMTP_APP_PASSWORD}
+      - GMAIL_FROM_NAME=${GMAIL_FROM_NAME:-Whale}
     depends_on:
       postgres:
         condition: service_healthy

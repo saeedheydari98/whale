@@ -1,3 +1,11 @@
+import {
+  EMAIL_PATTERN,
+  OTP_CODE_PATTERN,
+  PERSIAN_NAME_MAX_LENGTH,
+  PERSIAN_NAME_PATTERN,
+  PHONE_PATTERN,
+} from "@/lib/validation-patterns";
+
 type OpenApiObject = Record<string, unknown>;
 
 const ref = (name: string) => ({ $ref: `#/components/schemas/${name}` });
@@ -329,10 +337,10 @@ export const openApiDocument = {
       AppUserProfile: {
         type: "object",
         properties: {
-          firstName: { type: "string" },
-          lastName: { type: "string" },
-          phone: { type: "string", pattern: "^09\\d{9}$" },
-          email: { type: "string", format: "email", nullable: true },
+          firstName: { type: "string", pattern: PERSIAN_NAME_PATTERN.source, maxLength: PERSIAN_NAME_MAX_LENGTH },
+          lastName: { type: "string", pattern: PERSIAN_NAME_PATTERN.source, maxLength: PERSIAN_NAME_MAX_LENGTH },
+          phone: { type: "string", pattern: PHONE_PATTERN.source },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source, nullable: true },
           address: { type: "string" },
           isAdminUnlocked: { type: "boolean" },
         },
@@ -341,10 +349,10 @@ export const openApiDocument = {
       AppUserProfileInput: {
         type: "object",
         properties: {
-          firstName: { type: "string", minLength: 2, maxLength: 50 },
-          lastName: { type: "string", minLength: 2, maxLength: 50 },
-          phone: { type: "string", pattern: "^09\\d{9}$" },
-          email: { type: "string", format: "email" },
+          firstName: { type: "string", minLength: 2, maxLength: PERSIAN_NAME_MAX_LENGTH, pattern: PERSIAN_NAME_PATTERN.source },
+          lastName: { type: "string", minLength: 2, maxLength: PERSIAN_NAME_MAX_LENGTH, pattern: PERSIAN_NAME_PATTERN.source },
+          phone: { type: "string", pattern: PHONE_PATTERN.source },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source },
           address: { type: "string", minLength: 5, maxLength: 200 },
           isAdminUnlocked: { type: "boolean" },
         },
@@ -355,10 +363,10 @@ export const openApiDocument = {
         properties: {
           id: { type: "string" },
           userId: { type: "integer", nullable: true },
-          firstName: { type: "string" },
-          lastName: { type: "string" },
-          phone: { type: "string", pattern: "^09\\d{9}$" },
-          email: { type: "string", format: "email", nullable: true },
+          firstName: { type: "string", pattern: PERSIAN_NAME_PATTERN.source, maxLength: PERSIAN_NAME_MAX_LENGTH },
+          lastName: { type: "string", pattern: PERSIAN_NAME_PATTERN.source, maxLength: PERSIAN_NAME_MAX_LENGTH },
+          phone: { type: "string", pattern: PHONE_PATTERN.source },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source, nullable: true },
           address: { type: "string" },
           avatarUrl: { type: "string", nullable: true },
           isAdminUnlocked: { type: "boolean" },
@@ -370,10 +378,10 @@ export const openApiDocument = {
       CustomerProfileInput: {
         type: "object",
         properties: {
-          firstName: { type: "string", minLength: 2, maxLength: 50 },
-          lastName: { type: "string", minLength: 2, maxLength: 50 },
-          phone: { type: "string", pattern: "^09\\d{9}$" },
-          email: { type: "string", format: "email" },
+          firstName: { type: "string", minLength: 2, maxLength: PERSIAN_NAME_MAX_LENGTH, pattern: PERSIAN_NAME_PATTERN.source },
+          lastName: { type: "string", minLength: 2, maxLength: PERSIAN_NAME_MAX_LENGTH, pattern: PERSIAN_NAME_PATTERN.source },
+          phone: { type: "string", pattern: PHONE_PATTERN.source },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source },
           address: { type: "string", minLength: 5, maxLength: 200 },
           avatarUrl: { type: "string", nullable: true },
           isAdminUnlocked: { type: "boolean" },
@@ -383,8 +391,8 @@ export const openApiDocument = {
       OtpRequestInput: {
         type: "object",
         properties: {
-          phone: { type: "string", pattern: "^09\\d{9}$" },
-          email: { type: "string", format: "email" },
+          phone: { type: "string", pattern: PHONE_PATTERN.source },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source },
           purpose: { type: "string", enum: ["login", "admin"], default: "login" },
         },
         required: ["phone", "email"],
@@ -395,7 +403,7 @@ export const openApiDocument = {
           {
             type: "object",
             properties: {
-              code: { type: "string", pattern: "^\\d{6}$" },
+              code: { type: "string", pattern: OTP_CODE_PATTERN.source },
             },
             required: ["code"],
           },
@@ -1594,7 +1602,7 @@ export const openApiDocument = {
         tags: ["Profile"],
         summary: "Get legacy profile by phone",
         operationId: "getLegacyProfile",
-        parameters: [queryParam("phone", "Profile phone number.", { type: "string", pattern: "^09\\d{9}$" })],
+        parameters: [queryParam("phone", "Profile phone number.", { type: "string", pattern: PHONE_PATTERN.source })],
         data: {
           type: "object",
           properties: {

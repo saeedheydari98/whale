@@ -18,6 +18,13 @@ import {
 } from "@/lib/user-profile";
 import { fetchCurrentUser, setCachedAuthUser } from "@/lib/auth-client";
 import { isLocalAccountEmail } from "@/lib/auth-constants";
+import {
+  EMAIL_PATTERN,
+  PERSIAN_NAME_MAX_LENGTH,
+  PERSIAN_NAME_PATTERN,
+  PERSIAN_NAME_PATTERN_SOURCE,
+  PHONE_PATTERN,
+} from "@/lib/validation-patterns";
 
 type PanelUser = {
   username?: string | null;
@@ -25,10 +32,6 @@ type PanelUser = {
   name?: string | null;
   profile?: unknown;
 };
-
-const NAME_PATTERN = /^[\p{L}][\p{L}\s'-]{1,49}$/u;
-const PHONE_PATTERN = /^09\d{9}$/;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function profileFromUser(user: PanelUser | null) {
   const profile = normalizeUserProfile(user?.profile as Partial<UserProfile> | null | undefined);
@@ -91,8 +94,8 @@ export function UserProfilePanel() {
   const validateProfile = () => {
     const profile = cleanProfile();
     if (
-      NAME_PATTERN.test(profile.firstName)
-      && NAME_PATTERN.test(profile.lastName)
+      PERSIAN_NAME_PATTERN.test(profile.firstName)
+      && PERSIAN_NAME_PATTERN.test(profile.lastName)
       && PHONE_PATTERN.test(profile.phone)
       && EMAIL_PATTERN.test(profile.email)
       && profile.address.length >= 5
@@ -151,18 +154,20 @@ export function UserProfilePanel() {
         <CustomInput
           value={profileDraft.firstName}
           placeholder="نام"
-          pattern="[\p{L}][\p{L}\s'-]{1,49}"
+          pattern={PERSIAN_NAME_PATTERN_SOURCE}
+          maxLength={PERSIAN_NAME_MAX_LENGTH}
           required
-          invalid={showRequiredErrors && !NAME_PATTERN.test(profileDraft.firstName.trim())}
+          invalid={showRequiredErrors && !PERSIAN_NAME_PATTERN.test(profileDraft.firstName.trim())}
           aria-label="نام"
           onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
         />
         <CustomInput
           value={profileDraft.lastName}
           placeholder="نام خانوادگی"
-          pattern="[\p{L}][\p{L}\s'-]{1,49}"
+          pattern={PERSIAN_NAME_PATTERN_SOURCE}
+          maxLength={PERSIAN_NAME_MAX_LENGTH}
           required
-          invalid={showRequiredErrors && !NAME_PATTERN.test(profileDraft.lastName.trim())}
+          invalid={showRequiredErrors && !PERSIAN_NAME_PATTERN.test(profileDraft.lastName.trim())}
           aria-label="نام خانوادگی"
           onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
         />

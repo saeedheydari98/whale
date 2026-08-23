@@ -5,6 +5,7 @@ import { getAuthUser, type AuthUser } from "@/lib/api/auth";
 import { validationError } from "@/lib/api/validation";
 import { profileSchema } from "@/lib/api/schemas";
 import { readWithRetry } from "@/lib/api/read-retry";
+import { PHONE_PATTERN } from "@/lib/validation-patterns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -142,7 +143,7 @@ async function saveProfile(request: Request, requestBody?: unknown) {
     if (!parsed.success) return validationError(parsed.error);
 
     const profile = parsed.data;
-    const verifiedPhone = authUser?.username && /^09\d{9}$/.test(authUser.username)
+    const verifiedPhone = authUser?.username && PHONE_PATTERN.test(authUser.username)
       ? authUser.username
       : profile.phone;
     const verifiedEmail = authUser?.email && !authUser.email.endsWith("@local.user")

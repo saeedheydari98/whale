@@ -11,16 +11,17 @@ import {
   serializeColorSelection,
 } from "@/lib/cart-color-selection";
 import { normalizeColorStock } from "@/lib/color-counts";
+import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 type ProfilePayload = {
-  firstName?: string;
-  lastName?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
   isAdminUnlocked?: boolean;
 };
 
@@ -83,10 +84,11 @@ function normalizeProfile(value: ProfilePayload) {
 
 function isProfileComplete(profile: ReturnType<typeof normalizeProfile>) {
   return Boolean(
-    profile.firstName &&
-    profile.lastName &&
-    profile.phone &&
-    profile.address
+    PERSIAN_NAME_PATTERN.test(profile.firstName) &&
+    PERSIAN_NAME_PATTERN.test(profile.lastName) &&
+    PHONE_PATTERN.test(profile.phone) &&
+    EMAIL_PATTERN.test(profile.email) &&
+    profile.address.length >= 5
   );
 }
 
@@ -341,13 +343,16 @@ export async function PATCH(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
 
-  const body = await request.json().catch(() => ({}));
-  const profile = await findLegacyProfile(request, body.profile ?? {});
-  if (!profile) return apiFail("پروفایل پیدا نشد.", 404);
+  const authUser = await getAuthUser(request);
+  if (!authUser) return apiFail("برای پرداخت باید وارد حساب شوید.", 401);
+
+  const profile = await prisma.customerProfile.findFirst({ where: { userId: authUser.id } });
+  if (!profile || !isProfileComplete(normalizeProfile(profile))) {
+    return apiFail("برای پرداخت باید پروفایل را کامل کنید.", 400);
+  }
 
   try {
     const cart = await activeCartForProfile(profile.id);
-    const authUser = await getAuthUser(request);
     const cartItems = cart.items as CheckoutCartItem[];
     const productIds = cartItems
       .map((item) => item.productId)
@@ -397,38 +402,34 @@ export async function PATCH(request: Request) {
     }
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const order = authUser
-        ? await tx.order.create({
-            data: {
-              userId: authUser.id,
-              profileId: profile.id,
-              status: "paid",
-              fulfillmentStatus: "pending_approval",
-              total: "0",
-              statusHistory: {
-                create: { status: "pending_approval" },
-              },
-            },
-          })
-        : null;
+      const order = await tx.order.create({
+        data: {
+          userId: authUser.id,
+          profileId: profile.id,
+          status: "paid",
+          fulfillmentStatus: "pending_approval",
+          total: "0",
+          statusHistory: {
+            create: { status: "pending_approval" },
+          },
+        },
+      });
 
-      if (order) {
-        await tx.orderItem.createMany({
-          data: cartItems.map((item) => ({
-            orderId: order.id,
-            productId: item.productId,
-            title: item.title,
-            description: item.description,
-            price: item.price,
-            originalPrice: item.originalPrice,
-            discountPrice: item.discountPrice,
-            discountPercent: item.discountPercent,
-            imageUrl: item.imageUrl,
-            selectedColor: item.selectedColor,
-            quantity: item.quantity,
-          })),
-        });
-      }
+      await tx.orderItem.createMany({
+        data: cartItems.map((item) => ({
+          orderId: order.id,
+          productId: item.productId,
+          title: item.title,
+          description: item.description,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          discountPrice: item.discountPrice,
+          discountPercent: item.discountPercent,
+          imageUrl: item.imageUrl,
+          selectedColor: item.selectedColor,
+          quantity: item.quantity,
+        })),
+      });
 
       for (const update of productUpdates) {
         await tx.product.update({

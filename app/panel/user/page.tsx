@@ -1,17 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IoPersonCircleOutline, IoReceiptOutline } from "react-icons/io5";
+import { useRouter } from "next/navigation";
+import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
+import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { OrderStatusTag, OrderStatusTimeline } from "@/app/design-system/components/ui/order-status";
 import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
-import { AUTH_USER_UPDATED_EVENT } from "@/lib/auth-client";
+import { AUTH_USER_UPDATED_EVENT, clearCachedAuthUser } from "@/lib/auth-client";
+import { clearCachedAppUser } from "@/lib/app-user-client";
+import { useAppUser } from "@/lib/app-user-context";
+import { clearLocalCartSnapshot } from "@/lib/cart-client";
 import { formatPersianDate } from "@/lib/date-format";
 import type { OrderStatusEventRecord } from "@/lib/order-status";
 import { formatPlainPrice } from "@/lib/price-format";
+import { clearUserProfile } from "@/lib/user-profile";
 import { UserProfilePanel } from "./user-profile-panel";
 
 type OrderItem = {
@@ -36,8 +42,10 @@ type UserOrder = {
 };
 
 let cachedUserOrders: UserOrder[] | null = null;
+let cachedUserOrdersAt = 0;
 let pendingUserOrders: Promise<UserOrder[]> | null = null;
 let userOrdersCacheVersion = 0;
+const USER_ORDERS_CACHE_TTL_MS = 30_000;
 
 function readOrders(data: unknown) {
   const orders = (data as { data?: { orders?: unknown } } | null)?.data?.orders;
@@ -46,12 +54,15 @@ function readOrders(data: unknown) {
 
 function clearUserOrdersCache() {
   cachedUserOrders = null;
+  cachedUserOrdersAt = 0;
   pendingUserOrders = null;
   userOrdersCacheVersion += 1;
 }
 
 function fetchUserOrdersOnce() {
-  if (cachedUserOrders !== null) return Promise.resolve(cachedUserOrders);
+  if (cachedUserOrders !== null && Date.now() - cachedUserOrdersAt < USER_ORDERS_CACHE_TTL_MS) {
+    return Promise.resolve(cachedUserOrders);
+  }
   if (pendingUserOrders) return pendingUserOrders;
 
   const cacheVersion = userOrdersCacheVersion;
@@ -61,6 +72,7 @@ function fetchUserOrdersOnce() {
       const orders = readOrders(data);
       if (cacheVersion === userOrdersCacheVersion) {
         cachedUserOrders = orders;
+        cachedUserOrdersAt = Date.now();
       }
       return orders;
     })
@@ -97,7 +109,6 @@ function UserOrdersPanel() {
       loadOrders();
     };
 
-    clearUserOrdersCache();
     loadOrders();
     window.addEventListener(AUTH_USER_UPDATED_EVENT, reloadOrders);
 
@@ -196,16 +207,62 @@ function UserOrdersPanel() {
 }
 
 export default function UserPanelPage() {
+  const router = useRouter();
+  const { data: appUserData } = useAppUser();
   const [activeTab, setActiveTab] = useState<"profile" | "orders">("profile");
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState("");
   const tabs: Array<CustomTabItem<typeof activeTab>> = [
     { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
   ];
 
+  const logout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    setLogoutError("");
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("خروج از حساب انجام نشد.");
+
+      const currentUser = appUserData?.user ?? null;
+      clearLocalCartSnapshot(currentUser);
+      clearLocalCartSnapshot(null);
+      clearUserProfile(currentUser);
+      clearUserOrdersCache();
+      clearCachedAppUser();
+      clearCachedAuthUser();
+      router.replace("/");
+      router.refresh();
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : "خروج از حساب انجام نشد.");
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <main className="min-h-full bg-primary-base p-6 text-primary-text">
       <div className="flex flex-col gap-4">
-        <div className="text-2xl text-primary-text font-bold">حساب کاربری</div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-2xl text-primary-text font-bold">حساب کاربری</div>
+          {appUserData?.user ? (
+            <CustomButton
+              size="sm"
+              variant="danger"
+              icon={<IoLogOutOutline />}
+              isLoading={isLoggingOut}
+              loadingText="در حال خروج"
+              onClick={() => void logout()}
+            >
+              <span>خروج از حساب</span>
+            </CustomButton>
+          ) : null}
+        </div>
+        {logoutError ? (
+          <div className="rounded-md border border-danger-border-nomode bg-danger-bg-nomode p-2 text-sm font-semibold text-danger-text-nomode">
+            <span>{logoutError}</span>
+          </div>
+        ) : null}
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
         {activeTab === "profile" ? <UserProfilePanel /> : null}
         {activeTab === "orders" ? <UserOrdersPanel /> : null}

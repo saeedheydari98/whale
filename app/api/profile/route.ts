@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -20,10 +21,11 @@ function readAdminUnlocked(value: any) {
 
 function isComplete(profile: ReturnType<typeof normalizeProfile>) {
   return Boolean(
-    profile.firstName &&
-    profile.lastName &&
-    profile.phone &&
-    profile.address
+    PERSIAN_NAME_PATTERN.test(profile.firstName) &&
+    PERSIAN_NAME_PATTERN.test(profile.lastName) &&
+    PHONE_PATTERN.test(profile.phone) &&
+    (!profile.email || EMAIL_PATTERN.test(profile.email)) &&
+    profile.address.length >= 5
   );
 }
 
