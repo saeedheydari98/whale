@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { IoArrowForward, IoHomeOutline, IoPersonCircleOutline, IoStorefrontOutline } from "react-icons/io5";
+import { IoArrowForward, IoHomeOutline, IoStorefrontOutline } from "react-icons/io5";
 import { usePathname, useRouter } from "next/navigation";
 import Toggle from "../shared/toggle";
 import GlobalSearch from "../ui/global-search";
@@ -28,34 +28,15 @@ import {
 } from "@/lib/auth-client";
 import { readCachedAppUser } from "@/lib/app-user-client";
 import { useAppUser } from "@/lib/app-user-context";
-import {
-  isUserProfileComplete,
-  normalizeUserProfile,
-  readUserProfile,
-  USER_PROFILE_UPDATED_EVENT,
-  writeUserProfile,
-  type UserProfile,
-} from "@/lib/user-profile";
-import { getProfileFullName, getUserPhone } from "@/lib/user-display";
+import { readUserProfile, USER_PROFILE_UPDATED_EVENT, type UserProfile } from "@/lib/user-profile";
 import { GiSpermWhale } from "react-icons/gi";
+import {
+  AccountButton,
+  syncStoredProfileFromUser,
+  type AccountUser,
+} from "./account-button";
 
-type HeaderUser = {
-  id?: number | string;
-  username?: string | null;
-  email?: string | null;
-  name?: string | null;
-  role?: string | null;
-  profile?: unknown;
-};
-
-type HeaderProfile = {
-  firstName?: string | null;
-  lastName?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  address?: string | null;
-  isAdminUnlocked?: boolean | null;
-};
+type HeaderUser = AccountUser;
 
 const navItems = [
   { href: "/", label: "خانه", icon: <IoHomeOutline /> },
@@ -79,71 +60,6 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
       )}
     </Link>
   );
-}
-
-function AccountButton({
-  user,
-  profile,
-  active = false,
-  compact = false,
-  onOpen,
-}: {
-  user: HeaderUser | null;
-  profile: UserProfile | null;
-  active?: boolean;
-  compact?: boolean;
-  onOpen: () => void;
-}) {
-  const [mounted, setMounted] = useState(false);
-  const label = getProfileFullName(profile ?? getUserProfile(user)) || getUserPhone(user, profile) || "";
-  const initial = label.trim().charAt(0).toUpperCase();
-  const showsInitial = Boolean(mounted && user && initial);
-  const className = compact
-    ? "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-base font-bold text-primary-text transition-colors hover:bg-primary-soft hover:text-primary"
-    : `flex h-20 shrink-0 items-center justify-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${active ? "text-primary-text" : "border-transparent text-primary-text hover:text-primary"}`;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  return (
-    <button
-      type="button"
-      className={className}
-      aria-label="حساب کاربری"
-      aria-current={active ? "page" : undefined}
-      style={!compact && active ? { borderBottomColor: "color-mix(in srgb, var(--primary-border) 58%, var(--primary-text))" } : undefined}
-      onClick={onOpen}
-    >
-      {showsInitial ? (
-        <span className={compact ? "flex items-center justify-center" : "flex h-7 w-7 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-xs font-bold"}>
-          <span>{initial}</span>
-        </span>
-      ) : (
-        <span className={compact ? "flex items-center justify-center" : "flex items-center justify-center text-lg"}>
-          <IoPersonCircleOutline />
-        </span>
-      )}
-      {compact ? null : <span>حساب کاربری</span>}
-    </button>
-  );
-}
-
-function getUserProfile(user: HeaderUser | null | undefined): HeaderProfile | null {
-  return user?.profile && typeof user.profile === "object"
-    ? user.profile as HeaderProfile
-    : null;
-}
-
-function readAccountProfileFromUser(user: HeaderUser | null | undefined) {
-  const profile = normalizeUserProfile(getUserProfile(user) as Partial<UserProfile> | null | undefined);
-  return isUserProfileComplete(profile) ? profile : null;
-}
-
-function syncStoredProfileFromUser(user: HeaderUser | null | undefined) {
-  const profile = readAccountProfileFromUser(user);
-  if (profile) writeUserProfile(profile, { emit: false });
-  return profile;
 }
 
 function getVisibleCartCount(user: HeaderUser | null | undefined, fallbackCount: number) {
@@ -278,16 +194,8 @@ export function AppHeader() {
           </nav>
         )}
 
-        {/* Right: cart and mobile menu */}
+        {/* Right: cart */}
         <div className="flex shrink-0 items-center gap-3">
-          {isMobile ? (
-            <AccountButton
-              user={authUser}
-              profile={accountProfile}
-              compact
-              onOpen={openAccount}
-            />
-          ) : null}
           <CartLink count={cartCount} />
         </div>
       </div>

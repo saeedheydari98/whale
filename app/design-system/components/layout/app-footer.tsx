@@ -1,11 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { BiCategoryAlt } from "react-icons/bi";
 import { GiSpermWhale } from "react-icons/gi";
 import { IoHomeOutline, IoStorefrontOutline } from "react-icons/io5";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import { useAppUser } from "@/lib/app-user-context";
+import { readCachedAuthUser, setCachedAuthUser } from "@/lib/auth-client";
+import { getCart } from "@/lib/cart-client";
+import { readUserProfile, USER_PROFILE_UPDATED_EVENT, type UserProfile } from "@/lib/user-profile";
+import { EmailOtpAuthForm } from "../ui/email-otp-auth-form";
+import { CustomModal } from "../ui/modal";
+import {
+  AccountButton,
+  syncStoredProfileFromUser,
+  type AccountUser,
+} from "./account-button";
 
 const mobileNavItems = [
   { href: "/", label: "خانه", icon: <IoHomeOutline /> },
@@ -16,10 +28,38 @@ const mobileNavItems = [
 export function AppFooter() {
   const isMobile = useIsMobile();
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: appUserData, refresh: refreshAppUser } = useAppUser();
+  const [authUser, setAuthUser] = useState<AccountUser | null>(null);
+  const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
   const visibleNavItems = mobileNavItems;
   const isActiveLink = (href: string) => href === "/"
     ? pathname === "/" || pathname.startsWith("/brand/")
     : pathname === href || pathname.startsWith(`${href}/`);
+
+  useEffect(() => {
+    if (!appUserData) return;
+    setAuthUser(appUserData.user);
+    setAccountProfile(syncStoredProfileFromUser(appUserData.user) ?? readUserProfile());
+    if (!appUserData.user) setAccountProfile(null);
+  }, [appUserData]);
+
+  useEffect(() => {
+    const syncProfile = () => setAccountProfile(readUserProfile());
+    window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
+    return () => window.removeEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
+  }, []);
+
+  const openAccount = () => {
+    if (authUser ?? readCachedAuthUser()) {
+      router.push("/panel/user");
+      return;
+    }
+    setAuthOpen(true);
+  };
+
+  const accountActive = pathname === "/panel/user" || pathname.startsWith("/panel/user/");
 
   return (
     <footer className="fixed inset-x-0 bottom-0 z-40 flex h-14 w-full shrink-0 items-center justify-center border-t border-primary-border bg-primary-panel font-bold text-primary-text shadow-lg backdrop-blur md:static md:h-12">
@@ -46,6 +86,13 @@ export function AppFooter() {
               </Link>
             );
           })}
+          <AccountButton
+            user={authUser}
+            profile={accountProfile}
+            active={accountActive}
+            variant="footer"
+            onOpen={openAccount}
+          />
         </nav>
       ) : (
         <div className="flex items-center justify-center gap-2 text-xl font-bold">
@@ -53,6 +100,28 @@ export function AppFooter() {
           <span>وال</span>
         </div>
       )}
+      <CustomModal
+        open={authOpen && !authUser}
+        onClose={() => setAuthOpen(false)}
+        title="ورود یا ساخت حساب"
+        rounded="lg"
+        shadow="lg"
+      >
+        <div className="flex flex-col gap-3">
+          <EmailOtpAuthForm
+            onSuccess={async ({ user, profileComplete }) => {
+              setCachedAuthUser(user, { emit: false });
+              setAuthUser(user);
+              setAuthOpen(false);
+              const nextUserData = await refreshAppUser({ force: true });
+              setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
+              await getCart();
+              if (!profileComplete) router.push("/panel/user");
+              router.refresh();
+            }}
+          />
+        </div>
+      </CustomModal>
     </footer>
   );
 }
