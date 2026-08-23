@@ -237,15 +237,15 @@ const authResultData = {
     refreshToken: { type: "string" },
     profileComplete: { type: "boolean" },
   },
-  required: ["user", "accessToken", "refreshToken"],
+  required: ["user", "accessToken", "refreshToken", "profileComplete"],
 };
 
 export const openApiDocument = {
   openapi: "3.0.3",
   info: {
-    title: "Next Store API",
-    version: "0.1.0",
-    description: "OpenAPI documentation generated from the current Next.js route handlers.",
+    title: "Whale Store API",
+    version: "0.2.0",
+    description: "API فروشگاه وال شامل ورود با کد ایمیلی، پروفایل کاربر، سبد خرید و پرداخت.",
   },
   servers: [
     {
@@ -315,11 +315,12 @@ export const openApiDocument = {
         type: "object",
         properties: {
           id: { type: "integer" },
-          email: { type: "string", format: "email" },
-          username: { type: "string", nullable: true },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source },
+          username: { type: "string", pattern: PHONE_PATTERN.source, nullable: true },
           name: { type: "string", nullable: true },
           role: { type: "string", enum: ["user", "admin", "superadmin"] },
           avatarUrl: { type: "string", nullable: true },
+          themeMode: { type: "string", enum: ["light", "dark"] },
         },
         required: ["id", "email", "role"],
       },
@@ -327,9 +328,11 @@ export const openApiDocument = {
         type: "object",
         properties: {
           id: { type: "integer" },
-          username: { type: "string", nullable: true },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source },
+          username: { type: "string", pattern: PHONE_PATTERN.source, nullable: true },
           name: { type: "string", nullable: true },
           role: { type: "string", enum: ["user", "admin", "superadmin"] },
+          themeMode: { type: "string", enum: ["light", "dark"] },
           profile: nullableRef("AppUserProfile"),
         },
         required: ["id", "role"],
@@ -391,8 +394,8 @@ export const openApiDocument = {
       OtpRequestInput: {
         type: "object",
         properties: {
-          phone: { type: "string", pattern: PHONE_PATTERN.source },
-          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source },
+          phone: { type: "string", pattern: PHONE_PATTERN.source, example: "09123456789" },
+          email: { type: "string", format: "email", pattern: EMAIL_PATTERN.source, example: "user@example.com" },
           purpose: { type: "string", enum: ["login", "admin"], default: "login" },
         },
         required: ["phone", "email"],
@@ -403,7 +406,7 @@ export const openApiDocument = {
           {
             type: "object",
             properties: {
-              code: { type: "string", pattern: OTP_CODE_PATTERN.source },
+              code: { type: "string", pattern: OTP_CODE_PATTERN.source, minLength: 6, maxLength: 6, example: "123456" },
             },
             required: ["code"],
           },
@@ -1061,7 +1064,8 @@ export const openApiDocument = {
     "/api/auth/request-otp": {
       post: operation({
         tags: ["Auth"],
-        summary: "Send a login OTP to the verified email identity",
+        summary: "ارسال کد ورود شش‌رقمی به ایمیل",
+        description: "شماره موبایل و ایمیل باید معتبر باشند. کد پنج دقیقه اعتبار دارد و ارسال مجدد تا ۶۰ ثانیه محدود است.",
         operationId: "requestOtp",
         body: ref("OtpRequestInput"),
         data: {
@@ -1070,16 +1074,21 @@ export const openApiDocument = {
             sent: { type: "boolean" },
             retryAfterSeconds: { type: "integer" },
             expiresInSeconds: { type: "integer" },
-            developmentCode: { type: "string" },
+            developmentCode: { type: "string", pattern: OTP_CODE_PATTERN.source, description: "فقط وقتی AUTH_OTP_EXPOSE_CODE فعال باشد." },
           },
           required: ["sent"],
+        },
+        extraResponses: {
+          "429": errorResponse("ارسال مجدد زودتر از زمان مجاز"),
+          "503": errorResponse("عدم دسترسی به سرویس ارسال ایمیل"),
         },
       }),
     },
     "/api/auth/verify-otp": {
       post: operation({
         tags: ["Auth"],
-        summary: "Verify an OTP code",
+        summary: "تأیید کد ورود شش‌رقمی",
+        description: "پس از تأیید، حساب ساخته یا بازیابی می‌شود. مقدار profileComplete مشخص می‌کند کاربر باید پیش از پرداخت پروفایل خود را تکمیل کند یا خیر.",
         operationId: "verifyOtp",
         body: ref("OtpVerifyInput"),
         data: authResultData,
@@ -1515,16 +1524,16 @@ export const openApiDocument = {
       }),
       patch: operation({
         tags: ["Cart"],
-        summary: "Legacy checkout current cart",
-        operationId: "legacyCheckoutCart",
-        body: {
-          type: "object",
-          properties: {
-            profile: ref("CustomerProfileInput"),
-          },
-        },
+        summary: "پرداخت سبد خرید جاری",
+        description: "این مسیر مورد استفاده صفحه سبد خرید است. ورود به حساب و تکمیل پروفایل هر دو الزامی هستند؛ در غیر این صورت پاسخ 401 یا 400 برمی‌گردد.",
+        operationId: "checkoutCurrentCart",
         data: ref("CartSnapshot"),
         security: authSecurity,
+        extraResponses: {
+          "400": errorResponse("پروفایل کاربر کامل نیست"),
+          "401": errorResponse("کاربر وارد حساب نشده است"),
+          "409": errorResponse("رنگ یا موجودی کالا تغییر کرده است"),
+        },
       }),
       delete: operation({
         tags: ["Cart"],
@@ -1591,7 +1600,8 @@ export const openApiDocument = {
     "/api/cart/checkout": {
       post: operation({
         tags: ["Cart"],
-        summary: "Checkout authenticated cart",
+        summary: "پرداخت جایگزین سبد احراز هویت‌شده",
+        description: "مسیر جایگزین پرداخت برای کلاینت‌هایی که مستقیماً با سبد حساب کاربری کار می‌کنند.",
         operationId: "checkoutCart",
         data: ref("CheckoutData"),
         security: authSecurity,
