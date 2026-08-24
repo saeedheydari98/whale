@@ -4,8 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { BiCategoryAlt } from "react-icons/bi";
+import { FaGithub, FaInstagram } from "react-icons/fa6";
 import { GiSpermWhale } from "react-icons/gi";
-import { IoHomeOutline, IoStorefrontOutline } from "react-icons/io5";
+import { IoCallOutline, IoHomeOutline, IoStorefrontOutline } from "react-icons/io5";
+import { SiGmail } from "react-icons/si";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useAppUser } from "@/lib/app-user-context";
 import { readCachedAuthUser, setCachedAuthUser } from "@/lib/auth-client";
@@ -62,7 +64,7 @@ export function AppFooter() {
   const accountActive = pathname === "/panel/user" || pathname.startsWith("/panel/user/");
 
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-40 flex h-14 w-full shrink-0 items-center justify-center border-t border-primary-border bg-primary-panel font-bold text-primary-text shadow-lg backdrop-blur md:static md:h-12">
+    <footer className="fixed inset-x-0 bottom-0 z-40 flex h-14 w-full shrink-0 items-center justify-center border-t border-primary-border bg-primary-panel font-bold text-primary-text shadow-lg backdrop-blur md:static md:h-auto md:min-h-40 md:p-4">
       {isMobile ? (
         <nav className="flex h-full w-full items-center justify-around gap-1 px-2 py-1.5">
           {visibleNavItems.map((item) => {
@@ -95,9 +97,59 @@ export function AppFooter() {
           />
         </nav>
       ) : (
-        <div className="flex items-center justify-center gap-2 text-xl font-bold">
-          <GiSpermWhale aria-hidden="true" />
-          <span>وال</span>
+        <div className="flex w-full max-w-7xl flex-col items-center gap-4">
+          <div className="flex items-center gap-2 text-xl font-bold">
+            <GiSpermWhale aria-hidden="true" />
+            <span>وال</span>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-sm font-bold">ارتباط با ما</span>
+            <div className="flex flex-wrap items-center justify-center gap-4 text-sm font-medium">
+              <a
+                href="tel:+989176991556"
+                dir="ltr"
+                aria-label="تماس با شماره ۰۹۱۷۶۹۹۱۵۵۶"
+                className="flex items-center gap-2 text-secondary-text transition-colors hover:text-primary focus-visible:text-primary"
+              >
+                <IoCallOutline className="text-lg" aria-hidden="true" />
+                <span>09176991556</span>
+              </a>
+              <a
+                href="mailto:saeedheydri.98@gmail.com"
+                dir="ltr"
+                aria-label="ارسال ایمیل به سعید حیدری"
+                className="flex items-center gap-2 text-secondary-text transition-colors hover:text-primary focus-visible:text-primary"
+              >
+                <SiGmail className="text-lg" aria-hidden="true" />
+                <span>saeedheydri.98@gmail.com</span>
+              </a>
+              <a
+                href="https://github.com/saeedheydari98"
+                target="_blank"
+                rel="noreferrer"
+                dir="ltr"
+                aria-label="صفحه گیت‌هاب سعید حیدری"
+                className="flex items-center gap-2 text-secondary-text transition-colors hover:text-primary focus-visible:text-primary"
+              >
+                <FaGithub className="text-lg" aria-hidden="true" />
+                <span>saeedheydari98</span>
+              </a>
+              <a
+                href="https://www.instagram.com/saeed.heydari.98/"
+                target="_blank"
+                rel="noreferrer"
+                dir="ltr"
+                aria-label="صفحه اینستاگرام سعید حیدری"
+                className="flex items-center gap-2 text-secondary-text transition-colors hover:text-primary focus-visible:text-primary"
+              >
+                <FaInstagram className="text-lg" aria-hidden="true" />
+                <span>saeed.heydari.98</span>
+              </a>
+            </div>
+          </div>
+          <span className="max-w-4xl text-center text-sm font-normal leading-7 text-secondary-text">
+            وال یک پروژه آزمایشی برای ساخت فروشگاهی کاملاً پویاست؛ فروشگاهی که مدیر آن می‌تواند ظاهر و شیوه عملکرد بخش‌های مختلف را بدون تغییر کد مدیریت کند. هدف این پروژه، دستیابی به بالاترین سطح انعطاف‌پذیری در مدیریت فروشگاه است.
+          </span>
         </div>
       )}
       <CustomModal

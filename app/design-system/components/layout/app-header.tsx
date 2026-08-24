@@ -49,7 +49,7 @@ function CartLink({ count, onClick }: { count: number; onClick?: () => void }) {
     <Link
       href="/cart"
       onClick={onClick}
-      className="relative inline-flex items-center justify-center p-1 text-secondary-border-nomode transition-all hover:scale-110"
+      className="relative inline-flex items-center justify-center p-1 text-primary-text transition-all hover:scale-110 hover:text-primary"
       aria-label="سبد خرید"
     >
       <RiShoppingCartFill size={24}/>

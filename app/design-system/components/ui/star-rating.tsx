@@ -41,6 +41,7 @@ export function StarRating({
   const [hoverValue, setHoverValue] = useState<number | null>(null);
   const iconSize = sizeMap[size];
   const displayValue = interactive && hoverValue !== null ? hoverValue : value;
+  const emptyStarClassName = displayValue === 0 ? "text-primary-text" : "text-primary-border";
 
   const renderStar = (index: number) => {
     const starNumber = index + 1;
@@ -52,7 +53,7 @@ export function StarRating({
       ) : state === "half" ? (
         <IoStarHalf size={iconSize} className="text-amber-400" aria-hidden="true" />
       ) : (
-        <IoStarOutline size={iconSize} className="text-primary-border" aria-hidden="true" />
+        <IoStarOutline size={iconSize} className={emptyStarClassName} aria-hidden="true" />
       );
 
     if (!interactive) {
