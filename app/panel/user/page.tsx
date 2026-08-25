@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline } from "react-icons/io5";
+import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline, IoWalletOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
@@ -16,9 +16,10 @@ import { useAppUser } from "@/lib/app-user-context";
 import { clearLocalCartSnapshot } from "@/lib/cart-client";
 import { formatPersianDate } from "@/lib/date-format";
 import type { OrderStatusEventRecord } from "@/lib/order-status";
-import { formatPlainPrice } from "@/lib/price-format";
+import { formatAmount } from "@/lib/price-format";
 import { clearUserProfile } from "@/lib/user-profile";
 import { UserProfilePanel } from "./user-profile-panel";
+import { UserWalletPanel } from "./user-wallet-panel";
 
 type OrderItem = {
   id: string;
@@ -34,6 +35,12 @@ type OrderItem = {
 type UserOrder = {
   id: string;
   createdAt: string;
+  total?: string;
+  shippingMethod?: string;
+  shippingAmount?: string;
+  discountAmount?: string;
+  walletAmount?: string;
+  cashbackEarned?: string;
   fulfillmentStatus?: string | null;
   trackingCode?: string | null;
   shippedAt?: string | null;
@@ -170,7 +177,7 @@ function UserOrdersPanel() {
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
                       <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
-                      <span className="text-xs font-semibold text-primary">{formatPlainPrice(item.discountPrice || item.price)}</span>
+                      <span className="text-xs font-semibold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
                     </div>
                     {item.productId ? (
                       <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
@@ -184,6 +191,10 @@ function UserOrdersPanel() {
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-border pt-2">
                 <span className="text-xs font-bold text-primary">مشاهده مسیر سفارش</span>
                 {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری: {order.trackingCode}</span> : null}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-secondary-text">{order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
+                <span className="text-sm font-bold text-primary">پرداختی: {formatAmount(order.total ?? "0")}</span>
               </div>
             </div>
           ))}
@@ -209,12 +220,13 @@ function UserOrdersPanel() {
 export default function UserPanelPage() {
   const router = useRouter();
   const { data: appUserData } = useAppUser();
-  const [activeTab, setActiveTab] = useState<"profile" | "orders">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "orders" | "wallet">("profile");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const tabs: Array<CustomTabItem<typeof activeTab>> = [
     { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
+    { id: "wallet", label: "کیف پول", icon: <IoWalletOutline /> },
   ];
 
   const logout = async () => {
@@ -266,6 +278,7 @@ export default function UserPanelPage() {
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
         {activeTab === "profile" ? <UserProfilePanel /> : null}
         {activeTab === "orders" ? <UserOrdersPanel /> : null}
+        {activeTab === "wallet" ? <UserWalletPanel /> : null}
       </div>
     </main>
   );

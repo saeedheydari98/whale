@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
@@ -11,7 +12,7 @@ import { OrderStatusTag, OrderStatusTimeline } from "@/app/design-system/compone
 import { formatPersianDate } from "@/lib/date-format";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUS_LABELS, type OrderStatusEventRecord } from "@/lib/order-status";
-import { formatPlainPrice, toLatinDigits } from "@/lib/price-format";
+import { formatAmount, toLatinDigits } from "@/lib/price-format";
 import { AdminOrderCardsSkeleton, writeAdminOrdersSkeletonCount } from "./admin-orders-skeleton";
 
 type AdminOrderItem = {
@@ -32,6 +33,13 @@ type AdminOrder = {
   trackingCode?: string | null;
   shippedAt?: string | null;
   total: string;
+  subtotal?: string;
+  discountAmount?: string;
+  walletAmount?: string;
+  shippingAmount?: string;
+  shippingMethod?: string;
+  discountCode?: string | null;
+  cashbackEarned?: string;
   createdAt: string;
   statusHistory?: OrderStatusEventRecord[];
   user?: { username?: string | null; email?: string | null; name?: string | null } | null;
@@ -107,6 +115,7 @@ export function AdminOrdersPanel() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
   const [message, setMessage] = useState("");
+  useTransientAppMessage(message);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -199,7 +208,6 @@ export function AdminOrdersPanel() {
         </div>
       </div>
 
-      {message ? <div className="rounded-md border border-primary-border bg-primary-card p-3 text-xs font-semibold text-primary-text">{message}</div> : null}
       {loading ? <AdminOrderCardsSkeleton count={orders.length || undefined} /> : null}
       {!loading && visibleOrders.length === 0 ? <CustomEmptyState description={hasFilters ? "نتیجه‌ای با این فیلترها پیدا نشد." : "هنوز سفارشی ثبت نشده است."} /> : null}
 
@@ -227,13 +235,19 @@ export function AdminOrdersPanel() {
                       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                         <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
                         <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
-                        <span className="text-xs font-bold text-primary">{formatPlainPrice(item.discountPrice || item.price)}</span>
+                        <span className="text-xs font-bold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
                       </div>
                     </div>
                   ))}
                 </div>
 
                 {order.profile?.address ? <span className="text-xs text-secondary-text">نشانی: {order.profile.address}</span> : null}
+                <div className="flex flex-col gap-1 border-t border-primary-border pt-2">
+                  <span className="text-xs text-secondary-text">روش تحویل: {order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
+                  {Number(order.discountAmount) > 0 ? <span className="text-xs text-secondary-text">تخفیف: {formatAmount(order.discountAmount)}</span> : null}
+                  {Number(order.walletAmount) > 0 ? <span className="text-xs text-secondary-text">پرداخت از کیف پول: {formatAmount(order.walletAmount)}</span> : null}
+                  <span className="text-sm font-bold text-primary">مبلغ پرداختی: {formatAmount(order.total)}</span>
+                </div>
                 <CustomAccordion
                   title="مسیر وضعیت سفارش"
                   meta={ORDER_STATUS_LABELS[normalizeOrderStatus(order.fulfillmentStatus)]}

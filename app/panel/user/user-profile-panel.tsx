@@ -5,6 +5,7 @@ import { IoSaveOutline } from "react-icons/io5";
 import { EmailOtpAuthForm } from "@/app/design-system/components/ui/email-otp-auth-form";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { persistCart, readLocalCart } from "@/lib/cart-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import {
@@ -52,6 +53,7 @@ export function UserProfilePanel() {
   const [profileDraft, setProfileDraft] = useState<UserProfile>(EMPTY_USER_PROFILE);
   const [authUser, setAuthUser] = useState<PanelUser | null>(null);
   const [status, setStatus] = useState("");
+  useTransientAppMessage(status);
   const [showRequiredErrors, setShowRequiredErrors] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const formRef = useRef<HTMLDivElement>(null);
@@ -197,11 +199,6 @@ export function UserProfilePanel() {
           />
         </div>
       </div>
-      {status ? (
-        <div className="rounded-md border border-primary-border bg-primary-base p-2 text-sm font-semibold text-primary-text">
-          <span>{status}</span>
-        </div>
-      ) : null}
       <CustomButton fullWidth icon={<IoSaveOutline />} isLoading={isSavingProfile} onClick={() => void saveProfile()}>
         <span>ذخیره و تکمیل پروفایل</span>
       </CustomButton>

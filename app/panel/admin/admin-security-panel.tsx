@@ -11,6 +11,7 @@ import {
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import {
   fetchAdminAccessRequests,
   reviewAdminAccessRequest,
@@ -36,6 +37,7 @@ export function AdminSecurityPanel() {
   const [requests, setRequests] = useState<AdminAccessRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
+  useTransientAppMessage(status);
   const [actingId, setActingId] = useState("");
   const [isSuperadmin, setIsSuperadmin] = useState(false);
   const [checkedSuperadmin, setCheckedSuperadmin] = useState(false);
@@ -147,11 +149,6 @@ export function AdminSecurityPanel() {
             </CustomButton>
           </div>
 
-          {status ? (
-            <div className="rounded-md border border-primary-border bg-primary-card px-3 py-2 text-sm font-semibold text-primary-text">
-              {status}
-            </div>
-          ) : null}
 
           {loading ? (
             <div className="flex items-center gap-2 rounded-lg border border-primary-border bg-primary-card p-3 text-sm font-semibold text-primary-text">

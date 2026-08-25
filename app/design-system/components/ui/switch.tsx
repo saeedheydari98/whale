@@ -75,7 +75,7 @@ export function CustomSwitch({
         ) : (
           <span
             className={cx(
-              "absolute top-0.5 h-5 w-5 rounded-full bg-white",
+              "absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white",
               motionVariants.smooth,
               checked ? "left-6" : "left-0.5"
             )}

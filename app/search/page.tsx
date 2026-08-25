@@ -8,6 +8,7 @@ import { isProductAvailable, normalizeColorStock, type ProductRecord } from "@/l
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { ProductListGrid } from "@/app/products/product-list-grid";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -15,6 +16,7 @@ export default function SearchPage() {
   const [results, setResults] = useState<ProductRecord[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [cartMessage, setCartMessage] = useState("");
+  useTransientAppMessage(cartMessage);
   const viewportProductCount = useLoadingViewportCount("product-grid");
   const resolvedResults = Array.isArray(results) ? results : [];
   const loadingCount = loading ? resolveLoadingItemCount(resolvedResults.length || undefined, viewportProductCount) : 0;
@@ -68,11 +70,6 @@ export default function SearchPage() {
           <div className="text-2xl font-bold">نتایج جست‌وجو برای «{q}»</div>
         </div>
 
-        {cartMessage ? (
-          <div className="mb-4 rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary">
-            {cartMessage}
-          </div>
-        ) : null}
 
         {q ? (
           <ProductListGrid

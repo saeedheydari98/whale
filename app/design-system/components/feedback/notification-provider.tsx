@@ -31,6 +31,7 @@ type NotificationContextValue = {
 };
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
+const ERROR_MESSAGE_PATTERN = /نشد|ناموفق|خطا|نامعتبر|الزامی|لطفاً|باید|نیست|وارد کنید|وارد حساب شوید|پیدا نشد|کامل کنید|مجاز نیست|دسترسی ندارید/;
 
 function isMutationMethod(method: string) {
   return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
@@ -74,6 +75,11 @@ function getSuccessMessage(method: string, url: string) {
   if (url.includes("/api/cart")) return "سبد خرید به‌روزرسانی شد.";
   if (url.includes("/api/profile") || url.includes("/api/user/profile") || url.includes("/api/app/user")) return "پروفایل با موفقیت ذخیره شد.";
   if (url.includes("/api/admin/security")) return "تنظیمات امنیتی با موفقیت ذخیره شد.";
+  if (url.includes("/api/admin/discounts")) {
+    if (method === "DELETE") return "کد تخفیف با موفقیت حذف شد.";
+    if (method === "POST") return "کد تخفیف با موفقیت ثبت شد.";
+    return "تنظیمات تخفیف با موفقیت ذخیره شد.";
+  }
   if (url.includes("/api/admin/theme") || url.includes("/api/theme/admin")) return "ظاهر فروشگاه با موفقیت ذخیره شد.";
   if (url.includes("/api/banners")) return method === "DELETE" ? "بنر با موفقیت حذف شد." : "بنر با موفقیت ذخیره شد.";
   if (url.includes("/api/showcases")) return method === "DELETE" ? "ویترین با موفقیت حذف شد." : "ویترین با موفقیت ذخیره شد.";
@@ -103,6 +109,7 @@ function parseResponseData(response: Response) {
 export function AppNotificationProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const notifyRef = useRef<(payload: AppNotificationPayload) => void>(() => undefined);
+  const recentNotificationRef = useRef({ key: "", time: 0 });
 
   const remove = useCallback((id: number) => {
     setItems((current) => current.filter((item) => item.id !== id));
@@ -111,16 +118,23 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
   const notify = useCallback((payload: AppNotificationPayload) => {
     const message = payload.message.trim();
     if (!message) return;
+    const type = payload.type ?? "info";
+    const key = `${type}:${message}`;
+    const now = Date.now();
+    if (recentNotificationRef.current.key === key && now - recentNotificationRef.current.time < 800) return;
+    recentNotificationRef.current = { key, time: now };
 
-    const id = Date.now() + Math.round(Math.random() * 1000);
+    const id = now + Math.round(Math.random() * 1000);
     setItems((current) => [
       ...current.slice(-3),
-      { id, type: payload.type ?? "info", message },
+      { id, type, message },
     ]);
     window.setTimeout(() => remove(id), 4200);
   }, [remove]);
 
-  notifyRef.current = notify;
+  useEffect(() => {
+    notifyRef.current = notify;
+  }, [notify]);
 
   useEffect(() => {
     const handleNotify = (event: Event) => {
@@ -138,28 +152,31 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
     window.fetch = async (input, init) => {
       const method = getRequestMethod(input, init);
       const url = getRequestUrl(input);
-      const shouldNotify = isMutationMethod(method) && isApiUrl(url) && !hasSilentHeader(input, init);
+      const shouldInspect = isApiUrl(url) && !hasSilentHeader(input, init);
+      const shouldNotifySuccess = shouldInspect && isMutationMethod(method);
 
       try {
         const response = await originalFetch(input, init);
 
-        if (shouldNotify) {
+        if (shouldInspect) {
           void parseResponseData(response).then((data) => {
             if (!response.ok || data?.ok === false) {
               notifyRef.current({ type: "error", message: getErrorMessage(data) });
               return;
             }
 
-            notifyRef.current({
-              type: "success",
-              message: String(data?.message ?? "").trim() || getSuccessMessage(method, url),
-            });
+            if (shouldNotifySuccess) {
+              notifyRef.current({
+                type: "success",
+                message: String(data?.message ?? "").trim() || getSuccessMessage(method, url),
+              });
+            }
           });
         }
 
         return response;
       } catch (error) {
-        if (shouldNotify) {
+        if (shouldInspect) {
           notifyRef.current({ type: "error", message: "ارتباط با سرور ناموفق بود." });
         }
         throw error;
@@ -222,4 +239,14 @@ export function useAppNotification() {
     throw new Error("useAppNotification must be used inside AppNotificationProvider");
   }
   return context;
+}
+
+export function useTransientAppMessage(message: string) {
+  const { notify } = useAppNotification();
+
+  useEffect(() => {
+    const normalized = message.trim();
+    if (!normalized) return;
+    notify({ type: ERROR_MESSAGE_PATTERN.test(normalized) ? "error" : "success", message: normalized });
+  }, [message, notify]);
 }

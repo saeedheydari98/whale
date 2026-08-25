@@ -9,7 +9,7 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
-import { formatTomanPrice, numericTextValue as numericFilterValue, readPriceNumberWithFallback as readPriceNumber } from "@/lib/price-format";
+import { formatAmount, numericTextValue as numericFilterValue, readPriceNumberWithFallback as readPriceNumber } from "@/lib/price-format";
 
 export type ProductFilterState = {
   priceMin: string;
@@ -133,7 +133,7 @@ function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, 
       <div className="flex items-center justify-between gap-3">
         <div className="text-sm font-bold text-primary-text">محدوده قیمت</div>
         <span className="text-xs font-semibold text-secondary-text">
-          {formatTomanPrice(minValue)} تا {formatTomanPrice(maxValue)}
+          {formatAmount(minValue, { suffix: " تومان" })} تا {formatAmount(maxValue, { suffix: " تومان" })}
         </span>
       </div>
       <div
@@ -168,8 +168,8 @@ function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, 
         />
       </div>
       <div className="flex items-center justify-between gap-3 text-xs font-semibold text-secondary-text" dir="ltr">
-        <span dir="rtl">{formatTomanPrice(0)}</span>
-        <span dir="rtl">{formatTomanPrice(rangeMax)}</span>
+        <span dir="rtl">{formatAmount(0, { suffix: " تومان" })}</span>
+        <span dir="rtl">{formatAmount(rangeMax, { suffix: " تومان" })}</span>
       </div>
     </div>
   );

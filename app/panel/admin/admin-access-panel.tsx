@@ -5,6 +5,7 @@ import { IoShieldCheckmarkOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { EmailOtpAuthForm } from "@/app/design-system/components/ui/email-otp-auth-form";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { requestAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, setCachedAuthUser, type AuthClientUser } from "@/lib/auth-client";
 import { getUserPhone } from "@/lib/user-display";
@@ -15,6 +16,7 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
   const [authUser, setAuthUser] = useState<AuthClientUser | null>(null);
   const [checkingUser, setCheckingUser] = useState(true);
   const [status, setStatus] = useState("");
+  useTransientAppMessage(status);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -117,9 +119,6 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
         </div>
       )}
 
-      {status ? (
-        <div className="rounded-md border border-primary-border bg-primary-base px-3 py-2 text-sm font-semibold text-primary-text">{status}</div>
-      ) : null}
     </section>
   );
 }

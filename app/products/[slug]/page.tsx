@@ -7,7 +7,7 @@ import { IoBagAddOutline } from "react-icons/io5";
 import { findProductById, getProductDetail, isProductAvailable, type ProductDetailResult, type ProductRecord } from "@/lib/products-client";
 import { addProductToCart } from "@/lib/cart-client";
 import {
-  formatCurrencyWithCommas as formatPrice,
+  formatAmount as formatPrice,
   getDiscountPercentValue as getDiscountPercent,
   getFinalPriceValue as getFinalPrice,
 } from "@/lib/price-format";
@@ -16,6 +16,7 @@ import { normalizeColorStock } from "@/lib/color-counts";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomTag } from "@/app/design-system/components/ui/tag";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
 import Loading from "@/app/design-system/components/loading/loading";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
@@ -27,8 +28,8 @@ const LOADING_PRODUCT: ProductRecord = {
   id: "loading-product",
   title: "عنوان محصول",
   description: "توضیح کوتاه محصول برای پیش‌نمایش\nادامه توضیحات محصول در این بخش نمایش داده می‌شود",
-  price: "$2,499",
-  originalPrice: "$2,899",
+  price: "2499",
+  originalPrice: "2899",
   discountPercent: 15,
   badge: "ویژه",
   active: true,
@@ -180,7 +181,9 @@ export default function ProductPage() {
   const [isPurchased, setIsPurchased] = useState(false);
   const [hasRated, setHasRated] = useState(false);
   const [reviewError, setReviewError] = useState("");
+  useTransientAppMessage(reviewError);
   const [cartMessage, setCartMessage] = useState("");
+  useTransientAppMessage(cartMessage);
   const [selectedColor, setSelectedColor] = useState("");
   const [activeTab, setActiveTab] = useState<ProductTab>("details");
 
@@ -353,11 +356,6 @@ export default function ProductPage() {
   return (
     <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
-        {cartMessage ? (
-          <div className="rounded-lg border border-primary-border bg-primary-card px-4 py-3 text-sm font-semibold text-primary">
-            {cartMessage}
-          </div>
-        ) : null}
 
         <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
           <section className="relative flex w-full flex-col gap-6 overflow-hidden rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:w-[42rem] lg:max-w-[42rem] lg:shrink-0">
@@ -393,7 +391,7 @@ export default function ProductPage() {
             <div className="flex flex-col gap-1 rounded-xl border border-primary-border bg-primary-card p-4">
               {(originalPrice && discountPercent > 0) || catalogLoading ? (
                 <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                  <div className="text-sm text-danger-text-nomode line-through">{originalPrice || "$0"}</div>
+                  <div className="text-sm text-danger-text-nomode line-through">{originalPrice || formatPrice(0)}</div>
                 </Loading>
               ) : null}
               <div className="flex flex-wrap items-center gap-3">
@@ -501,7 +499,6 @@ export default function ProductPage() {
                 userRating={userRating}
                 isPurchased={isPurchased}
                 hasRated={hasRated}
-                error={reviewError}
                 onTextChange={setText}
                 onRatingChange={setRating}
                 onSubmit={submitReview}

@@ -4,7 +4,7 @@ import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getAuthUser } from "@/lib/api/auth";
 import { cartItemDto, getOrCreateActiveCart } from "@/lib/api/catalog-service";
-import { readFormattedPriceNumber as readPriceNumber } from "@/lib/price-format";
+import { CheckoutError, completeCheckout, normalizeShippingMethod } from "@/lib/api/checkout-service";
 import {
   colorSelectionTotal,
   readCartItemColorSelection as readColorSelection,
@@ -40,26 +40,6 @@ type CartItemPayload = {
   quantity?: number | string;
 };
 
-type CheckoutCartItem = {
-  productId: number | null;
-  title: string;
-  description: string;
-  price: string;
-  originalPrice: string | null;
-  discountPrice: string | null;
-  discountPercent: number | null;
-  imageUrl: string | null;
-  selectedColor: string | null;
-  quantity: number;
-};
-
-type ProductUpdatePlan = {
-  productId: number;
-  stockQuantity: number;
-  quantity: number;
-  colorStock: Record<string, number>;
-};
-
 type CartProductSnapshot = {
   id: number;
   stockQuantity: number;
@@ -68,8 +48,6 @@ type CartProductSnapshot = {
   active: boolean;
   isActive: boolean;
 };
-
-class CheckoutValidationError extends Error {}
 
 function normalizeProfile(value: ProfilePayload) {
   return {
@@ -352,105 +330,16 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const cart = await activeCartForProfile(profile.id);
-    const cartItems = cart.items as CheckoutCartItem[];
-    const productIds = cartItems
-      .map((item) => item.productId)
-      .filter((id): id is number => typeof id === "number");
-    const products = productIds.length
-      ? await prisma.product.findMany({ where: { id: { in: Array.from(new Set(productIds)) } } })
-      : [];
-    const productsById = new Map(products.map((product: { id: number }) => [product.id, product]));
-    let total = 0;
-    const productUpdates: ProductUpdatePlan[] = [];
-
-    for (const item of cartItems) {
-      total += readPriceNumber(item.discountPrice || item.price) * item.quantity;
-      if (!item.productId) continue;
-
-      const product = productsById.get(item.productId) as
-        | { id: number; stockQuantity: number; colorStock: unknown }
-        | undefined;
-      if (!product || product.stockQuantity < item.quantity) {
-        throw new CheckoutValidationError(`${item.title} موجودی کافی ندارد.`);
-      }
-
-      const colorStock = normalizeColorStock(product.colorStock);
-      if (Object.keys(colorStock).length > 0 && !item.selectedColor) {
-        throw new CheckoutValidationError(`برای ${item.title} یک رنگ انتخاب کنید.`);
-      }
-      if (Object.keys(colorStock).length > 0) {
-        const selectedColors = readColorSelection(item.selectedColor, item.quantity);
-        const selectedTotal = colorSelectionTotal(selectedColors);
-        if (selectedTotal !== item.quantity) {
-          throw new CheckoutValidationError(`تعداد رنگ‌های انتخاب‌شده برای ${item.title} با تعداد سبد خرید هماهنگ نیست.`);
-        }
-        for (const [color, count] of Object.entries(selectedColors)) {
-          if ((colorStock[color] ?? 0) < count) {
-            throw new CheckoutValidationError(`${item.title} با رنگ ${color} موجودی کافی ندارد.`);
-          }
-          colorStock[color] -= count;
-        }
-      }
-
-      productUpdates.push({
-        productId: product.id,
-        stockQuantity: product.stockQuantity - item.quantity,
-        quantity: item.quantity,
-        colorStock,
-      });
-    }
-
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const order = await tx.order.create({
-        data: {
-          userId: authUser.id,
-          profileId: profile.id,
-          status: "paid",
-          fulfillmentStatus: "pending_approval",
-          total: "0",
-          statusHistory: {
-            create: { status: "pending_approval" },
-          },
-        },
-      });
-
-      await tx.orderItem.createMany({
-        data: cartItems.map((item) => ({
-          orderId: order.id,
-          productId: item.productId,
-          title: item.title,
-          description: item.description,
-          price: item.price,
-          originalPrice: item.originalPrice,
-          discountPrice: item.discountPrice,
-          discountPercent: item.discountPercent,
-          imageUrl: item.imageUrl,
-          selectedColor: item.selectedColor,
-          quantity: item.quantity,
-        })),
-      });
-
-      for (const update of productUpdates) {
-        await tx.product.update({
-          where: { id: update.productId },
-          data: {
-            stockQuantity: update.stockQuantity,
-            salesCount: { increment: update.quantity },
-            colorStock: Object.keys(update.colorStock).length > 0 ? update.colorStock : Prisma.JsonNull,
-          },
-        });
-      }
-      if (order) await tx.order.update({ where: { id: order.id }, data: { total: String(total) } });
-      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-    }, {
-      timeout: 15_000,
+    const body = await request.json().catch(() => ({}));
+    const result = await completeCheckout({
+      userId: authUser.id,
+      shippingMethod: normalizeShippingMethod(body.shippingMethod),
+      discountCode: body.discountCode,
     });
-
-    return apiOk({ user: { profile }, cart: { items: [] } });
+    return apiOk({ user: { profile }, cart: { items: [] }, checkout: result });
   } catch (error) {
     console.error("Cart checkout error:", error);
-    if (error instanceof CheckoutValidationError) return apiFail(error.message, 409);
+    if (error instanceof CheckoutError) return apiFail(error.message, error.status);
     return apiServerError("ثبت سفارش انجام نشد. لطفاً دوباره تلاش کنید.");
   }
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Loading from "@/app/design-system/components/loading/loading";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { addProductToCart } from "@/lib/cart-client";
@@ -57,6 +58,7 @@ export function ProductListingPage({
   onLoadMore,
 }: ProductListingPageProps) {
   const [cartMessage, setCartMessage] = useState("");
+  useTransientAppMessage(cartMessage);
   const [previewImage, setPreviewImage] = useState("");
   const resolvedLoading = loading || initialPageLoading;
   const resolvedHeaderLoading = headerLoading ?? resolvedLoading;
@@ -111,9 +113,6 @@ export function ProductListingPage({
             <CustomEmptyState description={emptyText} />
           ) : null}
 
-          {cartMessage ? (
-            <div className="rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary">{cartMessage}</div>
-          ) : null}
 
           <ProductListGrid
             products={products}

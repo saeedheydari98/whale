@@ -44,32 +44,30 @@ export function readPriceNumberWithFallback(value?: string | number | null, fall
   return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed)) : fallback;
 }
 
-export function formatNumberWithCommas(value?: string | number | null) {
+export type FormatAmountOptions = {
+  prefix?: string;
+  suffix?: string;
+  fallback?: string;
+};
+
+/** Canonical formatter for every monetary value shown in the application. */
+export function formatAmount(
+  value?: string | number | null,
+  options: FormatAmountOptions = {}
+) {
   const rawValue = toLatinDigits(value).trim();
+  const isNegative = rawValue.startsWith("-");
   const normalized = rawValue.replace(/[^0-9.]/g, "");
-  if (!normalized) return "";
+  if (!normalized) return options.fallback ?? "";
 
   const [integerPart = "", ...decimalParts] = normalized.split(".");
   const integerDigits = integerPart.replace(/^0+(?=\d)/, "") || "0";
   const formattedInteger = integerDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const decimalPart = decimalParts.join("");
+  const formattedNumber = decimalParts.length > 0 ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+  const signedNumber = isNegative && formattedNumber !== "0" ? `-${formattedNumber}` : formattedNumber;
 
-  return decimalParts.length > 0 ? `${formattedInteger}.${decimalPart}` : formattedInteger;
-}
-
-export function formatCurrencyWithCommas(value?: string | number | null, prefix = "$") {
-  const formatted = formatNumberWithCommas(value);
-  if (!formatted) return String(value || "");
-  return `${prefix}${formatted}`;
-}
-
-export function formatPlainPrice(value?: string | number | null, fallback = "بدون قیمت") {
-  return formatNumberWithCommas(value) || fallback;
-}
-
-export function formatTomanPrice(value?: string | number | null) {
-  const formatted = formatNumberWithCommas(value);
-  return formatted ? `${formatted} تومان` : "بدون قیمت";
+  return `${options.prefix ?? ""}${signedNumber}${options.suffix ?? ""}`;
 }
 
 export type PriceLike = {

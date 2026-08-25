@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../design-system/components/ui/button";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
+import { CustomInput } from "../design-system/components/ui/input";
 import { EmailOtpAuthForm } from "../design-system/components/ui/email-otp-auth-form";
 import { ImagePreview } from "../design-system/components/ui/image-preview";
 import { CustomModal } from "../design-system/components/ui/modal";
@@ -13,6 +14,7 @@ import {
   CART_UPDATED_EVENT,
   clearCart as clearCartData,
   checkoutCart,
+  getCheckoutQuote,
   getCartItemColorSelection,
   getCart,
   persistCart,
@@ -22,6 +24,8 @@ import {
   updateCartColorQuantity,
   updateCartQuantity,
   type CartItemRecord,
+  type CheckoutOptions,
+  type CheckoutQuote,
 } from "@/lib/cart-client";
 import {
   fetchUserProfile,
@@ -31,9 +35,10 @@ import {
   type UserProfile,
 } from "@/lib/user-profile";
 import { useAppUser } from "@/lib/app-user-context";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { readCachedAuthUser, setCachedAuthUser, type AuthClientUser } from "@/lib/auth-client";
 import {
-  formatCurrencyWithCommas as formatPrice,
+  formatAmount as formatPrice,
   getDiscountPercentValue as getDiscountPercent,
   getFinalPriceValue as getFinalPrice,
   readFormattedPriceNumber as readPriceNumber,
@@ -47,8 +52,12 @@ export default function CartPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState("");
+  useTransientAppMessage(checkoutMessage);
   const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
-  const [isCheckoutSuccessOpen, setIsCheckoutSuccessOpen] = useState(false);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [shippingMethod, setShippingMethod] = useState<CheckoutOptions["shippingMethod"]>("pickup");
+  const [discountCode, setDiscountCode] = useState("");
+  const [checkoutQuote, setCheckoutQuote] = useState<CheckoutQuote | null>(null);
   const [authUser, setAuthUser] = useState<AuthClientUser | null>(null);
   const router = useRouter();
   const { data: appUserData, refresh: refreshAppUser } = useAppUser();
@@ -172,17 +181,55 @@ export default function CartPage() {
     setCheckoutMessage("");
     try {
       await persistCart(checkoutItems, savedProfile);
-      const nextItems = await checkoutCart(savedProfile);
+      const nextItems = await checkoutCart(savedProfile, { shippingMethod, discountCode });
       purchasedItems.forEach((item) => {
         if (item.productId) {
           localStorage.setItem(`purchased:${item.productId}`, "1");
         }
       });
       setItems(nextItems);
+      setIsCheckoutModalOpen(false);
       setCheckoutMessage("پرداخت با موفقیت انجام شد.");
-      setIsCheckoutSuccessOpen(true);
     } catch (error) {
       setCheckoutMessage(error instanceof Error ? error.message : "پرداخت ناموفق بود.");
+    } finally {
+      setIsCheckoutLoading(false);
+    }
+  };
+
+  const requestCheckoutQuote = async (
+    nextShippingMethod = shippingMethod,
+    nextDiscountCode = discountCode
+  ) => {
+    setIsCheckoutLoading(true);
+    setCheckoutMessage("");
+    try {
+      const quote = await getCheckoutQuote({
+        shippingMethod: nextShippingMethod,
+        discountCode: nextDiscountCode,
+      });
+      setCheckoutQuote(quote);
+    } catch (error) {
+      setCheckoutQuote(null);
+      setCheckoutMessage(error instanceof Error ? error.message : "استعلام مبلغ پرداخت انجام نشد.");
+    } finally {
+      setIsCheckoutLoading(false);
+    }
+  };
+
+  const prepareCheckout = async (checkoutItems: CartItemRecord[], savedProfile: UserProfile) => {
+    setProfile(savedProfile);
+    setIsCheckoutLoading(true);
+    setCheckoutMessage("");
+    try {
+      await persistCart(checkoutItems, savedProfile);
+      const quote = await getCheckoutQuote({ shippingMethod: "pickup", discountCode: "" });
+      setShippingMethod("pickup");
+      setDiscountCode("");
+      setCheckoutQuote(quote);
+      setIsCheckoutModalOpen(true);
+    } catch (error) {
+      setCheckoutMessage(error instanceof Error ? error.message : "آماده‌سازی پرداخت انجام نشد.");
     } finally {
       setIsCheckoutLoading(false);
     }
@@ -207,7 +254,7 @@ export default function CartPage() {
       return;
     }
 
-    await completeCheckout(items, savedProfile);
+    await prepareCheckout(items, savedProfile);
   };
 
   const handleAuthSuccess = async ({
@@ -243,7 +290,7 @@ export default function CartPage() {
     }
 
     setProfile(checkoutProfile);
-    await completeCheckout(accountCart.items, checkoutProfile);
+    await prepareCheckout(accountCart.items, checkoutProfile);
   };
 
   return (
@@ -284,11 +331,6 @@ export default function CartPage() {
           )}
         </div>
 
-        {checkoutMessage ? (
-          <div className="rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary">
-            {checkoutMessage}
-          </div>
-        ) : null}
 
         {items.length === 0 ? (
           <CustomEmptyState description="سبد خرید شما خالی است." />
@@ -422,19 +464,90 @@ export default function CartPage() {
         </CustomModal>
 
         <CustomModal
-          open={isCheckoutSuccessOpen}
-          onClose={() => setIsCheckoutSuccessOpen(false)}
-          title="خرید تکمیل شد"
+          open={isCheckoutModalOpen}
+          onClose={() => setIsCheckoutModalOpen(false)}
+          title="تأیید و پرداخت"
           rounded="lg"
           shadow="lg"
+          isLoading={isCheckoutLoading}
+          closeOnBackdrop={!isCheckoutLoading}
         >
-          <div className="flex flex-col gap-3">
-            <div className="text-sm font-semibold text-primary-text">
-              خرید شما با موفقیت ثبت شد.
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <div className="text-sm font-bold text-primary-text"><span>روش تحویل</span></div>
+              <div className="flex gap-2">
+                <CustomButton
+                  fullWidth
+                  variant={shippingMethod === "pickup" ? "primary" : "neutral"}
+                  disabled={isCheckoutLoading}
+                  onClick={() => {
+                    setShippingMethod("pickup");
+                    void requestCheckoutQuote("pickup", discountCode);
+                  }}
+                >
+                  <span>تحویل حضوری</span>
+                </CustomButton>
+                <CustomButton
+                  fullWidth
+                  variant={shippingMethod === "post" ? "primary" : "neutral"}
+                  disabled={isCheckoutLoading}
+                  onClick={() => {
+                    setShippingMethod("post");
+                    void requestCheckoutQuote("post", discountCode);
+                  }}
+                >
+                  <span>ارسال با پست ({formatPrice(30000)})</span>
+                </CustomButton>
+              </div>
             </div>
-            <div className="text-sm text-secondary-text">
-              سوابق خریدتان به‌روزرسانی شد.
+
+            <div className="flex items-end gap-2">
+              <CustomInput
+                value={discountCode}
+                inputMode="text"
+                maxLength={6}
+                autoCapitalize="characters"
+                autoComplete="off"
+                spellCheck={false}
+                label="کد تخفیف ۶ کاراکتری"
+                onChange={(event) => {
+                  setDiscountCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6));
+                  setCheckoutQuote(null);
+                  setCheckoutMessage("");
+                }}
+              />
+              <CustomButton
+                variant="neutral"
+                disabled={isCheckoutLoading || (discountCode.length > 0 && discountCode.length !== 6)}
+                onClick={() => void requestCheckoutQuote()}
+              >
+                <span>استعلام</span>
+              </CustomButton>
             </div>
+
+
+            {checkoutQuote ? (
+              <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+                <div className="flex items-center justify-between gap-3"><span className="text-sm text-secondary-text">مبلغ کالاها</span><span className="text-sm font-bold">{formatPrice(checkoutQuote.subtotal)}</span></div>
+                {checkoutQuote.discountAmount > 0 ? <div className="flex items-center justify-between gap-3"><span className="text-sm text-secondary-text">تخفیف کد</span><span className="text-sm font-bold text-success-text">− {formatPrice(checkoutQuote.discountAmount)}</span></div> : null}
+                {checkoutQuote.discountType === "free_shipping" ? <div className="flex items-center justify-between gap-3"><span className="text-sm text-secondary-text">کد ارسال رایگان</span><span className="text-sm font-bold text-success-text">اعمال شد</span></div> : null}
+                <div className="flex items-center justify-between gap-3"><span className="text-sm text-secondary-text">هزینه ارسال</span><span className="text-sm font-bold">{checkoutQuote.shippingAmount > 0 ? formatPrice(checkoutQuote.shippingAmount) : "رایگان"}</span></div>
+                {checkoutQuote.walletAmount > 0 ? <div className="flex items-center justify-between gap-3"><span className="text-sm text-secondary-text">کسر از کیف پول</span><span className="text-sm font-bold text-success-text">− {formatPrice(checkoutQuote.walletAmount)}</span></div> : null}
+                <div className="flex items-center justify-between gap-3 border-t border-primary-border pt-2"><span className="text-base font-bold">مبلغ نهایی</span><span className="text-lg font-bold text-primary">{formatPrice(checkoutQuote.total)}</span></div>
+                {checkoutQuote.cashbackEarned > 0 ? <span className="text-xs font-semibold text-success-text">پس از این خرید {formatPrice(checkoutQuote.cashbackEarned)} به کیف پول شما برمی‌گردد.</span> : null}
+              </div>
+            ) : null}
+
+            <CustomButton
+              fullWidth
+              variant="success"
+              icon={<IoCardOutline />}
+              isLoading={isCheckoutLoading}
+              disabled={!checkoutQuote || isCheckoutLoading}
+              onClick={() => profile ? void completeCheckout(items, profile) : undefined}
+            >
+              <span>پرداخت مبلغ نهایی</span>
+            </CustomButton>
           </div>
         </CustomModal>
 

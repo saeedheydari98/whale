@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { LazyViewportSection } from "@/app/design-system/components/ui/lazy-viewport-section";
 import {
-  formatCurrencyWithCommas as formatPrice,
+  formatAmount as formatPrice,
   getDiscountPercentValue as getDiscountPercent,
   getFinalPriceValue as getFinalPrice,
 } from "@/lib/price-format";

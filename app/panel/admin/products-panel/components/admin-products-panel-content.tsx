@@ -1,6 +1,7 @@
 "use client";
 
 import Loading from "@/app/design-system/components/loading/loading";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { AdminBannerList } from "./admin-banner-list";
 import { AdminShowcaseList } from "./admin-showcase-list";
@@ -53,6 +54,7 @@ function hasLoadingItemHints(value: Record<string, number> | undefined) {
 }
 
 export function AdminProductsPanelContent({ section, panel }: AdminProductsPanelContentProps) {
+  useTransientAppMessage(panel.status);
   const sectionCount = getSectionCount(section, panel);
   const contentLoading = panel.loading;
   const canUseActiveSectionState = !contentLoading || panel.sectionReady;
@@ -83,11 +85,6 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         </Loading>
       </div>
 
-      {panel.status ? (
-        <div className="rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary-text">
-          <span>{panel.status}</span>
-        </div>
-      ) : null}
 
       {section === "products" ? (
         <ProductsSection

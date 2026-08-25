@@ -12,6 +12,8 @@ import {
   IoRibbonOutline,
   IoShieldCheckmarkOutline,
   IoReceiptOutline,
+  IoPeopleOutline,
+  IoTicketOutline,
 } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
@@ -20,6 +22,8 @@ import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
 import { AdminOrdersPanelSkeleton } from "@/app/panel/admin/admin-orders-skeleton";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
+import { AdminUsersPanel } from "@/app/panel/admin/admin-users-panel";
+import { AdminDiscountsPanel } from "@/app/panel/admin/admin-discounts-panel";
 import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
@@ -35,7 +39,7 @@ type AdminPanelUser = {
   role?: string | null;
 };
 
-type AdminPanelTab = "theme" | "security" | "orders" | AdminCatalogSection;
+type AdminPanelTab = "theme" | "security" | "orders" | "users" | "discounts" | AdminCatalogSection;
 
 export default function AdminPanelPage() {
   const { data: appUserData, refresh: refreshAppUser } = useAppUser();
@@ -102,6 +106,8 @@ export default function AdminPanelPage() {
     ...(isSuperadmin ? [{ id: "security" as const, label: "دسترسی‌ها", icon: <IoShieldCheckmarkOutline /> }] : []),
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
+    { id: "users", label: "کاربران", icon: <IoPeopleOutline /> },
+    { id: "discounts", label: "تخفیف‌ها", icon: <IoTicketOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
     { id: "showcases", label: "ویترین‌ها", icon: <IoAlbumsOutline /> },
     { id: "categories", label: "دسته‌بندی‌ها", icon: <IoPricetagsOutline /> },
@@ -125,7 +131,9 @@ export default function AdminPanelPage() {
           {activeTab === "theme" ? <AdminThemePanel /> : null}
           {activeTab === "security" && isSuperadmin ? <AdminSecurityPanel /> : null}
           {activeTab === "orders" ? <AdminOrdersPanel /> : null}
-          {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" ? (
+          {activeTab === "users" ? <AdminUsersPanel /> : null}
+          {activeTab === "discounts" ? <AdminDiscountsPanel /> : null}
+          {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" ? (
             <AdminProductsPanel section={activeTab} />
           ) : null}
         </div>

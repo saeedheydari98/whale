@@ -1,8 +1,7 @@
 import { MIN_LOADING_MS } from "./constants";
 import {
   calculateDiscountPercentValue,
-  formatCurrencyWithCommas,
-  formatNumberWithCommas,
+  formatAmount,
   readFormattedPriceNumber,
 } from "@/lib/price-format";
 import { getProductIdentityKey } from "@/lib/catalog-utils";
@@ -300,8 +299,8 @@ export function ensureShowcases(products: ProductForm[], savedShowcases: Showcas
 
 export const readPriceNumber = readFormattedPriceNumber;
 export const calculateDiscountPercent = calculateDiscountPercentValue;
-export const formatPrice = formatCurrencyWithCommas;
-export { formatNumberWithCommas };
+export const formatPrice = formatAmount;
+export { formatAmount };
 
 export function sortAdminShowcaseProducts(products: ProductForm[], sort: string) {
   return [...products].sort((a, b) => {

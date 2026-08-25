@@ -20,6 +20,7 @@ import {
 } from "@/lib/api/auth";
 import { sendAuthOtpEmail } from "@/lib/gmail";
 import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
+import { runDiscountRules } from "@/lib/api/discount-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -243,7 +244,14 @@ export async function POST(request: Request, context: Context) {
       if (consumed.count !== 1) return apiFail("این کد قبلاً استفاده شده است.", 401);
 
       const user = await normalizeRole(await findOrCreateVerifiedUser(identity));
-      const [tokens, profileComplete] = await Promise.all([authTokens(user), isProfileComplete(user.id)]);
+      const [tokens, profileComplete] = await Promise.all([
+        authTokens(user),
+        isProfileComplete(user.id),
+        runDiscountRules({ userIds: [user.id] }).catch((error) => {
+          console.error("Login discount rule evaluation error:", error);
+          return null;
+        }),
+      ]);
       return apiOk({ user: publicUser(user), profileComplete, ...tokens });
     }
 

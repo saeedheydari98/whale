@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { IoArrowForwardOutline, IoLogInOutline, IoMailOutline } from "react-icons/io5";
 import { CustomButton } from "./button";
 import { CustomInput } from "./input";
+import { useTransientAppMessage } from "../feedback/notification-provider";
 import type { AuthClientUser } from "@/lib/auth-client";
 import {
   EMAIL_PATTERN,
@@ -48,6 +49,7 @@ export function EmailOtpAuthForm({
   const [codeSent, setCodeSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [status, setStatus] = useState("");
+  useTransientAppMessage(status);
   const [loading, setLoading] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const code = codeDigits.join("");
@@ -282,11 +284,6 @@ export function EmailOtpAuthForm({
           </CustomButton>
         </div>
       )}
-      {status ? (
-        <div className="rounded-md border border-primary-border bg-primary-base p-2 text-sm font-semibold text-primary-text">
-          <span>{status}</span>
-        </div>
-      ) : null}
     </div>
   );
 }

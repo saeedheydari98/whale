@@ -22,7 +22,6 @@ type ProductReviewsSectionProps = {
   userRating?: number;
   isPurchased: boolean;
   hasRated: boolean;
-  error?: string;
   onTextChange: (value: string) => void;
   onRatingChange: (value: number | undefined) => void;
   onSubmit: () => void;
@@ -63,7 +62,6 @@ export function ProductReviewsSection({
   userRating,
   isPurchased,
   hasRated,
-  error,
   onTextChange,
   onRatingChange,
   onSubmit,
@@ -194,11 +192,6 @@ export function ProductReviewsSection({
                 <span>ثبت دیدگاه</span>
               </CustomButton>
             </div>
-            {error ? (
-              <div className="rounded-md border border-danger-border-nomode bg-primary-base px-3 py-2 text-sm font-semibold text-danger-text-nomode">
-                {error}
-              </div>
-            ) : null}
           </div>
 
           <div className="flex flex-col gap-4">

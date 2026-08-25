@@ -5,6 +5,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import {
@@ -41,6 +42,7 @@ export default function ShowcasePage() {
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
   const [cartMessage, setCartMessage] = useState("");
+  useTransientAppMessage(cartMessage);
   const [previewImage, setPreviewImage] = useState("");
 
   const structureQuery = useQuery({
@@ -173,11 +175,6 @@ export default function ShowcasePage() {
             </div>
           )}
         >
-          {cartMessage ? (
-            <div className="rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary">
-              {cartMessage}
-            </div>
-          ) : null}
 
           {!loading && products.length === 0 ? (
             <CustomEmptyState />

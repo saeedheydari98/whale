@@ -7,7 +7,7 @@ import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
-import { formatNumberWithCommas, getProductImageUrls, hasMatchingColorStock } from "../utils";
+import { formatAmount, getProductImageUrls, hasMatchingColorStock } from "../utils";
 import { AdminModalSection } from "./admin-modal-section";
 import { InventoryControls, ProductAdvancedFields, ProductPlacementFields } from "./product-form-fields";
 
@@ -186,13 +186,13 @@ function ProductModal({
             defaultOpen={!hasPrice}
           >
             <CustomInput
-              value={formatNumberWithCommas(product.originalPrice)}
+              value={formatAmount(product.originalPrice)}
               placeholder="قیمت قبل از تخفیف"
               inputMode="numeric"
               onChange={(event) => onPricingPatch({ originalPrice: event.target.value })}
             />
             <CustomInput
-              value={formatNumberWithCommas(product.discountPrice)}
+              value={formatAmount(product.discountPrice)}
               placeholder="قیمت با تخفیف"
               inputMode="numeric"
               invalid={hasRequiredError(priceErrorKey) && !product.discountPrice.trim()}

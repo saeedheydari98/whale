@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { addProductToCart } from "@/lib/cart-client";
 import {
-  formatCurrencyWithCommas as formatPrice,
+  formatAmount as formatPrice,
   getDiscountPercentValue as getDiscountPercent,
   getFinalPriceValue as getFinalPrice,
 } from "@/lib/price-format";
@@ -186,6 +187,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
   const tree = structure?.tree ?? { sections: [] };
   const structureLoading = catalogQuery.isLoading;
   const [cartMessage, setCartMessage] = useState("");
+  useTransientAppMessage(cartMessage);
   const [previewImage, setPreviewImage] = useState("");
   const [bannerPreviewImage, setBannerPreviewImage] = useState("");
 
@@ -464,11 +466,6 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           <CustomEmptyState />
         ) : null}
 
-        {cartMessage ? (
-          <div className="rounded-md border border-primary-border bg-primary-card px-4 py-2 text-sm font-semibold text-primary">
-            {cartMessage}
-          </div>
-        ) : null}
 
         {!loading ? (
         <div className="flex flex-col gap-8">

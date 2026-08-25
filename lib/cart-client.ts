@@ -91,6 +91,26 @@ type CartApiData = {
   };
 };
 
+export type CheckoutOptions = {
+  shippingMethod: "pickup" | "post";
+  discountCode?: string;
+};
+
+export type CheckoutQuote = {
+  subtotal: number;
+  discountAmount: number;
+  walletAmount: number;
+  shippingAmount: number;
+  total: number;
+  cashbackEarned: number;
+  cashbackPercent: number;
+  walletBalance: number;
+  shippingMethod: "pickup" | "post";
+  discountCode: string | null;
+  discountType: "percentage" | "free_shipping" | null;
+  discountPercent: number | null;
+};
+
 function readCartItemsFromApiData(data: unknown) {
   const response = data as CartApiData | null;
   return response?.data?.cart?.items ?? response?.data?.items ?? [];
@@ -613,7 +633,20 @@ export async function clearCart() {
   return savedItems;
 }
 
-export async function checkoutCart(profile = readUserProfile()) {
+export async function getCheckoutQuote(options: CheckoutOptions): Promise<CheckoutQuote> {
+  const res = await fetch("/api/cart/quote", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(options),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || data?.ok === false || !data?.data?.quote) {
+    throw new Error(data?.message || data?.error || "استعلام مبلغ پرداخت انجام نشد.");
+  }
+  return data.data.quote as CheckoutQuote;
+}
+
+export async function checkoutCart(profile = readUserProfile(), options: CheckoutOptions = { shippingMethod: "pickup" }) {
   const user = readCachedAuthUser();
   beginCartMutation(user);
   if (!profile || !isUserProfileComplete(profile)) {
@@ -625,7 +658,7 @@ export async function checkoutCart(profile = readUserProfile()) {
   const res = await fetch("/api/cart", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ profile }),
+    body: JSON.stringify({ profile, ...options }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {

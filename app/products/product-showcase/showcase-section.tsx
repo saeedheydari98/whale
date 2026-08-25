@@ -105,7 +105,7 @@ export function ProductShowcaseCard({
               ) : null}
               <Loading loading="skeleton-item" isLoading={isLoading}>
                 <div className="text-sm font-semibold text-primary">
-                  {product ? formatPrice(getFinalPrice(product)) : "۰ تومان"}
+                  {product ? formatPrice(getFinalPrice(product)) : formatPrice("0")}
                 </div>
               </Loading>
             </div>

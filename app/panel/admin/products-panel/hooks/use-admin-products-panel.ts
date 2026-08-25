@@ -23,7 +23,7 @@ import {
   dedupeProducts,
   ensureShowcases,
   formatPrice,
-  formatNumberWithCommas,
+  formatAmount,
   getProductImageUrls,
   getProductKey,
   getShowcaseProductsForAdmin,
@@ -2228,8 +2228,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
 function updatePricingPatch(product: ProductForm, patch: Partial<ProductForm>) {
   const normalizedPatch = {
     ...patch,
-    ...(patch.originalPrice !== undefined ? { originalPrice: formatNumberWithCommas(patch.originalPrice) } : {}),
-    ...(patch.discountPrice !== undefined ? { discountPrice: formatNumberWithCommas(patch.discountPrice) } : {}),
+    ...(patch.originalPrice !== undefined ? { originalPrice: formatAmount(patch.originalPrice) } : {}),
+    ...(patch.discountPrice !== undefined ? { discountPrice: formatAmount(patch.discountPrice) } : {}),
   };
   const next = { ...product, ...normalizedPatch };
 

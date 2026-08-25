@@ -9,7 +9,7 @@ import { CustomInput } from "./input";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { APP_USER_UPDATED_EVENT } from "@/lib/app-user-client";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
-import { formatNumberWithCommas, toLatinDigits } from "@/lib/price-format";
+import { formatAmount, toLatinDigits } from "@/lib/price-format";
 import { productSlug, type ProductRecord } from "@/lib/products-client";
 import {
   IRAN_PHONE_WITH_COUNTRY_CODE_PATTERN,
@@ -267,7 +267,7 @@ export function GlobalSearch() {
                   </span>
                   <span className="flex min-w-0 flex-1 flex-col gap-1">
                     <span className="line-clamp-1 text-sm font-bold text-primary-text">{product.title}</span>
-                    <span className="line-clamp-1 text-xs font-semibold text-secondary-text">{formatNumberWithCommas(product.discountPrice || product.price) || product.discountPrice || product.price}</span>
+                    <span className="line-clamp-1 text-xs font-semibold text-secondary-text">{formatAmount(product.discountPrice || product.price) || product.discountPrice || product.price}</span>
                   </span>
                 </button>
               ))}

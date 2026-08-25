@@ -19,10 +19,67 @@ model User {
   themeMode          String            @default("light")
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
+  walletBalance      Int               @default(0)
   profiles           CustomerProfile[]
   comments           Comment[]
   orders             Order[]
   adminRequests      AdminAccessRequest[]
+  discountCodes      DiscountCode[]
+  walletTransactions WalletTransaction[]
+}
+
+model CommerceSetting {
+  id                Int      @id @default(1)
+  cashbackPercent   Int      @default(0)
+  postalShippingFee Int      @default(30000)
+  updatedAt         DateTime @updatedAt
+}
+
+model DiscountCode {
+  id              String    @id @default(cuid())
+  name            String
+  code            String    @unique
+  userId          Int
+  ruleId          String?
+  type            String    @default("percentage")
+  percent         Int?
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdAt       DateTime  @default(now())
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule            DiscountRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+  @@unique([ruleId, userId])
+}
+
+model DiscountRule {
+  id              String         @id @default(cuid())
+  name            String
+  audienceType    String
+  minimumValue    Int            @default(1)
+  lookbackDays    Int            @default(30)
+  discountType    String         @default("percentage")
+  percent         Int?
+  validDays       Int            @default(30)
+  active          Boolean        @default(true)
+  lastRunAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  discountCodes   DiscountCode[]
+}
+
+model WalletTransaction {
+  id        String   @id @default(cuid())
+  userId    Int
+  orderId   String?
+  amount    Int
+  type      String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([orderId])
 }
 
 model AdminTheme {
@@ -255,6 +312,13 @@ model Order {
   trackingCode      String?
   shippedAt         DateTime?
   total             String      @default("0")
+  subtotal          String      @default("0")
+  discountAmount    String      @default("0")
+  walletAmount      String      @default("0")
+  shippingAmount    String      @default("0")
+  shippingMethod    String      @default("pickup")
+  discountCode      String?
+  cashbackEarned    String      @default("0")
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
