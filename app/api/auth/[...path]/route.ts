@@ -61,19 +61,39 @@ async function normalizeRole<T extends { id: number; username: string | null; ro
 }
 
 async function findIdentityUser(identity: AuthIdentity, tx: Prisma.TransactionClient | typeof prisma = prisma) {
-  const [phoneUser, emailUser] = await Promise.all([
+  const [phoneUser, emailUser, matchingProfiles] = await Promise.all([
     tx.user.findUnique({ where: { username: identity.phone } }),
     tx.user.findUnique({ where: { email: identity.email } }),
+    tx.customerProfile.findMany({
+      where: { phone: identity.phone, email: identity.email, userId: { not: null } },
+      select: { user: true },
+      take: 2,
+    }),
   ]);
-  if (phoneUser && emailUser && phoneUser.id !== emailUser.id) {
+
+  const profileUsers = matchingProfiles.flatMap((profile) => profile.user ? [profile.user] : []);
+  const candidateIds = new Set([
+    ...(phoneUser ? [phoneUser.id] : []),
+    ...(emailUser ? [emailUser.id] : []),
+    ...profileUsers.map((user) => user.id),
+  ]);
+  if (candidateIds.size > 1) {
     throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
   }
-  const user = phoneUser ?? emailUser;
+
+  const user = phoneUser ?? emailUser ?? profileUsers[0] ?? null;
   if (!user) return null;
-  if (user.username && user.username !== identity.phone) {
+
+  const profileMatchesUser = profileUsers.some((profileUser) => profileUser.id === user.id);
+  const emailProvesUser = emailUser?.id === user.id;
+  if (user.username && user.username !== identity.phone && !profileMatchesUser && !emailProvesUser) {
     throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
   }
-  if (!isLocalAccountEmail(user.email) && user.email !== identity.email) {
+  if (
+    !isLocalAccountEmail(user.email)
+    && user.email !== identity.email
+    && !profileMatchesUser
+  ) {
     throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
   }
   return user;
