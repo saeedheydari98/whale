@@ -229,6 +229,11 @@ export default function UserPanelPage() {
     { id: "wallet", label: "کیف پول", icon: <IoWalletOutline /> },
   ];
 
+  const handleProfileCompleted = () => {
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+    if (returnTo === "cart") router.replace("/cart");
+  };
+
   const logout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
@@ -276,7 +281,7 @@ export default function UserPanelPage() {
           </div>
         ) : null}
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
-        {activeTab === "profile" ? <UserProfilePanel /> : null}
+        {activeTab === "profile" ? <UserProfilePanel onCompleted={handleProfileCompleted} /> : null}
         {activeTab === "orders" ? <UserOrdersPanel /> : null}
         {activeTab === "wallet" ? <UserWalletPanel /> : null}
       </div>

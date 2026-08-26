@@ -250,7 +250,7 @@ export default function CartPage() {
     }
 
     if (!savedProfile || !isUserProfileComplete(savedProfile)) {
-      router.push("/panel/user");
+      router.push("/panel/user?returnTo=cart");
       return;
     }
 
@@ -273,7 +273,7 @@ export default function CartPage() {
     setAuthUser(verifiedUser);
 
     if (!profileComplete) {
-      router.push("/panel/user");
+      router.push("/panel/user?returnTo=cart");
       return;
     }
 
@@ -285,7 +285,7 @@ export default function CartPage() {
     const checkoutProfile = savedProfile ?? accountCart.profile;
 
     if (!checkoutProfile || !isUserProfileComplete(checkoutProfile)) {
-      router.push("/panel/user");
+      router.push("/panel/user?returnTo=cart");
       return;
     }
 

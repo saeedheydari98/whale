@@ -35,6 +35,10 @@ type PanelUser = {
 
 type ProfileFieldErrors = Partial<Record<"firstName" | "lastName" | "phone" | "email" | "address", string>>;
 
+type UserProfilePanelProps = {
+  onCompleted?: (profile: UserProfile) => void | Promise<void>;
+};
+
 function profileFromUser(user: PanelUser | null) {
   if (!user?.profile || typeof user.profile !== "object") return null;
   return normalizeUserProfile(user.profile as Partial<UserProfile>);
@@ -82,7 +86,7 @@ function getProfileFieldErrors(profile: UserProfile): ProfileFieldErrors {
   return errors;
 }
 
-export function UserProfilePanel() {
+export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
   const [profileDraft, setProfileDraft] = useState<UserProfile>(EMPTY_USER_PROFILE);
   const [authUser, setAuthUser] = useState<PanelUser | null>(null);
   const [status, setStatus] = useState("");
@@ -152,6 +156,7 @@ export function UserProfilePanel() {
       const localCart = readLocalCart();
       if (localCart.length > 0) void persistCart(localCart, savedProfile);
       setStatus("پروفایل تکمیل و ذخیره شد.");
+      await onCompleted?.(savedProfile);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "ذخیره پروفایل ناموفق بود.");
     } finally {
@@ -189,6 +194,7 @@ export function UserProfilePanel() {
         <div className="flex flex-col gap-1">
           <CustomInput
             value={profileDraft.firstName}
+            label="نام"
             placeholder="نام"
             pattern={PERSIAN_NAME_PATTERN_SOURCE}
             maxLength={PERSIAN_NAME_MAX_LENGTH}
@@ -203,6 +209,7 @@ export function UserProfilePanel() {
         <div className="flex flex-col gap-1">
           <CustomInput
             value={profileDraft.lastName}
+            label="نام خانوادگی"
             placeholder="نام خانوادگی"
             pattern={PERSIAN_NAME_PATTERN_SOURCE}
             maxLength={PERSIAN_NAME_MAX_LENGTH}
@@ -217,10 +224,11 @@ export function UserProfilePanel() {
         <div className="flex flex-col gap-1">
           <CustomInput
             value={profileDraft.phone}
-            placeholder="شماره تماس"
+            label="شماره موبایل"
+            placeholder="شماره موبایل"
             invalid={Boolean(fieldErrors.phone)}
             aria-describedby={fieldErrors.phone ? "profile-phone-error" : undefined}
-            aria-label="شماره تماس تأییدشده"
+            aria-label="شماره موبایل"
             disabled
           />
           {fieldErrors.phone ? <span id="profile-phone-error" className="text-xs text-danger-text-nomode">{fieldErrors.phone}</span> : null}
@@ -229,10 +237,11 @@ export function UserProfilePanel() {
           <CustomInput
             value={profileDraft.email}
             type="email"
+            label="ایمیل"
             placeholder="ایمیل"
             invalid={Boolean(fieldErrors.email)}
             aria-describedby={fieldErrors.email ? "profile-email-error" : undefined}
-            aria-label="ایمیل تأییدشده"
+            aria-label="ایمیل"
             disabled
           />
           {fieldErrors.email ? <span id="profile-email-error" className="text-xs text-danger-text-nomode">{fieldErrors.email}</span> : null}
@@ -240,13 +249,14 @@ export function UserProfilePanel() {
         <div className="flex flex-col gap-2 md:col-span-2">
           <CustomInput
             value={profileDraft.address}
+            label="آدرس کامل"
             placeholder="آدرس کامل"
             minLength={5}
             maxLength={200}
             required
             invalid={Boolean(fieldErrors.address)}
             aria-describedby={fieldErrors.address ? "profile-address-error" : undefined}
-            aria-label="آدرس"
+            aria-label="آدرس کامل"
             onChange={(event) => updateProfileDraft({ address: event.target.value })}
           />
           {fieldErrors.address ? <span id="profile-address-error" className="text-xs text-danger-text-nomode">{fieldErrors.address}</span> : null}
