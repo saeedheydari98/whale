@@ -188,7 +188,7 @@ export async function POST(request: Request, context: Context) {
       } catch (error) {
         await prisma.authOtp.delete({ where: { id: otp.id } }).catch(() => undefined);
         console.error("Gmail SMTP OTP delivery error:", error);
-        return apiFail("ارسال ایمیل ورود انجام نشد. تنظیمات Gmail SMTP را بررسی کنید.", 503);
+        return apiFail("در حال حاضر امکان ارسال کد ورود وجود ندارد. لطفاً چند دقیقه دیگر دوباره تلاش کنید.", 503);
       }
       await prisma.authOtp.updateMany({
         where: {

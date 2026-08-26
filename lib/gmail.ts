@@ -1,6 +1,15 @@
 import nodemailer from "nodemailer";
 import { EMAIL_PATTERN, OTP_CODE_PATTERN } from "@/lib/validation-patterns";
 
+const SMTP_CONNECTION_ERROR_CODES = new Set([
+  "ECONNECTION",
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ENETUNREACH",
+  "ESOCKET",
+  "ETIMEDOUT",
+]);
+
 function gmailConfig() {
   const user = String(process.env.GMAIL_SMTP_USER ?? "").trim().toLowerCase();
   const appPassword = String(process.env.GMAIL_SMTP_APP_PASSWORD ?? "").replace(/\s+/g, "");
@@ -13,6 +22,25 @@ function gmailConfig() {
   return { user, appPassword, fromName };
 }
 
+function smtpErrorCode(error: unknown) {
+  if (!error || typeof error !== "object" || !("code" in error)) return "";
+  return String(error.code ?? "").toUpperCase();
+}
+
+function createGmailTransport(
+  auth: { user: string; pass: string },
+  connection: { port: number; secure: boolean }
+) {
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    ...connection,
+    auth,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+  });
+}
+
 export async function sendAuthOtpEmail(input: {
   email: string;
   code: string;
@@ -23,15 +51,6 @@ export async function sendAuthOtpEmail(input: {
   if (!OTP_CODE_PATTERN.test(input.code)) throw new Error("Invalid OTP code.");
 
   const { user, appPassword, fromName } = gmailConfig();
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: { user, pass: appPassword },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  });
   const subject = "کد ورود به فروشگاه وال";
   const text = `به فروشگاه وال خوش آمدید.\nکد ورود شما: ${input.code}\nاین کد تا ${input.expiresInMinutes} دقیقه معتبر است. اگر این درخواست را شما ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.`;
   const html = `
@@ -44,11 +63,29 @@ export async function sendAuthOtpEmail(input: {
     </div>
   `;
 
-  await transporter.sendMail({
+  const message = {
     from: { address: user, name: fromName },
     to: email,
     subject,
     text,
     html,
-  });
+  };
+  const connections = [
+    { port: 465, secure: true },
+    { port: 587, secure: false },
+  ];
+
+  for (const [index, connection] of connections.entries()) {
+    const transporter = createGmailTransport({ user, pass: appPassword }, connection);
+    try {
+      await transporter.sendMail(message);
+      return;
+    } catch (error) {
+      const hasFallback = index < connections.length - 1;
+      if (!hasFallback || !SMTP_CONNECTION_ERROR_CODES.has(smtpErrorCode(error))) throw error;
+      console.warn(`Gmail SMTP connection on port ${connection.port} failed; trying the fallback port.`);
+    } finally {
+      transporter.close();
+    }
+  }
 }
