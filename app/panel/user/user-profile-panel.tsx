@@ -103,7 +103,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
       if (storedProfile) setProfileDraft(storedProfile);
     };
 
-    void fetchCurrentUser().then((user) => {
+    void fetchCurrentUser({ force: true }).then((user) => {
       if (cancelled) return;
       setAuthUser(user);
       const profile = profileFromUser(user) ?? readUserProfile();

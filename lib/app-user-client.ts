@@ -16,8 +16,8 @@ import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
 export const APP_USER_UPDATED_EVENT = "app-user-updated";
 
-const APP_USER_CACHE_KEY = "app-user:v1";
-const LEGACY_APP_USER_CACHE_KEY = "app-global:v2";
+const APP_USER_CACHE_KEY = "app-user:v2";
+const LEGACY_APP_USER_CACHE_KEYS = ["app-user:v1", "app-global:v2"] as const;
 const APP_USER_CACHE_MS = Number.POSITIVE_INFINITY;
 const APP_USER_RETRY_DELAYS_MS = [250] as const;
 const APP_USER_SOFT_TIMEOUT_MS = 2500;
@@ -31,7 +31,7 @@ export type AppClientProfile = {
   isAdminUnlocked: boolean;
 };
 
-export type AppClientUser = Omit<AuthClientUser, "avatarUrl" | "email" | "profile"> & {
+export type AppClientUser = Omit<AuthClientUser, "avatarUrl" | "profile"> & {
   themeMode: "light" | "dark";
   profile?: AppClientProfile | null;
 };
@@ -95,7 +95,6 @@ function normalizeAppUser(user: AuthClientUser | AppClientUser | null | undefine
   if (!user || typeof user !== "object") return null;
   const {
     avatarUrl: _avatarUrl,
-    email: _email,
     profile,
     themeMode,
     ...safeUser
@@ -168,10 +167,7 @@ function readLocalUserCache() {
   if (typeof window === "undefined") return null;
 
   try {
-    const rawCache =
-      localStorage.getItem(APP_USER_CACHE_KEY)
-      ?? localStorage.getItem(LEGACY_APP_USER_CACHE_KEY)
-      ?? "null";
+    const rawCache = localStorage.getItem(APP_USER_CACHE_KEY) ?? "null";
     const parsed = JSON.parse(rawCache) as CachedUserData | null;
     if (!parsed || typeof parsed !== "object") return null;
     const currentUser = readCachedAuthUser();
@@ -208,7 +204,7 @@ function writeUserCache(data: AppUserData) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(APP_USER_CACHE_KEY, JSON.stringify(cached));
-    localStorage.removeItem(LEGACY_APP_USER_CACHE_KEY);
+    LEGACY_APP_USER_CACHE_KEYS.forEach((key) => localStorage.removeItem(key));
   } catch {
   }
 }
@@ -346,7 +342,7 @@ export function clearAppUserCache() {
   if (typeof window !== "undefined") {
     try {
       localStorage.removeItem(APP_USER_CACHE_KEY);
-      localStorage.removeItem(LEGACY_APP_USER_CACHE_KEY);
+      LEGACY_APP_USER_CACHE_KEYS.forEach((key) => localStorage.removeItem(key));
     } catch {
     }
     emitUserUpdated();
