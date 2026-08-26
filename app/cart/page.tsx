@@ -457,6 +457,7 @@ export default function CartPage() {
           title="ورود یا ساخت حساب"
           rounded="lg"
           shadow="lg"
+          closeOnBackdrop={false}
         >
           <div className="flex flex-col gap-3">
             <EmailOtpAuthForm onSuccess={handleAuthSuccess} />
@@ -470,7 +471,7 @@ export default function CartPage() {
           rounded="lg"
           shadow="lg"
           isLoading={isCheckoutLoading}
-          closeOnBackdrop={!isCheckoutLoading}
+          closeOnBackdrop={false}
         >
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">

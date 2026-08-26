@@ -265,7 +265,10 @@ export async function completeCheckout(input: CheckoutRequest) {
     }
 
     await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-    await tx.cart.update({ where: { id: cart.id }, data: { status: "checked_out" } });
+    await tx.cart.update({
+      where: { id: cart.id },
+      data: { status: `checked_out:${order.id}` },
+    });
 
     return { orderId: order.id, quote };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15_000 });

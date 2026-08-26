@@ -205,6 +205,7 @@ export function AppHeader() {
         title="ورود یا ساخت حساب"
         rounded="lg"
         shadow="lg"
+        closeOnBackdrop={false}
       >
         <div className="flex flex-col gap-3">
           <EmailOtpAuthForm

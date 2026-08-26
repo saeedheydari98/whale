@@ -655,10 +655,10 @@ export async function checkoutCart(profile = readUserProfile(), options: Checkou
     throw new Error(message);
   }
 
-  const res = await fetch("/api/cart", {
-    method: "PATCH",
+  const res = await fetch("/api/cart/checkout", {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ profile, ...options }),
+    body: JSON.stringify(options),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {
