@@ -10,7 +10,6 @@ import { persistCart, readLocalCart } from "@/lib/cart-client";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import {
   EMPTY_USER_PROFILE,
-  isUserProfileComplete,
   normalizeUserProfile,
   readUserProfile,
   saveUserProfile,
@@ -34,19 +33,53 @@ type PanelUser = {
   profile?: unknown;
 };
 
+type ProfileFieldErrors = Partial<Record<"firstName" | "lastName" | "phone" | "email" | "address", string>>;
+
 function profileFromUser(user: PanelUser | null) {
-  const profile = normalizeUserProfile(user?.profile as Partial<UserProfile> | null | undefined);
-  return isUserProfileComplete(profile) ? profile : null;
+  if (!user?.profile || typeof user.profile !== "object") return null;
+  return normalizeUserProfile(user.profile as Partial<UserProfile>);
 }
 
 function identityProfile(user: PanelUser | null, profile?: UserProfile | null): UserProfile {
+  const userPhone = String(user?.username ?? "").trim();
+  const userEmail = String(user?.email ?? "").trim().toLowerCase();
   return {
     ...(profile ?? EMPTY_USER_PROFILE),
-    phone: String(user?.username ?? profile?.phone ?? ""),
-    email: user?.email && !isLocalAccountEmail(user.email)
-      ? user.email
+    phone: PHONE_PATTERN.test(userPhone)
+      ? userPhone
+      : String(profile?.phone ?? ""),
+    email: EMAIL_PATTERN.test(userEmail) && !isLocalAccountEmail(userEmail)
+      ? userEmail
       : String(profile?.email ?? ""),
   };
+}
+
+function getProfileFieldErrors(profile: UserProfile): ProfileFieldErrors {
+  const errors: ProfileFieldErrors = {};
+
+  if (!profile.firstName) errors.firstName = "نام را وارد کنید.";
+  else if (!PERSIAN_NAME_PATTERN.test(profile.firstName)) {
+    errors.firstName = "نام باید با حروف فارسی و بین ۲ تا ۱۵ حرف باشد.";
+  }
+
+  if (!profile.lastName) errors.lastName = "نام خانوادگی را وارد کنید.";
+  else if (!PERSIAN_NAME_PATTERN.test(profile.lastName)) {
+    errors.lastName = "نام خانوادگی باید با حروف فارسی و بین ۲ تا ۱۵ حرف باشد.";
+  }
+
+  if (!profile.phone) errors.phone = "شماره موبایل حساب در دسترس نیست؛ دوباره وارد حساب شوید.";
+  else if (!PHONE_PATTERN.test(profile.phone)) {
+    errors.phone = "شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.";
+  }
+
+  if (!profile.email) errors.email = "ایمیل حساب در دسترس نیست؛ دوباره وارد حساب شوید.";
+  else if (!EMAIL_PATTERN.test(profile.email)) errors.email = "نشانی ایمیل معتبر نیست.";
+
+  if (!profile.address) errors.address = "آدرس کامل را وارد کنید.";
+  else if (profile.address.length < 5) errors.address = "آدرس باید حداقل ۵ حرف باشد.";
+  else if (profile.address.length > 200) errors.address = "آدرس نباید بیشتر از ۲۰۰ حرف باشد.";
+
+  return errors;
 }
 
 export function UserProfilePanel() {
@@ -84,27 +117,27 @@ export function UserProfilePanel() {
     setStatus("");
   };
 
-  const cleanProfile = () => ({
-    firstName: profileDraft.firstName.trim(),
-    lastName: profileDraft.lastName.trim(),
-    phone: String(authUser?.username ?? profileDraft.phone).trim(),
-    email: String(authUser?.email ?? profileDraft.email).trim().toLowerCase(),
-    address: profileDraft.address.trim(),
-    isAdminUnlocked: profileDraft.isAdminUnlocked,
-  });
+  const cleanProfile = () => {
+    const profile = identityProfile(authUser, profileDraft);
+    return {
+      ...profile,
+      firstName: profile.firstName.trim(),
+      lastName: profile.lastName.trim(),
+      phone: profile.phone.trim(),
+      email: profile.email.trim().toLowerCase(),
+      address: profile.address.trim(),
+    };
+  };
+
+  const fieldErrors = showRequiredErrors ? getProfileFieldErrors(cleanProfile()) : {};
 
   const validateProfile = () => {
     const profile = cleanProfile();
-    if (
-      PERSIAN_NAME_PATTERN.test(profile.firstName)
-      && PERSIAN_NAME_PATTERN.test(profile.lastName)
-      && PHONE_PATTERN.test(profile.phone)
-      && EMAIL_PATTERN.test(profile.email)
-      && profile.address.length >= 5
-      && profile.address.length <= 200
-    ) return true;
+    const errors = getProfileFieldErrors(profile);
+    const firstError = Object.values(errors)[0];
+    if (!firstError) return true;
     setShowRequiredErrors(true);
-    setStatus("لطفاً اطلاعات پروفایل را به‌درستی وارد کنید.");
+    setStatus(firstError);
     window.setTimeout(() => scrollToFirstInvalidField(formRef.current), 0);
     return false;
   };
@@ -153,39 +186,57 @@ export function UserProfilePanel() {
         <div className="text-sm text-secondary-text">پس از ورود، اطلاعات موردنیاز ارسال سفارش را تکمیل کنید.</div>
       </div>
       <div ref={formRef} className="grid gap-3 md:grid-cols-2">
-        <CustomInput
-          value={profileDraft.firstName}
-          placeholder="نام"
-          pattern={PERSIAN_NAME_PATTERN_SOURCE}
-          maxLength={PERSIAN_NAME_MAX_LENGTH}
-          required
-          invalid={showRequiredErrors && !PERSIAN_NAME_PATTERN.test(profileDraft.firstName.trim())}
-          aria-label="نام"
-          onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
-        />
-        <CustomInput
-          value={profileDraft.lastName}
-          placeholder="نام خانوادگی"
-          pattern={PERSIAN_NAME_PATTERN_SOURCE}
-          maxLength={PERSIAN_NAME_MAX_LENGTH}
-          required
-          invalid={showRequiredErrors && !PERSIAN_NAME_PATTERN.test(profileDraft.lastName.trim())}
-          aria-label="نام خانوادگی"
-          onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
-        />
-        <CustomInput
-          value={profileDraft.phone}
-          placeholder="شماره تماس"
-          aria-label="شماره تماس تأییدشده"
-          disabled
-        />
-        <CustomInput
-          value={profileDraft.email}
-          type="email"
-          placeholder="ایمیل"
-          aria-label="ایمیل تأییدشده"
-          disabled
-        />
+        <div className="flex flex-col gap-1">
+          <CustomInput
+            value={profileDraft.firstName}
+            placeholder="نام"
+            pattern={PERSIAN_NAME_PATTERN_SOURCE}
+            maxLength={PERSIAN_NAME_MAX_LENGTH}
+            required
+            invalid={Boolean(fieldErrors.firstName)}
+            aria-describedby={fieldErrors.firstName ? "profile-first-name-error" : undefined}
+            aria-label="نام"
+            onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
+          />
+          {fieldErrors.firstName ? <span id="profile-first-name-error" className="text-xs text-danger-text-nomode">{fieldErrors.firstName}</span> : null}
+        </div>
+        <div className="flex flex-col gap-1">
+          <CustomInput
+            value={profileDraft.lastName}
+            placeholder="نام خانوادگی"
+            pattern={PERSIAN_NAME_PATTERN_SOURCE}
+            maxLength={PERSIAN_NAME_MAX_LENGTH}
+            required
+            invalid={Boolean(fieldErrors.lastName)}
+            aria-describedby={fieldErrors.lastName ? "profile-last-name-error" : undefined}
+            aria-label="نام خانوادگی"
+            onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
+          />
+          {fieldErrors.lastName ? <span id="profile-last-name-error" className="text-xs text-danger-text-nomode">{fieldErrors.lastName}</span> : null}
+        </div>
+        <div className="flex flex-col gap-1">
+          <CustomInput
+            value={profileDraft.phone}
+            placeholder="شماره تماس"
+            invalid={Boolean(fieldErrors.phone)}
+            aria-describedby={fieldErrors.phone ? "profile-phone-error" : undefined}
+            aria-label="شماره تماس تأییدشده"
+            disabled
+          />
+          {fieldErrors.phone ? <span id="profile-phone-error" className="text-xs text-danger-text-nomode">{fieldErrors.phone}</span> : null}
+        </div>
+        <div className="flex flex-col gap-1">
+          <CustomInput
+            value={profileDraft.email}
+            type="email"
+            placeholder="ایمیل"
+            invalid={Boolean(fieldErrors.email)}
+            aria-describedby={fieldErrors.email ? "profile-email-error" : undefined}
+            aria-label="ایمیل تأییدشده"
+            disabled
+          />
+          {fieldErrors.email ? <span id="profile-email-error" className="text-xs text-danger-text-nomode">{fieldErrors.email}</span> : null}
+        </div>
         <div className="flex flex-col gap-2 md:col-span-2">
           <CustomInput
             value={profileDraft.address}
@@ -193,10 +244,12 @@ export function UserProfilePanel() {
             minLength={5}
             maxLength={200}
             required
-            invalid={showRequiredErrors && (profileDraft.address.trim().length < 5 || profileDraft.address.trim().length > 200)}
+            invalid={Boolean(fieldErrors.address)}
+            aria-describedby={fieldErrors.address ? "profile-address-error" : undefined}
             aria-label="آدرس"
             onChange={(event) => updateProfileDraft({ address: event.target.value })}
           />
+          {fieldErrors.address ? <span id="profile-address-error" className="text-xs text-danger-text-nomode">{fieldErrors.address}</span> : null}
         </div>
       </div>
       <CustomButton fullWidth icon={<IoSaveOutline />} isLoading={isSavingProfile} onClick={() => void saveProfile()}>

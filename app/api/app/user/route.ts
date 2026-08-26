@@ -140,7 +140,9 @@ async function saveProfile(request: Request, requestBody?: unknown) {
     ]);
     const bodyValue = body && typeof body === "object" ? body as { profile?: unknown } : null;
     const parsed = profileSchema.safeParse(bodyValue?.profile ?? body);
-    if (!parsed.success) return validationError(parsed.error);
+    if (!parsed.success) {
+      return validationError(parsed.error, parsed.error.issues[0]?.message ?? "اطلاعات پروفایل معتبر نیست.");
+    }
 
     const profile = parsed.data;
     const verifiedPhone = authUser?.username && PHONE_PATTERN.test(authUser.username)

@@ -18,9 +18,9 @@ export async function parseJsonBody<T>(request: Request, schema: ZodType<T>) {
   };
 }
 
-export function validationError(error: ZodError) {
+export function validationError(error: ZodError, message = "اطلاعات ارسالی معتبر نیست.") {
   return apiFail(
-    "اطلاعات ارسالی معتبر نیست.",
+    message,
     422,
     error.issues.map((issue) => ({
       path: issue.path.join("."),

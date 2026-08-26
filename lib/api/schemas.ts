@@ -25,11 +25,20 @@ const optionalNullableWebpImageValueSchema = z
   .refine((value) => value == null || isAllowedWebpImageValue(value), { message: WEBP_ONLY_ERROR });
 
 const customerProfileSchema = z.object({
-  firstName: z.string().trim().regex(PERSIAN_NAME_PATTERN),
-  lastName: z.string().trim().regex(PERSIAN_NAME_PATTERN),
-  phone: z.string().trim().regex(PHONE_PATTERN),
+  firstName: z.string().trim()
+    .min(1, "نام را وارد کنید.")
+    .regex(PERSIAN_NAME_PATTERN, "نام باید با حروف فارسی و بین ۲ تا ۱۵ حرف باشد."),
+  lastName: z.string().trim()
+    .min(1, "نام خانوادگی را وارد کنید.")
+    .regex(PERSIAN_NAME_PATTERN, "نام خانوادگی باید با حروف فارسی و بین ۲ تا ۱۵ حرف باشد."),
+  phone: z.string().trim()
+    .min(1, "شماره موبایل حساب در دسترس نیست؛ دوباره وارد حساب شوید.")
+    .regex(PHONE_PATTERN, "شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد."),
   email: z.string().trim().toLowerCase().regex(EMAIL_PATTERN).optional().or(z.literal("")).default(""),
-  address: z.string().trim().min(5).max(200),
+  address: z.string().trim()
+    .min(1, "آدرس کامل را وارد کنید.")
+    .min(5, "آدرس باید حداقل ۵ حرف باشد.")
+    .max(200, "آدرس نباید بیشتر از ۲۰۰ حرف باشد."),
 });
 
 export const idParamSchema = z.object({
@@ -47,6 +56,9 @@ export const authOtpVerifySchema = authOtpRequestSchema.extend({
 });
 
 export const profileSchema = customerProfileSchema.extend({
+  email: z.string().trim().toLowerCase()
+    .min(1, "ایمیل حساب در دسترس نیست؛ دوباره وارد حساب شوید.")
+    .regex(EMAIL_PATTERN, "نشانی ایمیل معتبر نیست."),
   avatarUrl: optionalNullableWebpImageValueSchema,
   isAdminUnlocked: z.boolean().optional(),
 });
