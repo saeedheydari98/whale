@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { FiSearch } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import { CustomEmptyState } from "./empty-state";
+import { AppImage } from "./app-image";
 import { CustomInput } from "./input";
 import Loading, { startRouteLoading } from "../loading/loading";
 import { useIsMobile } from "@/hooks/useIsMobile";
@@ -278,7 +279,7 @@ export function GlobalSearch() {
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
                     {product.imageUrl ? (
-                      <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover" />
+                      <AppImage src={product.imageUrl} alt={product.title} width={80} height={80} className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-xs font-bold text-secondary-text">بدون</span>
                     )}

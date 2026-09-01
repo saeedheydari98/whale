@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { IoAdd, IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
@@ -274,7 +275,7 @@ function ProductModal({
               {productImages.map((item, index) => (
                 <div key={`${item}-${index}`} className="flex min-w-40 flex-col gap-2">
                   <button type="button" className="h-24 overflow-hidden rounded-md border border-primary-border bg-primary-media" onClick={() => onPreview(item)} aria-label="باز کردن تصویر محصول">
-                    <img src={item} alt={`تصویر محصول ${index + 1}`} className="h-full w-full object-cover" />
+                    <AppImage src={item} alt={`تصویر محصول ${index + 1}`} width={160} height={160} className="h-full w-full object-cover" />
                   </button>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-semibold text-secondary-text">{index === 0 ? "اصلی" : index + 1}</span>

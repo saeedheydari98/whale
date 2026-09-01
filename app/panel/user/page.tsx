@@ -7,6 +7,7 @@ import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
+import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { OrderStatusTag, OrderStatusTimeline } from "@/app/design-system/components/ui/order-status";
 import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
@@ -236,7 +237,7 @@ function UserOrderCard({ order, onSelect, onPreview }: {
               disabled={!item.imageUrl}
               aria-label="باز کردن تصویر محصول"
             >
-              {item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
+              {item.imageUrl ? <AppImage src={item.imageUrl} alt={item.title} width={112} height={112} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
             </button>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>

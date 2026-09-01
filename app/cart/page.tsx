@@ -9,6 +9,7 @@ import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { CustomInput } from "../design-system/components/ui/input";
 import { EmailOtpAuthForm } from "../design-system/components/ui/email-otp-auth-form";
 import { ImagePreview } from "../design-system/components/ui/image-preview";
+import { AppImage } from "../design-system/components/ui/app-image";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { startRouteLoading } from "../design-system/components/loading/loading";
 import {
@@ -383,7 +384,7 @@ export default function CartPage() {
                     aria-label="باز کردن تصویر محصول"
                   >
                     {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" />
+                      <AppImage src={item.imageUrl} alt={item.title} width={128} height={128} className="h-full w-full object-cover" />
                     ) : (
                       <IoBagHandleOutline className="text-2xl text-primary" aria-hidden="true" />
                     )}

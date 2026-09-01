@@ -1,6 +1,7 @@
 import localFont from "next/font/local";
 import Script from "next/script";
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { GiSpermWhale } from "react-icons/gi";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
@@ -20,6 +21,9 @@ import {
 } from "./design-system/theme/storage";
 import { AppNotificationProvider } from "./design-system/components/feedback/notification-provider";
 import Loading, { RouteLoadingController } from "./design-system/components/loading/loading";
+import { JsonLd } from "./design-system/components/seo/json-ld";
+import { breadcrumbJsonLd, DEFAULT_HOME_DESCRIPTION, organizationJsonLd, pageMetadata, websiteJsonLd } from "@/lib/seo";
+import { SITE_NAME, siteUrl } from "@/lib/site";
 
 const storeFont = localFont({
   variable: "--font-store",
@@ -77,6 +81,21 @@ const initialThemeScript = `
 })();
 `;
 
+const homeMetadata = pageMetadata({
+  title: SITE_NAME,
+  description: DEFAULT_HOME_DESCRIPTION,
+  path: "/",
+});
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl()),
+  ...homeMetadata,
+  title: {
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
+  },
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -93,6 +112,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="h-[100dvh] overflow-hidden bg-primary-base text-right" dir="rtl">
+        <JsonLd data={organizationJsonLd()} />
+        <JsonLd data={websiteJsonLd()} />
+        <JsonLd data={breadcrumbJsonLd([{ name: SITE_NAME, path: "/" }])} />
         <style
           dangerouslySetInnerHTML={{
             __html: 'html[data-theme-color-ready="false"] [data-theme-boot-loader],html[data-theme-color-ready="false"] .whale-loader-surface{visibility:hidden!important}html[data-theme-color-ready="false"],html[data-theme-color-ready="false"] body{background-color:transparent!important}',

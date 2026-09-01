@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { AppImage } from "./app-image";
 
 type ImagePreviewProps = {
   imageUrl?: string | null;
@@ -35,9 +36,11 @@ export function ImagePreview({ imageUrl, onClose }: ImagePreviewProps) {
       onClick={onClose}
       aria-label="بستن تصویر"
     >
-      <img
+      <AppImage
         src={imageUrl}
-        alt=""
+        alt="پیش‌نمایش تصویر"
+        width={1600}
+        height={1600}
         draggable={false}
         className="max-h-[100dvh] max-w-[100vw] object-contain"
       />

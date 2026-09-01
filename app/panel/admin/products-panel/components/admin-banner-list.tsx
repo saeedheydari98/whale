@@ -2,6 +2,7 @@
 
 import { IoCreateOutline, IoImageOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { AppImage } from "@/app/design-system/components/ui/app-image";
 import type { BannerForm } from "../types";
 
 type AdminBannerListProps = {
@@ -50,7 +51,7 @@ export function AdminBannerList({ banner, onEdit, onPreview, isLoading = false }
           aria-label="باز کردن تصویر بنر"
         >
           {previewImage ? (
-            <img src={previewImage} alt={banner.title || "بنر"} className="h-full w-full object-cover" />
+            <AppImage src={previewImage} alt={banner.title || "بنر"} width={800} height={450} className="h-full w-full object-cover" />
           ) : (
             <IoImageOutline className="text-2xl text-primary" aria-hidden="true" />
           )}

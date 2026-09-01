@@ -1,6 +1,6 @@
 ---
 name: next-project-guidelines
-description: Project-specific rules for this Next.js 16 app. Use when editing, reviewing, or generating code in this repository, especially UI, Docker, Prisma, API routes, admin panel, or design-system work. Applies alongside installed Vercel React, web design, view transition, and writing skills.
+description: Project-specific rules for this Next.js 16 app. Use when editing, reviewing, or generating code in this repository, especially UI, Docker, Prisma, API routes, admin panel, design-system, loading, SEO, metadata, JSON-LD, security headers, or validation work. Applies alongside installed Vercel React, web design, view transition, and writing skills.
 ---
 
 # Next Project Guidelines
@@ -28,7 +28,18 @@ description: Project-specific rules for this Next.js 16 app. Use when editing, r
 - Keep client components narrow. Add `"use client"` only where state, effects, event handlers, browser APIs, or design-system client components require it.
 - Avoid derived state in effects; compute derived values during render or with focused memoization when expensive.
 - Start independent async work early and await together with `Promise.all` when possible.
-- For API routes, validate inputs, keep response shapes stable, and avoid leaking internal errors.
+- For API routes, validate inputs with Zod via `lib/api/validation.ts` and `lib/api/schemas.ts`. Keep response shapes stable, and never leak internal errors to the client.
+
+## SEO And Security
+
+Follow [seo-and-security.md](seo-and-security.md) whenever adding pages, metadata, JSON-LD, images, headers, env, or API validation.
+
+- Public pages need `metadata` / `generateMetadata` (`title`, `description` 150–160 chars, `robots`, `alternates.canonical`, Open Graph, Twitter). Put it on Server layouts; do not export metadata from `"use client"` pages.
+- Root layout owns `Organization` + `WebSite` JSON-LD. Product/category/brand/showcase layouts add `BreadcrumbList` and `Product` where relevant. Serialize with `jsonLdScript` (escape `<` as `\u003c`).
+- Visible UI text stays in `div`/`span`. Do not add `h1`–`h6` for SEO. Document title and JSON-LD carry heading semantics.
+- Use `AppImage` (`next/image`) instead of `<img>`. Require `alt` plus `width`/`height`. `priority` only for LCP images.
+- Internal links go through `next/link` (`CustomButton` href already does). Public catalog URLs stay slug-based, hyphenated, without extra query noise.
+- Security headers live in `proxy.ts` (Next.js 16; `middleware.ts` is deprecated) and `next.config.ts`. Keep cookies `httpOnly`, `sameSite: 'lax'`, `secure` in production. Validate env in `lib/env.ts`. Sanitize any HTML with `lib/sanitize-html.ts`. Rate-limit APIs with `lib/api/rate-limit.ts`; do not add NextAuth, Upstash Ratelimit, or a second auth stack.
 
 ## Theme Boot (do not change)
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from "react";
 import Loading from "@/app/design-system/components/loading/loading";
+import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 import type { Banner } from "./types";
 
@@ -150,10 +151,13 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
             onTransitionEnd={handleRailTransitionEnd}
           >
             {visibleImages.map((imageUrl, index) => (
-              <img
+              <AppImage
                 key={`${imageUrl}-${index}`}
                 src={imageUrl}
                 alt={banner.title || "بنر فروشگاه"}
+                width={1600}
+                height={900}
+                priority={index === 1 || visibleImages.length === 1}
                 draggable={false}
                 className="h-full w-full min-w-full flex-none object-cover"
               />

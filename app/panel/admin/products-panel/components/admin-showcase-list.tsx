@@ -3,6 +3,7 @@
 import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import type { AdminCountItem } from "@/lib/admin-structure";
 import type { ProductForm, ShowcaseForm } from "../types";
@@ -96,7 +97,7 @@ function ShowcaseProductCard({ product, index, showcase, onReorderProducts, onPr
     <div draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(product.id)); }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }} onDrop={(event) => { event.preventDefault(); const sourceId = event.dataTransfer.getData("text/plain"); if (sourceId) onReorderProducts(showcase, sourceId, product.id); }} className="flex min-w-56 max-w-56 shrink-0 cursor-grab flex-col overflow-hidden rounded-lg border border-primary-border bg-primary-card shadow-sm active:cursor-grabbing">
       <div className="flex gap-2 p-2">
         <button type="button" className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => onPreview(product.imageUrl)} disabled={!product.imageUrl} aria-label="باز کردن تصویر محصول">
-          {product.imageUrl ? <img src={product.imageUrl} alt={product.title || `محصول ${index + 1}`} className="h-full w-full object-cover" /> : <IoImageOutline className="text-3xl text-primary" aria-hidden="true" />}
+          {product.imageUrl ? <AppImage src={product.imageUrl} alt={product.title || `محصول ${index + 1}`} width={96} height={96} className="h-full w-full object-cover" /> : <IoImageOutline className="text-3xl text-primary" aria-hidden="true" />}
         </button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="line-clamp-1 text-xs font-bold text-primary-text">{product.title || `محصول ${index + 1}`}</div>

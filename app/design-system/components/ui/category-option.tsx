@@ -3,6 +3,7 @@
 import React from "react";
 import { GiSpermWhale } from "react-icons/gi";
 import { cx } from "../../variants/shared.variant";
+import { AppImage } from "./app-image";
 
 type CategoryOptionProps = {
   label: string;
@@ -52,7 +53,7 @@ export function CategoryOption({
       )}
     >
       {imageUrl ? (
-        <img src={imageUrl} alt={label} className="h-full w-full object-cover" />
+        <AppImage src={imageUrl} alt={label} width={96} height={96} className="h-full w-full object-cover" />
       ) : (
         <GiSpermWhale className="text-3xl" aria-hidden="true" />
       )}

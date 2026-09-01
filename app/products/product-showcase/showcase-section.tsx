@@ -8,6 +8,7 @@ import ProductRatingSummary from "@/app/design-system/components/ui/product-rati
 import { ProductCardBadge } from "@/app/design-system/components/ui/product-card-badge";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 import { CustomButton } from "../../design-system/components/ui/button";
+import { AppImage } from "../../design-system/components/ui/app-image";
 import ShowcaseLink from "../../design-system/components/ui/ShowcaseLink";
 import { CustomTag } from "../../design-system/components/ui/tag";
 import { isProductAvailable } from "@/lib/products-client";
@@ -76,10 +77,11 @@ export function ProductShowcaseCard({
           aria-label="باز کردن تصویر محصول"
         >
           {primaryImage ? (
-            <img
+            <AppImage
               src={primaryImage}
               alt={productTitle}
-              loading="lazy"
+              width={192}
+              height={192}
               className="h-full w-full object-cover"
             />
           ) : (

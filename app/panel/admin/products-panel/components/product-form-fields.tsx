@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { IoCheckmarkSharp } from "react-icons/io5";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
+import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
@@ -438,7 +439,7 @@ function SelectableOption({ label, imageUrl, selected, role, onClick }: Selectab
       </span>
       {imageUrl ? (
         <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary-border bg-primary-media">
-          <img src={imageUrl} alt={label} className="h-full w-full object-cover" />
+          <AppImage src={imageUrl} alt={label} width={80} height={80} className="h-full w-full object-cover" />
         </span>
       ) : null}
       <span className="min-w-0 flex-1 truncate text-xs font-semibold">{label}</span>

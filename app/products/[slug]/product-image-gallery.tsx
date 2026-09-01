@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from "react";
 import { IoBagHandleOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 
@@ -139,10 +140,13 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false }: Pro
           aria-label="باز کردن تصویر محصول"
         >
           {visibleImages.map((imageUrl, index) => (
-            <img
+            <AppImage
               key={`${imageUrl}-${index}`}
               src={imageUrl}
               alt={title || "محصول"}
+              width={800}
+              height={800}
+              priority={visibleImages.length === 1 || index === 1}
               draggable={false}
               className="h-full w-full min-w-full flex-none object-cover"
             />

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { apiFail } from "@/lib/api/response";
 import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
+import { authSecret } from "@/lib/env";
 
 export type AuthUser = {
   id: number;
@@ -21,7 +22,7 @@ const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 30;
 const SUPERADMIN_USERNAME = SUPERADMIN_PHONE;
 
 function secret() {
-  return process.env.JWT_SECRET || process.env.AUTH_SECRET || "development-jwt-secret-change-me";
+  return authSecret();
 }
 
 function base64Url(input: Buffer | string) {

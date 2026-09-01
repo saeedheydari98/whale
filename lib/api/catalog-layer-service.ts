@@ -93,7 +93,7 @@ export function slugifyCatalogValue(value: string | number | null | undefined) {
     .replace(/^-|-$/g, "");
 }
 
-function decodeCatalogIdentifier(value: string | number | null | undefined) {
+export function decodeCatalogIdentifier(value: string | number | null | undefined) {
   let text = String(value ?? "");
 
   for (let index = 0; index < 3; index += 1) {
@@ -1243,6 +1243,36 @@ export async function getRecommendationProducts(product: ProductRecord | null, s
       products: fallback.slice(0, limit).map(toProductSummary),
     };
   });
+}
+
+export async function getProductSeoFields(identifier: string) {
+  const product = await findProductByIdentifier(identifier);
+  if (!product) return null;
+  const slug = slugifyCatalogValue(product.slug || product.title || product.id);
+  const imageUrls = [
+    product.imageUrl,
+    ...(Array.isArray(product.images) ? product.images.map((item) => String(item)) : []),
+  ].map((item) => String(item ?? "").trim()).filter(Boolean);
+
+  return {
+    id: product.id,
+    title: product.title,
+    slug,
+    description: product.description,
+    metaTitle: product.metaTitle,
+    metaDescription: product.metaDescription,
+    metaKeywords: product.metaKeywords,
+    imageUrl: imageUrls[0] ?? "",
+    images: imageUrls,
+    price: product.discountPrice || product.price,
+    originalPrice: product.originalPrice || product.price,
+    isAvailable: product.isAvailable !== false && Number(product.stockQuantity) > 0,
+    brand: product.brand,
+    sku: product.sku,
+    ratingAverage: product.ratingAverage,
+    ratingCount: product.ratingCount,
+    updatedAt: product.updatedAt,
+  };
 }
 
 export async function getProductDetail(identifier: string, searchParams: URLSearchParams) {
