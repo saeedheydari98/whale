@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import {
   IoAlbumsOutline,
   IoColorPaletteOutline,
@@ -15,24 +14,20 @@ import {
   IoPeopleOutline,
   IoTicketOutline,
 } from "react-icons/io5";
-import Loading from "@/app/design-system/components/loading/loading";
+import Loading, { useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
 import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
 import { AdminAccessPanel } from "@/app/panel/admin/admin-access-panel";
 import { AdminThemePanel } from "@/app/panel/admin/admin-theme-panel";
 import { AdminProductsPanel, type AdminCatalogSection } from "@/app/panel/admin/admin-products-panel";
-import { AdminOrdersPanelSkeleton } from "@/app/panel/admin/admin-orders-skeleton";
 import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
 import { AdminUsersPanel } from "@/app/panel/admin/admin-users-panel";
 import { AdminDiscountsPanel } from "@/app/panel/admin/admin-discounts-panel";
+import { AdminOrdersPanel } from "@/app/panel/admin/admin-orders-panel";
+import { getAdminPanelStructure, type AdminPanelStructure } from "@/lib/admin-structure";
 import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
 import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
-
-const AdminOrdersPanel = dynamic(
-  () => import("@/app/panel/admin/admin-orders-panel").then((module) => module.AdminOrdersPanel),
-  { loading: () => <AdminOrdersPanelSkeleton /> }
-);
 
 type AdminPanelUser = {
   username?: string | null;
@@ -49,6 +44,27 @@ export default function AdminPanelPage() {
   );
   const [authUser, setAuthUser] = useState<AdminPanelUser | null>(() => appUser);
   const [activeTab, setActiveTab] = useState<AdminPanelTab>("theme");
+  const [structure, setStructure] = useState<AdminPanelStructure | null>(null);
+  const [structureReady, setStructureReady] = useState(false);
+
+  useEffect(() => {
+    if (hasAdminAccess !== true) return;
+    let cancelled = false;
+    void getAdminPanelStructure()
+      .then((next) => {
+        if (cancelled) return;
+        setStructure(next);
+        setStructureReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setStructureReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAdminAccess]);
+
+  useStructureRouteLoading(hasAdminAccess === null || (hasAdminAccess === true && !structureReady));
 
   useEffect(() => {
     if (!appUserData) return;
@@ -118,9 +134,14 @@ export default function AdminPanelPage() {
   return (
     <main className="min-h-full bg-primary-base p-6 text-primary-text">
       {hasAdminAccess === null ? (
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <Loading loading="page" size="xl" />
-        </div>
+        <Loading loading="skeleton-structure" isLoading>
+          <div className="flex w-full flex-col gap-6">
+            <section className="flex flex-col gap-4">
+              <div className="text-primary text-2xl font-bold">پنل مدیریت</div>
+              <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
+            </section>
+          </div>
+        </Loading>
       ) : hasAdminAccess ? (
         <div className="flex w-full flex-col gap-6">
           <section className="flex flex-col gap-4">
@@ -130,8 +151,8 @@ export default function AdminPanelPage() {
 
           {activeTab === "theme" ? <AdminThemePanel /> : null}
           {activeTab === "security" && isSuperadmin ? <AdminSecurityPanel /> : null}
-          {activeTab === "orders" ? <AdminOrdersPanel /> : null}
-          {activeTab === "users" ? <AdminUsersPanel /> : null}
+          {activeTab === "orders" ? <AdminOrdersPanel totalCount={structure?.orders} /> : null}
+          {activeTab === "users" ? <AdminUsersPanel totalCount={structure?.users} /> : null}
           {activeTab === "discounts" ? <AdminDiscountsPanel /> : null}
           {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" ? (
             <AdminProductsPanel section={activeTab} />

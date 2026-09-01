@@ -3,11 +3,11 @@
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import Loading from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
+import type { Banner } from "@/app/products/product-showcase/types";
 import {
   EMPTY_PRODUCT_FILTERS,
   hasProductFilters,
@@ -17,18 +17,65 @@ import {
 } from "@/app/products/product-list-controls";
 import {
   ProductListGrid,
-  PRODUCT_LIST_PAGE_SIZE,
-  resolveProductListLoadingCount,
 } from "@/app/products/product-list-grid";
 import { addProductToCart } from "@/lib/cart-client";
 import { getPageBootstrap } from "@/lib/page-bootstrap-client";
 import {
   decodeCatalogSegment,
+  getCatalogSectionData,
   getShowcasePageStructure,
   getShowcaseProducts,
   normalizeColorStock,
+  type BannerRecord,
   type ProductRecord,
 } from "@/lib/products-client";
+import { LazyViewport, useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
+
+function showcaseCarouselBanner(
+  banner: BannerRecord,
+  loaded?: Pick<BannerRecord, "title" | "imageUrls" | "intervalSeconds" | "heightPercent" | "imageCount" | "showcaseId"> | null,
+): Banner {
+  return {
+    id: banner.id,
+    title: loaded?.title ?? banner.title ?? "",
+    showcaseId: loaded?.showcaseId ?? banner.showcaseId,
+    imageUrls: loaded?.imageUrls ?? banner.imageUrls ?? [],
+    active: banner.active !== false,
+    showOnHome: banner.showOnHome,
+    showOnShowcase: banner.showOnShowcase,
+    intervalSeconds: loaded?.intervalSeconds ?? banner.intervalSeconds,
+    heightPercent: loaded?.heightPercent ?? banner.heightPercent,
+    imageCount: Number(loaded?.imageCount ?? banner.imageCount ?? loaded?.imageUrls?.length ?? 0),
+    homeSortOrder: banner.homeSortOrder,
+    showcaseSortOrder: banner.showcaseSortOrder,
+    sortOrder: Number(banner.showcaseSortOrder ?? banner.sortOrder ?? 0),
+  };
+}
+
+function ShowcasePageBanner({
+  banner,
+  onPreview,
+}: {
+  banner: BannerRecord;
+  onPreview: (imageUrl?: string) => void;
+}) {
+  const hasImages = Boolean(banner.imageUrls?.length);
+  const query = useQuery({
+    queryKey: ["catalog", "section", "banner", banner.id],
+    queryFn: () => getCatalogSectionData({ type: "banner", id: banner.id }),
+    enabled: !hasImages,
+  });
+  const loaded = query.data?.banner;
+  const dataLoading = !hasImages && !loaded?.imageUrls?.length && query.isLoading;
+
+  return (
+    <BannerCarousel
+      banner={showcaseCarouselBanner(banner, loaded)}
+      onPreview={onPreview}
+      isLoading={dataLoading}
+    />
+  );
+}
 
 export default function ShowcasePage() {
   const params = useParams();
@@ -39,6 +86,7 @@ export default function ShowcasePage() {
   const normalizedSearchQuery = deferredSearchQuery.trim();
   const [sort, setSort] = useState("newest");
   const [filters, setFilters] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
+  const [pageSize, setPageSize] = useState(0);
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
   const [cartMessage, setCartMessage] = useState("");
@@ -55,15 +103,15 @@ export default function ShowcasePage() {
   const banners = pageStructure?.banners ?? [];
 
   const showcaseProductsQuery = useInfiniteQuery({
-    queryKey: ["catalog", "showcase", showcaseId, "products", "page", sort, normalizedSearchQuery, filterParams],
+    queryKey: ["catalog", "showcase", showcaseId, "products", "page", sort, normalizedSearchQuery, filterParams, pageSize],
     queryFn: ({ pageParam }) => getShowcaseProducts(showcaseId, {
       page: Number(pageParam),
-      limit: PRODUCT_LIST_PAGE_SIZE,
+      limit: Math.max(1, pageSize),
       sort,
       q: normalizedSearchQuery,
       ...filterParams,
     }),
-    enabled: Boolean(showcaseId),
+    enabled: Boolean(showcaseId) && pageSize > 0,
     initialPageParam: 1,
     placeholderData: (previous) => previous,
     getNextPageParam: (lastPage) => {
@@ -80,23 +128,16 @@ export default function ShowcasePage() {
   const firstPage = pages[0];
   const lastPage = pages[pages.length - 1];
   const showcase = firstPage?.section ?? structureShowcase;
-  const initialPageLoading = structureQuery.isLoading && !showcase && !showcaseProductsQuery.data;
-  const productLoading = showcaseProductsQuery.isLoading && !showcaseProductsQuery.data;
-  const loading = productLoading || initialPageLoading;
-  const headerLoading = (structureQuery.isLoading && !showcase) || loading;
+  const productLoading = pageSize === 0 || (showcaseProductsQuery.isLoading && !showcaseProductsQuery.data);
+  const loading = productLoading;
+  const headerLoading = structureQuery.isLoading && !showcase;
+  useStructureRouteLoading(structureQuery.isLoading && !structureQuery.data);
   const showcaseProductCount = Number(showcase?.productCount);
   const totalProducts = lastPage?.pagination.total
     ?? firstPage?.pagination.total
     ?? (normalizedSearchQuery || filtersActive || !Number.isFinite(showcaseProductCount) ? undefined : showcaseProductCount);
   const totalProductCount = Number(totalProducts);
   const hasKnownTotalProducts = Number.isFinite(totalProductCount);
-  const loadingCount = loading
-    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined)
-    : 0;
-  const loadingMoreCount = showcaseProductsQuery.isFetchingNextPage
-    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined, products.length)
-    : 0;
-  const shouldHoldLoadingWall = loading && !hasKnownTotalProducts;
 
   const showcaseBanners = useMemo(
     () => banners.filter((banner) => banner.active !== false && banner.showOnShowcase === true),
@@ -127,9 +168,7 @@ export default function ShowcasePage() {
     window.setTimeout(() => setCartMessage(""), 1800);
   };
 
-  return shouldHoldLoadingWall ? (
-    <Loading loading="fullscreen" />
-  ) : (
+  return (
     <main className="min-h-full bg-primary-base text-primary-text">
       <div className="flex w-full flex-col gap-4 px-4 pb-4">
         <ProductListShell
@@ -151,24 +190,12 @@ export default function ShowcasePage() {
               {showcaseBanners.length > 0 ? (
                 <div className="flex flex-col gap-4">
                   {showcaseBanners.map((banner) => (
-                    <BannerCarousel
+                    <LazyViewport
                       key={banner.id}
-                      banner={{
-                        id: banner.id,
-                        title: banner.title ?? "",
-                        showcaseId: banner.showcaseId,
-                        imageUrls: banner.imageUrls ?? [],
-                        active: banner.active !== false,
-                        showOnHome: banner.showOnHome,
-                        showOnShowcase: banner.showOnShowcase,
-                        intervalSeconds: banner.intervalSeconds,
-                        heightPercent: banner.heightPercent,
-                        homeSortOrder: banner.homeSortOrder,
-                        showcaseSortOrder: banner.showcaseSortOrder,
-                        sortOrder: Number(banner.showcaseSortOrder ?? banner.sortOrder ?? 0),
-                      }}
-                      onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
-                    />
+                      fallback={<BannerCarousel banner={showcaseCarouselBanner(banner)} isLoading />}
+                    >
+                      <ShowcasePageBanner banner={banner} onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")} />
+                    </LazyViewport>
                   ))}
                 </div>
               ) : null}
@@ -183,11 +210,11 @@ export default function ShowcasePage() {
           <ProductListGrid
             products={products}
             loading={loading}
-            loadingCount={loadingCount}
             loadingMore={showcaseProductsQuery.isFetchingNextPage}
-            loadingMoreCount={loadingMoreCount}
+            totalProducts={hasKnownTotalProducts ? totalProductCount : undefined}
             hasMore={Boolean(showcaseProductsQuery.hasNextPage)}
             onLoadMore={loadMore}
+            onCapacityChange={setPageSize}
             onAddToCart={(product) => void addToCart(product)}
             onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
           />

@@ -5,6 +5,7 @@ import { IoShieldCheckmarkOutline } from "react-icons/io5";
 import { useAppUser } from "@/lib/app-user-context";
 import { hasAdminRole } from "@/lib/auth-client";
 import { FloatButton } from "../ui/float-button";
+import { startRouteLoading } from "../loading/loading";
 
 export function AdminPanelFloatButton() {
   const router = useRouter();
@@ -21,7 +22,10 @@ export function AdminPanelFloatButton() {
       icon={<IoShieldCheckmarkOutline />}
       position="bottom-right"
       shadow="lg"
-      onClick={() => router.push("/panel/admin")}
+      onClick={() => {
+        startRouteLoading();
+        router.push("/panel/admin");
+      }}
     />
   );
 }

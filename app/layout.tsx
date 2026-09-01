@@ -1,5 +1,6 @@
 import localFont from "next/font/local";
 import Script from "next/script";
+import { Suspense } from "react";
 import { GiSpermWhale } from "react-icons/gi";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
@@ -18,6 +19,7 @@ import {
   THEME_CSS_VARS_STORAGE_KEY,
 } from "./design-system/theme/storage";
 import { AppNotificationProvider } from "./design-system/components/feedback/notification-provider";
+import Loading, { RouteLoadingController } from "./design-system/components/loading/loading";
 
 const storeFont = localFont({
   variable: "--font-store",
@@ -62,8 +64,9 @@ const initialThemeScript = `
       variableKeys.forEach(function(key) {
         root.style.setProperty(key, String(vars[key]));
       });
+      /* Colors only. Do not set data-theme-ready here: the HTML whale must cover
+         the shell until React takes over, already painted in cached theme colors. */
       root.setAttribute("data-theme-color-ready", "true");
-      root.setAttribute("data-theme-ready", "true");
     }
     var mode = cachedUser
       ? (cachedUser.themeMode === "dark" ? "dark" : "light")
@@ -90,6 +93,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="h-[100dvh] overflow-hidden bg-primary-base text-right" dir="rtl">
+        <style
+          dangerouslySetInnerHTML={{
+            __html: 'html[data-theme-color-ready="false"] [data-theme-boot-loader],html[data-theme-color-ready="false"] .whale-loader-surface{visibility:hidden!important}html[data-theme-color-ready="false"],html[data-theme-color-ready="false"] body{background-color:transparent!important}',
+          }}
+        />
         <Script id="theme-bootstrap" strategy="beforeInteractive">
           {initialThemeScript}
         </Script>
@@ -97,7 +105,7 @@ export default function RootLayout({
           data-theme-boot-loader
           aria-busy="true"
           aria-live="polite"
-          className="fixed inset-0 z-[10000] min-h-[100dvh] w-screen flex-col items-center justify-center gap-4"
+          className="fixed inset-0 z-[10000] flex min-h-[100dvh] w-screen flex-col items-center justify-center gap-4"
         >
           <GiSpermWhale aria-label="وال" className="whale-loader-icon h-24 w-24" />
           <div className="flex items-center gap-2" aria-hidden="true">
@@ -106,6 +114,9 @@ export default function RootLayout({
             <span className="theme-boot-dot whale-loader-dot h-2 w-2 rounded-full" />
           </div>
         </div>
+        <Suspense fallback={<Loading loading="fullscreen" />}>
+          <RouteLoadingController />
+        </Suspense>
         <AppThemeProvider>
           <AppUserProvider>
             <AppNotificationProvider>

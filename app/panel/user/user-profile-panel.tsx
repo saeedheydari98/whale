@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { IoSaveOutline } from "react-icons/io5";
-import { EmailOtpAuthForm } from "@/app/design-system/components/ui/email-otp-auth-form";
+import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
@@ -16,7 +16,7 @@ import {
   USER_PROFILE_UPDATED_EVENT,
   type UserProfile,
 } from "@/lib/user-profile";
-import { fetchCurrentUser, setCachedAuthUser } from "@/lib/auth-client";
+import { fetchCurrentUser } from "@/lib/auth-client";
 import { isLocalAccountEmail } from "@/lib/auth-constants";
 import {
   EMAIL_PATTERN,
@@ -89,6 +89,7 @@ function getProfileFieldErrors(profile: UserProfile): ProfileFieldErrors {
 export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
   const [profileDraft, setProfileDraft] = useState<UserProfile>(EMPTY_USER_PROFILE);
   const [authUser, setAuthUser] = useState<PanelUser | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [status, setStatus] = useState("");
   useTransientAppMessage(status);
   const [showRequiredErrors, setShowRequiredErrors] = useState(false);
@@ -103,12 +104,16 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
       if (storedProfile) setProfileDraft(storedProfile);
     };
 
-    void fetchCurrentUser({ force: true }).then((user) => {
-      if (cancelled) return;
-      setAuthUser(user);
-      const profile = profileFromUser(user) ?? readUserProfile();
-      setProfileDraft(identityProfile(user, profile));
-    });
+    void fetchCurrentUser({ force: true })
+      .then((user) => {
+        if (cancelled) return;
+        setAuthUser(user);
+        const profile = profileFromUser(user) ?? readUserProfile();
+        setProfileDraft(identityProfile(user, profile));
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingUser(false);
+      });
     window.addEventListener(USER_PROFILE_UPDATED_EVENT, syncProfile);
     return () => {
       cancelled = true;
@@ -164,28 +169,11 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
     }
   };
 
-  if (!authUser) {
-    return (
-      <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
-        <div className="flex flex-col gap-1">
-          <div className="text-base font-bold text-primary-text">ورود یا ساخت حساب</div>
-          <div className="text-sm text-secondary-text">شماره موبایل و ایمیل را وارد کنید؛ کد ورود به ایمیل شما ارسال می‌شود.</div>
-        </div>
-        <EmailOtpAuthForm
-          onSuccess={async ({ user }) => {
-            setCachedAuthUser(user);
-            const refreshedUser = await fetchCurrentUser({ force: true }).catch(() => user);
-            setAuthUser(refreshedUser);
-            setProfileDraft(identityProfile(refreshedUser, profileFromUser(refreshedUser) ?? readUserProfile()));
-            setStatus("ورود انجام شد. اکنون اطلاعات پروفایل را تکمیل کنید.");
-          }}
-        />
-      </section>
-    );
-  }
+  if (!isLoadingUser && !authUser) return null;
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
+    <Loading loading="skeleton-structure" isLoading={isLoadingUser}>
+      <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-col gap-1">
         <div className="text-base font-bold text-primary-text">تکمیل پروفایل</div>
         <div className="text-sm text-secondary-text">پس از ورود، اطلاعات موردنیاز ارسال سفارش را تکمیل کنید.</div>
@@ -265,6 +253,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
       <CustomButton fullWidth icon={<IoSaveOutline />} isLoading={isSavingProfile} onClick={() => void saveProfile()}>
         <span>ذخیره و تکمیل پروفایل</span>
       </CustomButton>
-    </section>
+      </section>
+    </Loading>
   );
 }

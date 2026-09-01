@@ -8,7 +8,7 @@ import {
   readCachedAppTheme,
   type AppThemeData,
 } from "@/lib/app-theme-client";
-import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useLayoutEffect, useState, type ReactNode } from "react";
 
 const AppThemeReadyContext = createContext(false);
 
@@ -16,31 +16,50 @@ function hasSameTheme(first: AppThemeData, second: AppThemeData) {
   return first.primary === second.primary && first.style === second.style;
 }
 
+function revealThemedDocument() {
+  document.documentElement.setAttribute("data-theme-color-ready", "true");
+  document.documentElement.setAttribute("data-theme-ready", "true");
+}
+
 export function AppThemeProvider({ children }: { children: ReactNode }) {
   const [adminTheme, setAdminTheme] = useState<AppThemeData>(() => fallbackAppTheme);
-  const [themeResolved, setThemeResolved] = useState(false);
+  const [applyToDocument, setApplyToDocument] = useState(false);
   const [themeReady, setThemeReady] = useState(false);
+
+  const applyTheme = useCallback((next: AppThemeData) => {
+    setAdminTheme((current) => (hasSameTheme(current, next) ? current : next));
+  }, []);
+
+  const handleDocumentApplied = useCallback(() => {
+    revealThemedDocument();
+    setThemeReady(true);
+  }, []);
 
   useLayoutEffect(() => {
     let cancelled = false;
-
-    const applyTheme = (next: AppThemeData) => {
-      if (cancelled) return;
-      setAdminTheme((current) => (hasSameTheme(current, next) ? current : next));
-    };
 
     const cached = readCachedAppTheme({ allowStale: true });
     const fresh = readCachedAppTheme();
     if (cached) applyTheme(cached);
 
-    if (fresh) {
-      setThemeResolved(true);
-    } else {
-      void fetchAppTheme({ force: true, timeoutMs: 0 })
-        .then((next) => {
-          applyTheme(next);
-          if (!cancelled) setThemeResolved(true);
-        });
+    if (cached || fresh) {
+      setApplyToDocument(true);
+    }
+
+    if (!fresh) {
+      const loadRealTheme = () => fetchAppTheme({ force: true, timeoutMs: 0 }).then((next) => {
+        if (cancelled) return;
+        applyTheme(next);
+        setApplyToDocument(true);
+      });
+
+      void loadRealTheme().catch(() => {
+        if (cancelled) return;
+        window.setTimeout(() => {
+          if (cancelled) return;
+          void loadRealTheme().catch(() => undefined);
+        }, 300);
+      });
     }
 
     const syncCachedTheme = () => {
@@ -56,21 +75,15 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
       window.removeEventListener(APP_THEME_UPDATED_EVENT, syncCachedTheme);
       window.removeEventListener("storage", syncCachedTheme);
     };
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!themeResolved) return;
-
-    // This parent layout effect runs after ThemeProvider has synchronously
-    // applied the resolved palette, so no fallback-colored frame is revealed.
-    document.documentElement.setAttribute("data-theme-color-ready", "true");
-    document.documentElement.setAttribute("data-theme-ready", "true");
-    setThemeReady(true);
-  }, [themeResolved]);
+  }, [applyTheme]);
 
   return (
     <AppThemeReadyContext.Provider value={themeReady}>
-      <ThemeProvider initialAdminTheme={adminTheme}>
+      <ThemeProvider
+        initialAdminTheme={adminTheme}
+        applyToDocument={applyToDocument}
+        onDocumentApplied={handleDocumentApplied}
+      >
         {children}
       </ThemeProvider>
     </AppThemeReadyContext.Provider>

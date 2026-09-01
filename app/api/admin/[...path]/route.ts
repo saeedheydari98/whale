@@ -329,8 +329,29 @@ function mergeBannerImagesMeta(currentImages: unknown, patch: BannerLayoutPatch,
   };
 }
 
-async function readAdminProducts() {
-  return prisma.product.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] });
+type CatalogPaging = {
+  take?: number;
+  skip: number;
+};
+
+function parseCatalogPaging(searchParams: URLSearchParams): CatalogPaging {
+  const limit = Number(searchParams.get("limit"));
+  const offset = Number(searchParams.get("offset"));
+  return {
+    take: Number.isFinite(limit) && limit > 0 ? Math.min(100, Math.round(limit)) : undefined,
+    skip: Number.isFinite(offset) && offset > 0 ? Math.round(offset) : 0,
+  };
+}
+
+function pageArgs(paging?: CatalogPaging) {
+  return (paging?.take ? { take: paging.take, skip: paging.skip } : {}) as { take?: number; skip?: number };
+}
+
+async function readAdminProducts(paging?: CatalogPaging) {
+  return prisma.product.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    ...pageArgs(paging),
+  });
 }
 
 async function readAdminProductRefs() {
@@ -410,6 +431,111 @@ function withShowcaseCounts<T extends AdminShowcaseRecord>(
     ...showcase,
     productCount: countShowcaseProducts(showcase, products),
   }));
+}
+
+function showcaseProductIds(showcase: AdminShowcaseRecord, products: AdminProductRef[]) {
+  const manualProductIds = stringList(showcase.manualProductIds);
+  if (showcase.mode === "auto") {
+    const categoryId = String(showcase.categoryId ?? "").trim();
+    const limit = Number.isFinite(Number(showcase.limit)) ? Math.max(1, Math.round(Number(showcase.limit))) : 8;
+    return products
+      .filter((product) => !categoryId || productMatchesCategory(product, categoryId))
+      .slice(0, limit)
+      .map((product) => Number(product.id))
+      .filter((id) => Number.isInteger(id));
+  }
+
+  if (manualProductIds.length > 0) {
+    const knownIds = new Set(products.map((product) => String(product.id)));
+    return Array.from(new Set(manualProductIds))
+      .filter((id) => knownIds.has(id))
+      .map((id) => Number(id))
+      .filter((id) => Number.isInteger(id));
+  }
+
+  return products
+    .filter((product) => productMatchesShowcase(product, showcase.id))
+    .map((product) => Number(product.id))
+    .filter((id) => Number.isInteger(id));
+}
+
+async function readShowcaseProducts(showcases: AdminShowcaseRecord[], productRefs: AdminProductRef[]) {
+  const productIds = Array.from(new Set(showcases.flatMap((showcase) => showcaseProductIds(showcase, productRefs))));
+  if (productIds.length === 0) return [];
+  return prisma.product.findMany({
+    where: { id: { in: productIds } },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+  });
+}
+
+async function readAdminCatalogStructure() {
+  const [
+    products,
+    banners,
+    users,
+    orders,
+    showcases,
+    categoryGroups,
+    brandGroups,
+    ungroupedCategories,
+    ungroupedBrands,
+    productRefs,
+  ] = await Promise.all([
+    prisma.product.count(),
+    prisma.banner.count(),
+    prisma.user.count(),
+    prisma.order.count(),
+    prisma.showcase.findMany({
+      select: {
+        id: true,
+        mode: true,
+        limit: true,
+        categoryId: true,
+        manualProductIds: true,
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.categoryGroup.findMany({
+      select: { id: true, _count: { select: { categories: true } } },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.brandGroup.findMany({
+      select: { id: true, _count: { select: { brands: true } } },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.category.count({ where: { groupId: null } }),
+    prisma.brand.count({ where: { groupId: null } }),
+    readAdminProductRefs(),
+  ]);
+
+  const categoryItems = categoryGroups.map((group) => ({
+    id: group.id,
+    count: group._count.categories,
+  }));
+  if (ungroupedCategories > 0 && !categoryItems.some((item) => item.id === "default-categories")) {
+    categoryItems.push({ id: "default-categories", count: ungroupedCategories });
+  }
+
+  const brandItems = brandGroups.map((group) => ({
+    id: group.id,
+    count: group._count.brands,
+  }));
+  if (ungroupedBrands > 0 && !brandItems.some((item) => item.id === "default-brands")) {
+    brandItems.push({ id: "default-brands", count: ungroupedBrands });
+  }
+
+  return {
+    products,
+    orders,
+    users,
+    banners,
+    showcases: showcases.map((showcase) => ({
+      id: showcase.id,
+      count: countShowcaseProducts(showcase, productRefs),
+    })),
+    categoryGroups: categoryItems,
+    brandGroups: brandItems,
+  };
 }
 
 async function readAdminStorefrontLayout() {
@@ -590,42 +716,73 @@ async function updateAdminStorefrontLayout(body: unknown) {
   await invalidateCatalogCache("admin.storefront-layout");
 }
 
-async function readAdminCatalogSection(section: string) {
+async function readAdminCatalogSection(section: string, paging?: CatalogPaging) {
   const base = emptyAdminCatalog();
+  const page = pageArgs(paging);
 
   if (section === "products") {
-    return { ...base, products: await readAdminProducts() };
+    return { ...base, products: await readAdminProducts(paging) };
   }
 
   if (section === "banners") {
-    const banners = await prisma.banner.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] });
+    const banners = await prisma.banner.findMany({
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      ...page,
+    });
     return { ...base, banners };
   }
 
   if (section === "showcases") {
-    const [showcases, products, productRefs] = await Promise.all([
-      prisma.showcase.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
-      readAdminProducts(),
+    const [showcases, productRefs] = await Promise.all([
+      prisma.showcase.findMany({
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        ...page,
+      }),
       readAdminProductRefs(),
     ]);
-    return { ...base, showcases: withShowcaseCounts(showcases, productRefs), products };
+    const counted = withShowcaseCounts(showcases, productRefs);
+    return { ...base, showcases: counted, products: await readShowcaseProducts(counted, productRefs) };
   }
 
   if (section === "categories") {
-    const [categories, categoryGroups, productRefs] = await Promise.all([
-      prisma.category.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
-      prisma.categoryGroup.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
+    const [categoryGroups, productRefs] = await Promise.all([
+      prisma.categoryGroup.findMany({
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        ...page,
+      }),
       readAdminProductRefs(),
     ]);
+    const groupIds = categoryGroups.map((group) => group.id);
+    const includeUngrouped = !paging?.take || groupIds.includes("default-categories") || categoryGroups.length === 0;
+    const categories = await prisma.category.findMany({
+      where: paging?.take
+        ? includeUngrouped
+          ? { OR: [{ groupId: { in: groupIds } }, { groupId: null }] }
+          : { groupId: { in: groupIds } }
+        : undefined,
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
     return { ...base, categories: withCategoryCounts(categories, productRefs), categoryGroups };
   }
 
   if (section === "brands") {
-    const [brands, brandGroups, productRefs] = await Promise.all([
-      prisma.brand.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
-      prisma.brandGroup.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
+    const [brandGroups, productRefs] = await Promise.all([
+      prisma.brandGroup.findMany({
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        ...page,
+      }),
       readAdminProductRefs(),
     ]);
+    const groupIds = brandGroups.map((group) => group.id);
+    const includeUngrouped = !paging?.take || groupIds.includes("default-brands") || brandGroups.length === 0;
+    const brands = await prisma.brand.findMany({
+      where: paging?.take
+        ? includeUngrouped
+          ? { OR: [{ groupId: { in: groupIds } }, { groupId: null }] }
+          : { groupId: { in: groupIds } }
+        : undefined,
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
     return { ...base, brands: withBrandCounts(brands, productRefs), brandGroups };
   }
 
@@ -667,8 +824,12 @@ export async function GET(request: Request, context: Context) {
       return apiOk({ storefront: toStorefrontLayoutResponse(await readAdminStorefrontLayout()) });
     }
 
+    if (path[0] === "catalog" && path[1] === "structure") {
+      return apiOk({ structure: await readAdminCatalogStructure() });
+    }
+
     if (path[0] === "catalog" && path[1]) {
-      const catalog = await readAdminCatalogSection(path[1]);
+      const catalog = await readAdminCatalogSection(path[1], parseCatalogPaging(new URL(request.url).searchParams));
       return catalog ? apiOk({ catalog }) : apiFail("مسیر پیدا نشد.", 404);
     }
 

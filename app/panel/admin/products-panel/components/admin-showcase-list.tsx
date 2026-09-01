@@ -1,194 +1,108 @@
 "use client";
 
 import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5";
+import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
-import Loading from "@/app/design-system/components/loading/loading";
-import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
-import { createProduct, createShowcase } from "../factories";
+import type { AdminCountItem } from "@/lib/admin-structure";
 import type { ProductForm, ShowcaseForm } from "../types";
 import { getShowcaseProductsForAdmin } from "../utils";
 
 type AdminShowcaseListProps = {
-  products: ProductForm[];
-  showcases: ShowcaseForm[];
-  onEditShowcase: (showcase: ShowcaseForm) => void;
+  products: ProductForm[]; showcases: ShowcaseForm[]; onEditShowcase: (showcase: ShowcaseForm) => void;
   onDeleteShowcase: (showcase: ShowcaseForm) => void;
   onReorderProducts: (showcase: ShowcaseForm, sourceProductId: number | string, targetProductId: number | string) => void;
-  onPreview: (imageUrl?: string) => void;
-  formatPrice: (value?: string) => string;
-  isLoading?: boolean;
-  loadingCountHint?: number;
-  productCountHints?: Record<string, number>;
+  onPreview: (imageUrl?: string) => void; formatPrice: (value?: string) => string; isLoading?: boolean;
+  isLoadingMore?: boolean;
+  totalCount?: number;
+  hasMore?: boolean;
+  onCapacityChange?: (capacity: number) => void;
+  onLoadMore?: () => void;
+  showcaseCounts?: AdminCountItem[];
 };
 
-function createLoadingShowcases(count: number): ShowcaseForm[] {
-  return Array.from({ length: count }, (_, index) => ({
-    ...createShowcase(),
-    id: `loading-showcase-${index + 1}`,
-    title: `ویترین ${index + 1}`,
-    limit: 1,
-    sortOrder: index + 1,
-  }));
-}
+const loadingShowcase: ShowcaseForm = { id: "loading-showcase", title: "ویترین", active: true, mode: "manual", autoSort: "", limit: 1, categoryId: "", manualProductIds: [], sortOrder: 0 };
+const loadingProduct = { id: "loading-product", title: "محصول", price: "0", discountPrice: "", imageUrl: "" } as ProductForm;
 
-function createLoadingShowcaseProducts(count: number): ProductForm[] {
-  return Array.from({ length: count }, (_, index) => ({
-    ...createProduct(),
-    id: `loading-showcase-product-${index + 1}`,
-    title: `محصول ${index + 1}`,
-    price: "1000000",
-    discountPrice: "900000",
-    sortOrder: index + 1,
-  }));
-}
-
-export function AdminShowcaseList({
-  products,
-  showcases,
-  onEditShowcase,
-  onDeleteShowcase,
-  onReorderProducts,
-  onPreview,
-  formatPrice,
-  isLoading = false,
-  loadingCountHint,
-  productCountHints,
-}: AdminShowcaseListProps) {
-  const showcaseLoadingCount = resolveExactLoadingItemCount(showcases.length || loadingCountHint);
-  const displayShowcases = isLoading
-    ? showcases.length > 0
-      ? showcases.slice(0, showcaseLoadingCount)
-      : createLoadingShowcases(showcaseLoadingCount)
-    : showcases;
+export function AdminShowcaseList({ products, showcases, onEditShowcase, onDeleteShowcase, onReorderProducts, onPreview, formatPrice, isLoading = false, isLoadingMore = false, totalCount, hasMore = false, onCapacityChange, onLoadMore, showcaseCounts }: AdminShowcaseListProps) {
+  const renderShowcase = (showcase: ShowcaseForm, loadingCard = false) => (
+    <ShowcaseCard showcase={showcase} products={loadingCard ? [] : getShowcaseProductsForAdmin(products, showcase)} isLoading={loadingCard} productCount={showcaseCounts?.find((item) => item.id === showcase.id)?.count ?? showcase.productCount} onEditShowcase={onEditShowcase} onDeleteShowcase={onDeleteShowcase} onReorderProducts={onReorderProducts} onPreview={onPreview} formatPrice={formatPrice} />
+  );
 
   return (
-    <div className="flex flex-col gap-5">
-      {displayShowcases.map((showcase) => {
-        const showcaseProducts = getShowcaseProductsForAdmin(products, showcase);
-        const hintedProductCount = productCountHints?.[showcase.id] ?? showcase.productCount;
-        const productLoadingCount = resolveExactLoadingItemCount(showcaseProducts.length || hintedProductCount);
-        const visibleShowcaseProducts = isLoading
-          ? showcaseProducts.length > 0
-            ? showcaseProducts.slice(0, productLoadingCount)
-            : createLoadingShowcaseProducts(productLoadingCount)
-          : showcaseProducts;
-
+    <DynamicLoadingCollection
+      items={showcases}
+      isLoading={isLoading}
+      isLoadingMore={isLoadingMore}
+      totalCount={totalCount}
+      hasMore={hasMore}
+      onCapacityChange={onCapacityChange}
+      onLoadMore={onLoadMore}
+      className="flex flex-col gap-5"
+      getKey={(showcase) => showcase.id}
+      lazy
+      renderItem={(showcase) => renderShowcase(showcase)}
+      renderSkeleton={(index) => {
+        const counted = showcaseCounts?.[index];
         return (
-          <div
-            key={showcase.id}
-            className={`flex w-full flex-col gap-3 rounded-xl border bg-primary-soft p-4 ${
-              isLoading ? "border-border-default" : "border-primary-border"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Loading loading="skeleton-item" isLoading={isLoading}>
-                  <div className="text-xl font-bold text-primary-text">{showcase.title || "ویترین بدون عنوان"}</div>
-                </Loading>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Loading loading="skeleton-item" isLoading={isLoading}>
-                  <span className="text-xs font-semibold text-primary-text">{visibleShowcaseProducts.length} محصول</span>
-                </Loading>
-                <Loading loading="skeleton-item" isLoading={isLoading}>
-                  <CustomButton
-                    variant="edit"
-                    rounded="full"
-                    size="sm"
-                    icon={<IoCreateOutline />}
-                    disabled={isLoading}
-                    onClick={() => onEditShowcase(showcase)}
-                  >
-                    <span>ویرایش</span>
-                  </CustomButton>
-                </Loading>
-                <Loading loading="skeleton-item" isLoading={isLoading}>
-                  <CustomButton
-                    variant="danger"
-                    rounded="full"
-                    size="sm"
-                    icon={<IoTrashOutline />}
-                    disabled={isLoading}
-                    onClick={() => onDeleteShowcase(showcase)}
-                  >
-                    <span>حذف</span>
-                  </CustomButton>
-                </Loading>
-              </div>
-            </div>
-
-            <div className="flex cursor-grab gap-3 overflow-x-auto overscroll-x-contain pb-2 active:cursor-grabbing">
-              {!isLoading && visibleShowcaseProducts.length === 0 && (
-                <CustomEmptyState
-                  description="یک محصول به این ویترین اضافه کنید."
-                  size="sm"
-                  className="min-h-36 min-w-56 max-w-56 shrink-0 justify-center border-dashed"
-                />
-              )}
-
-              {visibleShowcaseProducts.map((product, index) => (
-                <div
-                  key={product.id}
-                  draggable={!isLoading}
-                  onDragStart={(event) => {
-                    event.dataTransfer.effectAllowed = "move";
-                    event.dataTransfer.setData("text/plain", String(product.id));
-                  }}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    event.dataTransfer.dropEffect = "move";
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const sourceId = event.dataTransfer.getData("text/plain");
-                    if (sourceId) onReorderProducts(showcase, sourceId, product.id);
-                  }}
-                  className={`flex min-w-56 max-w-56 shrink-0 cursor-grab flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm active:cursor-grabbing ${
-                    isLoading ? "border-border-default" : "border-primary-border"
-                  }`}
-                >
-                  <div className="flex gap-2 p-2">
-                    <button
-                      type="button"
-                      className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
-                      onClick={() => onPreview(product.imageUrl)}
-                      disabled={isLoading || !product.imageUrl}
-                      aria-label="باز کردن تصویر محصول"
-                    >
-                      <Loading loading="skeleton-item" isLoading={isLoading} className="h-full w-full">
-                        <div className="flex h-full w-full items-center justify-center">
-                          {product.imageUrl ? (
-                            <img
-                              src={product.imageUrl}
-                              alt={product.title || `محصول ${index + 1}`}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <IoImageOutline className="text-3xl text-primary" aria-hidden="true" />
-                          )}
-                        </div>
-                      </Loading>
-                    </button>
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <div className="line-clamp-1 text-xs font-bold text-primary-text">
-                          {product.title || `محصول ${index + 1}`}
-                        </div>
-                      </Loading>
-                      <Loading loading="skeleton-item" isLoading={isLoading}>
-                        <div className="text-xs font-semibold text-primary">
-                          {formatPrice(product.discountPrice || product.price) || "بدون قیمت"}
-                        </div>
-                      </Loading>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <Loading loading="skeleton-structure" isLoading>
+            {renderShowcase({ ...loadingShowcase, id: counted?.id ?? loadingShowcase.id, productCount: counted?.count }, true)}
+          </Loading>
         );
-      })}
+      }}
+    />
+  );
+}
+
+function ShowcaseCard({ showcase, products, isLoading, productCount, onEditShowcase, onDeleteShowcase, onReorderProducts, onPreview, formatPrice }: {
+  showcase: ShowcaseForm; products: ProductForm[]; isLoading: boolean; productCount?: number; onEditShowcase: (showcase: ShowcaseForm) => void;
+  onDeleteShowcase: (showcase: ShowcaseForm) => void;
+  onReorderProducts: (showcase: ShowcaseForm, sourceProductId: number | string, targetProductId: number | string) => void;
+  onPreview: (imageUrl?: string) => void; formatPrice: (value?: string) => string;
+}) {
+  const knownProductCount = Number.isFinite(Number(productCount)) ? Number(productCount) : products.length;
+  return (
+    <div className="flex w-full flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-xl font-bold text-primary-text">{showcase.title || "ویترین بدون عنوان"}</div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="text-xs font-semibold text-primary-text">{Math.max(products.length, knownProductCount)} محصول</span>
+          <CustomButton variant="edit" rounded="full" size="sm" icon={<IoCreateOutline />} disabled={isLoading} onClick={() => onEditShowcase(showcase)}><span>ویرایش</span></CustomButton>
+          <CustomButton variant="danger" rounded="full" size="sm" icon={<IoTrashOutline />} disabled={isLoading} onClick={() => onDeleteShowcase(showcase)}><span>حذف</span></CustomButton>
+        </div>
+      </div>
+
+      {!isLoading && products.length === 0 ? <CustomEmptyState description="یک محصول به این ویترین اضافه کنید." size="sm" className="min-h-36 min-w-56 max-w-56 shrink-0 justify-center border-dashed" /> : null}
+      <DynamicLoadingCollection
+        items={products}
+        isLoading={isLoading}
+        totalCount={Number.isFinite(knownProductCount) ? knownProductCount : (isLoading ? undefined : products.length)}
+        className="flex cursor-grab gap-3 overflow-x-auto overscroll-x-contain pb-2 active:cursor-grabbing"
+        getKey={(product) => product.id}
+        lazy
+        renderItem={(product, index) => <ShowcaseProductCard product={product} index={index} showcase={showcase} onReorderProducts={onReorderProducts} onPreview={onPreview} formatPrice={formatPrice} />}
+        renderSkeleton={(index) => <Loading loading="skeleton-structure" isLoading><ShowcaseProductCard product={loadingProduct} index={index} showcase={showcase} onReorderProducts={() => undefined} onPreview={() => undefined} formatPrice={formatPrice} /></Loading>}
+      />
+    </div>
+  );
+}
+
+function ShowcaseProductCard({ product, index, showcase, onReorderProducts, onPreview, formatPrice }: {
+  product: ProductForm; index: number; showcase: ShowcaseForm;
+  onReorderProducts: (showcase: ShowcaseForm, sourceProductId: number | string, targetProductId: number | string) => void;
+  onPreview: (imageUrl?: string) => void; formatPrice: (value?: string) => string;
+}) {
+  return (
+    <div draggable onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(product.id)); }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }} onDrop={(event) => { event.preventDefault(); const sourceId = event.dataTransfer.getData("text/plain"); if (sourceId) onReorderProducts(showcase, sourceId, product.id); }} className="flex min-w-56 max-w-56 shrink-0 cursor-grab flex-col overflow-hidden rounded-lg border border-primary-border bg-primary-card shadow-sm active:cursor-grabbing">
+      <div className="flex gap-2 p-2">
+        <button type="button" className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => onPreview(product.imageUrl)} disabled={!product.imageUrl} aria-label="باز کردن تصویر محصول">
+          {product.imageUrl ? <img src={product.imageUrl} alt={product.title || `محصول ${index + 1}`} className="h-full w-full object-cover" /> : <IoImageOutline className="text-3xl text-primary" aria-hidden="true" />}
+        </button>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="line-clamp-1 text-xs font-bold text-primary-text">{product.title || `محصول ${index + 1}`}</div>
+          <div className="text-xs font-semibold text-primary">{formatPrice(product.discountPrice || product.price) || "بدون قیمت"}</div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -127,10 +127,6 @@ function writeThemeCache(data: AppThemeData) {
   }
 }
 
-function fallbackFromCache() {
-  return readAnyCachedAppTheme() ?? fallbackAppTheme;
-}
-
 function withSoftTimeout<T>(task: Promise<T>, ms: number, fallback: () => T | Promise<T>) {
   if (ms <= 0) return task;
 
@@ -147,11 +143,11 @@ function withSoftTimeout<T>(task: Promise<T>, ms: number, fallback: () => T | Pr
 }
 
 export function readCachedAppTheme(options?: { allowStale?: boolean }) {
-  if (isFresh(memoryCache)) return memoryCache?.data ?? fallbackAppTheme;
+  if (isFresh(memoryCache) && memoryCache?.data) return memoryCache.data;
   const cached = readLocalThemeCache();
-  if (isFresh(cached)) {
+  if (isFresh(cached) && cached?.data) {
     memoryCache = cached;
-    return cached?.data ?? fallbackAppTheme;
+    return cached.data;
   }
   if (options?.allowStale) return cached?.data ?? memoryCache?.data ?? readStoredThemeFallback();
   return null;
@@ -169,14 +165,29 @@ export async function fetchAppTheme(options?: { force?: boolean; timeoutMs?: num
 
   const requestTask = fetchAppThemePayload({ force: options?.force })
     .then((payload) => {
-      const data = readThemePayload(payload, fallbackFromCache());
+      const record = payload && typeof payload === "object" ? payload as { data?: { theme?: unknown } } : null;
+      const themeValue = record?.data?.theme;
+      if (!themeValue || typeof themeValue !== "object") {
+        const cached = readAnyCachedAppTheme();
+        if (cached) return cached;
+        throw new Error("بارگذاری تم ناموفق بود.");
+      }
+      const data = normalizeAppTheme(themeValue as Partial<AppThemeData>);
       writeThemeCache(data);
       emitThemeUpdated();
       return data;
     })
-    .catch(fallbackFromCache);
+    .catch((error) => {
+      const cached = readAnyCachedAppTheme();
+      if (cached) return cached;
+      throw error;
+    });
 
-  pendingTheme = withSoftTimeout(requestTask, options?.timeoutMs ?? APP_THEME_SOFT_TIMEOUT_MS, fallbackFromCache)
+  pendingTheme = withSoftTimeout(
+    requestTask,
+    options?.timeoutMs ?? APP_THEME_SOFT_TIMEOUT_MS,
+    () => readAnyCachedAppTheme() ?? requestTask
+  )
     .finally(() => {
       pendingTheme = null;
     });

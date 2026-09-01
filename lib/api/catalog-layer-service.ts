@@ -203,6 +203,58 @@ function toClientShowcase(showcase: {
   };
 }
 
+function toStructureBanner(banner: ReturnType<typeof toClientBanner>) {
+  return {
+    type: "banner" as const,
+    id: banner.id,
+    active: banner.active,
+    sortOrder: banner.sortOrder,
+    homeSortOrder: banner.homeSortOrder,
+    showcaseSortOrder: banner.showcaseSortOrder,
+    categorySortOrder: banner.categorySortOrder,
+    productSortOrder: banner.productSortOrder,
+    heightPercent: banner.heightPercent,
+    imageCount: banner.imageUrls.length,
+    showOnHome: banner.showOnHome,
+    showOnShowcase: banner.showOnShowcase,
+    showOnCategories: banner.showOnCategories,
+    showOnProducts: banner.showOnProducts,
+  };
+}
+
+function toStructureShowcase(showcase: ReturnType<typeof toClientShowcase>) {
+  return {
+    type: "showcase" as const,
+    id: showcase.id,
+    title: showcase.title,
+    active: showcase.active,
+    sortOrder: showcase.sortOrder,
+    placement: showcase.placement,
+    productCount: showcase.productCount,
+    limit: showcase.limit,
+  };
+}
+
+function toStructureGroup(group: {
+  type?: string;
+  id: string;
+  title: string;
+  active: boolean;
+  sortOrder: number;
+  placement?: number;
+  items: unknown[];
+}) {
+  return {
+    type: group.type,
+    id: group.id,
+    title: group.title,
+    active: group.active,
+    sortOrder: group.sortOrder,
+    placement: group.placement,
+    itemCount: group.items.length,
+  };
+}
+
 function toClientCategory(category: {
   id: string;
   groupId?: string | null;
@@ -579,8 +631,8 @@ export async function getHomePageStructure(searchParams: URLSearchParams) {
     const brandSections = groupBrandsForPage(brands, brandGroups);
 
     return pageStructure("home", {
-      brands: brandSections,
-      banners: clientBanners,
+      brands: brandSections.map((group) => toStructureGroup(group)),
+      banners: clientBanners.map(toStructureBanner),
     });
   });
 }
@@ -608,8 +660,8 @@ export async function getCategoriesPageStructure(searchParams: URLSearchParams) 
     const categorySections = groupCategoriesForPage(categories, categoryGroups);
 
     return pageStructure("categories", {
-      categories: categorySections,
-      banners: clientBanners,
+      categories: categorySections.map((group) => toStructureGroup(group)),
+      banners: clientBanners.map(toStructureBanner),
     });
   });
 }
@@ -626,16 +678,16 @@ export async function getProductsPageStructure(searchParams: URLSearchParams) {
       findVisibleProductRelations(includeInactive),
     ]);
     const clientShowcases = (showcases as ShowcaseRecord[])
-      .map((showcase) => toClientShowcase({
+      .map((showcase) => toStructureShowcase(toClientShowcase({
         ...showcase,
         productCount: countShowcaseProducts(showcase, products),
-      }))
+      })))
       .filter((showcase) => includeInactive || Number(showcase.productCount ?? 0) > 0);
     const clientBanners = visibleBanners(banners, "products");
 
     return pageStructure("products", {
       showcases: clientShowcases,
-      banners: clientBanners,
+      banners: clientBanners.map(toStructureBanner),
     });
   });
 }
@@ -1023,8 +1075,12 @@ export async function getCategoryPageStructure(identifier: string, searchParams:
     if (!category || (!includeInactive && category.active === false)) {
       return pageStructure("category", { categories: [] });
     }
-    const products = await findVisibleProductRelations(includeInactive);
-    const productCount = products.filter((product) => productMatchesCategory(product, category.id)).length;
+    const productCount = await prisma.product.count({
+      where: {
+        ...(includeInactive ? {} : { active: true, isActive: true, deletedAt: null }),
+        OR: [{ categoryId: category.id }],
+      },
+    });
 
     return pageStructure("category", {
       categories: [toClientCategory({ ...category, productCount })],
@@ -1041,8 +1097,12 @@ export async function getBrandPageStructure(identifier: string, searchParams: UR
     if (!brand || (!includeInactive && brand.active === false)) {
       return pageStructure("brand", { brands: [] });
     }
-    const products = await findVisibleProductRelations(includeInactive);
-    const productCount = products.filter((product) => productMatchesBrand(product, brand)).length;
+    const productCount = await prisma.product.count({
+      where: {
+        ...(includeInactive ? {} : { active: true, isActive: true, deletedAt: null }),
+        brand: { in: [brand.id, brand.title, brand.slug].filter(Boolean) },
+      },
+    });
 
     return pageStructure("brand", {
       brands: [toClientBrand({ ...brand, productCount })],
@@ -1069,10 +1129,78 @@ export async function getShowcasePageStructure(identifier: string, searchParams:
     });
 
     return pageStructure("showcase", {
-      showcases: [clientShowcase],
-      banners: visibleBanners(banners, "showcase", clientShowcase.id),
+      showcases: [toStructureShowcase(clientShowcase)],
+      banners: visibleBanners(banners, "showcase", clientShowcase.id).map(toStructureBanner),
     });
   });
+}
+
+export async function getPageSectionData(searchParams: URLSearchParams) {
+  const type = String(searchParams.get("type") ?? "").trim();
+  const id = decodeCatalogIdentifier(searchParams.get("id") ?? "");
+  const includeInactive = getIncludeInactive(searchParams);
+
+  if (!type || !id) {
+    return { type, banner: null, brands: [], categories: [] };
+  }
+
+  if (type === "banner") {
+    const banners = await findPageBanners(includeInactive);
+    const banner = banners.map(toClientBanner).find((item) => item.id === id) ?? null;
+    return { type, banner, brands: [], categories: [] };
+  }
+
+  if (type === "brands") {
+    const [brands, brandGroups] = await Promise.all([
+      (prisma as any).brand?.findMany
+        ? (prisma as any).brand.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ homeSortOrder: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+      (prisma as any).brandGroup?.findMany
+        ? (prisma as any).brandGroup.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+    ]);
+    const group = groupBrandsForPage(brands, brandGroups).find((item) => item.id === id);
+    return {
+      type,
+      banner: null,
+      brands: group?.items ?? [],
+      categories: [],
+      group: group ? { id: group.id, title: group.title } : null,
+    };
+  }
+
+  if (type === "categories") {
+    const [categories, categoryGroups] = await Promise.all([
+      (prisma as any).category?.findMany
+        ? (prisma as any).category.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+      (prisma as any).categoryGroup?.findMany
+        ? (prisma as any).categoryGroup.findMany({
+            where: includeInactive ? undefined : { active: true },
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          })
+        : Promise.resolve([]),
+    ]);
+    const group = groupCategoriesForPage(categories, categoryGroups).find((item) => item.id === id);
+    return {
+      type,
+      banner: null,
+      brands: [],
+      categories: group?.items ?? [],
+      group: group ? { id: group.id, title: group.title } : null,
+    };
+  }
+
+  return { type, banner: null, brands: [], categories: [] };
 }
 
 export async function getProductDetailPageStructure(identifier: string, searchParams: URLSearchParams) {

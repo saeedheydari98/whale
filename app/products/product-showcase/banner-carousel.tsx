@@ -7,7 +7,7 @@ import type { Banner } from "./types";
 
 type BannerCarouselProps = {
   banner: Banner;
-  onPreview: (imageUrl?: string) => void;
+  onPreview?: (imageUrl?: string) => void;
   isLoading?: boolean;
 };
 
@@ -39,7 +39,10 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
   }, []);
 
   const activeImage = imageUrls[activeIndex] ?? imageUrls[0];
-  const imageCount = imageUrls.length;
+  const imageCount = Math.max(
+    imageUrls.length,
+    isLoading ? Number(banner.imageCount ?? 0) : 0
+  );
   const moveBanner = useCallback((direction: BannerMoveDirection) => {
     if (imageCount <= 1) return;
     setActiveIndex((current) =>
@@ -96,10 +99,10 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
     const nextImage = imageUrls[(activeIndex + 1) % imageCount];
     return [previousImage, activeImage, nextImage].filter(Boolean) as string[];
   }, [activeImage, activeIndex, imageUrls, imageCount]);
-  const heightPercent = Number.isFinite(Number(banner.heightPercent))
-    ? Math.max(10, Math.min(100, Number(banner.heightPercent)))
-    : 28;
-  const bannerHeight = `${heightPercent}vh`;
+  const heightPercent = Number(banner.heightPercent);
+  const bannerHeight = Number.isFinite(heightPercent)
+    ? `${Math.max(10, Math.min(100, heightPercent))}vh`
+    : undefined;
   const railTransform = imageCount > 1
     ? snapDirection === "next"
       ? "translateX(-200%)"
@@ -109,27 +112,11 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
     : undefined;
   const shouldAnimateRail = imageCount > 1 && !bannerDrag.isDragging && !bannerDrag.isPointerActive && !isResettingRail;
 
-  if (isLoading) {
-    return (
-      <section className="flex flex-col gap-2">
-        <Loading loading="skeleton-item" isLoading className="w-full">
-          <div className="flex w-full items-center justify-center overflow-hidden rounded-xl border border-border-default bg-primary-media" style={{ height: bannerHeight }} />
-        </Loading>
-        <div className="flex justify-center gap-2">
-          {imageUrls.map((imageUrl, index) => (
-            <Loading key={`${imageUrl}-${index}`} loading="skeleton-item" isLoading>
-              <div className={index === activeIndex ? "h-2 w-4 rounded-full" : "h-2 w-2 rounded-full"} />
-            </Loading>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  if (!activeImage) return null;
+  if (!activeImage && !isLoading) return null;
 
   return (
-    <section className="flex flex-col gap-2">
+    <Loading loading="skeleton" isLoading={isLoading}>
+      <section className="flex flex-col gap-2">
       <div
         className="relative flex w-full"
         onMouseEnter={() => setIsHovered(true)}
@@ -144,9 +131,10 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
             bannerDrag.isDragging ? "cursor-grabbing" : ""
           }`}
           style={{ height: bannerHeight }}
+          disabled={isLoading}
           onClick={() => {
             if (bannerDrag.shouldSuppressClick()) return;
-            onPreview(activeImage);
+            onPreview?.(activeImage);
           }}
           onDragStart={(event) => event.preventDefault()}
           aria-label="باز کردن تصویر بنر"
@@ -173,16 +161,17 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
           </div>
         </button>
       </div>
-      {imageUrls.length > 1 && (
+      {imageCount > 1 ? (
         <div className="flex justify-center gap-2">
-          {imageUrls.map((imageUrl, index) => (
+          {(imageUrls.length > 1 ? imageUrls : imageUrls.concat(Array(Math.max(0, imageCount - imageUrls.length)).fill(""))).map((imageUrl, index) => (
             <button
-              key={`${imageUrl}-${index}`}
+              key={`${imageUrl || "dot"}-${index}`}
               type="button"
               data-drag-ignore="true"
               className={`h-2 w-2 rounded-full transition ${
                 index === activeIndex ? "bg-primary w-4" : "bg-primary-border"
               } cursor-pointer hover:scale-125`}
+              disabled={isLoading}
               onClick={() => setActiveIndex(index)}
               aria-label={`نمایش تصویر بنر ${index + 1}`}
             >
@@ -190,7 +179,8 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
             </button>
           ))}
         </div>
-      )}
-    </section>
+      ) : null}
+      </section>
+    </Loading>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Loading from "@/app/design-system/components/loading/loading";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
@@ -14,8 +13,6 @@ import {
 } from "./product-list-controls";
 import {
   ProductListGrid,
-  PRODUCT_LIST_PAGE_SIZE,
-  resolveProductListLoadingCount,
 } from "./product-list-grid";
 
 type ProductListingPageProps = {
@@ -35,9 +32,8 @@ type ProductListingPageProps = {
   loadingMore?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  onCapacityChange?: (capacity: number) => void;
 };
-
-export { PRODUCT_LIST_PAGE_SIZE };
 
 export function ProductListingPage({
   title,
@@ -56,6 +52,7 @@ export function ProductListingPage({
   loadingMore = false,
   hasMore = false,
   onLoadMore,
+  onCapacityChange,
 }: ProductListingPageProps) {
   const [cartMessage, setCartMessage] = useState("");
   useTransientAppMessage(cartMessage);
@@ -65,13 +62,6 @@ export function ProductListingPage({
   const totalProductCount = Number(totalProducts);
   const hasKnownTotalProducts = Number.isFinite(totalProductCount);
   const resolvedTotalProducts = hasKnownTotalProducts ? totalProductCount : (resolvedLoading ? 0 : products.length);
-  const loadingCount = resolvedLoading
-    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined)
-    : 0;
-  const loadingMoreCount = loadingMore
-    ? resolveProductListLoadingCount(hasKnownTotalProducts ? totalProductCount : undefined, products.length)
-    : 0;
-  const shouldHoldLoadingWall = resolvedLoading && !hasKnownTotalProducts;
   const resolvedFilters = filters ?? EMPTY_PRODUCT_FILTERS;
 
   const addToCart = async (product: ProductRecord) => {
@@ -93,9 +83,7 @@ export function ProductListingPage({
     window.setTimeout(() => setCartMessage(""), 1800);
   };
 
-  return shouldHoldLoadingWall ? (
-    <Loading loading="fullscreen" />
-  ) : (
+  return (
     <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-5 px-4 pb-6">
         <ProductListShell
@@ -117,11 +105,11 @@ export function ProductListingPage({
           <ProductListGrid
             products={products}
             loading={resolvedLoading}
-            loadingCount={loadingCount}
             loadingMore={loadingMore}
-            loadingMoreCount={loadingMoreCount}
+            totalProducts={hasKnownTotalProducts ? totalProductCount : undefined}
             hasMore={hasMore}
             onLoadMore={onLoadMore}
+            onCapacityChange={onCapacityChange}
             onAddToCart={(product) => void addToCart(product)}
             onPreview={(imageUrl) => setPreviewImage(imageUrl ?? "")}
           />

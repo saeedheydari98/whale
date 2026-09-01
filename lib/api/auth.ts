@@ -107,7 +107,7 @@ async function normalizeRole(user: AuthUser) {
 async function findPublicUser(id: number) {
   const users = await prisma.$queryRaw<AuthUser[]>`
     SELECT "id", "email", "username", "name", "role", "avatarUrl", "themeMode"
-    FROM "User"
+    FROM "users"
     WHERE "id" = ${id}
     LIMIT 1
   `;
@@ -144,7 +144,7 @@ export async function getAuthUser(request: Request): Promise<AuthUser | null> {
 
     const users = await prisma.$queryRaw<Array<AuthUser & { refreshTokenHash: string | null }>>`
       SELECT "id", "email", "username", "name", "role", "refreshTokenHash", "avatarUrl", "themeMode"
-      FROM "User"
+      FROM "users"
       WHERE "id" = ${refreshUserId}
       LIMIT 1
     `;

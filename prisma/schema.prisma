@@ -1,6 +1,7 @@
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "linux-musl-openssl-3.0.x"]
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -26,6 +27,8 @@ model User {
   adminRequests      AdminAccessRequest[]
   discountCodes      DiscountCode[]
   walletTransactions WalletTransaction[]
+
+  @@map("users")
 }
 
 model CommerceSetting {

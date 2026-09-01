@@ -20,6 +20,7 @@ import { formatAmount } from "@/lib/price-format";
 import { clearUserProfile } from "@/lib/user-profile";
 import { UserProfilePanel } from "./user-profile-panel";
 import { UserWalletPanel } from "./user-wallet-panel";
+import Loading, { DynamicLoadingCollection, startRouteLoading } from "@/app/design-system/components/loading/loading";
 
 type OrderItem = {
   id: string;
@@ -53,6 +54,15 @@ let cachedUserOrdersAt = 0;
 let pendingUserOrders: Promise<UserOrder[]> | null = null;
 let userOrdersCacheVersion = 0;
 const USER_ORDERS_CACHE_TTL_MS = 30_000;
+
+const loadingUserOrder: UserOrder = {
+  id: "loading-order",
+  createdAt: new Date(0).toISOString(),
+  total: "0",
+  shippingMethod: "post",
+  fulfillmentStatus: "pending",
+  items: [{ id: "loading-item", title: "محصول", price: "0", quantity: 1 }],
+};
 
 function readOrders(data: unknown) {
   const orders = (data as { data?: { orders?: unknown } } | null)?.data?.orders;
@@ -94,6 +104,7 @@ function fetchUserOrdersOnce() {
 
 function UserOrdersPanel() {
   const [orders, setOrders] = useState<UserOrder[]>(() => cachedUserOrders ?? []);
+  const [loading, setLoading] = useState(cachedUserOrders === null);
   const [previewImage, setPreviewImage] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<UserOrder | null>(null);
 
@@ -103,12 +114,16 @@ function UserOrdersPanel() {
     const loadOrders = () => {
       const nextRequestId = requestId + 1;
       requestId = nextRequestId;
+      setLoading(true);
       void fetchUserOrdersOnce()
         .then((nextOrders) => {
           if (!cancelled && nextRequestId === requestId) setOrders(nextOrders);
         })
         .catch(() => {
           if (!cancelled && nextRequestId === requestId) setOrders([]);
+        })
+        .finally(() => {
+          if (!cancelled && nextRequestId === requestId) setLoading(false);
         });
     };
     const reloadOrders = () => {
@@ -128,78 +143,37 @@ function UserOrdersPanel() {
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-col gap-1">
-        <div className="text-base font-bold text-primary-text">سفارش ها</div>
-        <span className="text-sm text-primary-text">
-          برای ثبت دیدگاه و امتیاز، وارد صفحه محصول شوید.
-        </span>
+        <Loading loading="skeleton-item" isLoading={loading}>
+          <div className="text-base font-bold text-primary-text">سفارش ها</div>
+        </Loading>
+        <Loading loading="skeleton-item" isLoading={loading}>
+          <span className="text-sm text-primary-text">
+            برای ثبت دیدگاه و امتیاز، وارد صفحه محصول شوید.
+          </span>
+        </Loading>
       </div>
-      {orders.length === 0 ? (
+      {!loading && orders.length === 0 ? (
         <CustomEmptyState description="هنوز خریدی ثبت نشده است." size="sm" />
-      ) : (
-        <div className="flex flex-wrap items-start gap-3">
-          {orders.map((order) => (
-            <div
-              key={order.id}
-              role="button"
-              tabIndex={0}
-              className="flex w-full max-w-md cursor-pointer flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3 text-right transition hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary-border"
-              onClick={() => setSelectedOrder(order)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setSelectedOrder(order);
-                }
-              }}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-bold text-primary-text">سفارش {order.id.slice(-8)}</span>
-                  <span className="text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
-                </div>
-                <OrderStatusTag status={order.fulfillmentStatus} />
-              </div>
-
-              <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
-                {order.items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (item.imageUrl) setPreviewImage(item.imageUrl);
-                      }}
-                      disabled={!item.imageUrl}
-                      aria-label="باز کردن تصویر محصول"
-                    >
-                      {item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
-                    </button>
-                    <div className="flex min-w-0 flex-1 flex-col gap-1">
-                      <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
-                      <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
-                      <span className="text-xs font-semibold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
-                    </div>
-                    {item.productId ? (
-                      <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                        <ProductLink productId={item.productId} productTitle={item.title} size="sm">مشاهده</ProductLink>
-                      </span>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-border pt-2">
-                <span className="text-xs font-bold text-primary">مشاهده مسیر سفارش</span>
-                {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری: {order.trackingCode}</span> : null}
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs text-secondary-text">{order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
-                <span className="text-sm font-bold text-primary">پرداختی: {formatAmount(order.total ?? "0")}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      ) : null}
+      <DynamicLoadingCollection
+        items={orders}
+        isLoading={loading}
+        className="flex flex-wrap items-start gap-3"
+        getKey={(order) => order.id}
+        lazy
+        renderItem={(order) => (
+          <UserOrderCard
+            order={order}
+            onSelect={() => setSelectedOrder(order)}
+            onPreview={setPreviewImage}
+          />
+        )}
+        renderSkeleton={() => (
+          <Loading loading="skeleton-structure" isLoading>
+            <UserOrderCard order={loadingUserOrder} onSelect={() => undefined} onPreview={() => undefined} />
+          </Loading>
+        )}
+      />
       <CustomModal open={Boolean(selectedOrder)} onClose={() => setSelectedOrder(null)} title="مسیر سفارش" variant="neutral">
         {selectedOrder ? (
           <div className="flex flex-col gap-4">
@@ -217,6 +191,73 @@ function UserOrdersPanel() {
   );
 }
 
+function UserOrderCard({ order, onSelect, onPreview }: {
+  order: UserOrder;
+  onSelect: () => void;
+  onPreview: (imageUrl: string) => void;
+}) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      className="flex w-full max-w-md cursor-pointer flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3 text-right transition hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary-border"
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-bold text-primary-text">سفارش {order.id.slice(-8)}</span>
+          <span className="text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
+        </div>
+        <OrderStatusTag status={order.fulfillmentStatus} />
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+        {order.items.map((item) => (
+          <div key={item.id} className="flex items-center gap-3">
+            <button
+              type="button"
+              className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+              onClick={(event) => {
+                event.stopPropagation();
+                if (item.imageUrl) onPreview(item.imageUrl);
+              }}
+              disabled={!item.imageUrl}
+              aria-label="باز کردن تصویر محصول"
+            >
+              {item.imageUrl ? <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
+            </button>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
+              <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
+              <span className="text-xs font-semibold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
+            </div>
+            {item.productId ? (
+              <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                <ProductLink productId={item.productId} productTitle={item.title} size="sm">مشاهده</ProductLink>
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-border pt-2">
+        <span className="text-xs font-bold text-primary">مشاهده مسیر سفارش</span>
+        {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری: {order.trackingCode}</span> : null}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-secondary-text">{order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
+        <span className="text-sm font-bold text-primary">پرداختی: {formatAmount(order.total ?? "0")}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function UserPanelPage() {
   const router = useRouter();
   const { data: appUserData } = useAppUser();
@@ -231,7 +272,10 @@ export default function UserPanelPage() {
 
   const handleProfileCompleted = () => {
     const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-    if (returnTo === "cart") router.replace("/cart");
+    if (returnTo === "cart") {
+      startRouteLoading();
+      router.replace("/cart");
+    }
   };
 
   const logout = async () => {
@@ -249,6 +293,7 @@ export default function UserPanelPage() {
       clearUserOrdersCache();
       clearCachedAppUser();
       clearCachedAuthUser();
+      startRouteLoading();
       router.replace("/");
       router.refresh();
     } catch (error) {

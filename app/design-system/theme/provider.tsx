@@ -134,9 +134,13 @@ function applyThemeSnapshot(snapshot: ThemeSnapshot) {
 export function ThemeProvider({
   children,
   initialAdminTheme,
+  applyToDocument = true,
+  onDocumentApplied,
 }: {
   children: React.ReactNode;
   initialAdminTheme?: unknown;
+  applyToDocument?: boolean;
+  onDocumentApplied?: () => void;
 }) {
   const hydratedThemeRef = useRef(false);
   const skipThemeStateApplyRef = useRef(true);
@@ -163,10 +167,12 @@ export function ThemeProvider({
     setModeState(snapshot.mode);
     setStyle(snapshot.style);
     setAdminTheme(snapshot.adminTheme);
+    if (!applyToDocument) return;
     applyThemeSnapshot(snapshot);
     hydratedThemeRef.current = true;
     skipThemeStateApplyRef.current = true;
-  }, [initialAdminTheme]);
+    onDocumentApplied?.();
+  }, [applyToDocument, initialAdminTheme, onDocumentApplied]);
 
   useLayoutEffect(() => {
     if (skipThemeStateApplyRef.current) {
@@ -174,13 +180,13 @@ export function ThemeProvider({
       return;
     }
 
-    if (!hydratedThemeRef.current) return;
+    if (!applyToDocument || !hydratedThemeRef.current) return;
 
     const vars = generateCSSVariables(theme);
     applyCSSVariables(vars as Record<string, string>);
     document.documentElement.classList.toggle("dark", mode === "dark");
     persistThemeSnapshot({ mode }, vars);
-  }, [adminTheme, mode, style, theme]);
+  }, [adminTheme, applyToDocument, mode, style, theme]);
 
   useEffect(() => {
     const syncUserMode = () => setModeState(readStoredMode());

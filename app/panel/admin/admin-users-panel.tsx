@@ -9,6 +9,7 @@ import { CustomInput } from "@/app/design-system/components/ui/input";
 import { AdminUserCompactRow, adminUserMatchesSearch } from "@/app/panel/admin/admin-user-compact-row";
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount } from "@/lib/price-format";
+import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 
 type AdminUser = {
   id: number;
@@ -21,10 +22,26 @@ type AdminUser = {
   profiles: Array<{ firstName: string; lastName: string; phone: string; email?: string | null }>;
 };
 
-export function AdminUsersPanel() {
+const loadingUser: AdminUser = {
+  id: 0,
+  name: "کاربر",
+  username: "user",
+  email: "user@example.com",
+  role: "user",
+  walletBalance: 0,
+  createdAt: new Date(0).toISOString(),
+  profiles: [{ firstName: "نام", lastName: "کاربر", phone: "09" }],
+};
+
+type AdminUsersPanelProps = {
+  totalCount?: number;
+};
+
+export function AdminUsersPanel({ totalCount }: AdminUsersPanelProps) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [, setCapacity] = useState(0);
   const [message, setMessage] = useState("");
   useTransientAppMessage(message);
   const filteredUsers = useMemo(
@@ -57,7 +74,7 @@ export function AdminUsersPanel() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="text-base font-bold text-primary-text">کاربران</div>
-          <span className="text-xs text-secondary-text">{filteredUsers.length} از {users.length} حساب کاربری</span>
+          <span className="text-xs text-secondary-text">{filteredUsers.length} از {Math.max(users.length, Number(totalCount) || 0)} حساب کاربری</span>
         </div>
         <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void load()} isLoading={loading}>
           <span>به‌روزرسانی</span>
@@ -77,16 +94,32 @@ export function AdminUsersPanel() {
       />
       {!loading && users.length === 0 ? <CustomEmptyState description="کاربری پیدا نشد." /> : null}
       {!loading && users.length > 0 && filteredUsers.length === 0 ? <CustomEmptyState description="کاربری مطابق جست‌وجو پیدا نشد." size="sm" /> : null}
-      <div className="flex w-full flex-col gap-1.5" aria-live="polite">
-        {filteredUsers.map((user) => (
+      <DynamicLoadingCollection
+        items={filteredUsers}
+        isLoading={loading && users.length === 0}
+        totalCount={searchQuery.trim() ? filteredUsers.length : totalCount}
+        onCapacityChange={searchQuery.trim() || totalCount === undefined ? undefined : setCapacity}
+        className="flex w-full flex-col gap-1.5"
+        containerProps={{ "aria-live": "polite" }}
+        getKey={(user) => user.id}
+        lazy
+        renderItem={(user) => (
           <AdminUserCompactRow
-            key={user.id}
             user={user}
             meta={<span>{user.role} · {formatPersianDate(user.createdAt)}</span>}
             trailing={<span className="tabular-nums">{formatAmount(user.walletBalance)}</span>}
           />
-        ))}
-      </div>
+        )}
+        renderSkeleton={() => (
+          <Loading loading="skeleton-structure" isLoading>
+            <AdminUserCompactRow
+              user={loadingUser}
+              meta={<span>{loadingUser.role} · {formatPersianDate(loadingUser.createdAt)}</span>}
+              trailing={<span className="tabular-nums">{formatAmount(loadingUser.walletBalance)}</span>}
+            />
+          </Loading>
+        )}
+      />
     </section>
   );
 }

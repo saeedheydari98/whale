@@ -9,9 +9,10 @@ import {
   productFilterParams,
   type ProductFilterState,
 } from "@/app/products/product-list-controls";
-import { ProductListingPage, PRODUCT_LIST_PAGE_SIZE } from "@/app/products/product-listing-page";
+import { ProductListingPage } from "@/app/products/product-listing-page";
 import { getPageBootstrap } from "@/lib/page-bootstrap-client";
 import { decodeCatalogSegment, getBrandPageStructure, getBrandProducts } from "@/lib/products-client";
+import { useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
 
 export default function BrandProductsPage() {
   const params = useParams();
@@ -22,6 +23,7 @@ export default function BrandProductsPage() {
   const normalizedSearchQuery = deferredSearchQuery.trim();
   const [sort, setSort] = useState("newest");
   const [filters, setFilters] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
+  const [pageSize, setPageSize] = useState(0);
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
 
@@ -32,15 +34,15 @@ export default function BrandProductsPage() {
   });
 
   const brandProductsQuery = useInfiniteQuery({
-    queryKey: ["catalog", "brand", slug, "products", sort, normalizedSearchQuery, filterParams],
+    queryKey: ["catalog", "brand", slug, "products", sort, normalizedSearchQuery, filterParams, pageSize],
     queryFn: ({ pageParam }) => getBrandProducts(slug, {
       page: Number(pageParam),
-      limit: PRODUCT_LIST_PAGE_SIZE,
+      limit: Math.max(1, pageSize),
       sort,
       q: normalizedSearchQuery,
       ...filterParams,
     }),
-    enabled: Boolean(slug),
+    enabled: Boolean(slug) && pageSize > 0,
     initialPageParam: 1,
     placeholderData: (previous) => previous,
     getNextPageParam: (lastPage) => {
@@ -58,8 +60,9 @@ export default function BrandProductsPage() {
   const lastPage = pages[pages.length - 1];
   const brand = structureQuery.data?.page.brands[0] ?? firstPage?.section;
   const brandProductCount = Number(brand?.productCount);
-  const productLoading = brandProductsQuery.isLoading && !brandProductsQuery.data;
+  const productLoading = pageSize === 0 || (brandProductsQuery.isLoading && !brandProductsQuery.data);
   const initialPageLoading = structureQuery.isLoading && !brand && !brandProductsQuery.data;
+  useStructureRouteLoading(structureQuery.isLoading && !structureQuery.data);
 
   const loadMore = useCallback(() => {
     if (!brandProductsQuery.hasNextPage || brandProductsQuery.isFetchingNextPage) return;
@@ -84,6 +87,7 @@ export default function BrandProductsPage() {
       loadingMore={brandProductsQuery.isFetchingNextPage}
       hasMore={Boolean(brandProductsQuery.hasNextPage)}
       onLoadMore={loadMore}
+      onCapacityChange={setPageSize}
     />
   );
 }

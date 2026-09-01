@@ -1,8 +1,7 @@
 "use client";
 
-import Loading from "@/app/design-system/components/loading/loading";
+import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
-import { resolveExactLoadingItemCount } from "@/app/design-system/components/loading/loading-count";
 import { AdminBannerList } from "./admin-banner-list";
 import { AdminShowcaseList } from "./admin-showcase-list";
 import { SECTION_COUNT_LABELS, SECTION_TITLES } from "../constants";
@@ -24,60 +23,42 @@ type AdminProductsPanelContentProps = {
   panel: AdminProductsPanelState;
 };
 
-function createLoadingBanners(count: number): BannerForm[] {
-  return Array.from({ length: count }, (_, index) => ({
-  id: `loading-banner-${index + 1}`,
-  title: `بنر ${index + 1}`,
+const loadingBanner: BannerForm = {
+  id: "loading-banner",
+  title: "بنر",
   showcaseId: "",
-  imageUrls: [""],
+  imageUrls: [],
   active: true,
   showOnHome: true,
-  showOnShowcase: false,
-  showOnCategories: false,
-  showOnProducts: false,
+  showOnShowcase: true,
+  showOnCategories: true,
+  showOnProducts: true,
   intervalSeconds: 5,
-  heightPercent: 28,
-  homeSortOrder: index + 1,
-  showcaseSortOrder: index + 1,
-  categorySortOrder: index + 1,
-  productSortOrder: index + 1,
-  sortOrder: index + 1,
-  }));
-}
-
-function hasFiniteLoadingHint(value: unknown) {
-  return Number.isFinite(Number(value));
-}
-
-function hasLoadingItemHints(value: Record<string, number> | undefined) {
-  return Object.keys(value ?? {}).length > 0;
-}
+  heightPercent: 30,
+  homeSortOrder: 0,
+  showcaseSortOrder: 0,
+  categorySortOrder: 0,
+  productSortOrder: 0,
+  sortOrder: 0,
+};
 
 export function AdminProductsPanelContent({ section, panel }: AdminProductsPanelContentProps) {
   useTransientAppMessage(panel.status);
   const sectionCount = getSectionCount(section, panel);
-  const contentLoading = panel.loading;
-  const canUseActiveSectionState = !contentLoading || panel.sectionReady;
-  const hasCategorySkeletonHints = hasFiniteLoadingHint(panel.skeletonHints.categoryGroups)
-    || hasLoadingItemHints(panel.skeletonHints.categoryItemsByGroupId);
-  const categoryGroupsForRender = canUseActiveSectionState || hasCategorySkeletonHints
-    ? panel.sortedCategoryGroups
-    : [];
-  const categoriesForRender = canUseActiveSectionState
-    ? panel.sortedCategories
-    : [];
-  const bannerLoadingCount = resolveExactLoadingItemCount(panel.sortedBanners.length || panel.skeletonHints.banners);
-  const visibleBanners = contentLoading
-    ? panel.sortedBanners.length > 0
-      ? panel.sortedBanners.slice(0, bannerLoadingCount)
-      : createLoadingBanners(bannerLoadingCount)
-    : panel.sortedBanners;
+  const canPage = Boolean(panel.structure) && section !== "storefront";
+  const collectionPaging = {
+    totalCount: panel.sectionTotalCount,
+    hasMore: canPage && panel.sectionHasMore,
+    onCapacityChange: canPage ? panel.setActiveCapacity : undefined,
+    onLoadMore: canPage ? panel.loadMoreSection : undefined,
+  };
 
   return (
     <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-base font-bold text-primary-text">{SECTION_TITLES[section]}</div>
-        <div className="hidden text-base font-bold text-primary-text">{SECTION_TITLES[section]}</div>
+        <Loading loading="skeleton-item" isLoading={panel.loading}>
+          <div className="text-base font-bold text-primary-text">{SECTION_TITLES[section]}</div>
+        </Loading>
         <Loading loading="skeleton-item" isLoading={panel.loading}>
           <span className="text-xs font-semibold text-primary-text">
             {sectionCount} {SECTION_COUNT_LABELS[section]}
@@ -95,17 +76,31 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onEditProduct={panel.openEditModal}
           onPreview={panel.openImagePreview}
           onReorderProducts={panel.reorderProducts}
-          isLoading={contentLoading}
-          loadingCountHint={panel.skeletonHints.products}
+          isLoading={panel.loading}
+          isLoadingMore={panel.loadingMore}
+          {...collectionPaging}
+          onNeedAllItems={panel.loadRemainingSection}
         />
       ) : null}
 
       {section === "banners" ? (
-        <div className="flex flex-col gap-5">
-          {visibleBanners.map((banner) => (
-            <AdminBannerList key={`banner-${banner.id}`} banner={banner} onEdit={panel.openEditBannerModal} onPreview={panel.openImagePreview} isLoading={contentLoading} />
-          ))}
-        </div>
+        <DynamicLoadingCollection
+          items={panel.sortedBanners}
+          isLoading={panel.loading}
+          isLoadingMore={panel.loadingMore}
+          {...collectionPaging}
+          className="flex flex-col gap-5"
+          getKey={(banner) => banner.id}
+          lazy
+          renderItem={(banner) => (
+            <AdminBannerList banner={banner} onEdit={panel.openEditBannerModal} onPreview={panel.openImagePreview} />
+          )}
+          renderSkeleton={() => (
+            <Loading loading="skeleton-structure" isLoading>
+              <AdminBannerList banner={loadingBanner} onEdit={() => undefined} onPreview={() => undefined} isLoading />
+            </Loading>
+          )}
+        />
       ) : null}
 
       {section === "showcases" ? (
@@ -119,16 +114,17 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           }}
           onPreview={panel.openImagePreview}
           formatPrice={panel.formatPrice}
-          isLoading={contentLoading}
-          loadingCountHint={panel.skeletonHints.showcases}
-          productCountHints={panel.skeletonHints.showcaseProductsById}
+          isLoading={panel.loading}
+          isLoadingMore={panel.loadingMore}
+          {...collectionPaging}
+          showcaseCounts={panel.structure?.showcases}
         />
       ) : null}
 
       {section === "categories" ? (
         <CategoriesSection
-          groups={categoryGroupsForRender}
-          categories={categoriesForRender}
+          groups={panel.sortedCategoryGroups}
+          categories={panel.sortedCategories}
           products={panel.sortedProducts}
           draggingCategoryId={panel.draggingCategoryId}
           setDraggingCategoryId={panel.setDraggingCategoryId}
@@ -137,9 +133,10 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onEditCategory={panel.openEditCategoryModal}
           onPreview={panel.openImagePreview}
           onReorderCategories={panel.reorderCategories}
-          isLoading={contentLoading}
-          loadingGroupCountHint={panel.skeletonHints.categoryGroups}
-          loadingItemCountHints={panel.skeletonHints.categoryItemsByGroupId}
+          isLoading={panel.loading}
+          isLoadingMore={panel.loadingMore}
+          {...collectionPaging}
+          groupCounts={panel.structure?.categoryGroups}
         />
       ) : null}
 
@@ -155,9 +152,10 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onEditBrand={panel.openEditBrandModal}
           onPreview={panel.openImagePreview}
           onReorderBrands={panel.reorderBrands}
-          isLoading={contentLoading}
-          loadingGroupCountHint={panel.skeletonHints.brandGroups}
-          loadingItemCountHints={panel.skeletonHints.brandItemsByGroupId}
+          isLoading={panel.loading}
+          isLoadingMore={panel.loadingMore}
+          {...collectionPaging}
+          groupCounts={panel.structure?.brandGroups}
         />
       ) : null}
 
@@ -173,21 +171,19 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           onUpdateShowcasePlacement={panel.updateShowcasePlacement}
           onUpdateCategoryGroupPlacement={panel.updateCategoryGroupPlacement}
           onUpdateBrandGroupPlacement={panel.updateBrandGroupPlacement}
-          isLoading={contentLoading}
-          loadingCountHint={panel.skeletonHints.storefront?.[panel.storefrontLayoutTab]}
+          isLoading={panel.loading}
+          totalCount={panel.sectionTotalCount}
         />
       ) : null}
 
-      {!contentLoading ? (
-        <FloatingActions
+      <FloatingActions
           section={section}
           onCreateProduct={panel.openCreateModal}
           onCreateShowcase={panel.openShowcaseModal}
           onCreateCategoryGroup={panel.openCategoryGroupModal}
           onCreateBrandGroup={panel.openBrandGroupModal}
           onCreateBanner={panel.openBannerModal}
-        />
-      ) : null}
+      />
 
       <CatalogGroupModals
         categories={panel.sortedCategories}
@@ -347,23 +343,34 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
   );
 }
 
-function getSectionCount(section: AdminCatalogSection, panel: AdminProductsPanelState) {
-  if (panel.loading) {
-    if (section === "products" && hasFiniteLoadingHint(panel.skeletonHints.products)) return Number(panel.skeletonHints.products);
-    if (section === "banners" && hasFiniteLoadingHint(panel.skeletonHints.banners)) return Number(panel.skeletonHints.banners);
-    if (section === "showcases" && hasFiniteLoadingHint(panel.skeletonHints.showcases)) return Number(panel.skeletonHints.showcases);
-    if (section === "categories" && hasFiniteLoadingHint(panel.skeletonHints.categories)) return Number(panel.skeletonHints.categories);
-    if (section === "brands" && hasFiniteLoadingHint(panel.skeletonHints.brands)) return Number(panel.skeletonHints.brands);
-    if (section === "storefront" && hasFiniteLoadingHint(panel.skeletonHints.storefront?.[panel.storefrontLayoutTab])) {
-      return Number(panel.skeletonHints.storefront?.[panel.storefrontLayoutTab]);
-    }
-    return 0;
-  }
+function sumCounts(items?: Array<{ count: number }>) {
+  return items?.reduce((total, item) => total + item.count, 0) ?? 0;
+}
 
-  if (section === "products") return panel.sortedProducts.length;
-  if (section === "banners") return panel.sortedBanners.length;
-  if (section === "showcases") return panel.sortedShowcases.length;
-  if (section === "categories") return panel.sortedCategories.length;
-  if (section === "brands") return panel.sortedBrands.length;
-  return panel.displaySections.length;
+function getSectionCount(section: AdminCatalogSection, panel: AdminProductsPanelState) {
+  const loaded = section === "products"
+    ? panel.sortedProducts.length
+    : section === "banners"
+      ? panel.sortedBanners.length
+      : section === "showcases"
+        ? panel.sortedShowcases.length
+        : section === "categories"
+          ? panel.sortedCategories.length
+          : section === "brands"
+            ? panel.sortedBrands.length
+            : panel.displaySections.length;
+  const fromStructure = panel.structure;
+  if (!fromStructure) return loaded;
+  const structured = section === "products"
+    ? fromStructure.products
+    : section === "banners"
+      ? fromStructure.banners
+      : section === "showcases"
+        ? fromStructure.showcases.length
+        : section === "categories"
+          ? sumCounts(fromStructure.categoryGroups)
+          : section === "brands"
+            ? sumCounts(fromStructure.brandGroups)
+            : loaded;
+  return Math.max(loaded, structured);
 }

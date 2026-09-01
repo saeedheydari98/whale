@@ -17,8 +17,6 @@ import {
   reviewAdminAccessRequest,
   type AdminAccessRequestRecord,
 } from "@/lib/admin-access";
-import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
-import { fetchCurrentUser } from "@/lib/auth-client";
 
 function statusLabel(status: string) {
   if (status === "approved") return "تایید شده";
@@ -39,8 +37,6 @@ export function AdminSecurityPanel() {
   const [status, setStatus] = useState("");
   useTransientAppMessage(status);
   const [actingId, setActingId] = useState("");
-  const [isSuperadmin, setIsSuperadmin] = useState(false);
-  const [checkedSuperadmin, setCheckedSuperadmin] = useState(false);
 
   const pendingRequests = useMemo(
     () => requests.filter((request) => request.status === "pending"),
@@ -55,39 +51,21 @@ export function AdminSecurityPanel() {
     [requests]
   );
 
-  const loadRequests = async (force = false) => {
-    setLoading(true);
+  const loadRequests = async (force = false, showSkeleton = true) => {
+    if (showSkeleton) setLoading(true);
     try {
       const nextRequests = await fetchAdminAccessRequests({ force });
       setRequests(nextRequests);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "بارگذاری درخواست‌ها ناموفق بود.");
     } finally {
-      setLoading(false);
+      if (showSkeleton) setLoading(false);
     }
   };
 
   useEffect(() => {
-    let cancelled = false;
-
-    void fetchCurrentUser({ allowStaleOnError: false })
-      .then((user) => {
-        if (cancelled) return;
-        const superadmin = user?.username === SUPERADMIN_PHONE && user?.role === "superadmin";
-        setIsSuperadmin(superadmin);
-        setCheckedSuperadmin(true);
-        if (superadmin) void loadRequests();
-        else setLoading(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCheckedSuperadmin(true);
-        setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    const timer = window.setTimeout(() => void loadRequests(), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const applyReview = async (id: string, action: "approve" | "reject" | "revoke") => {
@@ -96,7 +74,7 @@ export function AdminSecurityPanel() {
 
     try {
       await reviewAdminAccessRequest(id, action);
-      await loadRequests(true);
+      await loadRequests(true, false);
       setStatus(
         action === "approve"
           ? "دسترسی مدیریت تایید شد."
@@ -112,6 +90,7 @@ export function AdminSecurityPanel() {
   };
 
   return (
+    <Loading loading="skeleton-structure" isLoading={loading}>
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-bg p-4 text-primary-text">
       <div className="flex flex-col gap-1">
         <div className="text-base font-bold text-primary-text">دسترسی مدیریت</div>
@@ -120,14 +99,6 @@ export function AdminSecurityPanel() {
         </div>
       </div>
 
-      {checkedSuperadmin && !isSuperadmin ? (
-        <div className="rounded-md border border-primary-border bg-primary-card px-3 py-2 text-sm font-semibold text-primary-text">
-          فقط مدیر ارشد می‌تواند دسترسی‌ها را تغییر دهد.
-        </div>
-      ) : null}
-
-      {isSuperadmin ? (
-        <>
           <div className="flex flex-wrap gap-3">
             <div className="flex min-w-40 flex-1 flex-col gap-1 rounded-lg border border-primary-border bg-primary-card p-3">
               <span className="text-xs font-semibold text-secondary-text">در انتظار بررسی</span>
@@ -148,17 +119,7 @@ export function AdminSecurityPanel() {
               <span>به‌روزرسانی</span>
             </CustomButton>
           </div>
-
-
-          {loading ? (
-            <div className="flex items-center gap-2 rounded-lg border border-primary-border bg-primary-card p-3 text-sm font-semibold text-primary-text">
-              <Loading loading="dots" />
-              <span>در حال دریافت درخواست‌ها</span>
-            </div>
-          ) : null}
-
-          {!loading ? (
-            <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-bold text-primary-text">درخواست‌های جدید</div>
                 <span className="text-xs text-secondary-text">
@@ -202,11 +163,9 @@ export function AdminSecurityPanel() {
                   ))}
                 </div>
               )}
-            </div>
-          ) : null}
+          </div>
 
-          {!loading ? (
-            <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
+          <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex flex-col gap-1">
                 <div className="text-sm font-bold text-primary-text">دسترسی‌های فعال</div>
                 <span className="text-xs text-secondary-text">
@@ -240,8 +199,7 @@ export function AdminSecurityPanel() {
                   ))}
                 </div>
               )}
-            </div>
-          ) : null}
+          </div>
 
           {!loading && archivedRequests.length > 0 ? (
             <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
@@ -261,8 +219,7 @@ export function AdminSecurityPanel() {
               </div>
             </div>
           ) : null}
-        </>
-      ) : null}
     </section>
+    </Loading>
   );
 }

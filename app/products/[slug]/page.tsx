@@ -468,7 +468,7 @@ export default function ProductPage() {
                 </div>
                 <div className="flex flex-col gap-3">
                   {visibleDetailRows.length > 0 ? visibleDetailRows.map(([label, value]) => (
-                    <Loading key={String(label)} loading="skeleton-item" isLoading={catalogLoading} className="flex min-w-52">
+                    <Loading key={String(label)} loading="skeleton-item" isLoading={catalogLoading}>
                       <div className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
                         <span className="text-xs font-semibold text-secondary-text">{label}</span>
                         <span className="text-sm font-bold text-primary-text">{String(value)}</span>
@@ -481,7 +481,7 @@ export default function ProductPage() {
                 <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
                   <div className="text-sm font-bold text-primary-text">توضیحات محصول</div>
                   {product.description.trim() ? (
-                    <Loading loading="skeleton-item" isLoading={catalogLoading} className="flex w-full">
+                    <Loading loading="skeleton-item" isLoading={catalogLoading}>
                       <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">{product.description}</div>
                     </Loading>
                   ) : (

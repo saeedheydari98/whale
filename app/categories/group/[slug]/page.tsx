@@ -9,7 +9,7 @@ import {
   productFilterParams,
   type ProductFilterState,
 } from "@/app/products/product-list-controls";
-import { ProductListingPage, PRODUCT_LIST_PAGE_SIZE } from "@/app/products/product-listing-page";
+import { ProductListingPage } from "@/app/products/product-listing-page";
 import { decodeCatalogSegment, getCategoryGroupProducts } from "@/lib/products-client";
 
 export default function CategoryGroupProductsPage() {
@@ -21,19 +21,20 @@ export default function CategoryGroupProductsPage() {
   const normalizedSearchQuery = deferredSearchQuery.trim();
   const [sort, setSort] = useState("newest");
   const [filters, setFilters] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
+  const [pageSize, setPageSize] = useState(0);
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
 
   const categoryGroupProductsQuery = useInfiniteQuery({
-    queryKey: ["catalog", "category-group", slug, "products", sort, normalizedSearchQuery, filterParams],
+    queryKey: ["catalog", "category-group", slug, "products", sort, normalizedSearchQuery, filterParams, pageSize],
     queryFn: ({ pageParam }) => getCategoryGroupProducts(slug, {
       page: Number(pageParam),
-      limit: PRODUCT_LIST_PAGE_SIZE,
+      limit: Math.max(1, pageSize),
       sort,
       q: normalizedSearchQuery,
       ...filterParams,
     }),
-    enabled: Boolean(slug),
+    enabled: Boolean(slug) && pageSize > 0,
     initialPageParam: 1,
     placeholderData: (previous) => previous,
     getNextPageParam: (lastPage) => {
@@ -50,7 +51,7 @@ export default function CategoryGroupProductsPage() {
   const firstPage = pages[0];
   const lastPage = pages[pages.length - 1];
   const categoryGroup = firstPage?.section;
-  const productLoading = categoryGroupProductsQuery.isLoading && !categoryGroupProductsQuery.data;
+  const productLoading = pageSize === 0 || (categoryGroupProductsQuery.isLoading && !categoryGroupProductsQuery.data);
 
   const loadMore = useCallback(() => {
     if (categoryGroupProductsQuery.hasNextPage && !categoryGroupProductsQuery.isFetchingNextPage) {
@@ -63,7 +64,7 @@ export default function CategoryGroupProductsPage() {
       title={categoryGroup?.title ? `محصولات ${categoryGroup.title}` : "محصولات گروه دسته‌بندی"}
       emptyText={filtersActive || normalizedSearchQuery ? "محصولی با این فیلترها پیدا نشد." : "هنوز محصولی در این گروه دسته‌بندی ثبت نشده است."}
       loading={productLoading}
-      initialPageLoading={productLoading}
+      initialPageLoading={false}
       headerLoading={productLoading && !categoryGroup}
       products={products}
       totalProducts={lastPage?.pagination.total ?? firstPage?.pagination.total}
@@ -76,6 +77,7 @@ export default function CategoryGroupProductsPage() {
       loadingMore={categoryGroupProductsQuery.isFetchingNextPage}
       hasMore={Boolean(categoryGroupProductsQuery.hasNextPage)}
       onLoadMore={loadMore}
+      onCapacityChange={setPageSize}
     />
   );
 }

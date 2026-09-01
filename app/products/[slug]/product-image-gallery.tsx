@@ -97,7 +97,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false }: Pro
   if (isLoading) {
     return (
       <div className="flex w-full flex-col gap-2">
-        <Loading loading="skeleton-item" isLoading className="flex aspect-square w-full">
+        <Loading loading="skeleton-item" isLoading>
           <div className="flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-primary-border bg-primary-media" />
         </Loading>
       </div>

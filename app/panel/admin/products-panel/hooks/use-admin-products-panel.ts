@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { clearProductsCache, getCatalogStructure, getProducts, type ProductsCache } from "@/lib/products-client";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ADMIN_STRUCTURE_URL, getAdminPanelStructure, type AdminPanelStructure } from "@/lib/admin-structure";
+import { clearProductsCache, getProducts, type ProductsCache } from "@/lib/products-client";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { scrollToFirstInvalidField } from "@/lib/form-validation";
 import { useFileDataUrl } from "@/hooks/useFileDataUrl";
@@ -38,7 +39,6 @@ import {
   productImagePatch,
   slugifyValue,
   storefrontKey,
-  waitForMinimumLoading,
 } from "../utils";
 
 type AdminCatalogSnapshot = {
@@ -49,20 +49,6 @@ type AdminCatalogSnapshot = {
   brands: BrandForm[];
   brandGroups: CatalogLinkGroupForm[];
   banners: BannerForm[];
-};
-
-export type AdminSkeletonHints = {
-  products?: number;
-  banners?: number;
-  showcases?: number;
-  categories?: number;
-  brands?: number;
-  storefront?: Partial<Record<StorefrontLayoutTab, number>>;
-  categoryGroups?: number;
-  categoryItemsByGroupId?: Record<string, number>;
-  brandGroups?: number;
-  brandItemsByGroupId?: Record<string, number>;
-  showcaseProductsById?: Record<string, number>;
 };
 
 type AdminCatalogLoadSection = AdminCatalogSection | "all" | "product-form";
@@ -77,9 +63,15 @@ type StorefrontLayoutItem = {
 type StorefrontLayoutResponse = Record<StorefrontLayoutTab, StorefrontLayoutItem[]>;
 
 const ADMIN_CATALOG_SECTION_URL = "/api/admin/catalog";
-const ADMIN_SKELETON_HINTS_KEY = "admin-catalog-skeleton-hints:v1";
 const ADMIN_CATALOG_SECTIONS: AdminCatalogSection[] = ["products", "banners", "showcases", "categories", "brands", "storefront"];
-const STOREFRONT_HINT_TABS: StorefrontLayoutTab[] = ["home", "categories", "products"];
+const EMPTY_SECTION_CAPACITY: Record<AdminCatalogSection, number> = {
+  products: 0,
+  banners: 0,
+  showcases: 0,
+  categories: 0,
+  brands: 0,
+  storefront: 0,
+};
 
 function visibleStatusMessage(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message.trim() : "";
@@ -134,13 +126,21 @@ function toProductsCache(value: unknown): ProductsCache {
   };
 }
 
-async function getAdminCatalogSection(section: AdminCatalogLoadSection, options?: { force?: boolean }) {
+function catalogSectionUrl(section: AdminCatalogLoadSection, options?: { limit?: number; offset?: number }) {
+  const params = new URLSearchParams();
+  if (Number.isFinite(Number(options?.limit)) && Number(options?.limit) > 0) params.set("limit", String(Math.round(Number(options?.limit))));
+  if (Number.isFinite(Number(options?.offset)) && Number(options?.offset) > 0) params.set("offset", String(Math.round(Number(options?.offset))));
+  const query = params.toString();
+  return `${ADMIN_CATALOG_SECTION_URL}/${section}${query ? `?${query}` : ""}`;
+}
+
+async function getAdminCatalogSection(section: AdminCatalogLoadSection, options?: { force?: boolean; limit?: number; offset?: number }) {
   const json = await fetchJsonDeduped<{
     ok?: boolean;
     data?: { catalog?: unknown };
     message?: string;
     error?: string;
-  }>(`${ADMIN_CATALOG_SECTION_URL}/${section}`, { force: options?.force });
+  }>(catalogSectionUrl(section, options), { force: options?.force });
 
   if (json?.ok === false) throw new Error(json.message || json.error || "دریافت اطلاعات فروشگاه ممکن نشد.");
   return toProductsCache(json?.data?.catalog);
@@ -192,120 +192,32 @@ async function getAdminStorefrontLayout(options?: { force?: boolean }) {
   return normalizeStorefrontLayout(json?.data?.storefront);
 }
 
-function normalizeHintRecord(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const entries = Object.entries(value as Record<string, unknown>)
-    .map(([key, count]) => [key, normalizedCount(count)] as const)
-    .filter((entry): entry is readonly [string, number] => entry[1] !== undefined);
-
-  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
-}
-
-function normalizeStorefrontHints(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
-  const record = value as Record<string, unknown>;
-  const next: Partial<Record<StorefrontLayoutTab, number>> = {};
-
-  for (const tab of STOREFRONT_HINT_TABS) {
-    const count = normalizedCount(record[tab]);
-    if (count !== undefined) next[tab] = count;
-  }
-
-  return Object.keys(next).length > 0 ? next : undefined;
-}
-
-function normalizeSkeletonHints(value: unknown): AdminSkeletonHints {
-  const record = value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
-
-  return {
-    products: normalizedCount(record.products),
-    banners: normalizedCount(record.banners),
-    showcases: normalizedCount(record.showcases),
-    categories: normalizedCount(record.categories),
-    brands: normalizedCount(record.brands),
-    storefront: normalizeStorefrontHints(record.storefront),
-    categoryGroups: normalizedCount(record.categoryGroups),
-    categoryItemsByGroupId: normalizeHintRecord(record.categoryItemsByGroupId),
-    brandGroups: normalizedCount(record.brandGroups),
-    brandItemsByGroupId: normalizeHintRecord(record.brandItemsByGroupId),
-    showcaseProductsById: normalizeHintRecord(record.showcaseProductsById),
-  };
-}
-
 function markCatalogSectionsLoaded(current: LoadedAdminCatalogSections, sections: AdminCatalogSection[]) {
   const next = { ...current };
   for (const section of sections) next[section] = true;
   return next;
 }
 
+function mergeById<T extends { id: string | number }>(current: T[], incoming: T[]) {
+  if (incoming.length === 0) return current;
+  const byId = new Map(current.map((item) => [String(item.id), item]));
+  for (const item of incoming) byId.set(String(item.id), item);
+  return Array.from(byId.values());
+}
+
+function collectionTotal(section: AdminCatalogSection, structure: AdminPanelStructure | null) {
+  if (!structure) return undefined;
+  if (section === "products") return structure.products;
+  if (section === "banners") return structure.banners;
+  if (section === "showcases") return structure.showcases.length;
+  if (section === "categories") return structure.categoryGroups.length;
+  if (section === "brands") return structure.brandGroups.length;
+  return undefined;
+}
+
 function normalizedCount(value: unknown) {
   const count = Number(value);
   return Number.isFinite(count) ? Math.max(0, Math.round(count)) : undefined;
-}
-
-function countByGroup<TItem extends { groupId?: string }>(items: TItem[]) {
-  return items.reduce<Record<string, number>>((counts, item) => {
-    const groupId = String(item.groupId ?? "").trim();
-    if (!groupId) return counts;
-    counts[groupId] = (counts[groupId] ?? 0) + 1;
-    return counts;
-  }, {});
-}
-
-function hasSkeletonHints(hints: AdminSkeletonHints) {
-  return Object.keys(hints).some((key) => {
-    const value = hints[key as keyof AdminSkeletonHints];
-    return value !== undefined && value !== null && (!(typeof value === "object") || Object.keys(value).length > 0);
-  });
-}
-
-function mergeSkeletonHints(current: AdminSkeletonHints, next: AdminSkeletonHints): AdminSkeletonHints {
-  return {
-    ...current,
-    ...next,
-    storefront: {
-      ...(current.storefront ?? {}),
-      ...(next.storefront ?? {}),
-    },
-    categoryItemsByGroupId: {
-      ...(current.categoryItemsByGroupId ?? {}),
-      ...(next.categoryItemsByGroupId ?? {}),
-    },
-    brandItemsByGroupId: {
-      ...(current.brandItemsByGroupId ?? {}),
-      ...(next.brandItemsByGroupId ?? {}),
-    },
-    showcaseProductsById: {
-      ...(current.showcaseProductsById ?? {}),
-      ...(next.showcaseProductsById ?? {}),
-    },
-  };
-}
-
-function sameSkeletonHints(first: AdminSkeletonHints, second: AdminSkeletonHints) {
-  return JSON.stringify(first) === JSON.stringify(second);
-}
-
-function readSkeletonHints(): AdminSkeletonHints {
-  if (typeof window === "undefined") return {};
-
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(ADMIN_SKELETON_HINTS_KEY) || "null");
-    return normalizeSkeletonHints(parsed);
-  } catch {
-    return {};
-  }
-}
-
-function writeSkeletonHints(hints: AdminSkeletonHints) {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(ADMIN_SKELETON_HINTS_KEY, JSON.stringify(hints));
-  } catch {
-  }
 }
 
 function normalizeAdminCatalog(
@@ -562,24 +474,6 @@ function storefrontLayoutToCatalog(layout: StorefrontLayoutResponse): ProductsCa
   };
 }
 
-function storefrontLayoutToSkeletonHints(layout: StorefrontLayoutResponse): AdminSkeletonHints {
-  return {
-    storefront: {
-      home: layout.home.length,
-      categories: layout.categories.length,
-      products: layout.products.length,
-    },
-    banners: new Set(
-      [...layout.home, ...layout.categories, ...layout.products]
-        .filter((item) => item.type === "banner")
-        .map((item) => item.id)
-    ).size,
-    showcases: layout.products.filter((item) => item.type === "showcase").length,
-    categoryGroups: layout.categories.filter((item) => item.type === "categoryGroup").length,
-    brandGroups: layout.home.filter((item) => item.type === "brandGroup").length,
-  };
-}
-
 function buildStorefrontLayoutPayload(
   banners: BannerForm[],
   showcases: ShowcaseForm[],
@@ -659,7 +553,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [loadedSections, setLoadedSections] = useState<LoadedAdminCatalogSections>(initialLoadedSections);
   const [productFormReferencesLoaded, setProductFormReferencesLoaded] = useState(false);
-  const [skeletonHints, setSkeletonHints] = useState<AdminSkeletonHints>(() => readSkeletonHints());
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
   const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
@@ -673,68 +566,62 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [editingBannerImageUrl, setEditingBannerImageUrl] = useState("");
   const [categoryGroupLinkIds, setCategoryGroupLinkIds] = useState<string[]>([]);
   const [brandGroupLinkIds, setBrandGroupLinkIds] = useState<string[]>([]);
+  const [sectionCapacity, setSectionCapacity] = useState<Record<AdminCatalogSection, number>>(EMPTY_SECTION_CAPACITY);
+  const [structure, setStructure] = useState<AdminPanelStructure | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const { readFileAsDataUrl, readFilesAsDataUrls } = useFileDataUrl();
+  const loadedSectionsRef = useRef(loadedSections);
+  loadedSectionsRef.current = loadedSections;
   const activeSectionReady = loadedSections[activeSection];
 
   const hasRequiredError = (key: string) => requiredErrors.includes(key);
-  const applySkeletonHints = useCallback((nextHints: AdminSkeletonHints) => {
-    if (!hasSkeletonHints(nextHints)) return;
-
-    setSkeletonHints((current) => {
-      const next = mergeSkeletonHints(current, nextHints);
-      if (sameSkeletonHints(current, next)) return current;
-      writeSkeletonHints(next);
-      return next;
-    });
-  }, []);
-
   const showRequiredErrors = (keys: string[], message: string) => {
     setRequiredErrors(keys);
     setStatus(message);
     window.setTimeout(() => scrollToFirstInvalidField(document), 0);
   };
 
-  const applyCatalogSectionSnapshot = (section: AdminCatalogLoadSection, catalog: ProductsCache) => {
+  const applyCatalogSectionSnapshot = (section: AdminCatalogLoadSection, catalog: ProductsCache, options?: { append?: boolean }) => {
     const hasProducts = catalog.products.length > 0;
+    const append = options?.append === true;
     const snapshot = normalizeAdminCatalog(
       catalog,
       hasProducts || section === "products" || section === "showcases" || section === "all",
-      { preserveEmptyCatalogLinks: section === "storefront" }
+      { preserveEmptyCatalogLinks: section === "storefront" || (section !== "all" && section !== "product-form") }
     );
 
     if (section === "products") {
-      setProducts(snapshot.products);
+      setProducts((current) => append ? mergeById(current, snapshot.products) : snapshot.products);
       setProductsLoaded(true);
       setLoadedSections((current) => markCatalogSectionsLoaded(current, ["products"]));
       return;
     }
 
     if (section === "banners") {
-      setBanners(snapshot.banners);
+      setBanners((current) => append ? mergeById(current, snapshot.banners) : snapshot.banners);
       setLoadedSections((current) => markCatalogSectionsLoaded(current, ["banners"]));
       return;
     }
 
     if (section === "showcases") {
-      setShowcases(snapshot.showcases);
-      if (hasProducts) {
-        setProducts(snapshot.products);
-        setProductsLoaded(true);
+      setShowcases((current) => append ? mergeById(current, snapshot.showcases) : snapshot.showcases);
+      if (snapshot.products.length > 0) {
+        setProducts((current) => mergeById(current, snapshot.products));
       }
-      setLoadedSections((current) => markCatalogSectionsLoaded(current, hasProducts ? ["showcases", "products"] : ["showcases"]));
+      setLoadedSections((current) => markCatalogSectionsLoaded(current, ["showcases"]));
       return;
     }
 
     if (section === "categories") {
-      setCategoryGroups(snapshot.categoryGroups);
-      setCategories(snapshot.categories);
+      setCategoryGroups((current) => append ? mergeById(current, snapshot.categoryGroups) : snapshot.categoryGroups);
+      setCategories((current) => append ? mergeById(current, snapshot.categories) : snapshot.categories);
       setLoadedSections((current) => markCatalogSectionsLoaded(current, ["categories"]));
       return;
     }
 
     if (section === "brands") {
-      setBrandGroups(snapshot.brandGroups);
-      setBrands(snapshot.brands);
+      setBrandGroups((current) => append ? mergeById(current, snapshot.brandGroups) : snapshot.brandGroups);
+      setBrands((current) => append ? mergeById(current, snapshot.brands) : snapshot.brands);
       setLoadedSections((current) => markCatalogSectionsLoaded(current, ["brands"]));
       return;
     }
@@ -791,61 +678,34 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   useEffect(() => {
     let cancelled = false;
 
-    if (activeSectionReady) {
-      setLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const loadSectionData = async () => {
-      const startedAt = Date.now();
-      setLoading(true);
-
+    const loadStructure = async () => {
       try {
-        if (activeSection === "storefront") {
-          let layout = await getAdminStorefrontLayout();
-
-          if (layout.home.length === 0 && layout.categories.length === 0 && layout.products.length === 0) {
-            await new Promise((resolve) => window.setTimeout(resolve, 250));
-            layout = await getAdminStorefrontLayout({ force: true });
-          }
-          if (cancelled) return;
-
-          applySkeletonHints(storefrontLayoutToSkeletonHints(layout));
-          applyCatalogSectionSnapshot("storefront", storefrontLayoutToCatalog(layout));
-          await waitForMinimumLoading(startedAt);
-          return;
-        }
-
-        let catalog = await getAdminCatalogSection(activeSection);
-
-        if (!hasCatalogData(catalog)) {
+        let next = await getAdminPanelStructure();
+        if (!next) {
           await new Promise((resolve) => window.setTimeout(resolve, 250));
-          catalog = await getAdminCatalogSection(activeSection, { force: true });
+          next = await getAdminPanelStructure({ force: true });
         }
-        if (cancelled) return;
-
-        applyCatalogSectionSnapshot(activeSection, catalog);
-        await waitForMinimumLoading(startedAt);
+        if (!cancelled) setStructure(next);
+        if (!cancelled && !next) setStatus("دریافت ساختار پنل ممکن نشد.");
       } catch {
-        if (cancelled) return;
-        setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
-        await waitForMinimumLoading(startedAt);
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setStatus("دریافت ساختار پنل ممکن نشد.");
       }
     };
 
-    void loadSectionData();
+    void loadStructure();
 
     return () => {
       cancelled = true;
     };
-  }, [activeSection, activeSectionReady, applySkeletonHints]);
+  }, []);
 
   const sortedProducts = useMemo(() => [...products].sort((a, b) => a.sortOrder - b.sortOrder), [products]);
-  const sortedShowcases = useMemo(() => ensureShowcases(products, showcases), [products, showcases]);
+  const sortedShowcases = useMemo(() => {
+    const next = ensureShowcases(products, showcases).sort((a, b) => a.sortOrder - b.sortOrder);
+    if (!loadedSections.showcases) return next;
+    const allowed = new Set(showcases.map((showcase) => showcase.id));
+    return next.filter((showcase) => allowed.has(showcase.id));
+  }, [loadedSections.showcases, products, showcases]);
   const sortedCategories = useMemo(() => [...categories].sort((a, b) => a.sortOrder - b.sortOrder), [categories]);
   const sortedCategoryGroups = useMemo(() => [...categoryGroups].sort((a, b) => a.sortOrder - b.sortOrder), [categoryGroups]);
   const sortedBrands = useMemo(() => [...brands].sort((a, b) => a.sortOrder - b.sortOrder), [brands]);
@@ -928,62 +788,153 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     ].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [sortedBanners, sortedBrandGroups, sortedBrands, sortedCategories, sortedCategoryGroups, sortedShowcases, storefrontLayoutTab]);
 
-  const currentSkeletonHints = useMemo<AdminSkeletonHints>(() => {
-    const hints: AdminSkeletonHints = {};
+  const sectionTotalCount = collectionTotal(activeSection, structure);
+  const loadedSectionCount = activeSection === "products"
+    ? products.length
+    : activeSection === "banners"
+      ? banners.length
+      : activeSection === "showcases"
+        ? showcases.length
+        : activeSection === "categories"
+          ? (loadedSections.categories ? categoryGroups.length : 0)
+          : activeSection === "brands"
+            ? (loadedSections.brands ? brandGroups.length : 0)
+            : displaySections.length;
+  const activeCapacity = sectionCapacity[activeSection];
+  const sectionHasMore = sectionTotalCount !== undefined && loadedSectionCount < sectionTotalCount;
 
-    if (productsLoaded || loadedSections.products) {
-      hints.products = sortedProducts.length;
-    }
-
-    if (loadedSections.banners) {
-      hints.banners = sortedBanners.length;
-    }
-
-    if (loadedSections.showcases) {
-      hints.showcases = sortedShowcases.length;
-      hints.showcaseProductsById = Object.fromEntries(
-        sortedShowcases.map((showcase) => {
-          const loadedProductCount = productsLoaded ? getShowcaseProductsForAdmin(sortedProducts, showcase).length : undefined;
-          const hintedProductCount = normalizedCount(showcase.productCount);
-          return [showcase.id, loadedProductCount ?? hintedProductCount ?? 0];
-        })
-      );
-    }
-
-    if (loadedSections.categories) {
-      hints.categories = sortedCategories.length;
-      hints.categoryGroups = sortedCategoryGroups.length;
-      hints.categoryItemsByGroupId = countByGroup(sortedCategories);
-    }
-
-    if (loadedSections.brands) {
-      hints.brands = sortedBrands.length;
-      hints.brandGroups = sortedBrandGroups.length;
-      hints.brandItemsByGroupId = countByGroup(sortedBrands);
-    }
-
-    if (loadedSections.storefront) {
-      hints.storefront = { [storefrontLayoutTab]: displaySections.length };
-    }
-
-    return hints;
-  }, [
-    displaySections.length,
-    loadedSections,
-    productsLoaded,
-    sortedBanners,
-    sortedBrandGroups,
-    sortedBrands,
-    sortedCategories,
-    sortedCategoryGroups,
-    sortedProducts,
-    sortedShowcases,
-    storefrontLayoutTab,
-  ]);
+  const setActiveCapacity = useCallback((capacity: number) => {
+    if (capacity <= 0) return;
+    setSectionCapacity((current) => (
+      current[activeSection] === capacity ? current : { ...current, [activeSection]: capacity }
+    ));
+  }, [activeSection]);
 
   useEffect(() => {
-    applySkeletonHints(currentSkeletonHints);
-  }, [applySkeletonHints, currentSkeletonHints]);
+    let cancelled = false;
+
+    if (activeSection !== "storefront" && !structure) {
+      setLoading(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (activeSection !== "storefront" && sectionTotalCount === 0) {
+      if (!activeSectionReady) applyCatalogSectionSnapshot(activeSection, EMPTY_CATALOG);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (activeSection === "storefront") {
+      if (activeSectionReady) {
+        setLoading(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+
+      const loadStorefront = async () => {
+        setLoading(true);
+        try {
+          let layout = await getAdminStorefrontLayout();
+          if (layout.home.length === 0 && layout.categories.length === 0 && layout.products.length === 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, 250));
+            layout = await getAdminStorefrontLayout({ force: true });
+          }
+          if (cancelled) return;
+          applyCatalogSectionSnapshot("storefront", storefrontLayoutToCatalog(layout));
+        } catch {
+          if (cancelled) return;
+          setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      };
+
+      void loadStorefront();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (activeCapacity <= 0) return () => {
+      cancelled = true;
+    };
+
+    if (loadedSectionCount >= activeCapacity && activeSectionReady) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const take = Math.max(1, activeCapacity - loadedSectionCount);
+    const offset = loadedSectionCount;
+    const append = offset > 0;
+
+    const loadSectionData = async () => {
+      if (!append) setLoading(true);
+      else setLoadingMore(true);
+
+      try {
+        let catalog = await getAdminCatalogSection(activeSection, { limit: take, offset });
+        const expected = sectionTotalCount ?? take;
+        if (!hasCatalogData(catalog) && expected > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, 250));
+          catalog = await getAdminCatalogSection(activeSection, { limit: take, offset, force: true });
+        }
+        if (cancelled) return;
+        applyCatalogSectionSnapshot(activeSection, catalog, { append });
+      } catch {
+        if (cancelled) return;
+        setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    };
+
+    void loadSectionData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCapacity, activeSection, activeSectionReady, loadedSectionCount, sectionTotalCount, structure]);
+
+  const loadMoreSection = useCallback(() => {
+    if (loading || loadingMore || !sectionHasMore || activeCapacity <= 0) return;
+    const offset = loadedSectionCount;
+    const take = activeCapacity;
+    setLoadingMore(true);
+    void getAdminCatalogSection(activeSection, { limit: take, offset, force: true })
+      .then((catalog) => {
+        applyCatalogSectionSnapshot(activeSection, catalog, { append: true });
+      })
+      .catch(() => {
+        setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
+      })
+      .finally(() => setLoadingMore(false));
+  }, [activeCapacity, activeSection, loadedSectionCount, loading, loadingMore, sectionHasMore]);
+
+  const loadRemainingSection = useCallback(() => {
+    if (loadingMore || !sectionHasMore || sectionTotalCount === undefined) return;
+    const offset = loadedSectionCount;
+    const take = Math.max(1, sectionTotalCount - offset);
+    setLoadingMore(true);
+    void getAdminCatalogSection(activeSection, { limit: take, offset, force: true })
+      .then((catalog) => {
+        applyCatalogSectionSnapshot(activeSection, catalog, { append: true });
+      })
+      .catch(() => {
+        setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
+      })
+      .finally(() => setLoadingMore(false));
+  }, [activeSection, loadedSectionCount, loadingMore, sectionHasMore, sectionTotalCount]);
 
   const persistProducts = async (
     nextProducts: ProductForm[],
@@ -1211,6 +1162,10 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           setLoadedSections(() => markCatalogSectionsLoaded(initialLoadedSections, ADMIN_CATALOG_SECTIONS));
           clearProductsCache();
           invalidateFetchCache(ADMIN_CATALOG_SECTION_URL);
+          invalidateFetchCache(ADMIN_STRUCTURE_URL);
+          void getAdminPanelStructure({ force: true }).then((next) => {
+            if (next) setStructure(next);
+          }).catch(() => undefined);
           if (showSavedStatus) setStatus("اطلاعات فروشگاه در پایگاه داده ذخیره شد.");
           return true;
         }
@@ -1283,9 +1238,12 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         throw new Error(String(data.message));
       }
 
-      applySkeletonHints(storefrontLayoutToSkeletonHints(storefrontPayload));
       clearProductsCache();
       invalidateFetchCache(ADMIN_CATALOG_SECTION_URL);
+      invalidateFetchCache(ADMIN_STRUCTURE_URL);
+      void getAdminPanelStructure({ force: true }).then((next) => {
+        if (next) setStructure(next);
+      }).catch(() => undefined);
       if (showSavedStatus) {
         setStatus("چیدمان فروشگاه ذخیره شد.");
         return true;
@@ -2078,9 +2036,15 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     sortedBrandGroups,
     sortedBanners,
     displaySections,
-    skeletonHints,
     loading,
+    loadingMore,
     sectionReady: activeSectionReady,
+    structure,
+    sectionTotalCount,
+    sectionHasMore,
+    setActiveCapacity,
+    loadMoreSection,
+    loadRemainingSection,
     saving,
     status,
     draftProduct,

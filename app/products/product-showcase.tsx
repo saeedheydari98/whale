@@ -10,12 +10,10 @@ import {
   getFinalPriceValue as getFinalPrice,
 } from "@/lib/price-format";
 import { normalizeColorStock } from "@/lib/color-counts";
-import { getProducts, getProductsPageStructure, getShowcaseProducts, isProductAvailable, readCachedProductsPageStructure, type ProductsCache } from "@/lib/products-client";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "../design-system/components/loading/loading-count";
-import Loading from "../design-system/components/loading/loading";
+import { getCatalogSectionData, getProducts, getProductsPageStructure, getShowcaseProducts, isProductAvailable, readCachedProductsPageStructure, type ProductsCache } from "@/lib/products-client";
+import { LazyViewport, useStructureRouteLoading } from "../design-system/components/loading/loading";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { ImagePreview } from "../design-system/components/ui/image-preview";
-import { LazyViewportSection } from "../design-system/components/ui/lazy-viewport-section";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
 import { ShowcaseSection } from "./product-showcase/showcase-section";
 import type { Banner, Product, Showcase } from "./product-showcase/types";
@@ -67,6 +65,7 @@ function normalizeBanner(item: Partial<Banner> & { bannerUrl?: string; images?: 
     intervalSeconds: Number.isFinite(Number(item.intervalSeconds)) ? Math.max(1, Math.round(Number(item.intervalSeconds))) : 5,
     heightPercent: Number.isFinite(Number(item.heightPercent)) ? Math.max(10, Math.min(100, Math.round(Number(item.heightPercent)))) : 28,
     sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+    imageCount: Number.isFinite(Number(item.imageCount)) ? Number(item.imageCount) : imageUrls.length,
   };
 }
 
@@ -91,18 +90,6 @@ function ensureShowcases(products: Product[], savedShowcases: Showcase[]) {
   return Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-function resolveShowcaseLoadingCount(showcase: Showcase, productsLength: number, viewportProductCount: number) {
-  if (productsLength > 0) return resolveLoadingItemCount(productsLength, viewportProductCount);
-
-  const knownProductCount = Number(showcase.productCount);
-  if (Number.isFinite(knownProductCount)) {
-    return resolveLoadingItemCount(Math.max(0, Math.round(knownProductCount)), viewportProductCount);
-  }
-
-  const requestedProductCount = Number(showcase.limit);
-  return resolveLoadingItemCount(Number.isFinite(requestedProductCount) ? requestedProductCount : undefined, viewportProductCount);
-}
-
 type BannerSection = {
   type: "banner";
   item: Banner;
@@ -113,7 +100,6 @@ type ShowcaseDisplaySection = {
   type: "showcase";
   item: Showcase;
   products: Product[];
-  loadingCount?: number;
   sortOrder: number;
 };
 
@@ -134,22 +120,21 @@ function LazyShowcaseSection({
   onPreview,
   hideShowcaseLink = false,
 }: LazyShowcaseSectionProps) {
-  const viewportProductCount = useLoadingViewportCount("product-rail");
+  const [capacity, setCapacity] = useState(0);
   const hasInitialProducts = products.length > 0;
   const showcaseProductsQuery = useQuery({
-    queryKey: ["catalog", "showcase", showcase.id, "products", "lazy"],
-    queryFn: () => getShowcaseProducts(showcase.id, { limit: Number(showcase.limit ?? 100) || 100 }),
-    enabled: Boolean(showcase.id) && showcase.id !== "all-products" && !hasInitialProducts,
+    queryKey: ["catalog", "showcase", showcase.id, "products", "lazy", capacity],
+    queryFn: () => getShowcaseProducts(showcase.id, { limit: Math.max(1, capacity) }),
+    enabled: Boolean(showcase.id) && showcase.id !== "all-products" && !hasInitialProducts && capacity > 0,
     placeholderData: (previous) => previous,
   });
 
   const loadedProducts = hasInitialProducts
     ? products
     : (showcaseProductsQuery.data?.products as Product[] | undefined) ?? [];
-  const isLoading = !hasInitialProducts && showcaseProductsQuery.isLoading;
-  const loadingCount = resolveShowcaseLoadingCount(showcase, loadedProducts.length, viewportProductCount);
+  const isLoading = !hasInitialProducts && (capacity === 0 || showcaseProductsQuery.isLoading);
 
-  if (!isLoading && loadedProducts.length === 0) return null;
+  if (!isLoading && loadedProducts.length === 0 && Number(showcase.productCount ?? 0) === 0) return null;
 
   return (
     <ShowcaseSection
@@ -162,7 +147,40 @@ function LazyShowcaseSection({
       getDiscountPercent={getDiscountPercent}
       hideShowcaseLink={hideShowcaseLink}
       isLoading={isLoading}
-      loadingCount={loadingCount}
+      totalCount={showcase.productCount}
+      onCapacityChange={setCapacity}
+    />
+  );
+}
+
+function ShowcaseBannerSection({
+  banner,
+  onPreview,
+}: {
+  banner: Banner;
+  onPreview: (imageUrl?: string) => void;
+}) {
+  const hasImages = banner.imageUrls.length > 0;
+  const query = useQuery({
+    queryKey: ["catalog", "section", "banner", banner.id],
+    queryFn: () => getCatalogSectionData({ type: "banner", id: banner.id }),
+    enabled: !hasImages,
+  });
+  const loaded = query.data?.banner;
+  const dataLoading = !hasImages && !loaded?.imageUrls?.length && query.isLoading;
+
+  return (
+    <BannerCarousel
+      banner={{
+        ...banner,
+        title: loaded?.title ?? banner.title,
+        imageUrls: loaded?.imageUrls ?? banner.imageUrls,
+        intervalSeconds: loaded?.intervalSeconds ?? banner.intervalSeconds,
+        heightPercent: loaded?.heightPercent ?? banner.heightPercent,
+        imageCount: Number(loaded?.imageCount ?? banner.imageCount ?? loaded?.imageUrls?.length ?? 0),
+      }}
+      onPreview={onPreview}
+      isLoading={dataLoading}
     />
   );
 }
@@ -173,7 +191,6 @@ type ProductShowcaseProps = {
 };
 
 export function ProductShowcase({ mode = "storefront", root = "main" }: ProductShowcaseProps) {
-  const viewportProductCount = useLoadingViewportCount("product-rail");
   // header search is handled on the separate `/search` route
   const catalogQuery = useQuery({
     queryKey: ["catalog", mode === "products" ? "products-page-full" : "products-page-structure", mode],
@@ -185,7 +202,8 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
   const catalogShowcases = structure?.catalog.showcases ?? structure?.showcases ?? [];
   const catalogBanners = structure?.banners ?? [];
   const tree = structure?.tree ?? { sections: [] };
-  const structureLoading = catalogQuery.isLoading;
+  const structureLoading = catalogQuery.isLoading && !structure;
+  useStructureRouteLoading(mode !== "products" && structureLoading);
   const [cartMessage, setCartMessage] = useState("");
   useTransientAppMessage(cartMessage);
   const [previewImage, setPreviewImage] = useState("");
@@ -306,94 +324,6 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [catalogBanners, mode, showcaseProductsById, sortedProducts, sortedShowcases, tree]);
 
-  
-
-  const loadingSections = useMemo<DisplaySection[]>(() => {
-    const withShowcaseProducts = (showcase: Showcase): ShowcaseDisplaySection => {
-      const products = showcaseProductsById.get(showcase.id) ?? [];
-      const productCardCount = resolveShowcaseLoadingCount(showcase, products.length, viewportProductCount);
-
-      return {
-        type: "showcase",
-        item: showcase,
-        products,
-        loadingCount: productCardCount,
-        sortOrder: showcase.sortOrder,
-      };
-    };
-
-    if (displaySections.length > 0) {
-      return displaySections.map((section) =>
-        section.type === "banner"
-          ? section
-          : {
-              ...section,
-              loadingCount: resolveShowcaseLoadingCount(section.item, section.products.length, viewportProductCount),
-            }
-      );
-    }
-
-    if (mode === "products") {
-      return [{
-        type: "showcase",
-        item: {
-          id: "all-products",
-          title: "محصولات",
-          active: true,
-          limit: viewportProductCount,
-          sortOrder: 1,
-        },
-        products: [],
-        loadingCount: viewportProductCount,
-        sortOrder: 1,
-      }];
-    }
-
-    if (tree.sections.length > 0) {
-      return tree.sections
-        .map((section): DisplaySection =>
-          section.type === "banner"
-            ? {
-                type: "banner",
-                item: normalizeBanner(section.item, section.sortOrder),
-                sortOrder: section.sortOrder,
-              }
-            : withShowcaseProducts(normalizeShowcase(section.item as Showcase, section.sortOrder))
-        )
-        .filter((section) =>
-          section.type === "banner"
-            ? section.item.active !== false && (mode === "showcase" ? section.item.showOnProducts === true : section.item.showOnHome !== false)
-            : section.item.active !== false
-        )
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-    }
-
-    const bannerSections = catalogBanners
-      .map((banner, index): BannerSection => ({
-        type: "banner",
-        item: normalizeBanner(banner, index + 1),
-        sortOrder: Number(
-          mode === "showcase"
-            ? banner.productSortOrder ?? banner.sortOrder ?? banner.placement ?? index + 1
-            : banner.homeSortOrder ?? banner.sortOrder ?? banner.placement ?? index + 1
-        ),
-      }))
-      .filter((section) =>
-        section.item.active !== false && (mode === "showcase" ? section.item.showOnProducts === true : section.item.showOnHome !== false)
-      );
-
-    const showcaseSections = sortedShowcases
-      .filter((showcase) => showcase.active !== false)
-      .map(withShowcaseProducts);
-
-    const dynamicSections = [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
-    if (dynamicSections.length > 0) return dynamicSections;
-
-    return [];
-  }, [catalogBanners, displaySections, mode, showcaseProductsById, sortedShowcases, tree.sections, viewportProductCount]);
-  const loading = loadingSections.length === 0 && structureLoading;
-  const showWhaleLoading = loading && loadingSections.length === 0;
-
   const openImagePreview = (imageUrl?: string) => {
     if (!imageUrl) return;
     setPreviewImage(imageUrl);
@@ -430,89 +360,52 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           <div className="text-3xl font-bold">ویترین محصولات فروشگاه وال</div>
         </div>
 
-        {showWhaleLoading ? (
-          <Loading loading="fullscreen" />
-        ) : null}
-
-        {loading && !showWhaleLoading ? (
-          <div className="flex flex-col gap-8">
-            {loadingSections.map((section) =>
-              section.type === "banner" ? (
-                <BannerCarousel
-                  key={`loading-banner-${section.item.id}`}
-                  banner={section.item}
-                  onPreview={() => undefined}
-                  isLoading
-                />
-              ) : (
-                <ShowcaseSection
-                  key={`loading-showcase-${section.item.id}`}
-                  showcase={section.item}
-                  products={section.products}
-                  onAddToCart={() => undefined}
-                  onPreview={() => undefined}
-                  formatPrice={formatPrice}
-                  getFinalPrice={getFinalPrice}
-                  getDiscountPercent={getDiscountPercent}
-                  isLoading
-                  loadingCount={section.loadingCount}
-                />
-              )
-            )}
-          </div>
-        ) : null}
-
-        {!loading && mode === "products" && sortedProducts.length === 0 ? (
+        {!structureLoading && mode === "products" && sortedProducts.length === 0 ? (
           <CustomEmptyState />
         ) : null}
 
-
-        {!loading ? (
         <div className="flex flex-col gap-8">
-          {/* Normal showcase/banner sections */}
-
           {displaySections.map((section) => {
-            const fallbackProductCount = section.type === "showcase"
-              ? resolveShowcaseLoadingCount(section.item, section.products.length, viewportProductCount)
-              : 0;
-            const fallback = section.type === "banner" ? (
-              <BannerCarousel banner={section.item} onPreview={() => undefined} isLoading />
-            ) : (
-              <ShowcaseSection
-                showcase={section.item}
-                products={[]}
-                onAddToCart={() => undefined}
-                onPreview={() => undefined}
-                formatPrice={formatPrice}
-                getFinalPrice={getFinalPrice}
-                getDiscountPercent={getDiscountPercent}
-                hideShowcaseLink={mode === "products"}
-                isLoading
-                loadingCount={fallbackProductCount}
-              />
-            );
+            if (section.type === "banner") {
+              return (
+                <LazyViewport
+                  key={`${section.type}-${section.item.id}`}
+                  fallback={<BannerCarousel banner={section.item} isLoading />}
+                >
+                  <ShowcaseBannerSection banner={section.item} onPreview={openBannerPreview} />
+                </LazyViewport>
+              );
+            }
 
             return (
-              <LazyViewportSection key={`${section.type}-${section.item.id}`} fallback={fallback}>
-                {section.type === "banner" ? (
-                  <BannerCarousel
-                    banner={section.item}
-                    onPreview={openBannerPreview}
-                  />
-                ) : (
-                  <LazyShowcaseSection
+              <LazyViewport
+                key={`${section.type}-${section.item.id}`}
+                fallback={
+                  <ShowcaseSection
                     showcase={section.item}
-                    products={section.products}
-                    onAddToCart={addToCart}
-                    onPreview={openImagePreview}
+                    products={[]}
+                    onAddToCart={() => undefined}
+                    onPreview={() => undefined}
+                    formatPrice={formatPrice}
+                    getFinalPrice={getFinalPrice}
+                    getDiscountPercent={getDiscountPercent}
                     hideShowcaseLink={mode === "products"}
+                    isLoading
+                    totalCount={Math.min(1, Number(section.item.productCount) || 1)}
                   />
-                )}
-              </LazyViewportSection>
+                }
+              >
+                <LazyShowcaseSection
+                  showcase={section.item}
+                  products={section.products}
+                  onAddToCart={addToCart}
+                  onPreview={openImagePreview}
+                  hideShowcaseLink={mode === "products"}
+                />
+              </LazyViewport>
             );
           })}
         </div>
-        ) : null}
 
         <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
         <ImagePreview imageUrl={bannerPreviewImage} onClose={() => setBannerPreviewImage("")} />

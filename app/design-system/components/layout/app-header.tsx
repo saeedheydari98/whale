@@ -30,6 +30,7 @@ import { readCachedAppUser } from "@/lib/app-user-client";
 import { useAppUser } from "@/lib/app-user-context";
 import { readUserProfile, USER_PROFILE_UPDATED_EVENT, type UserProfile } from "@/lib/user-profile";
 import { GiSpermWhale } from "react-icons/gi";
+import { startRouteLoading } from "../loading/loading";
 import {
   AccountButton,
   syncStoredProfileFromUser,
@@ -138,6 +139,7 @@ export function AppHeader() {
   const visibleNavItems = navItems;
   const openAccount = () => {
     if (authUser ?? readCachedAuthUser()) {
+      startRouteLoading();
       router.push("/panel/user");
       return;
     }
@@ -217,7 +219,10 @@ export function AppHeader() {
               setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
               const accountCart = await getCart();
               setCartCount(getCartCount(accountCart.items));
-              if (!profileComplete) router.push("/panel/user");
+              if (!profileComplete) {
+                startRouteLoading();
+                router.push("/panel/user");
+              }
               router.refresh();
             }}
           />

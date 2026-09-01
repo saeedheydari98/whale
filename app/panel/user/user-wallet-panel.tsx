@@ -7,10 +7,17 @@ import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state"
 import { useAppNotification, useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount } from "@/lib/price-format";
+import Loading from "@/app/design-system/components/loading/loading";
 
 type WalletCode = { id: string; name: string; code: string; type: string; percent?: number | null; expiresAt: string; usedAt?: string | null };
 type WalletTransaction = { id: string; amount: number; type: string; createdAt: string };
 type WalletData = { balance: number; discountCodes: WalletCode[]; transactions: WalletTransaction[] };
+
+const loadingWallet: WalletData = {
+  balance: 0,
+  discountCodes: [{ id: "loading-code", name: "کد تخفیف", code: "CODE", type: "percent", percent: 0, expiresAt: new Date(Date.now() + 86_400_000).toISOString() }],
+  transactions: [{ id: "loading-transaction", amount: 0, type: "cashback", createdAt: new Date(0).toISOString() }],
+};
 
 export function UserWalletPanel() {
   const [wallet, setWallet] = useState<WalletData | null>(null);
@@ -41,7 +48,8 @@ export function UserWalletPanel() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const activeCodes = wallet?.discountCodes.filter((code) => !code.usedAt && new Date(code.expiresAt).getTime() > loadedAt) ?? [];
+  const displayWallet = wallet ?? loadingWallet;
+  const activeCodes = displayWallet.discountCodes.filter((code) => !code.usedAt && new Date(code.expiresAt).getTime() > loadedAt);
 
   const copyCode = async (code: string) => {
     try {
@@ -53,7 +61,8 @@ export function UserWalletPanel() {
   };
 
   return (
-    <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
+    <Loading loading="skeleton-structure" isLoading={loading && !wallet}>
+      <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <div className="text-base font-bold text-primary-text">کیف پول</div>
@@ -65,11 +74,11 @@ export function UserWalletPanel() {
       </div>
       <div className="flex flex-col gap-1 rounded-md border border-primary-border bg-primary-base p-4">
         <span className="text-xs text-secondary-text">موجودی قابل استفاده</span>
-        <span className="text-2xl font-bold text-primary">{formatAmount(wallet?.balance ?? 0)}</span>
+        <span className="text-2xl font-bold text-primary">{formatAmount(displayWallet.balance)}</span>
       </div>
       <div className="flex flex-col gap-2">
         <div className="text-sm font-bold"><span>کدهای قابل استفاده</span></div>
-        {activeCodes.length === 0 ? <CustomEmptyState description="کد تخفیف فعالی ندارید." size="sm" /> : (
+        {!loading && activeCodes.length === 0 ? <CustomEmptyState description="کد تخفیف فعالی ندارید." size="sm" /> : (
           <div className="flex flex-wrap gap-2">
             {activeCodes.map((code) => (
               <div key={code.id} className="flex min-w-56 flex-col gap-1 rounded-md border border-primary-border bg-primary-base p-3">
@@ -90,9 +99,9 @@ export function UserWalletPanel() {
 
       <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
         <div className="text-sm font-bold"><span>گردش کیف پول</span></div>
-        {(wallet?.transactions.length ?? 0) === 0 ? <CustomEmptyState description="هنوز تراکنشی ثبت نشده است." size="sm" /> : (
+        {!loading && displayWallet.transactions.length === 0 ? <CustomEmptyState description="هنوز تراکنشی ثبت نشده است." size="sm" /> : (
           <div className="flex flex-col gap-2">
-            {wallet?.transactions.map((transaction) => (
+            {displayWallet.transactions.map((transaction) => (
               <div key={transaction.id} className="flex items-center justify-between gap-3 border-b border-primary-border pb-2">
                 <div className="flex flex-col gap-0.5">
                   <span className="text-sm font-semibold">{transaction.type === "cashback" ? "بازگشت وجه خرید" : "استفاده در خرید"}</span>
@@ -106,6 +115,7 @@ export function UserWalletPanel() {
           </div>
         )}
       </div>
-    </section>
+      </section>
+    </Loading>
   );
 }

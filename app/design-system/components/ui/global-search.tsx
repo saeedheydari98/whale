@@ -6,6 +6,7 @@ import { FiSearch } from "react-icons/fi";
 import { IoClose } from "react-icons/io5";
 import { CustomEmptyState } from "./empty-state";
 import { CustomInput } from "./input";
+import Loading, { startRouteLoading } from "../loading/loading";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { APP_USER_UPDATED_EVENT } from "@/lib/app-user-client";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
@@ -68,10 +69,12 @@ export function GlobalSearch() {
 
   useEffect(() => {
     if (!query) {
-      setResults([]);
-      setLoading(false);
-      setHasSearched(false);
-      return;
+      const resetTimer = window.setTimeout(() => {
+        setResults([]);
+        setLoading(false);
+        setHasSearched(false);
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
     let cancelled = false;
@@ -128,7 +131,9 @@ export function GlobalSearch() {
   }, [isMobile]);
 
   useEffect(() => {
-    if (isMobile) setExpanded(false);
+    if (!isMobile) return;
+    const timer = window.setTimeout(() => setExpanded(false), 0);
+    return () => window.clearTimeout(timer);
   }, [isMobile]);
 
   const open = () => {
@@ -144,6 +149,7 @@ export function GlobalSearch() {
   const goToProduct = (product: ProductRecord) => {
     setFocused(false);
     setExpanded(false);
+    startRouteLoading();
     router.push(`/products/${productSlug(product) || product.id}`);
   };
 
@@ -247,7 +253,19 @@ export function GlobalSearch() {
       {showPanel ? (
         <div className="absolute top-full z-40 mt-2 flex w-full min-w-72 flex-col overflow-hidden rounded-lg border border-primary-border bg-primary-card shadow-lg md:w-72">
           {loading ? (
-            <div className="px-3 py-3 text-sm font-semibold text-secondary-text">در حال جست‌وجو…</div>
+            <Loading loading="skeleton-structure" isLoading>
+              <div className="flex max-h-80 flex-col overflow-y-auto">
+                <button type="button" className="flex items-center gap-3 border-b border-primary-border bg-transparent px-3 py-2 text-right">
+                  <span data-loading-leaf className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                    <span className="text-xs font-bold text-secondary-text">تصویر</span>
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-1">
+                    <span className="line-clamp-1 text-sm font-bold text-primary-text">نتیجه جست‌وجوی محصول</span>
+                    <span className="line-clamp-1 text-xs font-semibold text-secondary-text">قیمت محصول</span>
+                  </span>
+                </button>
+              </div>
+            </Loading>
           ) : results.length > 0 ? (
             <div className="flex max-h-80 flex-col overflow-y-auto">
               {results.map((product) => (

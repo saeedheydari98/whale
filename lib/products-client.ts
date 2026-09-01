@@ -120,6 +120,7 @@ export type CatalogLinkGroupRecord = {
   active?: boolean;
   sortOrder?: number | string;
   categoryCount?: number;
+  itemCount?: number;
 };
 
 type GroupedCategoryRecord = CatalogLinkGroupRecord & {
@@ -155,6 +156,7 @@ export type BannerRecord = {
   productSortOrder?: number | string;
   sortOrder?: number;
   placement?: number | string;
+  imageCount?: number;
 };
 
 export type CatalogTreeSection =
@@ -550,6 +552,7 @@ function normalizeLinkGroupRecord(group: CatalogLinkGroupRecord, fallbackOrder: 
     title: title || `Group ${fallbackOrder}`,
     active: group.active !== false,
     sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : fallbackOrder,
+    itemCount: Number.isFinite(Number(group.itemCount)) ? Math.max(0, Math.round(Number(group.itemCount))) : undefined,
   };
 }
 
@@ -574,7 +577,8 @@ function readGroupedCategories(source: unknown) {
   source.forEach((item, index) => {
     if (!isRecord(item)) return;
     const items = nestedList<CategoryRecord>(item, ["items", "categories"]);
-    const isGroup = items.length > 0 || item.type === "categoryGroup" || item.type === "categories";
+    const itemCount = Number.isFinite(Number(item.itemCount)) ? Number(item.itemCount) : items.length;
+    const isGroup = items.length > 0 || itemCount > 0 || item.type === "categoryGroup" || item.type === "categories";
 
     if (!isGroup) {
       categories.push(normalizeCategoryRecord(item as CategoryRecord, index + 1));
@@ -602,7 +606,8 @@ function readGroupedBrands(source: unknown) {
   source.forEach((item, index) => {
     if (!isRecord(item)) return;
     const items = nestedList<BrandRecord>(item, ["items", "brands"]);
-    const isGroup = items.length > 0 || item.type === "brandGroup" || item.type === "brands";
+    const itemCount = Number.isFinite(Number(item.itemCount)) ? Number(item.itemCount) : items.length;
+    const isGroup = items.length > 0 || itemCount > 0 || item.type === "brandGroup" || item.type === "brands";
 
     if (!isGroup) {
       brands.push(normalizeBrandRecord(item as BrandRecord, index + 1));
@@ -634,6 +639,7 @@ function normalizeBannerRecord(banner: BannerRecord, fallbackOrder: number): Ban
     active: banner.active !== false,
     intervalSeconds: Number.isFinite(Number(banner.intervalSeconds)) ? Math.max(1, Math.round(Number(banner.intervalSeconds))) : 5,
     heightPercent: Number.isFinite(Number(banner.heightPercent)) ? Math.max(10, Math.min(100, Math.round(Number(banner.heightPercent)))) : 28,
+    imageCount: Number.isFinite(Number(banner.imageCount)) ? Math.max(0, Math.round(Number(banner.imageCount))) : imageUrls.length,
     sortOrder: meta.homeSortOrder || placement,
     placement: meta.homeSortOrder || placement,
   };
@@ -1114,6 +1120,31 @@ export function getProductDetailPageStructure(id: string | number, options?: Pic
   return getPageStructure(`/api/products/${encodeCatalogSegment(id)}/structure`, options);
 }
 
+export type CatalogSectionData = {
+  type: string;
+  banner: BannerRecord | null;
+  brands: BrandRecord[];
+  categories: CategoryRecord[];
+  group?: { id: string; title: string } | null;
+};
+
+export async function getCatalogSectionData(params: { type: string; id: string }, options?: Pick<GetProductsOptions, "force">): Promise<CatalogSectionData> {
+  const url = withQuery("/api/catalog/section", params);
+  try {
+    const json = await fetchJsonWithBootstrapRetry<{ data?: CatalogSectionData }>(url, { force: options?.force ?? false });
+    const data = json?.data;
+    return {
+      type: data?.type ?? params.type,
+      banner: data?.banner ? normalizeBannerRecord(data.banner, 1) : null,
+      brands: Array.isArray(data?.brands) ? data.brands.map((brand, index) => normalizeBrandRecord(brand, index + 1)) : [],
+      categories: Array.isArray(data?.categories) ? data.categories.map((category, index) => normalizeCategoryRecord(category, index + 1)) : [],
+      group: data?.group ?? null,
+    };
+  } catch {
+    return { type: params.type, banner: null, brands: [], categories: [], group: null };
+  }
+}
+
 export async function getProductPage(
   params?: Record<string, string | number | boolean | null | undefined>,
   options?: GetProductsOptions
@@ -1345,4 +1376,4 @@ export function clearProductsCache() {
   }
 }
 
-export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getProductPage, getShowcaseProducts, getCategoryProducts, getCategoryGroupProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };
+export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getCatalogSectionData, getProductPage, getShowcaseProducts, getCategoryProducts, getCategoryGroupProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };

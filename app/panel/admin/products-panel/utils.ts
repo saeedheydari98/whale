@@ -1,4 +1,3 @@
-import { MIN_LOADING_MS } from "./constants";
 import {
   calculateDiscountPercentValue,
   formatAmount,
@@ -9,13 +8,6 @@ import { normalizeColorStock } from "@/lib/color-counts";
 import type { BannerForm, BrandForm, CatalogLinkGroupForm, CategoryForm, ProductForm, ShowcaseForm } from "./types";
 
 export { normalizeColorStock };
-
-export function waitForMinimumLoading(startedAt: number) {
-  const remaining = MIN_LOADING_MS - (Date.now() - startedAt);
-  return remaining > 0
-    ? new Promise((resolve) => window.setTimeout(resolve, remaining))
-    : Promise.resolve();
-}
 
 function uniqueImageList(values: unknown[]) {
   const seen = new Set<string>();

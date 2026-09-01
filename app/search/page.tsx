@@ -1,50 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
 import { addProductToCart } from "@/lib/cart-client";
 import { isProductAvailable, normalizeColorStock, type ProductRecord } from "@/lib/products-client";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
-import { resolveLoadingItemCount, useLoadingViewportCount } from "@/app/design-system/components/loading/loading-count";
 import { ProductListGrid } from "@/app/products/product-list-grid";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
   const q = (searchParams?.get("q") || "").trim();
-  const [results, setResults] = useState<ProductRecord[] | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [pageSize, setPageSize] = useState(0);
   const [cartMessage, setCartMessage] = useState("");
   useTransientAppMessage(cartMessage);
-  const viewportProductCount = useLoadingViewportCount("product-grid");
-  const resolvedResults = Array.isArray(results) ? results : [];
-  const loadingCount = loading ? resolveLoadingItemCount(resolvedResults.length || undefined, viewportProductCount) : 0;
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!q) {
-      setResults(null);
-      setLoading(false);
-      return;
-    }
-
-    (async () => {
-      setLoading(true);
-      try {
-        const data = await fetchJsonDeduped<any>(`/api/products/search?q=${encodeURIComponent(q)}&limit=24`);
-        if (data?.ok === false) throw new Error(data?.error || "جست‌وجو ناموفق بود");
-        const items = data?.data?.products?.items;
-        if (!cancelled) setResults(Array.isArray(items) ? items : []);
-      } catch {
-        if (!cancelled) setResults([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [q]);
+  const resultsQuery = useInfiniteQuery({
+    queryKey: ["catalog", "search", q, pageSize],
+    queryFn: async ({ pageParam }) => {
+      const data = await fetchJsonDeduped<any>(`/api/products/search?q=${encodeURIComponent(q)}&page=${pageParam}&limit=${Math.max(1, pageSize)}`);
+      if (data?.ok === false) throw new Error(data?.error || "جست‌وجو ناموفق بود");
+      return data?.data?.products;
+    },
+    enabled: Boolean(q) && pageSize > 0,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const pagination = lastPage?.pagination;
+      return pagination?.page < pagination?.totalPages ? pagination.page + 1 : undefined;
+    },
+  });
+  const pages = resultsQuery.data?.pages ?? [];
+  const resolvedResults = useMemo(
+    () => pages.flatMap((page) => Array.isArray(page?.items) ? page.items as ProductRecord[] : []),
+    [pages]
+  );
+  const totalResults = Number(pages[pages.length - 1]?.pagination?.total ?? pages[0]?.pagination?.total);
+  const loading = Boolean(q) && (pageSize === 0 || resultsQuery.isLoading);
+  const loadMore = useCallback(() => {
+    if (resultsQuery.hasNextPage && !resultsQuery.isFetchingNextPage) void resultsQuery.fetchNextPage();
+  }, [resultsQuery]);
 
   const addToCart = async (product: ProductRecord) => {
     if (!isProductAvailable(product)) {
@@ -75,12 +70,16 @@ export default function SearchPage() {
           <ProductListGrid
             products={resolvedResults}
             loading={loading}
-            loadingCount={loadingCount}
+            loadingMore={resultsQuery.isFetchingNextPage}
+            totalProducts={Number.isFinite(totalResults) ? totalResults : undefined}
+            hasMore={Boolean(resultsQuery.hasNextPage)}
+            onLoadMore={loadMore}
+            onCapacityChange={setPageSize}
             onAddToCart={(product) => void addToCart(product)}
           />
         ) : null}
 
-        {!loading && results && results.length === 0 ? (
+        {!loading && resultsQuery.data && resolvedResults.length === 0 ? (
           <CustomEmptyState description="نتیجه‌ای با این جست‌وجو پیدا نشد." />
         ) : null}
       </section>

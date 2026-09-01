@@ -316,11 +316,10 @@ export async function searchProducts(searchParams: URLSearchParams, extra: Recor
 export async function getOrCreateActiveCart(userId: number) {
   let profile = await prisma.customerProfile.findFirst({ where: { userId } });
   if (!profile) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
     profile = await prisma.customerProfile.create({
       data: {
         userId,
-        firstName: user?.name || "User",
+        firstName: "",
         lastName: "",
         phone: "",
       },

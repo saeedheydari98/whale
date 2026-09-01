@@ -887,6 +887,49 @@ export const openApiDocument = {
           trackingCode: { type: "string" },
         },
       },
+      AdminPanelStructure: {
+        type: "object",
+        properties: {
+          products: { type: "integer" },
+          orders: { type: "integer" },
+          users: { type: "integer" },
+          banners: { type: "integer" },
+          showcases: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                count: { type: "integer" },
+              },
+              required: ["id", "count"],
+            },
+          },
+          categoryGroups: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                count: { type: "integer" },
+              },
+              required: ["id", "count"],
+            },
+          },
+          brandGroups: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                count: { type: "integer" },
+              },
+              required: ["id", "count"],
+            },
+          },
+        },
+        required: ["products", "orders", "users", "banners", "showcases", "categoryGroups", "brandGroups"],
+      },
       AdminDashboard: {
         type: "object",
         properties: {
@@ -1697,6 +1740,42 @@ export const openApiDocument = {
         summary: "List current user's orders",
         operationId: "listUserOrders",
         data: listData("orders", "Order"),
+        security: authSecurity,
+      }),
+    },
+    "/api/admin/catalog/structure": {
+      get: operation({
+        tags: ["Admin"],
+        summary: "Get admin panel structure counts",
+        description: "Tiny count-only payload fetched as soon as the admin panel opens. Collections skeleton min(count, viewportFit) from this response.",
+        operationId: "getAdminCatalogStructure",
+        data: {
+          type: "object",
+          properties: {
+            structure: ref("AdminPanelStructure"),
+          },
+          required: ["structure"],
+        },
+        security: authSecurity,
+      }),
+    },
+    "/api/admin/catalog/{section}": {
+      get: operation({
+        tags: ["Admin"],
+        summary: "Get a paged admin catalog section",
+        description: "Pass limit and offset from the viewport capacity. Omit them only for product-form and all snapshots used by save/edit flows.",
+        operationId: "getAdminCatalogSection",
+        parameters: [
+          pathParam("section", "Admin catalog section."),
+          queryParam("limit", "Viewport-sized page size.", { type: "integer", minimum: 1, maximum: 100 }),
+          queryParam("offset", "Number of already loaded items to skip.", { type: "integer", minimum: 0 }),
+        ],
+        data: {
+          type: "object",
+          properties: {
+            catalog: { type: "object" },
+          },
+        },
         security: authSecurity,
       }),
     },

@@ -76,18 +76,14 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
   const userPhone = getUserPhone(authUser, undefined, { fallbackToUsername: true });
 
   return (
+    <Loading loading="skeleton-structure" isLoading={checkingUser}>
     <section className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-primary-border bg-primary-card p-6 shadow-sm">
       <div className="flex flex-col gap-1">
         <div className="text-xl font-bold text-primary-text">دسترسی مدیریت</div>
         <div className="text-sm text-secondary-text">درخواستتان پس از تأیید مدیر ارشد فعال می‌شود.</div>
       </div>
 
-      {checkingUser ? (
-        <div className="flex items-center gap-2 rounded-md border border-primary-border bg-primary-base px-3 py-2 text-sm font-semibold text-primary-text">
-          <Loading loading="dots" size="md" />
-          <span>در حال بررسی حساب کاربری</span>
-        </div>
-      ) : authUser ? (
+      {authUser ? (
         <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3">
           <div className="flex flex-col gap-1">
             <span className="text-sm font-bold text-primary-text">درخواست مدیریت</span>
@@ -120,5 +116,6 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
       )}
 
     </section>
+    </Loading>
   );
 }

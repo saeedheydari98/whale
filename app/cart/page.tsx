@@ -10,6 +10,7 @@ import { CustomInput } from "../design-system/components/ui/input";
 import { EmailOtpAuthForm } from "../design-system/components/ui/email-otp-auth-form";
 import { ImagePreview } from "../design-system/components/ui/image-preview";
 import { CustomModal } from "../design-system/components/ui/modal";
+import { startRouteLoading } from "../design-system/components/loading/loading";
 import {
   CART_UPDATED_EVENT,
   clearCart as clearCartData,
@@ -250,6 +251,7 @@ export default function CartPage() {
     }
 
     if (!savedProfile || !isUserProfileComplete(savedProfile)) {
+      startRouteLoading();
       router.push("/panel/user?returnTo=cart");
       return;
     }
@@ -273,6 +275,7 @@ export default function CartPage() {
     setAuthUser(verifiedUser);
 
     if (!profileComplete) {
+      startRouteLoading();
       router.push("/panel/user?returnTo=cart");
       return;
     }
@@ -285,6 +288,7 @@ export default function CartPage() {
     const checkoutProfile = savedProfile ?? accountCart.profile;
 
     if (!checkoutProfile || !isUserProfileComplete(checkoutProfile)) {
+      startRouteLoading();
       router.push("/panel/user?returnTo=cart");
       return;
     }

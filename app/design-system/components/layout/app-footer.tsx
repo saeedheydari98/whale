@@ -15,6 +15,7 @@ import { getCart } from "@/lib/cart-client";
 import { readUserProfile, USER_PROFILE_UPDATED_EVENT, type UserProfile } from "@/lib/user-profile";
 import { EmailOtpAuthForm } from "../ui/email-otp-auth-form";
 import { CustomModal } from "../ui/modal";
+import { startRouteLoading } from "../loading/loading";
 import {
   AccountButton,
   syncStoredProfileFromUser,
@@ -55,6 +56,7 @@ export function AppFooter() {
 
   const openAccount = () => {
     if (authUser ?? readCachedAuthUser()) {
+      startRouteLoading();
       router.push("/panel/user");
       return;
     }
@@ -169,7 +171,10 @@ export function AppFooter() {
               const nextUserData = await refreshAppUser({ force: true });
               setAccountProfile(syncStoredProfileFromUser(nextUserData.user ?? user) ?? readUserProfile());
               await getCart();
-              if (!profileComplete) router.push("/panel/user");
+              if (!profileComplete) {
+                startRouteLoading();
+                router.push("/panel/user");
+              }
               router.refresh();
             }}
           />

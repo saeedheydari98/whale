@@ -362,6 +362,12 @@ html[data-theme-ready="false"] [data-app-shell] {
   visibility: hidden;
 }
 
+html[data-theme-color-ready="false"],
+html[data-theme-color-ready="false"] body {
+  background-color: transparent;
+}
+
+/* Whale stays unpainted until theme colors are on :root. Do not make this visible by default. */
 [data-theme-boot-loader] {
   background-color: var(--bg-base);
   display: flex;
@@ -370,6 +376,10 @@ html[data-theme-ready="false"] [data-app-shell] {
 
 html[data-theme-color-ready="true"] [data-theme-boot-loader] {
   visibility: visible;
+}
+
+html[data-theme-color-ready="false"] .whale-loader-surface {
+  visibility: hidden;
 }
 
 .whale-loader-surface {

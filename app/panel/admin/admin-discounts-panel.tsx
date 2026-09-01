@@ -13,6 +13,7 @@ import { AdminUserCompactRow, adminUserMatchesSearch, getAdminUserTitle } from "
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount, readFormattedPriceNumber } from "@/lib/price-format";
 import { NOTIFICATION_SILENT_HEADER } from "@/lib/app-notifications";
+import Loading from "@/app/design-system/components/loading/loading";
 
 type AudienceType = "new_users" | "purchase_count" | "purchase_amount";
 type DiscountType = "percentage" | "free_shipping";
@@ -286,6 +287,7 @@ export function AdminDiscountsPanel() {
   };
 
   return (
+    <Loading loading="skeleton-structure" isLoading={loading && rules.length === 0 && users.length === 0}>
     <section className="flex w-full flex-col gap-3 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
@@ -420,5 +422,6 @@ export function AdminDiscountsPanel() {
         </div>
       </CustomModal>
     </section>
+    </Loading>
   );
 }

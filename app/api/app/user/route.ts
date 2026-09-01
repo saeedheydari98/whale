@@ -117,7 +117,7 @@ async function saveThemeMode(request: Request, value: unknown) {
     if (!authUser) return apiFail("برای ذخیره حالت نمایش باید وارد حساب شوید.", 401);
 
     await prisma.$executeRaw`
-      UPDATE "User"
+      UPDATE "users"
       SET "themeMode" = ${value}, "updatedAt" = CURRENT_TIMESTAMP
       WHERE "id" = ${authUser.id}
     `;

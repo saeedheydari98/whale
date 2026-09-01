@@ -67,4 +67,5 @@ export type Banner = {
   categorySortOrder?: number | string;
   productSortOrder?: number | string;
   sortOrder: number;
+  imageCount?: number;
 };

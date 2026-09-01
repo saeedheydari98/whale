@@ -61,11 +61,18 @@ async function normalizeRole<T extends { id: number; username: string | null; ro
 }
 
 async function findIdentityUser(identity: AuthIdentity, tx: Prisma.TransactionClient | typeof prisma = prisma) {
-  const [phoneUser, emailUser, matchingProfiles] = await Promise.all([
+  const [phoneUser, emailUsers, matchingProfiles] = await Promise.all([
     tx.user.findUnique({ where: { username: identity.phone } }),
-    tx.user.findUnique({ where: { email: identity.email } }),
+    tx.user.findMany({
+      where: { email: { equals: identity.email, mode: "insensitive" } },
+      take: 2,
+    }),
     tx.customerProfile.findMany({
-      where: { phone: identity.phone, email: identity.email, userId: { not: null } },
+      where: {
+        phone: identity.phone,
+        email: { equals: identity.email, mode: "insensitive" },
+        userId: { not: null },
+      },
       select: { user: true },
       take: 2,
     }),
@@ -74,18 +81,18 @@ async function findIdentityUser(identity: AuthIdentity, tx: Prisma.TransactionCl
   const profileUsers = matchingProfiles.flatMap((profile) => profile.user ? [profile.user] : []);
   const candidateIds = new Set([
     ...(phoneUser ? [phoneUser.id] : []),
-    ...(emailUser ? [emailUser.id] : []),
+    ...emailUsers.map((user) => user.id),
     ...profileUsers.map((user) => user.id),
   ]);
   if (candidateIds.size > 1) {
     throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
   }
 
-  const user = phoneUser ?? emailUser ?? profileUsers[0] ?? null;
+  const user = phoneUser ?? emailUsers[0] ?? profileUsers[0] ?? null;
   if (!user) return null;
 
   const profileMatchesUser = profileUsers.some((profileUser) => profileUser.id === user.id);
-  const emailProvesUser = emailUser?.id === user.id;
+  const emailProvesUser = emailUsers.some((emailUser) => emailUser.id === user.id);
   if (user.username && user.username !== identity.phone && !profileMatchesUser && !emailProvesUser) {
     throw new AuthIdentityConflictError("شماره موبایل و ایمیل متعلق به یک حساب نیستند.");
   }
