@@ -18,6 +18,7 @@ import { clearLocalCartSnapshot } from "@/lib/cart-client";
 import { formatPersianDate } from "@/lib/date-format";
 import type { OrderStatusEventRecord } from "@/lib/order-status";
 import { formatAmount } from "@/lib/price-format";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { clearUserProfile } from "@/lib/user-profile";
 import { UserProfilePanel } from "./user-profile-panel";
 import { UserDiscountsPanel } from "./user-discounts-panel";
@@ -149,7 +150,7 @@ function UserOrdersPanel({ totalCount }: { totalCount?: number }) {
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-col gap-1">
         <Loading loading="skeleton-item" isLoading={loading}>
-          <div className="text-base font-bold text-primary-text">سفارش ها</div>
+          <AppHeading level={2} className="text-base font-bold text-primary-text">سفارش ها</AppHeading>
         </Loading>
         <Loading loading="skeleton-item" isLoading={loading}>
           <span className="text-sm text-primary-text">
@@ -240,7 +241,7 @@ function UserOrderCard({ order, onSelect, onPreview }: {
               {item.imageUrl ? <AppImage src={item.imageUrl} alt={item.title} width={112} height={112} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
             </button>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
+              <AppHeading level={3} className="truncate text-sm font-bold text-primary-text">{item.title}</AppHeading>
               <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
               <span className="text-xs font-semibold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
             </div>
@@ -357,7 +358,7 @@ export default function UserPanelPage() {
     <main className="min-h-full bg-primary-base p-6 text-primary-text">
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="text-2xl text-primary-text font-bold">حساب کاربری</div>
+          <AppHeading level={1} className="text-2xl text-primary-text font-bold">حساب کاربری</AppHeading>
           {appUserData?.user ? (
             <CustomButton
               size="sm"

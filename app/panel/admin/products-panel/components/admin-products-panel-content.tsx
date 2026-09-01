@@ -5,6 +5,7 @@ import { useTransientAppMessage } from "@/app/design-system/components/feedback/
 import { AdminBannerList } from "./admin-banner-list";
 import { AdminShowcaseList } from "./admin-showcase-list";
 import { SECTION_COUNT_LABELS, SECTION_TITLES } from "../constants";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import type { AdminCatalogSection, BannerForm } from "../types";
 import type { AdminProductsPanelState } from "../hooks/use-admin-products-panel";
 import { BannerModals } from "./banner-modals";
@@ -57,7 +58,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
     <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
         <Loading loading="skeleton-item" isLoading={panel.loading}>
-          <div className="text-base font-bold text-primary-text">{SECTION_TITLES[section]}</div>
+          <AppHeading level={2} className="text-base font-bold text-primary-text">{SECTION_TITLES[section]}</AppHeading>
         </Loading>
         <Loading loading="skeleton-item" isLoading={panel.loading}>
           <span className="text-xs font-semibold text-primary-text">

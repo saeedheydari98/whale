@@ -9,6 +9,7 @@ import {
   IoTrashOutline,
 } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
@@ -93,7 +94,7 @@ export function AdminSecurityPanel() {
     <Loading loading="skeleton-structure" isLoading={loading}>
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-bg p-4 text-primary-text">
       <div className="flex flex-col gap-1">
-        <div className="text-base font-bold text-primary-text">دسترسی مدیریت</div>
+        <AppHeading level={2} className="text-base font-bold text-primary-text">دسترسی مدیریت</AppHeading>
         <div className="text-sm text-primary-text">
           درخواست‌ها را بررسی کنید و دسترسی‌های فعال را لغو کنید.
         </div>
@@ -121,7 +122,7 @@ export function AdminSecurityPanel() {
           </div>
           <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex flex-col gap-1">
-                <div className="text-sm font-bold text-primary-text">درخواست‌های جدید</div>
+                <AppHeading level={3} className="text-sm font-bold text-primary-text">درخواست‌های جدید</AppHeading>
                 <span className="text-xs text-secondary-text">
                   درخواست‌های ورود به پنل مدیریت.
                 </span>
@@ -167,7 +168,7 @@ export function AdminSecurityPanel() {
 
           <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex flex-col gap-1">
-                <div className="text-sm font-bold text-primary-text">دسترسی‌های فعال</div>
+                <AppHeading level={3} className="text-sm font-bold text-primary-text">دسترسی‌های فعال</AppHeading>
                 <span className="text-xs text-secondary-text">
                   کاربران دارای دسترسی مدیریت.
                 </span>
@@ -205,7 +206,7 @@ export function AdminSecurityPanel() {
             <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
               <div className="flex items-center gap-2">
                 <IoShieldCheckmarkOutline aria-hidden="true" />
-                <div className="text-sm font-bold text-primary-text">سوابق درخواست‌ها</div>
+                <AppHeading level={3} className="text-sm font-bold text-primary-text">سوابق درخواست‌ها</AppHeading>
               </div>
               <div className="flex flex-col gap-2">
                 {archivedRequests.map((request) => (

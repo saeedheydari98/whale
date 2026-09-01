@@ -17,8 +17,9 @@ Installed Vercel skills live in `.agents/skills/` and should be applied when rel
 
 ## Shared UI Rules
 
-- Put every visible text node inside `div` or `span` only. Do not use `p` or `h1`-`h6` anywhere in project UI.
-- Control typography with explicit Tailwind `text-*` and `font-*` classes instead of semantic text tags.
+- Body copy and chrome stay in `div` or `span`. Do not use `p`.
+- Page, section, and item titles use `AppHeading` from `app/design-system/components/ui/text.tsx`. Do not write raw `h1`–`h6`. Pass explicit Tailwind `text-*` and `font-*` classes; do not rely on browser heading size.
+- One `level={1}` per page. `level={2}` for major sections. `level={3}` for repeated item titles. Never put a heading inside a `button` or `a`. Header/footer brand is not a page `h1`.
 - Build layout with flexbox and `gap-*`.
 - Preserve the existing visual appearance unless the user explicitly asks for a design change.
 - Prefer avoiding grid, left/right margin, left/right padding, and positioning in new or refactored code, but do not remove them when they are part of the current visual spacing, alignment, overlay behavior, or responsive layout.

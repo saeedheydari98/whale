@@ -1,6 +1,6 @@
 # SEO And Security
 
-Use this file with the project skill. Keep visible UI in `div`/`span`. Do not introduce `p` or `h1`–`h6`. Keep the loading and theme-boot contracts unchanged.
+Use this file with the project skill. Keep body copy and chrome in `div`/`span`. Page/section/item titles use `AppHeading` (`app/design-system/components/ui/text.tsx`). Do not use `p` or raw unstyled `h1`–`h6`. Keep the loading and theme-boot contracts unchanged.
 
 ## SEO
 
@@ -22,6 +22,15 @@ Every public route needs:
 - at most 10 `keywords`
 
 Helpers: `pageMetadata`, `lib/site.ts`, `lib/seo-catalog.ts`. Use product `metaTitle` / `metaDescription` / `metaKeywords` when present.
+
+### Headings
+
+- Import `AppHeading`. Never invent a second heading helper or write raw `h1`–`h6`.
+- One `level={1}` per page. `level={2}` major sections. `level={3}` repeated item titles. Nested titles under an item heading may use `level={4}`.
+- Keep the existing visual classes (`text-*`, `font-*`). Appearance must not change.
+- Do not turn prices, counts, buttons, tabs, OTP, wallet balance, empty states, or header/footer chrome into headings.
+- Never put a heading inside a `button` or `a` (invalid HTML). Accordion page titles belong in the `heading` slot, which is a sibling of the toggle button.
+- `CustomModal` titles are `h2` and label the dialog with `aria-labelledby`.
 
 ### JSON-LD
 
@@ -73,4 +82,4 @@ Helpers: `pageMetadata`, `lib/site.ts`, `lib/seo-catalog.ts`. Use product `metaT
 
 ### Loading and CLS
 
-SEO work must not bypass the loading contract: whale until structure, then skeletons sized from structure counts. `AppImage` width/height exist to keep CLS under 0.1. Do not add page-local spinners or heading tags to “fix” SEO.
+SEO work must not bypass the loading contract: whale until structure, then skeletons sized from structure counts. `AppImage` width/height exist to keep CLS under 0.1. Do not add page-local spinners. Headings go through `AppHeading` so skeleton measurement still treats them as last-layer text.

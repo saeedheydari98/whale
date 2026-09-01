@@ -3,6 +3,7 @@
 import { IoAdd } from "react-icons/io5";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import type { AdminCountItem } from "@/lib/admin-structure";
 import type { BrandForm, CatalogLinkGroupForm, CategoryForm, ProductForm } from "../types";
@@ -79,7 +80,7 @@ export function CategoriesSection({
       <div className="flex w-full flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <div className="text-sm font-bold text-primary-text">{group.title}</div>
+              <AppHeading level={3} className="text-sm font-bold text-primary-text">{group.title}</AppHeading>
               <span className="text-xs text-secondary-text">{groupTotal ?? visibleGroupCategories.length} دسته بندی</span>
             </div>
           <div className="flex flex-wrap gap-2">
@@ -269,7 +270,7 @@ export function BrandsSection({
       <div className="flex w-full flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
-              <div className="text-sm font-bold text-primary-text">{group.title}</div>
+              <AppHeading level={3} className="text-sm font-bold text-primary-text">{group.title}</AppHeading>
               <span className="text-xs text-secondary-text">{groupTotal ?? visibleGroupBrands.length} برند</span>
             </div>
           <div className="flex flex-wrap gap-2">

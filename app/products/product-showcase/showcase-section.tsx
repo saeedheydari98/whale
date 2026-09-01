@@ -11,6 +11,7 @@ import { CustomButton } from "../../design-system/components/ui/button";
 import { AppImage } from "../../design-system/components/ui/app-image";
 import ShowcaseLink from "../../design-system/components/ui/ShowcaseLink";
 import { CustomTag } from "../../design-system/components/ui/tag";
+import { AppHeading, type AppHeadingLevel } from "../../design-system/components/ui/text";
 import { isProductAvailable } from "@/lib/products-client";
 import type { Product, Showcase } from "./types";
 
@@ -31,6 +32,7 @@ type ShowcaseSectionProps = {
 type ProductShowcaseCardProps = {
   product?: Product;
   isLoading?: boolean;
+  titleLevel?: AppHeadingLevel;
   onAddToCart: (product: Product) => void;
   onPreview?: (imageUrl?: string) => void;
   formatPrice: (value?: string) => string;
@@ -49,6 +51,7 @@ function getPrimaryProductImage(product?: Product) {
 export function ProductShowcaseCard({
   product,
   isLoading = false,
+  titleLevel = 3,
   onAddToCart,
   onPreview,
   formatPrice,
@@ -90,7 +93,7 @@ export function ProductShowcaseCard({
         </button>
 
         <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="line-clamp-1 text-sm font-bold">{productTitle}</div>
+          <AppHeading level={titleLevel} className="line-clamp-1 text-sm font-bold">{productTitle}</AppHeading>
           <div className="flex items-center justify-between gap-2">
             <div className="flex flex-col gap-1">
               {product?.originalPrice && discountPercent > 0 && !isLoading ? (
@@ -168,7 +171,7 @@ export function ShowcaseSection({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Loading loading="skeleton-item" isLoading={isLoading}>
-            <div className="text-xl font-bold">{showcase.title || "ویترین بدون عنوان"}</div>
+            <AppHeading level={2} className="text-xl font-bold">{showcase.title || "ویترین بدون عنوان"}</AppHeading>
           </Loading>
         </div>
         <div className="flex items-center gap-2">

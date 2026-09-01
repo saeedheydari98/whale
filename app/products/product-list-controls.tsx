@@ -9,6 +9,7 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { formatAmount, numericTextValue as numericFilterValue, readPriceNumberWithFallback as readPriceNumber } from "@/lib/price-format";
 
 export type ProductFilterState = {
@@ -266,7 +267,7 @@ export function ProductListShell({
           heading={(
             <div className="flex min-w-0 flex-col gap-0.5">
               <Loading loading="skeleton-item" isLoading={headerLoading}>
-                <div className="truncate text-xl font-bold sm:text-2xl">{title || "محصولات"}</div>
+                <AppHeading level={1} className="truncate text-xl font-bold sm:text-2xl">{title || "محصولات"}</AppHeading>
               </Loading>
               <Loading loading="skeleton-item" isLoading={headerLoading}>
                 <span className="text-[11px] font-semibold text-secondary-text sm:text-xs">{count} محصول</span>

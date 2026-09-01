@@ -5,6 +5,7 @@ import { IoShieldCheckmarkOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { EmailOtpAuthForm } from "@/app/design-system/components/ui/email-otp-auth-form";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { requestAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, setCachedAuthUser, type AuthClientUser } from "@/lib/auth-client";
@@ -79,7 +80,7 @@ export function AdminAccessPanel({ onUnlock }: AdminAccessPanelProps) {
     <Loading loading="skeleton-structure" isLoading={checkingUser}>
     <section className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-primary-border bg-primary-card p-6 shadow-sm">
       <div className="flex flex-col gap-1">
-        <div className="text-xl font-bold text-primary-text">دسترسی مدیریت</div>
+        <AppHeading level={1} className="text-xl font-bold text-primary-text">دسترسی مدیریت</AppHeading>
         <div className="text-sm text-secondary-text">درخواستتان پس از تأیید مدیر ارشد فعال می‌شود.</div>
       </div>
 

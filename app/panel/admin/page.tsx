@@ -23,6 +23,7 @@ import { AdminSecurityPanel } from "@/app/panel/admin/admin-security-panel";
 import { AdminUsersPanel } from "@/app/panel/admin/admin-users-panel";
 import { AdminDiscountsPanel } from "@/app/panel/admin/admin-discounts-panel";
 import { AdminOrdersPanel } from "@/app/panel/admin/admin-orders-panel";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { getAdminPanelStructure, type AdminPanelStructure } from "@/lib/admin-structure";
 import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
@@ -137,7 +138,7 @@ export default function AdminPanelPage() {
         <Loading loading="skeleton-structure" isLoading>
           <div className="flex w-full flex-col gap-6">
             <section className="flex flex-col gap-4">
-              <div className="text-primary text-2xl font-bold">پنل مدیریت</div>
+              <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
               <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
             </section>
           </div>
@@ -145,7 +146,7 @@ export default function AdminPanelPage() {
       ) : hasAdminAccess ? (
         <div className="flex w-full flex-col gap-6">
           <section className="flex flex-col gap-4">
-            <div className="text-primary text-2xl font-bold">پنل مدیریت</div>
+            <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
             <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
           </section>
 

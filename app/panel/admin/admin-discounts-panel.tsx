@@ -13,6 +13,7 @@ import { AdminUserCompactRow, adminUserMatchesSearch, getAdminUserTitle } from "
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount, readFormattedPriceNumber } from "@/lib/price-format";
 import { NOTIFICATION_SILENT_HEADER } from "@/lib/app-notifications";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import Loading from "@/app/design-system/components/loading/loading";
 
 type AudienceType = "new_users" | "purchase_count" | "purchase_amount";
@@ -291,7 +292,7 @@ export function AdminDiscountsPanel() {
     <section className="flex w-full flex-col gap-3 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <div className="text-base font-bold">تخفیف‌ها</div>
+          <AppHeading level={2} className="text-base font-bold">تخفیف‌ها</AppHeading>
           <span className="text-xs text-secondary-text">تنظیم بازگشت وجه، کدهای خودکار و کدهای اختصاصی</span>
         </div>
         <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline aria-hidden="true" />} onClick={() => void load()} isLoading={loading}>

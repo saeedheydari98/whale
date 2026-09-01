@@ -19,6 +19,7 @@ import {
   type ProductsCache,
 } from "@/lib/products-client";
 import { useAppUser } from "@/lib/app-user-context";
+import { AppHeading } from "./design-system/components/ui/text";
 
 function homeCarouselBanner(
   banner: BannerRecord,
@@ -84,7 +85,7 @@ function HomeBrandSection({
     <Loading isLoading={dataLoading}>
       <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xl font-bold">{group.title}</div>
+          <AppHeading level={2} className="text-xl font-bold">{group.title}</AppHeading>
           <span className="text-xs font-semibold text-secondary-text">{group.itemCount ?? brands.length} برند</span>
         </div>
         {!dataLoading && brands.length === 0 ? <CustomEmptyState size="sm" /> : null}
@@ -184,7 +185,7 @@ export default function Home() {
     <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
-          <div className="text-3xl font-bold">{welcomeText}</div>
+          <AppHeading level={1} className="text-3xl font-bold">{welcomeText}</AppHeading>
         </div>
 
         {!structureLoading && displaySections.length === 0 ? <CustomEmptyState /> : null}
@@ -207,7 +208,7 @@ export default function Home() {
                 key={`brands-${section.item.id}`}
                 fallback={
                   <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
-                    <div className="text-xl font-bold">{section.title}</div>
+                    <AppHeading level={2} className="text-xl font-bold">{section.title}</AppHeading>
                     <CategoryOption label="برند" size="lg" className="min-w-28 shrink-0" />
                   </div>
                 }

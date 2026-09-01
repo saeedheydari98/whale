@@ -4,6 +4,7 @@ import { IoCreateOutline, IoImageOutline, IoTrashOutline } from "react-icons/io5
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import type { AdminCountItem } from "@/lib/admin-structure";
 import type { ProductForm, ShowcaseForm } from "../types";
@@ -65,7 +66,7 @@ function ShowcaseCard({ showcase, products, isLoading, productCount, onEditShowc
   return (
     <div className="flex w-full flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
-        <div className="text-xl font-bold text-primary-text">{showcase.title || "ویترین بدون عنوان"}</div>
+        <AppHeading level={3} className="text-xl font-bold text-primary-text">{showcase.title || "ویترین بدون عنوان"}</AppHeading>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <span className="text-xs font-semibold text-primary-text">{Math.max(products.length, knownProductCount)} محصول</span>
           <CustomButton variant="edit" rounded="full" size="sm" icon={<IoCreateOutline />} disabled={isLoading} onClick={() => onEditShowcase(showcase)}><span>ویرایش</span></CustomButton>
@@ -100,7 +101,7 @@ function ShowcaseProductCard({ product, index, showcase, onReorderProducts, onPr
           {product.imageUrl ? <AppImage src={product.imageUrl} alt={product.title || `محصول ${index + 1}`} width={96} height={96} className="h-full w-full object-cover" /> : <IoImageOutline className="text-3xl text-primary" aria-hidden="true" />}
         </button>
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="line-clamp-1 text-xs font-bold text-primary-text">{product.title || `محصول ${index + 1}`}</div>
+          <AppHeading level={4} className="line-clamp-1 text-xs font-bold text-primary-text">{product.title || `محصول ${index + 1}`}</AppHeading>
           <div className="text-xs font-semibold text-primary">{formatPrice(product.discountPrice || product.price) || "بدون قیمت"}</div>
         </div>
       </div>

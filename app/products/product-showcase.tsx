@@ -14,6 +14,7 @@ import { getCatalogSectionData, getProducts, getProductsPageStructure, getShowca
 import { LazyViewport, useStructureRouteLoading } from "../design-system/components/loading/loading";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { ImagePreview } from "../design-system/components/ui/image-preview";
+import { AppHeading } from "../design-system/components/ui/text";
 import { BannerCarousel } from "./product-showcase/banner-carousel";
 import { ShowcaseSection } from "./product-showcase/showcase-section";
 import type { Banner, Product, Showcase } from "./product-showcase/types";
@@ -357,7 +358,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
     <Root className="min-h-full bg-primary-base text-primary-text">
       <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex flex-col gap-2 border-b border-primary-border pb-4">
-          <div className="text-3xl font-bold">ویترین محصولات فروشگاه وال</div>
+          <AppHeading level={1} className="text-3xl font-bold">ویترین محصولات فروشگاه وال</AppHeading>
         </div>
 
         {!structureLoading && mode === "products" && sortedProducts.length === 0 ? (

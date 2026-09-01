@@ -7,6 +7,7 @@ import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state"
 import { useAppNotification, useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { formatPersianDate } from "@/lib/date-format";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 
 type WalletCode = { id: string; name: string; code: string; type: string; percent?: number | null; expiresAt: string; usedAt?: string | null };
 
@@ -65,7 +66,7 @@ export function UserDiscountsPanel({ totalCount }: { totalCount?: number }) {
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-col gap-1">
         <Loading loading="skeleton-item" isLoading={loading}>
-          <div className="text-base font-bold text-primary-text">کدهای تخفیف</div>
+          <AppHeading level={2} className="text-base font-bold text-primary-text">کدهای تخفیف</AppHeading>
         </Loading>
         <Loading loading="skeleton-item" isLoading={loading}>
           <span className="text-sm text-secondary-text">کدهای فعال را کپی کنید و هنگام پرداخت استفاده کنید.</span>
@@ -94,7 +95,7 @@ export function UserDiscountsPanel({ totalCount }: { totalCount?: number }) {
 function DiscountCodeCard({ code, onCopy }: { code: WalletCode; onCopy: () => void }) {
   return (
     <div className="flex min-w-56 flex-col gap-1 rounded-md border border-primary-border bg-primary-base p-3">
-      <span className="truncate text-sm font-bold text-primary-text">{code.name}</span>
+      <AppHeading level={3} className="truncate text-sm font-bold text-primary-text">{code.name}</AppHeading>
       <span className="flex items-center justify-between gap-2">
         <span dir="ltr" translate="no" className="text-lg font-bold tracking-[0.3em] text-primary">{code.code}</span>
         <CustomButton size="sm" variant="neutral" icon={<IoCopyOutline aria-hidden="true" />} onClick={onCopy}>

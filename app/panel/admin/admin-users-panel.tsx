@@ -10,6 +10,7 @@ import { AdminUserCompactRow, adminUserMatchesSearch } from "@/app/panel/admin/a
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount } from "@/lib/price-format";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 
 type AdminUser = {
   id: number;
@@ -73,7 +74,7 @@ export function AdminUsersPanel({ totalCount }: AdminUsersPanelProps) {
     <section className="flex w-full flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <div className="text-base font-bold text-primary-text">کاربران</div>
+          <AppHeading level={2} className="text-base font-bold text-primary-text">کاربران</AppHeading>
           <span className="text-xs text-secondary-text">{filteredUsers.length} از {Math.max(users.length, Number(totalCount) || 0)} حساب کاربری</span>
         </div>
         <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void load()} isLoading={loading}>

@@ -21,6 +21,8 @@ type ProductListGridProps = {
   onPreview?: (imageUrl?: string) => void;
 };
 
+const LISTING_PRODUCT_TITLE_LEVEL = 2;
+
 export function ProductListGrid({
   products,
   loading,
@@ -48,6 +50,7 @@ export function ProductListGrid({
         <Loading loading="skeleton-structure" isLoading>
           <ProductShowcaseCard
             isLoading
+            titleLevel={LISTING_PRODUCT_TITLE_LEVEL}
             onAddToCart={onAddToCart}
             onPreview={onPreview}
             formatPrice={formatPrice}
@@ -59,6 +62,7 @@ export function ProductListGrid({
       renderItem={(product) => (
         <ProductShowcaseCard
           product={product}
+          titleLevel={LISTING_PRODUCT_TITLE_LEVEL}
           onAddToCart={onAddToCart}
           onPreview={onPreview}
           formatPrice={formatPrice}

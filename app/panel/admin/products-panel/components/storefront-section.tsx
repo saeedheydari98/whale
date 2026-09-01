@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { STOREFRONT_TABS } from "../constants";
 import type { BannerForm, ShowcaseForm, StorefrontDisplayEntry, StorefrontLayoutTab } from "../types";
 import { storefrontKey } from "../utils";
@@ -96,7 +97,7 @@ function StorefrontEntryRow({
       }`}
     >
       <div className="flex flex-col gap-1">
-        <div className="text-sm font-bold text-primary-text">{entry.item?.title || entryFallbackTitle(entry.type)}</div>
+        <AppHeading level={3} className="text-sm font-bold text-primary-text">{entry.item?.title || entryFallbackTitle(entry.type)}</AppHeading>
         <span className="text-xs text-secondary-text">{entryFallbackTitle(entry.type)}</span>
       </div>
       <StorefrontOrderInput

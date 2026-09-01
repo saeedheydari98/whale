@@ -15,6 +15,7 @@ import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUS_LABELS, type OrderStatusEventRecord } from "@/lib/order-status";
 import { formatAmount, toLatinDigits } from "@/lib/price-format";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 
 type AdminOrderItem = {
   id: string;
@@ -203,7 +204,7 @@ export function AdminOrdersPanel({ totalCount }: { totalCount?: number }) {
     <section className="flex w-full flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <div className="text-base font-bold text-primary-text">سفارش‌ها</div>
+          <AppHeading level={2} className="text-base font-bold text-primary-text">سفارش‌ها</AppHeading>
           <span className="text-xs font-semibold text-secondary-text">{Math.max(visibleOrders.length, Number(totalCount) || 0)} سفارش</span>
         </div>
         <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void loadOrders(true)} isLoading={loading}><span>به‌روزرسانی</span></CustomButton>

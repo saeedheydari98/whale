@@ -8,7 +8,7 @@ alwaysApply: true
 Follow `AGENTS.md` and `.agents/skills/next-project-guidelines/SKILL.md`.
 
 - This project uses Next.js 16. Read relevant docs in `node_modules/next/dist/docs/` before writing Next.js-specific code.
-- Keep every visible UI text node in `div` or `span` only. Do not use `p` or `h1`-`h6`.
+- Keep body copy and chrome in `div` or `span` only. Do not use `p`. Page/section/item titles use `AppHeading` (`app/design-system/components/ui/text.tsx`); do not write raw `h1`–`h6`. One `h1` per page.
 - Set typography with explicit `text-*` and `font-*` classes.
 - Preserve the existing visual appearance when refactoring existing UI.
 - Use flexbox and `gap-*` where it does not alter appearance. Avoid grid and left/right margin or padding in new code, but keep them when required for current spacing, alignment, or responsive layout.

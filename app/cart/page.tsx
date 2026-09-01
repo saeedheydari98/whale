@@ -10,6 +10,7 @@ import { CustomInput } from "../design-system/components/ui/input";
 import { EmailOtpAuthForm } from "../design-system/components/ui/email-otp-auth-form";
 import { ImagePreview } from "../design-system/components/ui/image-preview";
 import { AppImage } from "../design-system/components/ui/app-image";
+import { AppHeading } from "../design-system/components/ui/text";
 import { CustomModal } from "../design-system/components/ui/modal";
 import { startRouteLoading } from "../design-system/components/loading/loading";
 import {
@@ -303,7 +304,7 @@ export default function CartPage() {
       <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
         <div className="flex items-center justify-between gap-3 border-b border-primary-border pb-4">
           <div>
-            <div className="text-3xl font-bold">سبد خرید</div>
+            <AppHeading level={1} className="text-3xl font-bold">سبد خرید</AppHeading>
             <div className="text-sm text-secondary-text">{totalItems} کالا در سبد خرید</div>
             {items.length > 0 && (
               <div className="mt-1 text-base font-bold text-primary">
@@ -390,7 +391,7 @@ export default function CartPage() {
                     )}
                   </button>
                   <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <div className="truncate text-sm font-bold">{item.title}</div>
+                    <AppHeading level={2} className="truncate text-sm font-bold">{item.title}</AppHeading>
                     {hasColorStock ? (
                       <div className="flex items-center gap-1.5">
                         <ColorStockDots

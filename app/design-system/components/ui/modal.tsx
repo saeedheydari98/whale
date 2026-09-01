@@ -4,6 +4,7 @@ import React from "react";
 import { createPortal } from "react-dom";
 import { CustomButton } from "./button";
 import { CustomCard } from "./card";
+import { AppHeading } from "./text";
 import { UICommonVariant } from "../../variants/ui.variant";
 import { LoadingVariant } from "../loading/loading";
 import { borderVariants, GradientDirection, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
@@ -47,6 +48,7 @@ export function CustomModal({
   closeOnBackdrop = true,
 }: CustomModalProps) {
   const [mounted, setMounted] = React.useState(false);
+  const titleId = React.useId();
   const overlayColor = "color-mix(in srgb, var(--primary) 8%, transparent)";
 
   React.useEffect(() => {
@@ -63,6 +65,7 @@ export function CustomModal({
       onClick={closeOnBackdrop ? onClose : undefined}
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
     >
       <CustomCard
         variant={variant}
@@ -85,7 +88,7 @@ export function CustomModal({
       >
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-xl font-bold">{title}</div>
+            <AppHeading level={2} id={titleId} className="text-xl font-bold">{title}</AppHeading>
             <CustomButton variant="danger" size="sm" onClick={onClose} disabled={isLoading}>
               {closeText || closeIcon}
             </CustomButton>

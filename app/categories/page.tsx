@@ -7,6 +7,7 @@ import CategoryOption from "@/app/design-system/components/ui/category-option";
 import Loading, { DynamicLoadingCollection, LazyViewport, startRouteLoading, useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { BannerCarousel } from "@/app/products/product-showcase/banner-carousel";
 import type { Banner } from "@/app/products/product-showcase/types";
@@ -85,7 +86,7 @@ function CategoriesGroupSection({
     <Loading isLoading={dataLoading}>
       <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xl font-bold">{group.title}</div>
+          <AppHeading level={2} className="text-xl font-bold">{group.title}</AppHeading>
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-secondary-text">{group.itemCount ?? categories.length} دسته‌بندی</span>
             <CustomButton href={`/categories/group/${encodeURIComponent(group.id)}`} size="sm" rounded="full">
@@ -178,7 +179,7 @@ export default function CategoriesPage() {
     <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-8 px-4 py-8">
         <div className="flex flex-col gap-3 border-b border-primary-border pb-5">
-          <div className="text-3xl font-bold">دسته‌بندی محصولات فروشگاه وال</div>
+          <AppHeading level={1} className="text-3xl font-bold">دسته‌بندی محصولات فروشگاه وال</AppHeading>
         </div>
 
         {!structureLoading && visibleCategories.length === 0 && displaySections.length === 0 ? (
@@ -203,7 +204,7 @@ export default function CategoriesPage() {
                 key={`categories-${section.item.id}`}
                 fallback={
                   <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-soft p-4">
-                    <div className="text-xl font-bold">{section.title}</div>
+                    <AppHeading level={2} className="text-xl font-bold">{section.title}</AppHeading>
                     <CategoryOption label="دسته‌بندی" size="lg" shape="rounded" className="min-w-28 shrink-0" />
                   </div>
                 }

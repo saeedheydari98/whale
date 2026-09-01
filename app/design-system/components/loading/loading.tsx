@@ -181,7 +181,7 @@ function isInViewport(rect: DOMRect) {
   return rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth;
 }
 
-const LAST_LAYER_SELECTOR = "button, a, input, textarea, select, img, [role='button'], [data-loading-leaf]";
+const LAST_LAYER_SELECTOR = "button, a, input, textarea, select, img, h1, h2, h3, h4, h5, h6, [role='button'], [data-loading-leaf]";
 
 function isLastLayerElement(element: HTMLElement) {
   const tag = element.tagName.toLowerCase();
@@ -611,7 +611,7 @@ function SkeletonStructure({
         const sourceStyle = window.getComputedStyle(source);
         const sourceFontSize = numericStyleValue(sourceStyle.fontSize);
         const elements = Array.from(source.querySelectorAll<HTMLElement>(
-          "main, section, article, form, ul, ol, li, div, a, button, img, input, textarea, select, [role='button'], [data-loading-leaf]"
+          "main, section, article, form, ul, ol, li, div, a, button, img, input, textarea, select, h1, h2, h3, h4, h5, h6, [role='button'], [data-loading-leaf]"
         ));
         const accepted = new Map<HTMLElement, SkeletonStructureRect>();
         const lastLayers = new Set<HTMLElement>();

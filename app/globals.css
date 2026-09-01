@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+/* Headings take size/weight from explicit text-* / font-* classes, same as div/span. */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+}
+
 /* =========================
    Base Variables
 ========================= */

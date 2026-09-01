@@ -6,6 +6,7 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 
 export type ProductReview = {
   id: string;
@@ -88,7 +89,7 @@ export function ProductReviewsSection({
       className="flex w-full flex-col gap-8 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm"
     >
       <div className="flex flex-col gap-2 border-b border-primary-border pb-6">
-        <div className="text-2xl font-bold text-primary-text">دیدگاه‌های خریداران</div>
+        <AppHeading level={2} className="text-2xl font-bold text-primary-text">دیدگاه‌های خریداران</AppHeading>
         <div className="text-sm text-secondary-text">
           نظر خریداران و امتیازها را ببینید.
         </div>

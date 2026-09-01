@@ -8,6 +8,7 @@ import { useTransientAppMessage } from "@/app/design-system/components/feedback/
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount } from "@/lib/price-format";
 import Loading from "@/app/design-system/components/loading/loading";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 
 type WalletTransaction = { id: string; amount: number; type: string; createdAt: string };
 type WalletData = { balance: number; transactions: WalletTransaction[] };
@@ -53,7 +54,7 @@ export function UserWalletPanel() {
       <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <div className="text-base font-bold text-primary-text">کیف پول</div>
+          <AppHeading level={2} className="text-base font-bold text-primary-text">کیف پول</AppHeading>
           <span className="text-sm text-secondary-text">اعتبار کیف پول هنگام پرداخت به‌صورت خودکار از مبلغ کم می‌شود.</span>
         </div>
         <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void load()} isLoading={loading}>

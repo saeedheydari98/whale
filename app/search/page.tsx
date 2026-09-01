@@ -9,6 +9,7 @@ import { isProductAvailable, normalizeColorStock, type ProductRecord } from "@/l
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { ProductListGrid } from "@/app/products/product-list-grid";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 
 export default function SearchPage() {
   const searchParams = useSearchParams();
@@ -62,7 +63,7 @@ export default function SearchPage() {
     <main className="min-h-full bg-primary-base text-primary-text">
       <section className="mx-auto w-full px-4 py-8">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-2xl font-bold">نتایج جست‌وجو برای «{q}»</div>
+          <AppHeading level={1} className="text-2xl font-bold">نتایج جست‌وجو برای «{q}»</AppHeading>
         </div>
 
 

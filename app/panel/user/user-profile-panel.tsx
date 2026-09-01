@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { IoSaveOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
@@ -175,7 +176,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
     <Loading loading="skeleton-structure" isLoading={isLoadingUser}>
       <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
       <div className="flex flex-col gap-1">
-        <div className="text-base font-bold text-primary-text">تکمیل پروفایل</div>
+        <AppHeading level={2} className="text-base font-bold text-primary-text">تکمیل پروفایل</AppHeading>
         <div className="text-sm text-secondary-text">پس از ورود، اطلاعات موردنیاز ارسال سفارش را تکمیل کنید.</div>
       </div>
       <div ref={formRef} className="grid gap-3 md:grid-cols-2">

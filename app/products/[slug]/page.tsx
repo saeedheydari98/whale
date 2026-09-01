@@ -23,6 +23,7 @@ import { ProductReviewsSection, type ProductReview } from "./product-reviews-sec
 import { ProductImageGallery } from "./product-image-gallery";
 import ColorStockDots from "@/app/design-system/components/ui/color-stock-dots";
 import { ProductCardBadge } from "@/app/design-system/components/ui/product-card-badge";
+import { AppHeading } from "@/app/design-system/components/ui/text";
 
 const LOADING_PRODUCT: ProductRecord = {
   id: "loading-product",
@@ -367,7 +368,7 @@ export default function ProductPage() {
             <div className="flex min-w-0 flex-col gap-5">
               <div className="flex flex-col gap-3">
               <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                <div className="text-3xl font-bold leading-tight text-primary-text">{product.title}</div>
+                <AppHeading level={1} className="text-3xl font-bold leading-tight text-primary-text">{product.title}</AppHeading>
               </Loading>
 
                 <Loading loading="skeleton-item" isLoading={catalogLoading}>
@@ -464,7 +465,7 @@ export default function ProductPage() {
           {activeTab === "details" ? (
               <section className="flex flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6">
                 <div className="flex flex-col gap-2">
-                  <div className="text-2xl font-bold text-primary-text">مشخصات محصول</div>
+                  <AppHeading level={2} className="text-2xl font-bold text-primary-text">مشخصات محصول</AppHeading>
                 </div>
                 <div className="flex flex-col gap-3">
                   {visibleDetailRows.length > 0 ? visibleDetailRows.map(([label, value]) => (
@@ -479,7 +480,7 @@ export default function ProductPage() {
                   )}
                 </div>
                 <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
-                  <div className="text-sm font-bold text-primary-text">توضیحات محصول</div>
+                  <AppHeading level={3} className="text-sm font-bold text-primary-text">توضیحات محصول</AppHeading>
                   {product.description.trim() ? (
                     <Loading loading="skeleton-item" isLoading={catalogLoading}>
                       <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">{product.description}</div>
@@ -508,7 +509,7 @@ export default function ProductPage() {
           {activeTab === "price" ? (
               <section className="flex flex-col gap-5 rounded-2xl border border-primary-border bg-primary-soft p-6">
                 <div className="flex flex-col gap-2">
-                  <div className="text-2xl font-bold text-primary-text">تغییرات قیمت</div>
+                  <AppHeading level={2} className="text-2xl font-bold text-primary-text">تغییرات قیمت</AppHeading>
                   <div className="text-sm text-secondary-text">آخرین قیمت ثبت‌شده.</div>
                 </div>
                 <div className="flex flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-4 sm:flex-row sm:items-center sm:justify-between">
