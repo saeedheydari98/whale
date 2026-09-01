@@ -7,6 +7,7 @@ export type CustomTabItem<TValue extends string = string> = {
   id: TValue;
   label: string;
   icon?: ReactNode;
+  badge?: number;
 };
 
 type CustomTabsProps<TValue extends string = string> = {
@@ -38,10 +39,19 @@ export function CustomTabs<TValue extends string = string>({
                 ? "bg-primary text-primary-contrast shadow-sm"
                 : "bg-primary-card text-primary-text hover:bg-primary-bg hover:text-primary"
             )}
+            aria-label={item.badge && item.badge > 0 ? `${item.label}، ${item.badge} مورد جدید` : undefined}
             onClick={() => onChange(item.id)}
           >
             {item.icon ? <span className="text-base" aria-hidden="true">{item.icon}</span> : null}
             <span>{item.label}</span>
+            {item.badge && item.badge > 0 ? (
+              <span className={cx(
+                "flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-bold",
+                active ? "bg-primary-contrast text-primary" : "bg-primary text-primary-contrast"
+              )} aria-hidden="true">
+                {item.badge}
+              </span>
+            ) : null}
           </button>
         );
       })}

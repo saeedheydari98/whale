@@ -1,0 +1,1 @@
+ALTER TABLE "DiscountCode" ADD COLUMN "seenAt" TIMESTAMP(3);

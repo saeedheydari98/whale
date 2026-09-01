@@ -48,6 +48,7 @@ model DiscountCode {
   percent         Int?
   expiresAt       DateTime
   usedAt          DateTime?
+  seenAt          DateTime?
   createdAt       DateTime  @default(now())
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   rule            DiscountRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)

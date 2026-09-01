@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline, IoWalletOutline } from "react-icons/io5";
+import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline, IoTicketOutline, IoWalletOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
@@ -19,8 +19,11 @@ import type { OrderStatusEventRecord } from "@/lib/order-status";
 import { formatAmount } from "@/lib/price-format";
 import { clearUserProfile } from "@/lib/user-profile";
 import { UserProfilePanel } from "./user-profile-panel";
+import { UserDiscountsPanel } from "./user-discounts-panel";
 import { UserWalletPanel } from "./user-wallet-panel";
-import Loading, { DynamicLoadingCollection, startRouteLoading } from "@/app/design-system/components/loading/loading";
+import Loading, { DynamicLoadingCollection, startRouteLoading, useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
+import { getUserPanelStructure, markUserDiscountsSeen, USER_STRUCTURE_URL, type UserPanelStructure } from "@/lib/user-structure";
+import { invalidateFetchCache } from "@/lib/fetch-json";
 
 type OrderItem = {
   id: string;
@@ -102,11 +105,12 @@ function fetchUserOrdersOnce() {
   return pendingUserOrders;
 }
 
-function UserOrdersPanel() {
+function UserOrdersPanel({ totalCount }: { totalCount?: number }) {
   const [orders, setOrders] = useState<UserOrder[]>(() => cachedUserOrders ?? []);
   const [loading, setLoading] = useState(cachedUserOrders === null);
   const [previewImage, setPreviewImage] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<UserOrder | null>(null);
+  const [, setCapacity] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +162,8 @@ function UserOrdersPanel() {
       <DynamicLoadingCollection
         items={orders}
         isLoading={loading}
+        totalCount={totalCount}
+        onCapacityChange={totalCount === undefined ? undefined : setCapacity}
         className="flex flex-wrap items-start gap-3"
         getKey={(order) => order.id}
         lazy
@@ -261,12 +267,55 @@ function UserOrderCard({ order, onSelect, onPreview }: {
 export default function UserPanelPage() {
   const router = useRouter();
   const { data: appUserData } = useAppUser();
-  const [activeTab, setActiveTab] = useState<"profile" | "orders" | "wallet">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "orders" | "discounts" | "wallet">("profile");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [structure, setStructure] = useState<UserPanelStructure | null>(null);
+  const [structureReady, setStructureReady] = useState(false);
+  const isLoggedIn = Boolean(appUserData?.user);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setStructure(null);
+      setStructureReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    setStructureReady(false);
+    void getUserPanelStructure()
+      .then((next) => {
+        if (cancelled) return;
+        setStructure(next);
+        setStructureReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setStructureReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn]);
+
+  useStructureRouteLoading(isLoggedIn && !structureReady);
+
+  useEffect(() => {
+    if (activeTab !== "discounts" || !structure?.unseenDiscounts) return;
+    let cancelled = false;
+    void markUserDiscountsSeen()
+      .then((next) => {
+        if (!cancelled && next) setStructure(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, structure?.unseenDiscounts]);
+
   const tabs: Array<CustomTabItem<typeof activeTab>> = [
     { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
+    { id: "discounts", label: "تخفیف‌ها", icon: <IoTicketOutline />, badge: structure?.unseenDiscounts },
     { id: "wallet", label: "کیف پول", icon: <IoWalletOutline /> },
   ];
 
@@ -291,6 +340,7 @@ export default function UserPanelPage() {
       clearLocalCartSnapshot(null);
       clearUserProfile(currentUser);
       clearUserOrdersCache();
+      invalidateFetchCache(USER_STRUCTURE_URL);
       clearCachedAppUser();
       clearCachedAuthUser();
       startRouteLoading();
@@ -327,7 +377,8 @@ export default function UserPanelPage() {
         ) : null}
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
         {activeTab === "profile" ? <UserProfilePanel onCompleted={handleProfileCompleted} /> : null}
-        {activeTab === "orders" ? <UserOrdersPanel /> : null}
+        {activeTab === "orders" ? <UserOrdersPanel totalCount={structure?.orders} /> : null}
+        {activeTab === "discounts" ? <UserDiscountsPanel totalCount={structure?.discounts} /> : null}
         {activeTab === "wallet" ? <UserWalletPanel /> : null}
       </div>
     </main>

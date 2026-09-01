@@ -4,7 +4,7 @@ import { PrismaNeon } from "@prisma/adapter-neon";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import WebSocket from "ws";
 
-const PRISMA_SCHEMA_VERSION = "neon-driver-v1";
+const PRISMA_SCHEMA_VERSION = "neon-driver-v2-discount-seen-at";
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   prismaSchemaVersion?: string;

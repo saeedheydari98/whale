@@ -887,6 +887,15 @@ export const openApiDocument = {
           trackingCode: { type: "string" },
         },
       },
+      UserPanelStructure: {
+        type: "object",
+        properties: {
+          orders: { type: "integer" },
+          discounts: { type: "integer" },
+          unseenDiscounts: { type: "integer" },
+        },
+        required: ["orders", "discounts", "unseenDiscounts"],
+      },
       AdminPanelStructure: {
         type: "object",
         properties: {
@@ -1731,6 +1740,42 @@ export const openApiDocument = {
         operationId: "updateUserAvatar",
         body: ref("AvatarInput"),
         data: singleData("user", "PublicUser"),
+        security: authSecurity,
+      }),
+    },
+    "/api/user/structure": {
+      get: operation({
+        tags: ["Profile"],
+        summary: "Get user account structure counts",
+        description: "Tiny count-only payload fetched as soon as the user account page opens. orders and discounts drive skeleton counts; unseenDiscounts is the discount-tab badge until those codes are viewed.",
+        operationId: "getUserPanelStructure",
+        data: {
+          type: "object",
+          properties: {
+            structure: ref("UserPanelStructure"),
+          },
+          required: ["structure"],
+        },
+        security: authSecurity,
+      }),
+      post: operation({
+        tags: ["Profile"],
+        summary: "Mark unseen discount codes as seen",
+        description: "Set seenDiscounts to true after the user opens the discounts tab. The badge stays at 0 until a new active code is issued.",
+        operationId: "updateUserPanelStructure",
+        body: {
+          type: "object",
+          properties: {
+            seenDiscounts: { type: "boolean" },
+          },
+        },
+        data: {
+          type: "object",
+          properties: {
+            structure: ref("UserPanelStructure"),
+          },
+          required: ["structure"],
+        },
         security: authSecurity,
       }),
     },

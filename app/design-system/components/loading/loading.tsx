@@ -147,31 +147,20 @@ export function RouteLoadingController() {
       if (destination.pathname === window.location.pathname && destination.search === window.location.search) return;
       begin();
     };
-    const handleNavigate = (event: Event) => {
-      const destinationUrl = (event as Event & { destination?: { url?: string } }).destination?.url;
-      if (!destinationUrl) return;
-      const destination = new URL(destinationUrl, window.location.href);
-      if (destination.origin !== window.location.origin) return;
-      if (destination.pathname === window.location.pathname && destination.search === window.location.search) return;
-      begin();
-    };
     const finish = () => {
       if (structureHoldCount > 0) return;
       setLoading(false);
     };
-    const navigation = (window as Window & { navigation?: EventTarget }).navigation;
 
     window.addEventListener(ROUTE_LOADING_START_EVENT, begin);
     window.addEventListener("app:route-loading-end", finish);
     window.addEventListener("popstate", begin);
     document.addEventListener("click", handleClick, true);
-    navigation?.addEventListener("navigate", handleNavigate);
     return () => {
       window.removeEventListener(ROUTE_LOADING_START_EVENT, begin);
       window.removeEventListener("app:route-loading-end", finish);
       window.removeEventListener("popstate", begin);
       document.removeEventListener("click", handleClick, true);
-      navigation?.removeEventListener("navigate", handleNavigate);
     };
   }, []);
 
