@@ -50,17 +50,17 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
   const collectionPaging = {
     totalCount: panel.sectionTotalCount,
     hasMore: canPage && panel.sectionHasMore,
-    onCapacityChange: canPage ? panel.setActiveCapacity : undefined,
+    onCapacityChange: panel.structure ? panel.setActiveCapacity : undefined,
     onLoadMore: canPage ? panel.loadMoreSection : undefined,
   };
 
   return (
     <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
-        <Loading loading="skeleton-item" isLoading={panel.loading}>
+        <Loading loading="skeleton-item" isLoading={panel.loading && section !== "storefront"}>
           <AppHeading level={2} className="text-base font-bold text-primary-text">{SECTION_TITLES[section]}</AppHeading>
         </Loading>
-        <Loading loading="skeleton-item" isLoading={panel.loading}>
+        <Loading loading="skeleton-item" isLoading={panel.loading && section !== "storefront"}>
           <span className="text-xs font-semibold text-primary-text">
             {sectionCount} {SECTION_COUNT_LABELS[section]}
           </span>
@@ -372,6 +372,6 @@ function getSectionCount(section: AdminCatalogSection, panel: AdminProductsPanel
           ? sumCounts(fromStructure.categoryGroups)
           : section === "brands"
             ? sumCounts(fromStructure.brandGroups)
-            : loaded;
+            : fromStructure.storefront[panel.storefrontLayoutTab];
   return Math.max(loaded, structured);
 }

@@ -94,10 +94,10 @@ export function UserDiscountsPanel({ totalCount }: { totalCount?: number }) {
 
 function DiscountCodeCard({ code, onCopy }: { code: WalletCode; onCopy: () => void }) {
   return (
-    <div className="flex min-w-56 flex-col gap-1 rounded-md border border-primary-border bg-primary-base p-3">
+    <div className="flex h-33 w-56 shrink-0 flex-col gap-1 overflow-hidden rounded-md border border-primary-border bg-primary-base p-3">
       <AppHeading level={3} className="truncate text-sm font-bold text-primary-text">{code.name}</AppHeading>
-      <span className="flex items-center justify-between gap-2">
-        <span dir="ltr" translate="no" className="text-lg font-bold tracking-[0.3em] text-primary">{code.code}</span>
+      <span className="flex min-w-0 items-center justify-between gap-2">
+        <span dir="ltr" translate="no" className="min-w-0 truncate text-lg font-bold tracking-[0.3em] text-primary">{code.code}</span>
         <CustomButton size="sm" variant="neutral" icon={<IoCopyOutline aria-hidden="true" />} onClick={onCopy}>
           <span>کپی</span>
         </CustomButton>

@@ -37,6 +37,15 @@ function isMutationMethod(method: string) {
   return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
 }
 
+function isQuietMutation(url: string) {
+  try {
+    const pathname = new URL(url, window.location.origin).pathname;
+    return pathname === "/api/user/structure";
+  } catch {
+    return url.includes("/api/user/structure");
+  }
+}
+
 function getRequestMethod(input: RequestInfo | URL, init?: RequestInit) {
   return String(init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
 }
@@ -153,7 +162,7 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
       const method = getRequestMethod(input, init);
       const url = getRequestUrl(input);
       const shouldInspect = isApiUrl(url) && !hasSilentHeader(input, init);
-      const shouldNotifySuccess = shouldInspect && isMutationMethod(method);
+      const shouldNotifySuccess = shouldInspect && isMutationMethod(method) && !isQuietMutation(url);
 
       try {
         const response = await originalFetch(input, init);

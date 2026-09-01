@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
+import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { AppHeading } from "@/app/design-system/components/ui/text";
 import { STOREFRONT_TABS } from "../constants";
@@ -35,9 +36,9 @@ const loadingStorefrontEntry: StorefrontDisplayEntry = {
     categoryId: "",
     manualProductIds: [],
     productCount: undefined,
-    sortOrder: 0,
+    sortOrder: 1,
   },
-  sortOrder: 0,
+  sortOrder: 1,
 };
 
 function StorefrontEntryRow({
@@ -88,7 +89,7 @@ function StorefrontEntryRow({
         setDraggingKey(null);
       }}
       onDragEnd={() => setDraggingKey(null)}
-      className={`flex flex-col gap-3 rounded-lg border bg-primary-card p-3 sm:flex-row sm:items-center sm:justify-between ${
+      className={`flex flex-col items-start gap-3 rounded-lg border bg-primary-card p-3 sm:flex-row sm:items-center sm:justify-between ${
         isLoading
           ? "cursor-default border-border-default"
           : draggingKey === key
@@ -96,7 +97,7 @@ function StorefrontEntryRow({
             : "cursor-grab border-primary-border active:cursor-grabbing"
       }`}
     >
-      <div className="flex flex-col gap-1">
+      <div className="flex w-max max-w-full flex-col gap-1">
         <AppHeading level={3} className="text-sm font-bold text-primary-text">{entry.item?.title || entryFallbackTitle(entry.type)}</AppHeading>
         <span className="text-xs text-secondary-text">{entryFallbackTitle(entry.type)}</span>
       </div>
@@ -129,6 +130,7 @@ export function StorefrontSection({
   totalCount,
 }: StorefrontSectionProps) {
   const visibleDisplaySections = displaySections;
+  const showEmpty = totalCount === 0 || (!isLoading && visibleDisplaySections.length === 0);
 
   return (
     <div className="flex flex-col gap-4">
@@ -137,7 +139,6 @@ export function StorefrontSection({
           <button
             key={item.id}
             type="button"
-            disabled={isLoading}
             onClick={() => setTab(item.id)}
             className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors hover:bg-primary-soft ${
               tab === item.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
@@ -148,10 +149,15 @@ export function StorefrontSection({
         ))}
       </div>
 
+      {showEmpty ? (
+        <CustomEmptyState description="هنوز بخشی برای این صفحه چیده نشده است." size="sm" />
+      ) : null}
+
       <DynamicLoadingCollection
         items={visibleDisplaySections}
-        isLoading={isLoading && visibleDisplaySections.length === 0}
+        isLoading={isLoading && !showEmpty}
         totalCount={totalCount}
+        structure={Number.isFinite(Number(totalCount)) ? { count: Number(totalCount) } : undefined}
         className="flex flex-col gap-4"
         getKey={(entry) => storefrontKey(entry)}
         lazy
@@ -187,7 +193,7 @@ export function StorefrontSection({
         )}
       />
 
-      {!isLoading ? <span className="text-xs font-semibold text-secondary-text">تغییرات چیدمان به‌صورت خودکار ذخیره می‌شوند.</span> : null}
+      <span className="text-xs font-semibold text-secondary-text">تغییرات چیدمان به‌صورت خودکار ذخیره می‌شوند.</span>
     </div>
   );
 }
@@ -225,6 +231,8 @@ function StorefrontOrderInput({ value, disabled, onCommit }: StorefrontOrderInpu
       value={draftValue}
       disabled={disabled}
       placeholder="ترتیب"
+      fullWidth={false}
+      className="max-w-full field-sizing-content"
       onChange={(event) => setDraftValue(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {

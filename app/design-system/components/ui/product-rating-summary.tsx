@@ -29,16 +29,17 @@ export function ProductRatingSummary({
   const ratingCount = normalizeCount(count);
 
   return (
-    <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+    <div className={`flex min-w-0 flex-nowrap items-center gap-1.5 overflow-hidden ${className}`}>
       <StarRating
+        className="shrink-0"
         value={ratingAverage}
         size={size}
         ariaLabel={`میانگین امتیاز ${ratingAverage} از ۵`}
       />
-      <span className="text-xs font-semibold text-primary-text">
+      <span className="min-w-0 truncate text-xs font-semibold text-primary-text">
         {ratingAverage > 0 ? ratingAverage.toFixed(1) : "بدون امتیاز"}
       </span>
-      <span className="text-xs text-secondary-text">
+      <span className="shrink-0 text-xs text-secondary-text">
         ({ratingCount})
       </span>
     </div>

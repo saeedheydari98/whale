@@ -199,7 +199,7 @@ function CategoryAdminCard({
         setDraggingCategoryId(null);
       }}
       onDragEnd={() => setDraggingCategoryId(null)}
-      className={`flex min-w-44 shrink-0 flex-col gap-2 rounded-lg border bg-primary-card p-2 shadow-sm ${
+      className={`flex h-40 w-44 shrink-0 flex-col items-center gap-1 overflow-hidden rounded-lg border bg-primary-card p-2 shadow-sm ${
         isLoading
           ? "cursor-default border-border-default"
           : draggingCategoryId === category.id
@@ -207,8 +207,10 @@ function CategoryAdminCard({
             : "cursor-grab border-primary-border active:cursor-grabbing"
       }`}
     >
-      <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" shape="rounded" onImageClick={() => onPreview(category.imageUrl)} />
-      <div className="flex gap-2">
+      <div className="flex w-full flex-col items-center">
+        <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" shape="rounded" onImageClick={() => onPreview(category.imageUrl)} />
+      </div>
+      <div className="flex w-full justify-center gap-2">
         <CustomButton size="sm" variant="edit" disabled={isLoading} onClick={() => onEditCategory(category)}>
           <span>ویرایش</span>
         </CustomButton>
@@ -389,7 +391,7 @@ function BrandAdminCard({
         setDraggingBrandId(null);
       }}
       onDragEnd={() => setDraggingBrandId(null)}
-      className={`flex min-w-44 shrink-0 flex-col gap-2 rounded-lg border bg-primary-card p-2 shadow-sm ${
+      className={`flex h-40 w-44 shrink-0 flex-col items-center gap-1 overflow-hidden rounded-lg border bg-primary-card p-2 shadow-sm ${
         isLoading
           ? "cursor-default border-border-default"
           : draggingBrandId === brand.id
@@ -397,8 +399,10 @@ function BrandAdminCard({
             : "cursor-grab border-primary-border active:cursor-grabbing"
       }`}
     >
-      <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" onImageClick={() => onPreview(brand.imageUrl)} />
-      <div className="flex gap-2">
+      <div className="flex w-full flex-col items-center">
+        <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" onImageClick={() => onPreview(brand.imageUrl)} />
+      </div>
+      <div className="flex w-full justify-center gap-2">
         <CustomButton size="sm" variant="edit" disabled={isLoading} onClick={() => onEditBrand(brand)}>
           <span>ویرایش</span>
         </CustomButton>

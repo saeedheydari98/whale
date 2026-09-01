@@ -480,6 +480,7 @@ async function readAdminCatalogStructure() {
     ungroupedCategories,
     ungroupedBrands,
     productRefs,
+    storefrontLayout,
   ] = await Promise.all([
     prisma.product.count(),
     prisma.banner.count(),
@@ -506,6 +507,7 @@ async function readAdminCatalogStructure() {
     prisma.category.count({ where: { groupId: null } }),
     prisma.brand.count({ where: { groupId: null } }),
     readAdminProductRefs(),
+    readAdminStorefrontLayout(),
   ]);
 
   const categoryItems = categoryGroups.map((group) => ({
@@ -535,6 +537,11 @@ async function readAdminCatalogStructure() {
     })),
     categoryGroups: categoryItems,
     brandGroups: brandItems,
+    storefront: {
+      home: storefrontLayout.home.length,
+      categories: storefrontLayout.categories.length,
+      products: storefrontLayout.products.length,
+    },
   };
 }
 

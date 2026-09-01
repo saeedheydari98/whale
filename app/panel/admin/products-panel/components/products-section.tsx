@@ -95,15 +95,14 @@ function ProductAdminCard({ product, productBrandTitle, draggingProductId, setDr
   onPreview: (imageUrl?: string) => void; onReorderProducts: (sourceId: number | string, targetId: number | string) => void;
 }) {
   return (
-    <div draggable onDragStart={(event) => { setDraggingProductId(product.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(product.id)); }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }} onDrop={(event) => { event.preventDefault(); const sourceId = event.dataTransfer.getData("text/plain") || draggingProductId; if (sourceId) void onReorderProducts(sourceId, product.id); setDraggingProductId(null); }} onDragEnd={() => setDraggingProductId(null)} className={`flex w-full max-w-64 rounded-lg border bg-primary-card p-2 shadow-sm ${draggingProductId === product.id ? "cursor-grab border-primary opacity-70 active:cursor-grabbing" : "cursor-grab border-primary-border active:cursor-grabbing"}`}>
+    <div draggable onDragStart={(event) => { setDraggingProductId(product.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(product.id)); }} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "move"; }} onDrop={(event) => { event.preventDefault(); const sourceId = event.dataTransfer.getData("text/plain") || draggingProductId; if (sourceId) void onReorderProducts(sourceId, product.id); setDraggingProductId(null); }} onDragEnd={() => setDraggingProductId(null)} className={`flex h-16 w-64 shrink-0 overflow-hidden rounded-lg border bg-primary-card p-2 shadow-sm ${draggingProductId === product.id ? "cursor-grab border-primary opacity-70 active:cursor-grabbing" : "cursor-grab border-primary-border active:cursor-grabbing"}`}>
       <div className="flex w-full items-center gap-2.5 text-right">
         <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => onPreview(product.imageUrl)} disabled={!product.imageUrl} aria-label="باز کردن تصویر محصول">
           {product.imageUrl ? <AppImage src={product.imageUrl} alt={product.title} width={112} height={112} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
         </button>
         <button type="button" className="flex min-w-0 flex-1 flex-col gap-0.5 text-right" onClick={() => onEditProduct(product)} aria-label={`ویرایش ${product.title || "محصول"}`}>
           <div className="line-clamp-1 text-sm font-bold text-primary-text">{product.title || "محصول بدون عنوان"}</div>
-          <span className="text-xs text-secondary-text">{formatPrice(product.discountPrice || product.price) || "بدون قیمت"}</span>
-          <span className="text-xs text-secondary-text">{productBrandTitle || "بدون برند"}</span>
+          <span className="line-clamp-1 text-xs text-secondary-text">{formatPrice(product.discountPrice || product.price) || "بدون قیمت"}{productBrandTitle ? ` · ${productBrandTitle}` : ""}</span>
         </button>
         <button type="button" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-primary-border bg-primary-soft text-primary" onClick={() => onEditProduct(product)} aria-label={`ویرایش ${product.title || "محصول"}`}><IoCreateOutline aria-hidden="true" /></button>
       </div>

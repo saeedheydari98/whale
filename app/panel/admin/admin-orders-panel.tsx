@@ -270,17 +270,19 @@ function AdminOrderCard({ order, trackingValue, saving, onPreview, onTrackingCha
   const nextStatus = nextOrderStatus(order.fulfillmentStatus);
 
   return (
-    <div className="flex w-full max-w-sm flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-2">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className="flex h-96 w-96 shrink-0 flex-col gap-2 overflow-hidden rounded-md border border-primary-border bg-primary-card p-2">
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
           <span className="truncate text-sm font-bold text-primary-text">{customerName(order)}</span>
           <span className="text-xs text-secondary-text">{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
           <span className="text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
         </div>
-        <OrderStatusTag status={order.fulfillmentStatus} />
+        <div>
+          <OrderStatusTag status={order.fulfillmentStatus} />
+        </div>
       </div>
 
-      <div className="flex flex-col gap-1.5 border-t border-primary-border pt-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden border-t border-primary-border pt-2">
         {order.items.map((item) => (
           <div key={item.id} className="flex items-center gap-2.5">
             <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? onPreview(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
@@ -295,25 +297,22 @@ function AdminOrderCard({ order, trackingValue, saving, onPreview, onTrackingCha
         ))}
       </div>
 
-      {order.profile?.address ? <span className="text-xs text-secondary-text">نشانی: {order.profile.address}</span> : null}
-      <div className="flex flex-col gap-1 border-t border-primary-border pt-2">
-        <span className="text-xs text-secondary-text">روش تحویل: {order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
-        {Number(order.discountAmount) > 0 ? <span className="text-xs text-secondary-text">تخفیف: {formatAmount(order.discountAmount)}</span> : null}
-        {Number(order.walletAmount) > 0 ? <span className="text-xs text-secondary-text">پرداخت از کیف پول: {formatAmount(order.walletAmount)}</span> : null}
-        <span className="text-sm font-bold text-primary">مبلغ پرداختی: {formatAmount(order.total)}</span>
-      </div>
-      <CustomAccordion title="مسیر وضعیت سفارش" meta={ORDER_STATUS_LABELS[normalizeOrderStatus(order.fulfillmentStatus)]} defaultOpen={false} showStatusLabel={false} className="rounded-md" contentClassName="p-2">
-        <OrderStatusTimeline status={order.fulfillmentStatus} history={order.statusHistory} createdAt={order.createdAt} />
-      </CustomAccordion>
+      <div className="flex shrink-0 flex-col gap-2">
+        {order.profile?.address ? <span className="line-clamp-1 text-xs text-secondary-text">نشانی: {order.profile.address}</span> : <span className="invisible line-clamp-1 text-xs">نشانی</span>}
+        <div className="flex flex-col gap-1 border-t border-primary-border pt-2">
+          <span className="text-xs text-secondary-text">روش تحویل: {order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
+          <span className="text-sm font-bold text-primary">مبلغ پرداختی: {formatAmount(order.total)}</span>
+        </div>
+        <CustomAccordion title="مسیر وضعیت سفارش" meta={ORDER_STATUS_LABELS[normalizeOrderStatus(order.fulfillmentStatus)]} defaultOpen={false} showStatusLabel={false} className="rounded-md" contentClassName="p-2">
+          <OrderStatusTimeline status={order.fulfillmentStatus} history={order.statusHistory} createdAt={order.createdAt} />
+        </CustomAccordion>
 
-      <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
-        <CustomInput value={trackingValue} onChange={(event) => onTrackingChange(event.target.value)} placeholder="کد پیگیری مرسوله" size="sm" disabled={saving} />
-        {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری ثبت‌شده: {order.trackingCode}</span> : null}
-        {nextStatus ? (
-          <CustomButton size="sm" variant={nextStatus === "delivered" ? "success" : "primary"} icon={<IoCheckmarkCircleOutline />} isLoading={saving} onClick={onAdvance}>
-            <span>ثبت مرحله: {ORDER_STATUS_LABELS[nextStatus]}</span>
+        <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
+          <CustomInput value={trackingValue} onChange={(event) => onTrackingChange(event.target.value)} placeholder="کد پیگیری مرسوله" size="sm" disabled={saving} />
+          <CustomButton size="sm" variant={nextStatus === "delivered" ? "success" : nextStatus ? "primary" : "neutral"} icon={nextStatus ? <IoCheckmarkCircleOutline /> : undefined} isLoading={saving} disabled={!nextStatus} onClick={onAdvance}>
+            <span>{nextStatus ? `ثبت مرحله: ${ORDER_STATUS_LABELS[nextStatus]}` : "این سفارش تحویل داده شده است."}</span>
           </CustomButton>
-        ) : <span className="text-xs font-bold text-success-text">این سفارش تحویل داده شده است.</span>}
+        </div>
       </div>
     </div>
   );

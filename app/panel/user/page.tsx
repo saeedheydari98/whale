@@ -66,7 +66,7 @@ const loadingUserOrder: UserOrder = {
   total: "0",
   shippingMethod: "post",
   fulfillmentStatus: "pending",
-  items: [{ id: "loading-item", title: "محصول", price: "0", quantity: 1 }],
+  items: [{ id: "loading-item", productId: 1, title: "محصول", price: "0", quantity: 1 }],
 };
 
 function readOrders(data: unknown) {
@@ -205,24 +205,15 @@ function UserOrderCard({ order, onSelect, onPreview }: {
   onPreview: (imageUrl: string) => void;
 }) {
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      className="flex w-full max-w-md cursor-pointer flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3 text-right transition hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary-border"
-      onClick={onSelect}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onSelect();
-        }
-      }}
-    >
+    <article className="flex w-full max-w-md flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3 text-right">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-bold text-primary-text">سفارش {order.id.slice(-8)}</span>
           <span className="text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
         </div>
-        <OrderStatusTag status={order.fulfillmentStatus} />
+        <div>
+          <OrderStatusTag status={order.fulfillmentStatus} />
+        </div>
       </div>
 
       <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
@@ -231,8 +222,7 @@ function UserOrderCard({ order, onSelect, onPreview }: {
             <button
               type="button"
               className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
-              onClick={(event) => {
-                event.stopPropagation();
+              onClick={() => {
                 if (item.imageUrl) onPreview(item.imageUrl);
               }}
               disabled={!item.imageUrl}
@@ -246,23 +236,23 @@ function UserOrderCard({ order, onSelect, onPreview }: {
               <span className="text-xs font-semibold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
             </div>
             {item.productId ? (
-              <span onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-                <ProductLink productId={item.productId} productTitle={item.title} size="sm">مشاهده</ProductLink>
-              </span>
+              <ProductLink productId={item.productId} productTitle={item.title} size="sm">مشاهده</ProductLink>
             ) : null}
           </div>
         ))}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-border pt-2">
-        <span className="text-xs font-bold text-primary">مشاهده مسیر سفارش</span>
+        <CustomButton size="sm" variant="neutral" onClick={onSelect}>
+          <span>مشاهده مسیر سفارش</span>
+        </CustomButton>
         {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری: {order.trackingCode}</span> : null}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-xs text-secondary-text">{order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
         <span className="text-sm font-bold text-primary">پرداختی: {formatAmount(order.total ?? "0")}</span>
       </div>
-    </div>
+    </article>
   );
 }
 

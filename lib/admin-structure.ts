@@ -7,6 +7,12 @@ export type AdminCountItem = {
   count: number;
 };
 
+export type AdminStorefrontStructure = {
+  home: number;
+  categories: number;
+  products: number;
+};
+
 export type AdminPanelStructure = {
   products: number;
   orders: number;
@@ -15,6 +21,7 @@ export type AdminPanelStructure = {
   showcases: AdminCountItem[];
   categoryGroups: AdminCountItem[];
   brandGroups: AdminCountItem[];
+  storefront: AdminStorefrontStructure;
 };
 
 function asCount(value: unknown) {
@@ -39,6 +46,17 @@ function asCountItems(value: unknown) {
     : [];
 }
 
+function asStorefrontStructure(value: unknown): AdminStorefrontStructure {
+  const record = value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+  return {
+    home: asCount(record.home),
+    categories: asCount(record.categories),
+    products: asCount(record.products ?? record.showcases),
+  };
+}
+
 export function normalizeAdminPanelStructure(value: unknown): AdminPanelStructure | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
@@ -54,6 +72,7 @@ export function normalizeAdminPanelStructure(value: unknown): AdminPanelStructur
     showcases: asCountItems(record.showcases),
     categoryGroups: asCountItems(record.categoryGroups),
     brandGroups: asCountItems(record.brandGroups),
+    storefront: asStorefrontStructure(record.storefront ?? nested.storefront),
   };
 }
 

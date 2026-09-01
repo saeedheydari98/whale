@@ -21,14 +21,17 @@ const sizeClasses = {
   sm: {
     image: "h-14 w-14",
     text: "text-xs",
+    frame: "h-27 w-28",
   },
   md: {
     image: "h-20 w-20",
     text: "text-sm",
+    frame: "h-32 w-28",
   },
   lg: {
     image: "h-24 w-24",
     text: "text-base",
+    frame: "h-36 w-28",
   },
 };
 
@@ -66,7 +69,7 @@ export function CategoryOption({
           {imageContent}
         </button>
       ) : imageContent}
-      <span className={cx("max-w-24 text-center font-bold text-primary-text", sizeClasses[size].text)}>
+      <span className={cx("line-clamp-1 min-h-5 w-full max-w-24 text-center font-bold text-primary-text", sizeClasses[size].text)}>
         {label}
       </span>
     </>
@@ -74,7 +77,7 @@ export function CategoryOption({
 
   if (!onClick) {
     return (
-      <div className={cx("flex flex-col items-center gap-2", className)}>
+      <div className={cx("flex shrink-0 flex-col items-center gap-2 overflow-hidden p-2", sizeClasses[size].frame, className)}>
         {content}
       </div>
     );
@@ -84,7 +87,8 @@ export function CategoryOption({
     <button
       type="button"
       className={cx(
-        "flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-transparent p-2 transition hover:scale-[1.03] hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-60",
+        "flex shrink-0 cursor-pointer flex-col items-center gap-2 overflow-hidden rounded-lg border border-transparent p-2 transition hover:scale-[1.03] hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-60",
+        sizeClasses[size].frame,
         selected ? "border-primary-border bg-primary-soft" : "bg-transparent",
         className
       )}

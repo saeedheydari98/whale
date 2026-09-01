@@ -205,13 +205,14 @@ function mergeById<T extends { id: string | number }>(current: T[], incoming: T[
   return Array.from(byId.values());
 }
 
-function collectionTotal(section: AdminCatalogSection, structure: AdminPanelStructure | null) {
+function collectionTotal(section: AdminCatalogSection, structure: AdminPanelStructure | null, tab?: StorefrontLayoutTab) {
   if (!structure) return undefined;
   if (section === "products") return structure.products;
   if (section === "banners") return structure.banners;
   if (section === "showcases") return structure.showcases.length;
   if (section === "categories") return structure.categoryGroups.length;
   if (section === "brands") return structure.brandGroups.length;
+  if (section === "storefront") return structure.storefront[tab ?? "home"];
   return undefined;
 }
 
@@ -788,7 +789,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     ].sort((a, b) => a.sortOrder - b.sortOrder);
   }, [sortedBanners, sortedBrandGroups, sortedBrands, sortedCategories, sortedCategoryGroups, sortedShowcases, storefrontLayoutTab]);
 
-  const sectionTotalCount = collectionTotal(activeSection, structure);
+  const sectionTotalCount = collectionTotal(activeSection, structure, storefrontLayoutTab);
   const loadedSectionCount = activeSection === "products"
     ? products.length
     : activeSection === "banners"
@@ -799,7 +800,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           ? (loadedSections.categories ? categoryGroups.length : 0)
           : activeSection === "brands"
             ? (loadedSections.brands ? brandGroups.length : 0)
-            : displaySections.length;
+            : (loadedSections.storefront ? displaySections.length : 0);
   const activeCapacity = sectionCapacity[activeSection];
   const sectionHasMore = sectionTotalCount !== undefined && loadedSectionCount < sectionTotalCount;
 
@@ -813,7 +814,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   useEffect(() => {
     let cancelled = false;
 
-    if (activeSection !== "storefront" && !structure) {
+    if (!structure) {
       setLoading(true);
       return () => {
         cancelled = true;
@@ -836,11 +837,19 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         };
       }
 
+      if (sectionTotalCount === 0) {
+        setLoadedSections((current) => markCatalogSectionsLoaded(current, ["storefront"]));
+        setLoading(false);
+        return () => {
+          cancelled = true;
+        };
+      }
+
       const loadStorefront = async () => {
         setLoading(true);
         try {
           let layout = await getAdminStorefrontLayout();
-          if (layout.home.length === 0 && layout.categories.length === 0 && layout.products.length === 0) {
+          if ((sectionTotalCount ?? 0) > 0 && layout.home.length === 0 && layout.categories.length === 0 && layout.products.length === 0) {
             await new Promise((resolve) => window.setTimeout(resolve, 250));
             layout = await getAdminStorefrontLayout({ force: true });
           }

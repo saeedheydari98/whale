@@ -64,17 +64,19 @@ export function ProductShowcaseCard({
   const discountPercent = product ? getDiscountPercent(product) : 0;
   const primaryImage = getPrimaryProductImage(product);
 
+  const showOriginalPrice = Boolean(product?.originalPrice && discountPercent > 0 && !isLoading);
+
   return (
     <article
-      className={`relative flex min-h-40 min-w-72 max-w-72 shrink-0 flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
+      className={`relative flex h-44 w-72 shrink-0 flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
         isLoading ? "border-border-default" : "border-primary-border"
       }`}
     >
       {!isLoading ? <ProductCardBadge label={product?.badge} /> : null}
-      <div className="flex min-h-28 flex-1 gap-3 p-3">
+      <div className="flex min-h-0 flex-1 gap-3 p-3">
         <button
           type="button"
-          className="relative flex min-h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+          className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
           onClick={() => onPreview?.(primaryImage)}
           disabled={isLoading || !primaryImage || !onPreview}
           aria-label="باز کردن تصویر محصول"
@@ -92,30 +94,28 @@ export function ProductShowcaseCard({
           )}
         </button>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
           <AppHeading level={titleLevel} className="line-clamp-1 text-sm font-bold">{productTitle}</AppHeading>
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-col gap-1">
-              {product?.originalPrice && discountPercent > 0 && !isLoading ? (
-                <div className="text-xs text-danger-text-nomode line-through">
-                  {formatPrice(product.originalPrice)}
-                </div>
-              ) : null}
-              <div className="text-sm font-semibold text-primary">
+          <div className="flex min-h-0 flex-1 items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-col">
+              <div className={`text-xs leading-4 line-through ${showOriginalPrice ? "text-danger-text-nomode" : "invisible"}`}>
+                {showOriginalPrice ? formatPrice(product?.originalPrice) : formatPrice("0")}
+              </div>
+              <div className="text-sm font-semibold leading-5 text-primary">
                 {product ? formatPrice(getFinalPrice(product)) : formatPrice("0")}
               </div>
             </div>
             {discountPercent > 0 && !isLoading ? (
-              <CustomTag size="xs" rounded="full">
+              <CustomTag size="xs" rounded="full" className="shrink-0">
                 <span>{discountPercent}٪ تخفیف</span>
               </CustomTag>
             ) : null}
           </div>
-          <ProductRatingSummary average={product?.ratingAverage} count={product?.ratingCount} />
+          <ProductRatingSummary className="min-h-5 shrink-0" average={product?.ratingAverage} count={product?.ratingCount} />
         </div>
       </div>
       <div
-        className={`flex min-h-12 gap-2 border-t p-3 ${
+        className={`flex h-12 shrink-0 items-center gap-2 border-t px-3 ${
           isLoading ? "border-border-default" : "border-primary-border"
         }`}
       >

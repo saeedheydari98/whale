@@ -936,8 +936,17 @@ export const openApiDocument = {
               required: ["id", "count"],
             },
           },
+          storefront: {
+            type: "object",
+            properties: {
+              home: { type: "integer" },
+              categories: { type: "integer" },
+              products: { type: "integer" },
+            },
+            required: ["home", "categories", "products"],
+          },
         },
-        required: ["products", "orders", "users", "banners", "showcases", "categoryGroups", "brandGroups"],
+        required: ["products", "orders", "users", "banners", "showcases", "categoryGroups", "brandGroups", "storefront"],
       },
       AdminDashboard: {
         type: "object",

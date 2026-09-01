@@ -1,3 +1,4 @@
+import { NOTIFICATION_SILENT_HEADER } from "@/lib/app-notifications";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 
 export const USER_STRUCTURE_URL = "/api/user/structure";
@@ -38,7 +39,10 @@ export async function getUserPanelStructure(options?: { force?: boolean }) {
 export async function markUserDiscountsSeen() {
   const response = await fetch(USER_STRUCTURE_URL, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      [NOTIFICATION_SILENT_HEADER]: "true",
+    },
     credentials: "same-origin",
     body: JSON.stringify({ seenDiscounts: true }),
   });

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { securityHeaders } from "@/lib/security-headers";
+import type { NextRequest } from "next/server";
+import { securityHeaders } from "./lib/security-headers";
 
-export function proxy() {
+export function proxy(_request: NextRequest) {
   const response = NextResponse.next();
   for (const [key, value] of Object.entries(securityHeaders())) {
     response.headers.set(key, value);
