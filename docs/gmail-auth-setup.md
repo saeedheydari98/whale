@@ -18,7 +18,19 @@ GMAIL_FROM_NAME=Whale
 
 ## Vercel
 
-همین سه متغیر را در `Project Settings > Environment Variables` پروژه Vercel اضافه و deployment را دوباره اجرا کنید. برنامه از `smtp.gmail.com` روی پورت امن ۴۶۵ استفاده می‌کند و تا پایان ارسال منتظر می‌ماند.
+در `Project Settings > Environment Variables` این‌ها را برای Production بگذارید و بعد یک دیپلوی تازه بزنید:
+
+```env
+JWT_SECRET=
+GMAIL_SMTP_USER=your-account@gmail.com
+GMAIL_SMTP_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+GMAIL_FROM_NAME=Whale
+DATABASE_URL=
+```
+
+`JWT_SECRET` برای هش کد OTP لازم است؛ بدون آن `/api/auth/request-otp` خطا می‌دهد. اسکریپت `vercel-build` هنگام دیپلوی `prisma migrate deploy` را اجرا می‌کند تا جدول `AuthOtp` با ستون ایمیل روی دیتابیس پروداکشن هم‌خوان شود.
+
+ارسال ایمیل روی Vercel با SMTP روی IPv4 و پورت ۴۶۵/۵۸۷ انجام می‌شود. اگر پورت SMTP در پلن شما بسته باشد پاسخ `503` است، نه `500`.
 
 ## دیتابیس و اجرا
 

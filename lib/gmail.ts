@@ -1,19 +1,25 @@
 import nodemailer from "nodemailer";
+import { runtimeEnv } from "@/lib/env";
 import { EMAIL_PATTERN, OTP_CODE_PATTERN } from "@/lib/validation-patterns";
 
 const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ECONNECTION",
   "ECONNREFUSED",
   "ECONNRESET",
+  "EHOSTUNREACH",
   "ENETUNREACH",
+  "ENOTFOUND",
+  "EAI_AGAIN",
   "ESOCKET",
   "ETIMEDOUT",
+  "ETIMEOUT",
+  "ERR_SOCKET_CONNECTION_TIMEOUT",
 ]);
 
 function gmailConfig() {
-  const user = String(process.env.GMAIL_SMTP_USER ?? "").trim().toLowerCase();
-  const appPassword = String(process.env.GMAIL_SMTP_APP_PASSWORD ?? "").replace(/\s+/g, "");
-  const fromName = String(process.env.GMAIL_FROM_NAME ?? "Whale").trim() || "Whale";
+  const user = String(runtimeEnv("GMAIL_SMTP_USER") ?? "").toLowerCase();
+  const appPassword = String(runtimeEnv("GMAIL_SMTP_APP_PASSWORD") ?? "").replace(/\s+/g, "");
+  const fromName = runtimeEnv("GMAIL_FROM_NAME") || "Whale";
 
   if (!user || !appPassword) {
     throw new Error("Gmail SMTP is not configured. Set GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD.");
@@ -33,12 +39,14 @@ function createGmailTransport(
 ) {
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
-    ...connection,
+    port: connection.port,
+    secure: connection.secure,
     auth,
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
-    socketTimeout: 15_000,
-  });
+    family: 4,
+    connectionTimeout: 4_000,
+    greetingTimeout: 4_000,
+    socketTimeout: 8_000,
+  } as nodemailer.TransportOptions);
 }
 
 export async function sendAuthOtpEmail(input: {

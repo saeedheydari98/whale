@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import WebSocket from "ws";
+import { runtimeEnv } from "@/lib/env";
 
 const PRISMA_SCHEMA_VERSION = "neon-fetch-rhel-engine-v1";
 const globalForPrisma = globalThis as unknown as {
@@ -16,7 +17,7 @@ if (globalForPrisma.prisma && globalForPrisma.prismaSchemaVersion !== PRISMA_SCH
 }
 
 function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = runtimeEnv("DATABASE_URL");
   if (!connectionString) throw new Error("DATABASE_URL is not configured.");
 
   neonConfig.webSocketConstructor = typeof globalThis.WebSocket === "function" ? globalThis.WebSocket : WebSocket;

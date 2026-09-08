@@ -3,6 +3,7 @@ import { securityHeaderList } from "./lib/security-headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["nodemailer", "ws"],
   outputFileTracingIncludes: {
     "/*": ["./node_modules/.prisma/client/**", "./node_modules/@prisma/client/**"],
   },

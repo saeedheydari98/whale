@@ -18,12 +18,14 @@ import {
   verifyHashedToken,
   verifyToken,
 } from "@/lib/api/auth";
+import { MissingAuthSecretError } from "@/lib/env";
 import { sendAuthOtpEmail } from "@/lib/gmail";
 import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
 import { runDiscountRules } from "@/lib/api/discount-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 30;
 
 type Context = { params: Promise<{ path?: string[] }> };
 type AuthIdentity = { phone: string; email: string };
@@ -308,6 +310,10 @@ export async function POST(request: Request, context: Context) {
     return apiFail("مسیر پیدا نشد.", 404);
   } catch (error) {
     if (error instanceof AuthIdentityConflictError) return apiFail(error.message, 409);
+    if (error instanceof MissingAuthSecretError) {
+      console.error("Auth API error:", error);
+      return apiFail("در حال حاضر امکان ارسال کد ورود وجود ندارد. لطفاً چند دقیقه دیگر دوباره تلاش کنید.", 503);
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return apiFail("شماره موبایل یا ایمیل قبلاً به حساب دیگری متصل شده است.", 409);
     }
