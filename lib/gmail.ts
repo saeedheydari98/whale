@@ -79,6 +79,7 @@ async function sendViaWebhook(mail: OtpMail, url: string, secret: string | undef
     body: JSON.stringify({
       secret: secret ?? "",
       to: mail.to,
+      from: mail.fromAddress,
       fromName: mail.fromName,
       subject: mail.subject,
       text: mail.text,

@@ -1,6 +1,8 @@
 # راه‌اندازی ورود بدون رمز با Gmail
 
-این پروژه کد ورود شش‌رقمی را از حساب Gmail شما می‌فرستد. لوکال از SMTP استفاده می‌کند. دامنهٔ Vercel پورت SMTP را می‌بندد، بنابراین پروداکشن باید از HTTPS بفرستد.
+کد ورود همیشه از **همان جیمیل خودتان** می‌رود (`GMAIL_SMTP_USER`). روی لوکال این کار با SMTP انجام می‌شود. Vercel پورت SMTP را می‌بندد، پس پروداکشن همان حساب را با HTTPS می‌فرستد — نه سرویس ایمیل دیگری.
+
+اسکریپت یا OAuth را با **همان اکانتی** بسازید که `GMAIL_SMTP_USER` است.
 
 ## لوکال (SMTP)
 
@@ -35,6 +37,7 @@ function doPost(e) {
   }
   MailApp.sendEmail({
     to: String(data.to || ""),
+    replyTo: String(data.from || ""),
     subject: String(data.subject || ""),
     body: String(data.text || ""),
     htmlBody: String(data.html || data.text || ""),
@@ -46,17 +49,16 @@ function doPost(e) {
 
 3. `Project Settings > Script properties`: کلید `WEBHOOK_SECRET` با یک رشتهٔ تصادفی.
 4. `Deploy > New deployment > Web app`: Execute as **Me**، Who has access **Anyone**.
-5. URL را در Vercel بگذارید:
+5. URL را در Vercel بگذارید. اسکریپت را وقتی وارد همان جیمیل `GMAIL_SMTP_USER` هستید Deploy کنید تا فرستنده همان ایمیل خودتان باشد:
 
 ```env
+GMAIL_SMTP_USER=your-account@gmail.com
 GMAIL_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
 GMAIL_WEBHOOK_SECRET=همان-مقدار-اسکریپت
 GMAIL_FROM_NAME=Whale
 JWT_SECRET=
 DATABASE_URL=
 ```
-
-ایمیل از همان حساب گوگلِ صاحب اسکریپت می‌رود.
 
 ### روش ۲ — Gmail API (OAuth)
 
