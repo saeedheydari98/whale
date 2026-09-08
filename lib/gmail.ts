@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
-import { runtimeEnv } from "@/lib/env";
 import { EMAIL_PATTERN, OTP_CODE_PATTERN } from "@/lib/validation-patterns";
+
 const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ECONNECTION",
   "ECONNREFUSED",
@@ -24,18 +24,28 @@ type OtpMail = {
   html: string;
 };
 
-function mailConfig() {
-  const user = String(runtimeEnv("GMAIL_SMTP_USER") ?? "").toLowerCase();
-  const appPassword = String(runtimeEnv("GMAIL_SMTP_APP_PASSWORD") ?? "").replace(/\s+/g, "");
+function trimEnv(value: string | undefined) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function gmailConfig() {
+  const user = process.env.GMAIL_SMTP_USER;
+  const appPassword = process.env.GMAIL_SMTP_APP_PASSWORD;
+  const fromName = process.env.GMAIL_FROM_NAME;
+  const webhookUrl = process.env.GMAIL_WEBHOOK_URL;
+  const webhookSecret = process.env.GMAIL_WEBHOOK_SECRET;
+  const oauthClientId = process.env.GMAIL_OAUTH_CLIENT_ID;
+  const oauthClientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET;
+  const oauthRefreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN;
   return {
-    user,
-    appPassword,
-    fromName: runtimeEnv("GMAIL_FROM_NAME") || "Whale",
-    webhookUrl: runtimeEnv("GMAIL_WEBHOOK_URL"),
-    webhookSecret: runtimeEnv("GMAIL_WEBHOOK_SECRET"),
-    oauthClientId: runtimeEnv("GMAIL_OAUTH_CLIENT_ID"),
-    oauthClientSecret: runtimeEnv("GMAIL_OAUTH_CLIENT_SECRET"),
-    oauthRefreshToken: runtimeEnv("GMAIL_OAUTH_REFRESH_TOKEN"),
+    user: trimEnv(user).toLowerCase(),
+    appPassword: trimEnv(appPassword).replace(/\s+/g, ""),
+    fromName: trimEnv(fromName) || "Whale",
+    webhookUrl: trimEnv(webhookUrl),
+    webhookSecret: trimEnv(webhookSecret),
+    oauthClientId: trimEnv(oauthClientId),
+    oauthClientSecret: trimEnv(oauthClientSecret),
+    oauthRefreshToken: trimEnv(oauthRefreshToken),
   };
 }
 
@@ -71,13 +81,13 @@ function rfc822Raw(mail: OtpMail) {
   return Buffer.from(body, "utf8").toString("base64url");
 }
 
-async function sendViaWebhook(mail: OtpMail, url: string, secret: string | undefined) {
+async function sendViaWebhook(mail: OtpMail, url: string, secret: string) {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     redirect: "follow",
     body: JSON.stringify({
-      secret: secret ?? "",
+      secret,
       to: mail.to,
       from: mail.fromAddress,
       fromName: mail.fromName,
@@ -121,17 +131,18 @@ async function sendViaGmailApi(mail: OtpMail, clientId: string, clientSecret: st
 
 function createGmailTransport(
   auth: { user: string; pass: string },
-  connection: { port: number; secure: boolean }
+  connection: { port: number; secure: boolean; requireTLS?: boolean }
 ) {
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: connection.port,
     secure: connection.secure,
+    requireTLS: connection.requireTLS,
     auth,
     family: 4,
-    connectionTimeout: 3_000,
-    greetingTimeout: 3_000,
-    socketTimeout: 6_000,
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
   } as nodemailer.TransportOptions);
 }
 
@@ -145,7 +156,7 @@ async function sendViaSmtp(mail: OtpMail, user: string, appPassword: string) {
   };
   const connections = [
     { port: 465, secure: true },
-    { port: 587, secure: false },
+    { port: 587, secure: false, requireTLS: true },
   ];
 
   for (const [index, connection] of connections.entries()) {
@@ -172,7 +183,7 @@ export async function sendAuthOtpEmail(input: {
   if (!EMAIL_PATTERN.test(email)) throw new Error("Invalid OTP recipient email.");
   if (!OTP_CODE_PATTERN.test(input.code)) throw new Error("Invalid OTP code.");
 
-  const config = mailConfig();
+  const config = gmailConfig();
   const mail: OtpMail = {
     to: email,
     fromName: config.fromName,
@@ -190,7 +201,10 @@ export async function sendAuthOtpEmail(input: {
   `,
   };
 
-  const onVercel = Boolean(runtimeEnv("VERCEL"));
+  if (config.user && config.appPassword) {
+    await sendViaSmtp(mail, config.user, config.appPassword);
+    return;
+  }
   if (config.webhookUrl) {
     await sendViaWebhook(mail, config.webhookUrl, config.webhookSecret);
     return;
@@ -199,14 +213,5 @@ export async function sendAuthOtpEmail(input: {
     await sendViaGmailApi(mail, config.oauthClientId, config.oauthClientSecret, config.oauthRefreshToken);
     return;
   }
-  if (config.user && config.appPassword && !onVercel) {
-    await sendViaSmtp(mail, config.user, config.appPassword);
-    return;
-  }
-  if (config.user && config.appPassword && onVercel) {
-    throw new Error(
-      "Vercel blocks outbound SMTP. Set GMAIL_WEBHOOK_URL or GMAIL_OAUTH_CLIENT_ID/GMAIL_OAUTH_CLIENT_SECRET/GMAIL_OAUTH_REFRESH_TOKEN."
-    );
-  }
-  throw new Error("Gmail is not configured. Set GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD, or a Vercel HTTPS transport.");
+  throw new Error("Gmail SMTP is not configured. Set GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD.");
 }
