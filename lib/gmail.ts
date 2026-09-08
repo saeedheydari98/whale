@@ -1,7 +1,6 @@
 import nodemailer from "nodemailer";
 import { runtimeEnv } from "@/lib/env";
 import { EMAIL_PATTERN, OTP_CODE_PATTERN } from "@/lib/validation-patterns";
-
 const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ECONNECTION",
   "ECONNREFUSED",
@@ -16,21 +15,107 @@ const SMTP_CONNECTION_ERROR_CODES = new Set([
   "ERR_SOCKET_CONNECTION_TIMEOUT",
 ]);
 
-function gmailConfig() {
+type OtpMail = {
+  to: string;
+  fromName: string;
+  fromAddress: string;
+  subject: string;
+  text: string;
+  html: string;
+};
+
+function mailConfig() {
   const user = String(runtimeEnv("GMAIL_SMTP_USER") ?? "").toLowerCase();
   const appPassword = String(runtimeEnv("GMAIL_SMTP_APP_PASSWORD") ?? "").replace(/\s+/g, "");
-  const fromName = runtimeEnv("GMAIL_FROM_NAME") || "Whale";
-
-  if (!user || !appPassword) {
-    throw new Error("Gmail SMTP is not configured. Set GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD.");
-  }
-
-  return { user, appPassword, fromName };
+  return {
+    user,
+    appPassword,
+    fromName: runtimeEnv("GMAIL_FROM_NAME") || "Whale",
+    webhookUrl: runtimeEnv("GMAIL_WEBHOOK_URL"),
+    webhookSecret: runtimeEnv("GMAIL_WEBHOOK_SECRET"),
+    oauthClientId: runtimeEnv("GMAIL_OAUTH_CLIENT_ID"),
+    oauthClientSecret: runtimeEnv("GMAIL_OAUTH_CLIENT_SECRET"),
+    oauthRefreshToken: runtimeEnv("GMAIL_OAUTH_REFRESH_TOKEN"),
+  };
 }
 
 function smtpErrorCode(error: unknown) {
   if (!error || typeof error !== "object" || !("code" in error)) return "";
   return String(error.code ?? "").toUpperCase();
+}
+
+function encodedHeaderValue(value: string) {
+  if (/^[\x20-\x7E]*$/.test(value)) return value;
+  return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
+}
+
+function rfc822Raw(mail: OtpMail) {
+  const from = `${encodedHeaderValue(mail.fromName)} <${mail.fromAddress}>`;
+  const body = [
+    `From: ${from}`,
+    `To: ${mail.to}`,
+    `Subject: ${encodedHeaderValue(mail.subject)}`,
+    "MIME-Version: 1.0",
+    'Content-Type: multipart/alternative; boundary="whale-otp"',
+    "",
+    "--whale-otp",
+    "Content-Type: text/plain; charset=UTF-8",
+    "",
+    mail.text,
+    "--whale-otp",
+    "Content-Type: text/html; charset=UTF-8",
+    "",
+    mail.html,
+    "--whale-otp--",
+  ].join("\r\n");
+  return Buffer.from(body, "utf8").toString("base64url");
+}
+
+async function sendViaWebhook(mail: OtpMail, url: string, secret: string | undefined) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    redirect: "follow",
+    body: JSON.stringify({
+      secret: secret ?? "",
+      to: mail.to,
+      fromName: mail.fromName,
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+    }),
+  });
+  if (!response.ok) throw new Error(`Gmail HTTPS webhook failed (${response.status}).`);
+}
+
+async function gmailAccessToken(clientId: string, clientSecret: string, refreshToken: string) {
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  if (!response.ok) throw new Error("Gmail OAuth token refresh failed.");
+  const json = await response.json() as { access_token?: string };
+  if (!json.access_token) throw new Error("Gmail OAuth token refresh failed.");
+  return json.access_token;
+}
+
+async function sendViaGmailApi(mail: OtpMail, clientId: string, clientSecret: string, refreshToken: string) {
+  const accessToken = await gmailAccessToken(clientId, clientSecret, refreshToken);
+  const response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ raw: rfc822Raw(mail) }),
+  });
+  if (!response.ok) throw new Error(`Gmail API send failed (${response.status}).`);
 }
 
 function createGmailTransport(
@@ -43,40 +128,19 @@ function createGmailTransport(
     secure: connection.secure,
     auth,
     family: 4,
-    connectionTimeout: 4_000,
-    greetingTimeout: 4_000,
-    socketTimeout: 8_000,
+    connectionTimeout: 3_000,
+    greetingTimeout: 3_000,
+    socketTimeout: 6_000,
   } as nodemailer.TransportOptions);
 }
 
-export async function sendAuthOtpEmail(input: {
-  email: string;
-  code: string;
-  expiresInMinutes: number;
-}) {
-  const email = input.email.trim().toLowerCase();
-  if (!EMAIL_PATTERN.test(email)) throw new Error("Invalid OTP recipient email.");
-  if (!OTP_CODE_PATTERN.test(input.code)) throw new Error("Invalid OTP code.");
-
-  const { user, appPassword, fromName } = gmailConfig();
-  const subject = "کد ورود به فروشگاه وال";
-  const text = `به فروشگاه وال خوش آمدید.\nکد ورود شما: ${input.code}\nاین کد تا ${input.expiresInMinutes} دقیقه معتبر است. اگر این درخواست را شما ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.`;
-  const html = `
-    <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;line-height:1.8;color:#172033">
-      <div style="font-size:18px;font-weight:700">به فروشگاه وال خوش آمدید</div>
-      <div style="margin-top:16px">کد یک‌بارمصرف شما:</div>
-      <div dir="ltr" style="margin-top:8px;font-size:32px;font-weight:800;letter-spacing:8px">${input.code}</div>
-      <div style="margin-top:16px">این کد تا ${input.expiresInMinutes} دقیقه معتبر است.</div>
-      <div style="margin-top:8px;color:#667085">اگر این درخواست را شما ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.</div>
-    </div>
-  `;
-
+async function sendViaSmtp(mail: OtpMail, user: string, appPassword: string) {
   const message = {
-    from: { address: user, name: fromName },
-    to: email,
-    subject,
-    text,
-    html,
+    from: { address: user, name: mail.fromName },
+    to: mail.to,
+    subject: mail.subject,
+    text: mail.text,
+    html: mail.html,
   };
   const connections = [
     { port: 465, secure: true },
@@ -96,4 +160,52 @@ export async function sendAuthOtpEmail(input: {
       transporter.close();
     }
   }
+}
+
+export async function sendAuthOtpEmail(input: {
+  email: string;
+  code: string;
+  expiresInMinutes: number;
+}) {
+  const email = input.email.trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) throw new Error("Invalid OTP recipient email.");
+  if (!OTP_CODE_PATTERN.test(input.code)) throw new Error("Invalid OTP code.");
+
+  const config = mailConfig();
+  const mail: OtpMail = {
+    to: email,
+    fromName: config.fromName,
+    fromAddress: config.user || email,
+    subject: "کد ورود به فروشگاه وال",
+    text: `به فروشگاه وال خوش آمدید.\nکد ورود شما: ${input.code}\nاین کد تا ${input.expiresInMinutes} دقیقه معتبر است. اگر این درخواست را شما ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.`,
+    html: `
+    <div dir="rtl" style="font-family:Tahoma,Arial,sans-serif;line-height:1.8;color:#172033">
+      <div style="font-size:18px;font-weight:700">به فروشگاه وال خوش آمدید</div>
+      <div style="margin-top:16px">کد یک‌بارمصرف شما:</div>
+      <div dir="ltr" style="margin-top:8px;font-size:32px;font-weight:800;letter-spacing:8px">${input.code}</div>
+      <div style="margin-top:16px">این کد تا ${input.expiresInMinutes} دقیقه معتبر است.</div>
+      <div style="margin-top:8px;color:#667085">اگر این درخواست را شما ثبت نکرده‌اید، این ایمیل را نادیده بگیرید.</div>
+    </div>
+  `,
+  };
+
+  const onVercel = Boolean(runtimeEnv("VERCEL"));
+  if (config.webhookUrl) {
+    await sendViaWebhook(mail, config.webhookUrl, config.webhookSecret);
+    return;
+  }
+  if (config.oauthClientId && config.oauthClientSecret && config.oauthRefreshToken) {
+    await sendViaGmailApi(mail, config.oauthClientId, config.oauthClientSecret, config.oauthRefreshToken);
+    return;
+  }
+  if (config.user && config.appPassword && !onVercel) {
+    await sendViaSmtp(mail, config.user, config.appPassword);
+    return;
+  }
+  if (config.user && config.appPassword && onVercel) {
+    throw new Error(
+      "Vercel blocks outbound SMTP. Set GMAIL_WEBHOOK_URL or GMAIL_OAUTH_CLIENT_ID/GMAIL_OAUTH_CLIENT_SECRET/GMAIL_OAUTH_REFRESH_TOKEN."
+    );
+  }
+  throw new Error("Gmail is not configured. Set GMAIL_SMTP_USER and GMAIL_SMTP_APP_PASSWORD, or a Vercel HTTPS transport.");
 }

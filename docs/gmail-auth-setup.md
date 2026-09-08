@@ -1,40 +1,84 @@
-# راه‌اندازی ورود بدون رمز با Gmail SMTP
+# راه‌اندازی ورود بدون رمز با Gmail
 
-این پروژه کد ورود شش‌رقمی را با SMTP حساب Gmail ارسال می‌کند. این روش به دامنه اختصاصی وابسته نیست و برای پروژه‌های کم‌حجم مناسب است.
+این پروژه کد ورود شش‌رقمی را از حساب Gmail شما می‌فرستد. لوکال از SMTP استفاده می‌کند. دامنهٔ Vercel پورت SMTP را می‌بندد، بنابراین پروداکشن باید از HTTPS بفرستد.
 
-## ساخت App Password
+## لوکال (SMTP)
 
-1. در حساب Google، ورود دومرحله‌ای را فعال کنید.
-2. در بخش `App passwords` یک رمز مخصوص برنامه بسازید.
-3. فایل `.env.gmail.example` را مبنا قرار دهید و مقادیر زیر را در `.env` یا secretهای محیط استقرار تنظیم کنید:
+1. در حساب Google ورود دومرحله‌ای را فعال کنید.
+2. در `App passwords` یک رمز مخصوص برنامه بسازید.
+3. در `.env` بگذارید:
 
 ```env
 GMAIL_SMTP_USER=your-account@gmail.com
 GMAIL_SMTP_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
 GMAIL_FROM_NAME=Whale
+JWT_SECRET=
 ```
 
-رمز اصلی حساب Gmail را در پروژه قرار ندهید. فقط از App Password استفاده کنید و آن را در Git یا رابط کاربری منتشر نکنید.
+رمز اصلی Gmail را در پروژه نگذارید.
 
-## Vercel
+## Vercel (HTTPS، الزامی)
 
-در `Project Settings > Environment Variables` این‌ها را برای Production بگذارید و بعد یک دیپلوی تازه بزنید:
+SMTP روی `whalestore.vercel.app` کار نمی‌کند و `/api/auth/request-otp` با `503` برمی‌گردد. یکی از دو روش HTTPS را اضافه کنید، بعد دیپلوی کنید.
+
+### روش ۱ — Apps Script (یک آدرس وب‌هوک)
+
+1. به [Google Apps Script](https://script.google.com) بروید و یک پروژه بسازید.
+2. این کد را جایگزین `Code.gs` کنید:
+
+```javascript
+function doPost(e) {
+  const data = JSON.parse(e.postData.contents || "{}");
+  const expected = PropertiesService.getScriptProperties().getProperty("WEBHOOK_SECRET") || "";
+  if (expected && data.secret !== expected) {
+    return ContentService.createTextOutput(JSON.stringify({ ok: false })).setMimeType(ContentService.MimeType.JSON);
+  }
+  MailApp.sendEmail({
+    to: String(data.to || ""),
+    subject: String(data.subject || ""),
+    body: String(data.text || ""),
+    htmlBody: String(data.html || data.text || ""),
+    name: String(data.fromName || "Whale"),
+  });
+  return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+3. `Project Settings > Script properties`: کلید `WEBHOOK_SECRET` با یک رشتهٔ تصادفی.
+4. `Deploy > New deployment > Web app`: Execute as **Me**، Who has access **Anyone**.
+5. URL را در Vercel بگذارید:
 
 ```env
-JWT_SECRET=
-GMAIL_SMTP_USER=your-account@gmail.com
-GMAIL_SMTP_APP_PASSWORD=xxxx-xxxx-xxxx-xxxx
+GMAIL_WEBHOOK_URL=https://script.google.com/macros/s/.../exec
+GMAIL_WEBHOOK_SECRET=همان-مقدار-اسکریپت
 GMAIL_FROM_NAME=Whale
+JWT_SECRET=
 DATABASE_URL=
 ```
 
-`JWT_SECRET` برای هش کد OTP لازم است؛ بدون آن `/api/auth/request-otp` خطا می‌دهد. اسکریپت `vercel-build` هنگام دیپلوی `prisma migrate deploy` را اجرا می‌کند تا جدول `AuthOtp` با ستون ایمیل روی دیتابیس پروداکشن هم‌خوان شود.
+ایمیل از همان حساب گوگلِ صاحب اسکریپت می‌رود.
 
-ارسال ایمیل روی Vercel با SMTP روی IPv4 و پورت ۴۶۵/۵۸۷ انجام می‌شود. اگر پورت SMTP در پلن شما بسته باشد پاسخ `503` است، نه `500`.
+### روش ۲ — Gmail API (OAuth)
 
-## دیتابیس و اجرا
+اگر ترجیح می‌دهید Cloud Console:
 
-پس از تنظیم متغیرها، برنامه را دوباره اجرا کنید:
+1. Gmail API را روشن کنید و OAuth Client بسازید.
+2. Refresh token با اسکوپ `https://www.googleapis.com/auth/gmail.send` بگیرید.
+3. در Vercel:
+
+```env
+GMAIL_SMTP_USER=your-account@gmail.com
+GMAIL_FROM_NAME=Whale
+GMAIL_OAUTH_CLIENT_ID=
+GMAIL_OAUTH_CLIENT_SECRET=
+GMAIL_OAUTH_REFRESH_TOKEN=
+JWT_SECRET=
+DATABASE_URL=
+```
+
+## دیتابیس
+
+بیلد Vercel اسکریپت `vercel-build` را اجرا می‌کند و `prisma migrate deploy` می‌زند. لوکال:
 
 ```bash
 npx prisma migrate deploy
@@ -42,4 +86,4 @@ npx prisma generate
 npm run dev
 ```
 
-کدها پنج دقیقه اعتبار دارند، فقط هش آن‌ها در دیتابیس ذخیره می‌شود، پس از پنج تلاش ناموفق باطل می‌شوند و ارسال مجدد ۶۰ ثانیه زمان انتظار دارد. متغیر `AUTH_OTP_EXPOSE_CODE` فقط برای توسعه محلی است و در production باید خاموش بماند.
+کدها پنج دقیقه اعتبار دارند، فقط هش در دیتابیس ذخیره می‌شود، پس از پنج تلاش ناموفق باطل می‌شوند و ارسال مجدد ۶۰ ثانیه فاصله دارد. `AUTH_OTP_EXPOSE_CODE` فقط برای توسعهٔ محلی است.

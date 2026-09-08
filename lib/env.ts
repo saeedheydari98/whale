@@ -17,9 +17,10 @@ export class MissingAuthSecretError extends Error {
   }
 }
 
-/** Read at call time so Vercel runtime secrets are not frozen from the build machine. */
+/** Read at call time. `process["env"]` so Next.js cannot inline secrets at build. */
 export function runtimeEnv(name: string) {
-  const value = process.env[name];
+  const env = process["env"];
+  const value = env[name];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
