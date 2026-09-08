@@ -25,7 +25,6 @@ type ShowcaseSectionProps = {
   getDiscountPercent: (product: Product) => number;
   isLoading?: boolean;
   totalCount?: number | string;
-  onCapacityChange?: (capacity: number) => void;
   hideShowcaseLink?: boolean;
 };
 
@@ -157,7 +156,6 @@ export function ShowcaseSection({
   getDiscountPercent,
   isLoading = false,
   totalCount,
-  onCapacityChange,
   hideShowcaseLink = false,
 }: ShowcaseSectionProps) {
   const railDrag = useHorizontalDrag<HTMLDivElement>();
@@ -194,10 +192,9 @@ export function ShowcaseSection({
         isLoading={isLoading}
         totalCount={Number.isFinite(Number(totalCount)) ? Number(totalCount) : undefined}
         structure={Number.isFinite(Number(totalCount)) ? { count: Number(totalCount) } : undefined}
-        onCapacityChange={onCapacityChange}
         containerRef={railDrag.ref}
         containerProps={railDrag.dragHandlers}
-        className={`flex gap-3 overflow-x-auto overscroll-x-contain pb-2 ${
+        className={`flex flex-nowrap items-start gap-3 overflow-x-auto overscroll-x-contain py-2 ${
           railDrag.isDragging ? "cursor-grabbing" : "cursor-grab"
         }`}
         renderSkeleton={() => (

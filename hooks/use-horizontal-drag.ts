@@ -105,6 +105,7 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     if (disabled || event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest(ignoreSelector)) return;
+    if (event.pointerType !== "mouse") return;
     event.preventDefault();
 
     stateRef.current = {

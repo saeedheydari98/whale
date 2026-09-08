@@ -231,6 +231,7 @@ function observeUntilVisible(node: Element, onVisible: () => void, rootMargin = 
 function collectionItemShellClass(className?: string) {
   const classes = className ?? "";
   if (/\bflex-col\b/.test(classes)) return "w-full min-w-0 shrink-0";
+  if (/\boverflow-x-/.test(classes)) return "shrink-0 w-max";
   return "self-start w-max max-w-full shrink-0";
 }
 
@@ -272,7 +273,7 @@ function usedItemSize(item: HTMLElement, container: HTMLElement, wrap: boolean) 
     width = wrap || stretched || width <= 0
       ? layoutWidth
       : Math.min(Math.max(width, minWidth), layoutWidth);
-  } else if (containerWidth > 0 && (stretched || width > containerWidth)) {
+  } else if (wrap && containerWidth > 0 && (stretched || width > containerWidth)) {
     width = containerWidth;
   }
 
@@ -610,6 +611,7 @@ function SkeletonStructure({
 
         const sourceStyle = window.getComputedStyle(source);
         const sourceFontSize = numericStyleValue(sourceStyle.fontSize);
+        const sourceVisible = isInViewport(source.getBoundingClientRect()) || isInViewport(rootRect);
         const elements = Array.from(source.querySelectorAll<HTMLElement>(
           "main, section, article, form, ul, ol, li, div, a, button, img, input, textarea, select, h1, h2, h3, h4, h5, h6, [role='button'], [data-loading-leaf]"
         ));
@@ -629,7 +631,7 @@ function SkeletonStructure({
           const width = rect.width;
           const height = rect.height;
           if (width <= 0 || height <= 0) return [];
-          if (!isInViewport(rect) && element !== source) return [];
+          if (!sourceVisible && element !== source) return [];
 
           const style = window.getComputedStyle(element);
           if (style.display === "none" || style.display === "contents") return [];

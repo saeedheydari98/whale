@@ -121,19 +121,19 @@ function LazyShowcaseSection({
   onPreview,
   hideShowcaseLink = false,
 }: LazyShowcaseSectionProps) {
-  const [capacity, setCapacity] = useState(0);
   const hasInitialProducts = products.length > 0;
+  const productLimit = Math.max(1, Number(showcase.productCount) || Number(showcase.limit) || 8);
   const showcaseProductsQuery = useQuery({
-    queryKey: ["catalog", "showcase", showcase.id, "products", "lazy", capacity],
-    queryFn: () => getShowcaseProducts(showcase.id, { limit: Math.max(1, capacity) }),
-    enabled: Boolean(showcase.id) && showcase.id !== "all-products" && !hasInitialProducts && capacity > 0,
+    queryKey: ["catalog", "showcase", showcase.id, "products", "lazy", productLimit],
+    queryFn: () => getShowcaseProducts(showcase.id, { limit: productLimit }),
+    enabled: Boolean(showcase.id) && showcase.id !== "all-products" && !hasInitialProducts,
     placeholderData: (previous) => previous,
   });
 
   const loadedProducts = hasInitialProducts
     ? products
     : (showcaseProductsQuery.data?.products as Product[] | undefined) ?? [];
-  const isLoading = !hasInitialProducts && (capacity === 0 || showcaseProductsQuery.isLoading);
+  const isLoading = !hasInitialProducts && showcaseProductsQuery.isLoading;
 
   if (!isLoading && loadedProducts.length === 0 && Number(showcase.productCount ?? 0) === 0) return null;
 
@@ -148,8 +148,7 @@ function LazyShowcaseSection({
       getDiscountPercent={getDiscountPercent}
       hideShowcaseLink={hideShowcaseLink}
       isLoading={isLoading}
-      totalCount={showcase.productCount}
-      onCapacityChange={setCapacity}
+      totalCount={showcase.productCount ?? productLimit}
     />
   );
 }
@@ -392,7 +391,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
                     getDiscountPercent={getDiscountPercent}
                     hideShowcaseLink={mode === "products"}
                     isLoading
-                    totalCount={Math.min(1, Number(section.item.productCount) || 1)}
+                    totalCount={Number(section.item.productCount) || Number(section.item.limit) || 8}
                   />
                 }
               >

@@ -4,7 +4,7 @@ import { PrismaNeon } from "@prisma/adapter-neon";
 import { Pool, neonConfig } from "@neondatabase/serverless";
 import WebSocket from "ws";
 
-const PRISMA_SCHEMA_VERSION = "neon-driver-v2-discount-seen-at";
+const PRISMA_SCHEMA_VERSION = "neon-fetch-rhel-engine-v1";
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   prismaSchemaVersion?: string;
@@ -19,7 +19,8 @@ function createPrismaClient() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("DATABASE_URL is not configured.");
 
-  neonConfig.webSocketConstructor = WebSocket;
+  neonConfig.webSocketConstructor = typeof globalThis.WebSocket === "function" ? globalThis.WebSocket : WebSocket;
+  neonConfig.poolQueryViaFetch = true;
   const pool = new Pool({ connectionString });
   const adapter = new PrismaNeon(pool);
   return new PrismaClient({ adapter });
