@@ -30,7 +30,7 @@ export const maxDuration = 30;
 type Context = { params: Promise<{ path?: string[] }> };
 type AuthIdentity = { phone: string; email: string };
 
-const OTP_EXPIRES_MINUTES = 5;
+const OTP_EXPIRES_MINUTES = 1;
 const OTP_COOLDOWN_SECONDS = 60;
 const OTP_MAX_ATTEMPTS = 5;
 

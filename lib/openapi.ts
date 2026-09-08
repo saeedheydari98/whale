@@ -1126,7 +1126,7 @@ export const openApiDocument = {
       post: operation({
         tags: ["Auth"],
         summary: "ارسال کد ورود شش‌رقمی به ایمیل",
-        description: "شماره موبایل و ایمیل باید معتبر باشند. کد پنج دقیقه اعتبار دارد و ارسال مجدد تا ۶۰ ثانیه محدود است.",
+        description: "شماره موبایل و ایمیل باید معتبر باشند. کد یک دقیقه اعتبار دارد و ارسال مجدد تا ۶۰ ثانیه محدود است.",
         operationId: "requestOtp",
         body: ref("OtpRequestInput"),
         data: {

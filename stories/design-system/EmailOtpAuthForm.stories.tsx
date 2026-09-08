@@ -35,7 +35,7 @@ const meta = {
       if (url.includes("/api/auth/request-otp")) {
         return new Response(JSON.stringify({
           ok: true,
-          data: { sent: true, retryAfterSeconds: 60, expiresInSeconds: 300 },
+          data: { sent: true, retryAfterSeconds: 60, expiresInSeconds: 60 },
         }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
 
