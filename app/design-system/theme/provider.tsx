@@ -12,10 +12,11 @@ import React, {
 } from "react";
 import { applyCSSVariables } from "./engine";
 import { generateCSSVariables } from "./css-vars";
-import { createTheme, ThemeStyle } from "./theme";
+import { createTheme, resolveColor, ThemeStyle } from "./theme";
 import {
   APP_THEME_STORAGE_KEY,
   DEVICE_THEME_MODE_STORAGE_KEY,
+  LEGACY_THEME_LOCAL_STORAGE_KEYS,
   THEME_CSS_VARS_STORAGE_KEY,
   THEME_STATE_STORAGE_KEY,
 } from "./storage";
@@ -75,7 +76,7 @@ function readStoredMode(): ThemeMode {
 function readCachedGlobalTheme(initialAdminTheme?: unknown): AdminThemeConfig {
   if (typeof window !== "undefined") {
     try {
-      const parsed = JSON.parse(localStorage.getItem(APP_THEME_STORAGE_KEY) || "null") as {
+      const parsed = JSON.parse(window.sessionStorage.getItem(APP_THEME_STORAGE_KEY) || "null") as {
         data?: Partial<AdminThemeConfig>;
       } | null;
       if (parsed?.data) {
@@ -107,9 +108,10 @@ function persistThemeSnapshot(snapshot: Pick<ThemeSnapshot, "mode">, vars: React
   if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem("theme-mode", snapshot.mode);
-    localStorage.setItem(THEME_STATE_STORAGE_KEY, JSON.stringify({ mode: snapshot.mode }));
-    localStorage.setItem(THEME_CSS_VARS_STORAGE_KEY, JSON.stringify(vars));
+    LEGACY_THEME_LOCAL_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+    window.sessionStorage.setItem("theme-mode", snapshot.mode);
+    window.sessionStorage.setItem(THEME_STATE_STORAGE_KEY, JSON.stringify({ mode: snapshot.mode }));
+    window.sessionStorage.setItem(THEME_CSS_VARS_STORAGE_KEY, JSON.stringify(vars));
   } catch {
   }
 }
@@ -129,6 +131,40 @@ function applyThemeSnapshot(snapshot: ThemeSnapshot) {
   applyCSSVariables(vars as Record<string, string>);
   document.documentElement.classList.toggle("dark", snapshot.mode === "dark");
   persistThemeSnapshot(snapshot, vars);
+  updateFaviconAndThemeColor(snapshot.adminTheme, snapshot.style);
+}
+
+function updateFaviconAndThemeColor(adminTheme: AdminThemeConfig, style: ThemeStyle) {
+  if (typeof document === "undefined") return;
+
+  const iconHref = `/icon?primary=${adminTheme.primary}&style=${style}`;
+  const themeColor = resolveColor(adminTheme.primary, style, 500);
+  const head = document.head ?? document.querySelector("head");
+  if (!head) return;
+
+  const iconLinks = Array.from(document.querySelectorAll<HTMLLinkElement>("link[rel='icon'], link[rel='shortcut icon'], link[rel='apple-touch-icon']"));
+  if (iconLinks.length === 0) {
+    const iconLink = document.createElement("link");
+    iconLink.rel = "icon";
+    head.appendChild(iconLink);
+    iconLinks.push(iconLink);
+  }
+
+  for (const element of iconLinks) {
+    if (element.getAttribute("href") === iconHref) continue;
+    element.type = "image/png";
+    element.sizes = "32x32";
+    element.href = iconHref;
+  }
+
+  let themeColorMeta = document.querySelector<HTMLMetaElement>("meta[name='theme-color']");
+  if (!themeColorMeta) {
+    themeColorMeta = document.createElement("meta");
+    themeColorMeta.name = "theme-color";
+    head.appendChild(themeColorMeta);
+  }
+
+  themeColorMeta.setAttribute("content", themeColor);
 }
 
 export function ThemeProvider({
@@ -186,6 +222,7 @@ export function ThemeProvider({
     applyCSSVariables(vars as Record<string, string>);
     document.documentElement.classList.toggle("dark", mode === "dark");
     persistThemeSnapshot({ mode }, vars);
+    updateFaviconAndThemeColor(adminTheme, style);
   }, [adminTheme, applyToDocument, mode, style, theme]);
 
   useEffect(() => {

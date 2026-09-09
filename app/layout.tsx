@@ -11,7 +11,7 @@ import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppUserProvider } from "@/lib/app-user-context";
 import { AppThemeProvider } from "@/lib/app-theme-provider";
-import { createTheme } from "./design-system/theme/theme";
+import { createTheme, resolveColor } from "./design-system/theme/theme";
 import { generateCSSVariables } from "./design-system/theme/css-vars";
 import {
   APP_THEME_CACHE_TTL_MS,
@@ -59,8 +59,12 @@ const initialThemeScript = `
     var root = document.documentElement;
     var userCache = JSON.parse(localStorage.getItem("app-user:v1") || "null");
     var cachedUser = userCache && userCache.data && userCache.data.user;
-    var themeCache = JSON.parse(localStorage.getItem("${APP_THEME_STORAGE_KEY}") || "null");
-    var vars = JSON.parse(localStorage.getItem("${THEME_CSS_VARS_STORAGE_KEY}") || "{}");
+    var themeCache = JSON.parse(sessionStorage.getItem("${APP_THEME_STORAGE_KEY}") || "null");
+    var vars = JSON.parse(sessionStorage.getItem("${THEME_CSS_VARS_STORAGE_KEY}") || "{}");
+    try {
+      localStorage.removeItem("${APP_THEME_STORAGE_KEY}");
+      localStorage.removeItem("${THEME_CSS_VARS_STORAGE_KEY}");
+    } catch (error) {}
     var variableKeys = vars && typeof vars === "object" ? Object.keys(vars) : [];
     var themeCacheAge = themeCache && Number(themeCache.at) ? Date.now() - Number(themeCache.at) : Infinity;
     var hasFreshTheme = themeCacheAge >= 0 && themeCacheAge < ${APP_THEME_CACHE_TTL_MS};
@@ -93,6 +97,11 @@ export const metadata: Metadata = {
   title: {
     default: SITE_NAME,
     template: `%s | ${SITE_NAME}`,
+  },
+  themeColor: resolveColor("gray", "light", 500),
+  icons: {
+    icon: [{ url: "/icon", type: "image/png", sizes: "32x32" }],
+    apple: [{ url: "/icon", type: "image/png", sizes: "32x32" }],
   },
 };
 

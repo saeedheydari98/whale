@@ -8,7 +8,8 @@ import {
   readCachedAppTheme,
   type AppThemeData,
 } from "@/lib/app-theme-client";
-import { createContext, useCallback, useContext, useLayoutEffect, useState, type ReactNode } from "react";
+import { APP_THEME_REFRESH_INTERVAL_MS } from "@/app/design-system/theme/storage";
+import { createContext, useCallback, useContext, useLayoutEffect, useEffect, useState, type ReactNode } from "react";
 
 const AppThemeReadyContext = createContext(false);
 
@@ -34,6 +35,33 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     revealThemedDocument();
     setThemeReady(true);
   }, []);
+
+  useEffect(() => {
+    let lastRefreshAt = Date.now();
+
+    const refreshTheme = () => {
+      if (document.visibilityState === "hidden") return;
+      if (Date.now() - lastRefreshAt < APP_THEME_REFRESH_INTERVAL_MS) return;
+      lastRefreshAt = Date.now();
+      void fetchAppTheme({ force: true, timeoutMs: 0 })
+        .then((next) => {
+          applyTheme(next);
+          setApplyToDocument(true);
+        })
+        .catch(() => undefined);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refreshTheme();
+    };
+
+    const refreshTimer = window.setInterval(refreshTheme, APP_THEME_REFRESH_INTERVAL_MS);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(refreshTimer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [applyTheme]);
 
   useLayoutEffect(() => {
     let cancelled = false;

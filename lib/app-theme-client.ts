@@ -4,8 +4,18 @@ import type { ThemeColorKey, ThemeStyle } from "@/app/design-system/theme/theme"
 import {
   APP_THEME_CACHE_TTL_MS,
   APP_THEME_STORAGE_KEY,
+  LEGACY_THEME_LOCAL_STORAGE_KEYS,
 } from "@/app/design-system/theme/storage";
 import { fetchJsonDeduped } from "@/lib/fetch-json";
+
+function getSessionStorageSafe(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
 
 export const APP_THEME_UPDATED_EVENT = "app-theme-updated";
 
@@ -83,10 +93,11 @@ function readThemePayload(payload: unknown, fallback: AppThemeData) {
 }
 
 function readStoredThemeFallback(): AppThemeData | null {
-  if (typeof window === "undefined") return null;
+  const storage = getSessionStorageSafe();
+  if (!storage) return null;
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(APP_THEME_STORAGE_KEY) || "null") as CachedThemeData | null;
+    const parsed = JSON.parse(storage.getItem(APP_THEME_STORAGE_KEY) || "null") as CachedThemeData | null;
     if (parsed?.data) return normalizeAppTheme(parsed.data);
   } catch {
   }
@@ -95,10 +106,11 @@ function readStoredThemeFallback(): AppThemeData | null {
 }
 
 function readLocalThemeCache() {
-  if (typeof window === "undefined") return null;
+  const storage = getSessionStorageSafe();
+  if (!storage) return null;
 
   try {
-    const parsed = JSON.parse(localStorage.getItem(APP_THEME_STORAGE_KEY) || "null") as CachedThemeData | null;
+    const parsed = JSON.parse(storage.getItem(APP_THEME_STORAGE_KEY) || "null") as CachedThemeData | null;
     if (!parsed || typeof parsed !== "object") return null;
     return {
       at: Number(parsed.at) || 0,
@@ -116,13 +128,23 @@ function readAnyCachedAppTheme() {
     ?? null;
 }
 
+function clearLegacyThemeLocalStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    LEGACY_THEME_LOCAL_STORAGE_KEYS.forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+  }
+}
+
 function writeThemeCache(data: AppThemeData) {
   const cached = { at: Date.now(), data };
   memoryCache = cached;
+  clearLegacyThemeLocalStorage();
 
-  if (typeof window === "undefined") return;
+  const storage = getSessionStorageSafe();
+  if (!storage) return;
   try {
-    localStorage.setItem(APP_THEME_STORAGE_KEY, JSON.stringify(cached));
+    storage.setItem(APP_THEME_STORAGE_KEY, JSON.stringify(cached));
   } catch {
   }
 }
