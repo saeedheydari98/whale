@@ -67,6 +67,7 @@ export function ProductShowcaseCard({
 
   return (
     <article
+      data-loading-item="true"
       className={`relative flex h-44 w-72 shrink-0 flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
         isLoading ? "border-border-default" : "border-primary-border"
       }`}

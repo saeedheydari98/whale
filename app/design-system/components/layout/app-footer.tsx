@@ -36,6 +36,7 @@ export function AppFooter() {
   const [authUser, setAuthUser] = useState<AccountUser | null>(null);
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [language, setLanguage] = useState<"fa" | "en">("fa");
   const visibleNavItems = mobileNavItems;
   const isActiveLink = (href: string) => href === "/"
     ? pathname === "/" || pathname.startsWith("/brand/")
@@ -148,6 +149,11 @@ export function AppFooter() {
                 <span>saeed.heydari.98</span>
               </a>
             </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link href="/about-wahlle" className="text-sm font-bold text-secondary-text transition-colors hover:text-primary">
+              درباره وال
+            </Link>
           </div>
           <span className="max-w-4xl text-center text-sm font-normal leading-7 text-secondary-text">
             وال یک پروژه آزمایشی برای ساخت فروشگاهی کاملاً پویاست؛ فروشگاهی که مدیر آن می‌تواند ظاهر و شیوه عملکرد بخش‌های مختلف را بدون تغییر کد مدیریت کند. هدف این پروژه، دستیابی به بالاترین سطح انعطاف‌پذیری در مدیریت فروشگاه است.

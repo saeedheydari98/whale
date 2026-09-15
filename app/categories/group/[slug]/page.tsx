@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import {
   EMPTY_PRODUCT_FILTERS,
@@ -10,7 +10,13 @@ import {
   type ProductFilterState,
 } from "@/app/products/product-list-controls";
 import { ProductListingPage } from "@/app/products/product-listing-page";
-import { decodeCatalogSegment, getCategoryGroupProducts } from "@/lib/products-client";
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
+import {
+  decodeCatalogSegment,
+  getCategoryGroupPageStructure,
+  getCategoryGroupProducts,
+} from "@/lib/products-client";
+import { useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
 
 export default function CategoryGroupProductsPage() {
   const params = useParams();
@@ -24,6 +30,12 @@ export default function CategoryGroupProductsPage() {
   const [pageSize, setPageSize] = useState(0);
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
+
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "category-group", slug],
+    queryFn: () => getPageBootstrap(() => getCategoryGroupPageStructure(slug)),
+    enabled: Boolean(slug),
+  });
 
   const categoryGroupProductsQuery = useInfiniteQuery({
     queryKey: ["catalog", "category-group", slug, "products", sort, normalizedSearchQuery, filterParams, pageSize],
@@ -50,8 +62,11 @@ export default function CategoryGroupProductsPage() {
   const products = useMemo(() => pages.flatMap((page) => page.products), [pages]);
   const firstPage = pages[0];
   const lastPage = pages[pages.length - 1];
-  const categoryGroup = firstPage?.section;
+  const categoryGroup = structureQuery.data?.page.categoryGroups[0] ?? firstPage?.section;
+  const categoryGroupProductCount = Number(categoryGroup?.productCount);
   const productLoading = pageSize === 0 || (categoryGroupProductsQuery.isLoading && !categoryGroupProductsQuery.data);
+  const initialPageLoading = structureQuery.isLoading && !categoryGroup && !categoryGroupProductsQuery.data;
+  useStructureRouteLoading(structureQuery.isLoading && !structureQuery.data);
 
   const loadMore = useCallback(() => {
     if (categoryGroupProductsQuery.hasNextPage && !categoryGroupProductsQuery.isFetchingNextPage) {
@@ -64,10 +79,10 @@ export default function CategoryGroupProductsPage() {
       title={categoryGroup?.title ? `محصولات ${categoryGroup.title}` : "محصولات گروه دسته‌بندی"}
       emptyText={filtersActive || normalizedSearchQuery ? "محصولی با این فیلترها پیدا نشد." : "هنوز محصولی در این گروه دسته‌بندی ثبت نشده است."}
       loading={productLoading}
-      initialPageLoading={false}
-      headerLoading={productLoading && !categoryGroup}
+      initialPageLoading={initialPageLoading}
+      headerLoading={structureQuery.isLoading && !categoryGroup}
       products={products}
-      totalProducts={lastPage?.pagination.total ?? firstPage?.pagination.total}
+      totalProducts={lastPage?.pagination.total ?? firstPage?.pagination.total ?? (!normalizedSearchQuery && !filtersActive && Number.isFinite(categoryGroupProductCount) ? categoryGroupProductCount : undefined)}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
       sort={sort}

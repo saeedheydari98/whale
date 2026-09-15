@@ -387,6 +387,70 @@ function toProductDetail(product: ProductRecord) {
   };
 }
 
+function countUniqueProductImages(product: Partial<ProductRecord>) {
+  const values = [
+    product.imageUrl,
+    ...(Array.isArray(product.images) ? product.images : []),
+  ];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const imageUrl = String(value ?? "").trim();
+    if (imageUrl) seen.add(imageUrl);
+  }
+  return seen.size;
+}
+
+function countProductSpecFields(product: Partial<ProductRecord>) {
+  const dimensions = [product.length, product.width, product.height]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+  return [
+    product.brand,
+    product.vendor,
+    product.sku,
+    product.barcode,
+    product.manufactureYear,
+    product.weight,
+    dimensions.length > 0 ? dimensions.join(" × ") : "",
+    product.publishedAt,
+  ].filter((value) => String(value ?? "").trim()).length;
+}
+
+function toProductDetailStructure(product: ProductRecord) {
+  const colorStock = normalizeColorStock(product.colorStock);
+  const discountPercent = Number(product.discountPercent ?? 0);
+  const imageUrls = [
+    product.imageUrl,
+    ...(Array.isArray(product.images) ? product.images.map((item) => String(item)) : []),
+  ].map((item) => String(item ?? "").trim()).filter(Boolean);
+  const uniqueImages = [...new Set(imageUrls)];
+
+  return {
+    ...toProductSummary(product),
+    description: String(product.description ?? ""),
+    images: uniqueImages,
+    imageUrl: uniqueImages[0] ?? product.imageUrl ?? "",
+    vendor: product.vendor ?? "",
+    sku: product.sku ?? "",
+    barcode: product.barcode ?? "",
+    manufactureYear: product.manufactureYear,
+    weight: product.weight,
+    length: product.length,
+    width: product.width,
+    height: product.height,
+    publishedAt: product.publishedAt,
+    colorStock,
+    imageCount: uniqueImages.length,
+    specCount: countProductSpecFields(product),
+    reviewCount: Number.isFinite(Number(product.ratingCount)) ? Math.max(0, Math.round(Number(product.ratingCount))) : 0,
+    colorCount: Object.keys(colorStock).length,
+    hasDescription: Boolean(String(product.description ?? "").trim()),
+    hasColors: Object.keys(colorStock).length > 0,
+    hasDiscount: discountPercent > 0 && Boolean(String(product.originalPrice ?? "").trim()),
+    hasBadge: Boolean(String(product.badge ?? "").trim()),
+  };
+}
+
 function sortProductsBy(products: Array<Partial<ProductRecord>>, sort: string) {
   const time = (value: unknown) => {
     const parsed = new Date(String(value ?? "")).getTime();
@@ -948,7 +1012,7 @@ export async function getCategoryGroupProducts(identifier: string, searchParams:
             ...(getIncludeInactive(searchParams) ? {} : { active: true }),
           },
           select: { id: true },
-        })).map((category: { id: string }) => category.id))
+        })).map((category: { id: string }) => String(category.id)))
       : new Set<string>();
     const products = await prisma.product.findMany({
       where: getIncludeInactive(searchParams) ? {} : { active: true, isActive: true, deletedAt: null },
@@ -964,7 +1028,7 @@ export async function getCategoryGroupProducts(identifier: string, searchParams:
 
     return {
       categoryGroup: categoryGroup
-        ? { ...toClientLinkGroup(categoryGroup), categoryCount: categoryIds.size }
+        ? { ...toClientLinkGroup(categoryGroup), categoryCount: categoryIds.size, productCount: groupProducts.length }
         : null,
       products: paginateProducts(sorted.map(toProductSummary), searchParams),
     };
@@ -1084,6 +1148,46 @@ export async function getCategoryPageStructure(identifier: string, searchParams:
 
     return pageStructure("category", {
       categories: [toClientCategory({ ...category, productCount })],
+    });
+  });
+}
+
+export async function getCategoryGroupPageStructure(identifier: string, searchParams: URLSearchParams) {
+  const includeInactive = getIncludeInactive(searchParams);
+  const normalizedIdentifier = decodeCatalogIdentifier(identifier);
+
+  return withCatalogCache("page-structure", ["category-group", normalizedIdentifier, includeInactive ? "all" : "active"], getTtl(searchParams, STRUCTURE_TTL_SECONDS), async () => {
+    const categoryGroup = await findCategoryGroup(normalizedIdentifier);
+    if (!categoryGroup || (!includeInactive && categoryGroup.active === false)) {
+      return pageStructure("category-group", { categoryGroups: [] });
+    }
+
+    const categories = await prisma.category.findMany({
+      where: {
+        groupId: categoryGroup.id,
+        ...(includeInactive ? {} : { active: true }),
+      },
+      select: { id: true },
+    });
+    const categoryIds = new Set(categories.map((category: { id: string }) => String(category.id)));
+    const products = categoryIds.size === 0
+      ? []
+      : await prisma.product.findMany({
+          where: includeInactive ? {} : { active: true, isActive: true, deletedAt: null },
+          select: { categoryId: true, categoryIds: true },
+        });
+    const productCount = products.filter((product: { categoryId?: string | null; categoryIds?: unknown }) => {
+      const productCategoryIds = normalizeStringList(product.categoryIds, [String(product.categoryId ?? "")]);
+      return productCategoryIds.some((categoryId) => categoryIds.has(categoryId));
+    }).length;
+
+    return pageStructure("category-group", {
+      categoryGroups: [{
+        ...toClientLinkGroup(categoryGroup),
+        itemCount: categoryIds.size,
+        categoryCount: categoryIds.size,
+        productCount,
+      }],
     });
   });
 }
@@ -1211,7 +1315,7 @@ export async function getProductDetailPageStructure(identifier: string, searchPa
     const product = await findProductByIdentifier(normalizedIdentifier, includeInactive);
 
     return pageStructure("product", {
-      products: product ? [toProductSummary(product)] : [],
+      products: product ? [toProductDetailStructure(product)] : [],
     });
   });
 }

@@ -77,7 +77,7 @@ export function CategoryOption({
 
   if (!onClick) {
     return (
-      <div className={cx("flex shrink-0 flex-col items-center gap-2 overflow-hidden p-2", sizeClasses[size].frame, className)}>
+      <div data-loading-item="true" className={cx("flex shrink-0 flex-col items-center gap-2 overflow-hidden p-2", sizeClasses[size].frame, className)}>
         {content}
       </div>
     );
@@ -86,6 +86,7 @@ export function CategoryOption({
   return (
     <button
       type="button"
+      data-loading-item="true"
       className={cx(
         "flex shrink-0 cursor-pointer flex-col items-center gap-2 overflow-hidden rounded-lg border border-transparent p-2 transition hover:scale-[1.03] hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-60",
         sizeClasses[size].frame,

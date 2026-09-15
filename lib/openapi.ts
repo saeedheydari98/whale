@@ -712,6 +712,8 @@ export const openApiDocument = {
           active: { type: "boolean" },
           sortOrder: { type: "integer" },
           categoryCount: { type: "integer" },
+          itemCount: { type: "integer" },
+          productCount: { type: "integer" },
         },
       },
       CatalogStructure: {
@@ -1250,6 +1252,15 @@ export const openApiDocument = {
           },
           required: ["products"],
         },
+      }),
+    },
+    "/api/category-group/{id}/structure": {
+      get: operation({
+        tags: ["Catalog"],
+        summary: "Get category group page structure",
+        operationId: "getCategoryGroupStructure",
+        parameters: [pathParam("id", "Category group id or title."), ...structureParams],
+        data: ref("CatalogStructure"),
       }),
     },
     "/api/category-group/{id}/products": {

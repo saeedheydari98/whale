@@ -9,6 +9,7 @@ import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state"
 import { ImagePreview } from "@/app/design-system/components/ui/image-preview";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { OrderStatusTag, OrderStatusTimeline } from "@/app/design-system/components/ui/order-status";
 import { formatPersianDate } from "@/lib/date-format";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
@@ -125,6 +126,7 @@ export function AdminOrdersPanel({ totalCount }: { totalCount?: number }) {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({});
   const [previewImage, setPreviewImage] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
   const [loading, setLoading] = useState(true);
   const [, setCapacity] = useState(0);
   const [savingId, setSavingId] = useState("");
@@ -189,6 +191,7 @@ export function AdminOrdersPanel({ totalCount }: { totalCount?: number }) {
       const updatedOrder = data.data.order;
       invalidateFetchCache(ADMIN_ORDERS_URL);
       setOrders((current) => current.map((item) => item.id === updatedOrder.id ? updatedOrder : item));
+      setSelectedOrder(updatedOrder);
       setTrackingDrafts((current) => ({ ...current, [updatedOrder.id]: updatedOrder.trackingCode ?? "" }));
       setMessage(`وضعیت سفارش به «${ORDER_STATUS_LABELS[normalizeOrderStatus(updatedOrder.fulfillmentStatus)]}» تغییر کرد.`);
     } catch (error) {
@@ -228,7 +231,7 @@ export function AdminOrdersPanel({ totalCount }: { totalCount?: number }) {
         isLoading={loading && orders.length === 0}
         totalCount={hasFilters ? visibleOrders.length : totalCount}
         onCapacityChange={hasFilters || totalCount === undefined ? undefined : setCapacity}
-        className="flex flex-wrap items-start gap-3"
+        className="flex w-full min-w-0 flex-wrap items-start gap-3 overflow-x-hidden"
         getKey={(order) => order.id}
         lazy
         renderItem={(order) => (
@@ -239,6 +242,7 @@ export function AdminOrdersPanel({ totalCount }: { totalCount?: number }) {
             onPreview={setPreviewImage}
             onTrackingChange={(value) => setTrackingDrafts((current) => ({ ...current, [order.id]: value }))}
             onAdvance={() => void advanceOrder(order)}
+            onViewDetails={(nextOrder) => setSelectedOrder(nextOrder)}
           />
         )}
         renderSkeleton={() => (
@@ -250,67 +254,151 @@ export function AdminOrdersPanel({ totalCount }: { totalCount?: number }) {
               onPreview={() => undefined}
               onTrackingChange={() => undefined}
               onAdvance={() => undefined}
+              onViewDetails={() => undefined}
             />
           </Loading>
         )}
       />
+      <CustomModal open={Boolean(selectedOrder)} onClose={() => setSelectedOrder(null)} title="جزئیات سفارش" size="lg" closeOnBackdrop>
+        {selectedOrder ? (
+          <AdminOrderDetailsModalContent
+            order={selectedOrder}
+            trackingValue={trackingDrafts[selectedOrder.id] ?? ""}
+            saving={savingId === selectedOrder.id}
+            onPreview={setPreviewImage}
+            onTrackingChange={(value) => setTrackingDrafts((current) => ({ ...current, [selectedOrder.id]: value }))}
+            onAdvance={() => void advanceOrder(selectedOrder)}
+            onClose={() => setSelectedOrder(null)}
+          />
+        ) : null}
+      </CustomModal>
       <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
     </section>
   );
 }
 
-function AdminOrderCard({ order, trackingValue, saving, onPreview, onTrackingChange, onAdvance }: {
+function AdminOrderCard({ order, trackingValue, saving, onPreview, onTrackingChange, onAdvance, onViewDetails }: {
   order: AdminOrder;
   trackingValue: string;
   saving: boolean;
   onPreview: (imageUrl: string) => void;
   onTrackingChange: (value: string) => void;
   onAdvance: () => void;
+  onViewDetails: (order: AdminOrder) => void;
+}) {
+  return (
+    <div className="flex h-36 min-w-0 shrink-0 flex-col justify-between gap-2 overflow-hidden rounded-md border border-primary-border bg-primary-card p-3"
+      style={{ width: "18rem", maxWidth: "100%" }}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <span className="truncate text-sm font-bold text-primary-text">{customerName(order)}</span>
+          <span className="truncate text-xs text-secondary-text">{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
+        </div>
+        <OrderStatusTag status={order.fulfillmentStatus} />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 border-t border-primary-border pt-2">
+        <span className="truncate text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
+        <span className="text-sm font-bold text-primary">{formatAmount(order.total)}</span>
+      </div>
+
+      <div className="flex items-center justify-end border-t border-primary-border pt-2">
+        <CustomButton size="sm" variant="neutral" onClick={() => onViewDetails(order)}>
+          <span>مشاهده اطلاعات</span>
+        </CustomButton>
+      </div>
+    </div>
+  );
+}
+
+function AdminOrderDetailsModalContent({ order, trackingValue, saving, onPreview, onTrackingChange, onAdvance, onClose }: {
+  order: AdminOrder;
+  trackingValue: string;
+  saving: boolean;
+  onPreview: (imageUrl: string) => void;
+  onTrackingChange: (value: string) => void;
+  onAdvance: () => void;
+  onClose: () => void;
 }) {
   const nextStatus = nextOrderStatus(order.fulfillmentStatus);
 
   return (
-    <div className="flex h-96 w-96 shrink-0 flex-col gap-2 overflow-hidden rounded-md border border-primary-border bg-primary-card p-2">
-      <div className="flex shrink-0 flex-wrap items-start justify-between gap-2">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className="truncate text-sm font-bold text-primary-text">{customerName(order)}</span>
-          <span className="text-xs text-secondary-text">{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary-border pb-2">
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-bold text-primary-text">{customerName(order)}</span>
+          <span className="text-xs text-secondary-text">{order.id}</span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <OrderStatusTag status={order.fulfillmentStatus} />
           <span className="text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
         </div>
-        <div>
-          <OrderStatusTag status={order.fulfillmentStatus} />
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <div className="flex min-w-52 flex-1 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
+          <span className="text-xs text-secondary-text">شماره تماس</span>
+          <span className="text-sm font-bold text-primary-text">{order.profile?.phone || order.user?.username || "بدون شماره"}</span>
+        </div>
+        <div className="flex min-w-52 flex-1 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
+          <span className="text-xs text-secondary-text">ایمیل</span>
+          <span className="text-sm font-bold text-primary-text">{order.profile?.email || order.user?.email || "بدون ایمیل"}</span>
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-hidden border-t border-primary-border pt-2">
-        {order.items.map((item) => (
-          <div key={item.id} className="flex items-center gap-2.5">
-            <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? onPreview(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
-              {item.imageUrl ? <AppImage src={item.imageUrl} alt={item.title} width={112} height={112} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
-            </button>
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
-              <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
-              <span className="text-xs font-bold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
+      <div className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-3">
+        <span className="text-xs font-bold text-secondary-text">نشانی</span>
+        <span className="text-sm text-primary-text">{order.profile?.address || "نشانی ثبت نشده"}</span>
+      </div>
+
+      <div className="flex flex-col gap-2 border border-primary-border rounded-md p-2">
+        <span className="text-xs font-bold text-secondary-text">محصولات سفارش</span>
+        <div className="flex flex-col gap-2">
+          {order.items.map((item) => (
+            <div key={item.id} className="flex items-center gap-2.5 border-b border-primary-border pb-2 last:border-b-0 last:pb-0">
+              <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? onPreview(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
+                {item.imageUrl ? <AppImage src={item.imageUrl} alt={item.title} width={112} height={112} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
+              </button>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
+                <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
+                <span className="text-xs font-bold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
-      <div className="flex shrink-0 flex-col gap-2">
-        {order.profile?.address ? <span className="line-clamp-1 text-xs text-secondary-text">نشانی: {order.profile.address}</span> : <span className="invisible line-clamp-1 text-xs">نشانی</span>}
-        <div className="flex flex-col gap-1 border-t border-primary-border pt-2">
-          <span className="text-xs text-secondary-text">روش تحویل: {order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
-          <span className="text-sm font-bold text-primary">مبلغ پرداختی: {formatAmount(order.total)}</span>
+      <div className="flex flex-wrap gap-3">
+        <div className="flex min-w-40 flex-1 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
+          <span className="text-xs text-secondary-text">روش ارسال</span>
+          <span className="text-sm font-bold text-primary-text">{order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
         </div>
-        <CustomAccordion title="مسیر وضعیت سفارش" meta={ORDER_STATUS_LABELS[normalizeOrderStatus(order.fulfillmentStatus)]} defaultOpen={false} showStatusLabel={false} className="rounded-md" contentClassName="p-2">
-          <OrderStatusTimeline status={order.fulfillmentStatus} history={order.statusHistory} createdAt={order.createdAt} />
-        </CustomAccordion>
+        <div className="flex min-w-40 flex-1 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
+          <span className="text-xs text-secondary-text">مبلغ پرداختی</span>
+          <span className="text-sm font-bold text-primary">{formatAmount(order.total)}</span>
+        </div>
+      </div>
 
-        <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
-          <CustomInput value={trackingValue} onChange={(event) => onTrackingChange(event.target.value)} placeholder="کد پیگیری مرسوله" size="sm" disabled={saving} />
+      <div className="flex flex-wrap gap-3">
+        {order.shippingAmount ? <span className="text-xs text-secondary-text">هزینه ارسال: {formatAmount(order.shippingAmount)}</span> : null}
+        {order.discountAmount ? <span className="text-xs text-secondary-text">تخفیف: {formatAmount(order.discountAmount)}</span> : null}
+        {order.walletAmount ? <span className="text-xs text-secondary-text">کیف پول: {formatAmount(order.walletAmount)}</span> : null}
+        {order.discountCode ? <span className="text-xs text-secondary-text">کد تخفیف: {order.discountCode}</span> : null}
+      </div>
+
+      <CustomAccordion title="مسیر وضعیت سفارش" meta={ORDER_STATUS_LABELS[normalizeOrderStatus(order.fulfillmentStatus)]} defaultOpen={false} showStatusLabel={false} className="rounded-md" contentClassName="p-2">
+        <OrderStatusTimeline status={order.fulfillmentStatus} history={order.statusHistory} createdAt={order.createdAt} />
+      </CustomAccordion>
+
+      <div className="flex flex-col gap-2 border-t border-primary-border pt-2">
+        <CustomInput value={trackingValue} onChange={(event) => onTrackingChange(event.target.value)} placeholder="کد پیگیری مرسوله" size="sm" disabled={saving} />
+        <div className="flex flex-wrap gap-2">
           <CustomButton size="sm" variant={nextStatus === "delivered" ? "success" : nextStatus ? "primary" : "neutral"} icon={nextStatus ? <IoCheckmarkCircleOutline /> : undefined} isLoading={saving} disabled={!nextStatus} onClick={onAdvance}>
             <span>{nextStatus ? `ثبت مرحله: ${ORDER_STATUS_LABELS[nextStatus]}` : "این سفارش تحویل داده شده است."}</span>
+          </CustomButton>
+          <CustomButton size="sm" variant="neutral" onClick={onClose}>
+            <span>بستن</span>
           </CustomButton>
         </div>
       </div>

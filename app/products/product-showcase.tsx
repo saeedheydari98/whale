@@ -122,7 +122,12 @@ function LazyShowcaseSection({
   hideShowcaseLink = false,
 }: LazyShowcaseSectionProps) {
   const hasInitialProducts = products.length > 0;
-  const productLimit = Math.max(1, Number(showcase.productCount) || Number(showcase.limit) || 8);
+  const productLimit = Math.max(
+    1,
+    Number(showcase.productCount)
+      || Number(showcase.limit)
+      || (showcase.id === "all-products" ? products.length : 8)
+  );
   const showcaseProductsQuery = useQuery({
     queryKey: ["catalog", "showcase", showcase.id, "products", "lazy", productLimit],
     queryFn: () => getShowcaseProducts(showcase.id, { limit: productLimit }),
@@ -134,6 +139,11 @@ function LazyShowcaseSection({
     ? products
     : (showcaseProductsQuery.data?.products as Product[] | undefined) ?? [];
   const isLoading = !hasInitialProducts && showcaseProductsQuery.isLoading;
+  const displayTotalCount = Number.isFinite(Number(showcase.productCount))
+    ? Number(showcase.productCount)
+    : hasInitialProducts
+      ? loadedProducts.length
+      : productLimit;
 
   if (!isLoading && loadedProducts.length === 0 && Number(showcase.productCount ?? 0) === 0) return null;
 
@@ -148,7 +158,7 @@ function LazyShowcaseSection({
       getDiscountPercent={getDiscountPercent}
       hideShowcaseLink={hideShowcaseLink}
       isLoading={isLoading}
-      totalCount={showcase.productCount ?? productLimit}
+      totalCount={displayTotalCount}
     />
   );
 }
@@ -255,7 +265,9 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
               title: "محصولات",
               active: true,
               sortOrder: 1,
-            },
+              productCount: sortedProducts.length,
+              limit: sortedProducts.length,
+            } as Showcase,
             products: sortedProducts,
             sortOrder: 1,
           }]

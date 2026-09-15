@@ -1,7 +1,7 @@
 import localFont from "next/font/local";
 import Script from "next/script";
 import { Suspense } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GiSpermWhale } from "react-icons/gi";
 import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
@@ -91,6 +91,10 @@ const homeMetadata = pageMetadata({
   path: "/",
 });
 
+export const viewport: Viewport = {
+  themeColor: resolveColor("gray", "light", 500),
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl()),
   ...homeMetadata,
@@ -98,7 +102,6 @@ export const metadata: Metadata = {
     default: SITE_NAME,
     template: `%s | ${SITE_NAME}`,
   },
-  themeColor: resolveColor("gray", "light", 500),
   icons: {
     icon: [{ url: "/icon", type: "image/png", sizes: "32x32" }],
     apple: [{ url: "/icon", type: "image/png", sizes: "32x32" }],

@@ -71,6 +71,14 @@ export type ProductRecord = {
   updatedAt?: string | null;
   colorStock?: unknown;
   sortOrder: number;
+  imageCount?: number;
+  specCount?: number;
+  reviewCount?: number;
+  hasDescription?: boolean;
+  hasColors?: boolean;
+  hasDiscount?: boolean;
+  hasBadge?: boolean;
+  colorCount?: number;
 };
 
 export type ShowcaseRecord = {
@@ -121,6 +129,7 @@ export type CatalogLinkGroupRecord = {
   sortOrder?: number | string;
   categoryCount?: number;
   itemCount?: number;
+  productCount?: number;
 };
 
 type GroupedCategoryRecord = CatalogLinkGroupRecord & {
@@ -484,6 +493,14 @@ function normalizeProductRecord(product: ProductRecord, fallbackOrder: number): 
     colorStock: normalizeColorStock(product.colorStock),
     sortOrder: placement,
     placement,
+    imageCount: Number.isFinite(Number(product.imageCount)) ? Math.max(0, Math.round(Number(product.imageCount))) : imageList.length,
+    specCount: Number.isFinite(Number(product.specCount)) ? Math.max(0, Math.round(Number(product.specCount))) : undefined,
+    reviewCount: Number.isFinite(Number(product.reviewCount)) ? Math.max(0, Math.round(Number(product.reviewCount))) : undefined,
+    colorCount: Number.isFinite(Number(product.colorCount)) ? Math.max(0, Math.round(Number(product.colorCount))) : Object.keys(normalizeColorStock(product.colorStock)).length,
+    hasDescription: product.hasDescription ?? Boolean(String(product.description ?? "").trim()),
+    hasColors: product.hasColors ?? Object.keys(normalizeColorStock(product.colorStock)).length > 0,
+    hasDiscount: product.hasDiscount,
+    hasBadge: product.hasBadge ?? Boolean(String(product.badge ?? "").trim()),
   };
 }
 
@@ -553,6 +570,8 @@ function normalizeLinkGroupRecord(group: CatalogLinkGroupRecord, fallbackOrder: 
     active: group.active !== false,
     sortOrder: Number.isFinite(Number(group.sortOrder)) ? Number(group.sortOrder) : fallbackOrder,
     itemCount: Number.isFinite(Number(group.itemCount)) ? Math.max(0, Math.round(Number(group.itemCount))) : undefined,
+    categoryCount: Number.isFinite(Number(group.categoryCount)) ? Math.max(0, Math.round(Number(group.categoryCount))) : undefined,
+    productCount: Number.isFinite(Number(group.productCount)) ? Math.max(0, Math.round(Number(group.productCount))) : undefined,
   };
 }
 
@@ -1108,6 +1127,10 @@ export function getCategoryPageStructure(id: string | number, options?: Pick<Get
   return getPageStructure(`/api/category/${encodeCatalogSegment(id)}/structure`, options);
 }
 
+export function getCategoryGroupPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
+  return getPageStructure(`/api/category-group/${encodeCatalogSegment(id)}/structure`, options);
+}
+
 export function getBrandPageStructure(id: string | number, options?: Pick<GetProductsOptions, "force">) {
   return getPageStructure(`/api/brand/${encodeCatalogSegment(id)}/structure`, options);
 }
@@ -1376,4 +1399,4 @@ export function clearProductsCache() {
   }
 }
 
-export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getCatalogSectionData, getProductPage, getShowcaseProducts, getCategoryProducts, getCategoryGroupProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };
+export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getCategoryGroupPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getCatalogSectionData, getProductPage, getShowcaseProducts, getCategoryProducts, getCategoryGroupProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };

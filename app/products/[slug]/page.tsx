@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { IoBagAddOutline } from "react-icons/io5";
-import { findProductById, getProductDetail, isProductAvailable, type ProductDetailResult, type ProductRecord } from "@/lib/products-client";
+import { getProductDetail, getProductDetailPageStructure, isProductAvailable, type ProductDetailResult, type ProductRecord } from "@/lib/products-client";
 import { addProductToCart } from "@/lib/cart-client";
 import {
   formatAmount as formatPrice,
@@ -18,24 +18,13 @@ import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state"
 import { CustomTag } from "@/app/design-system/components/ui/tag";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
-import Loading from "@/app/design-system/components/loading/loading";
+import Loading, { useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import { ProductImageGallery } from "./product-image-gallery";
 import ColorStockDots from "@/app/design-system/components/ui/color-stock-dots";
 import { ProductCardBadge } from "@/app/design-system/components/ui/product-card-badge";
 import { AppHeading } from "@/app/design-system/components/ui/text";
-
-const LOADING_PRODUCT: ProductRecord = {
-  id: "loading-product",
-  title: "عنوان محصول",
-  description: "توضیح کوتاه محصول برای پیش‌نمایش\nادامه توضیحات محصول در این بخش نمایش داده می‌شود",
-  price: "2499",
-  originalPrice: "2899",
-  discountPercent: 15,
-  badge: "ویژه",
-  active: true,
-  sortOrder: 1,
-};
+import { getPageBootstrap } from "@/lib/page-bootstrap-client";
 
 type ProductTab = "details" | "reviews" | "price";
 
@@ -112,69 +101,26 @@ function getProductGalleryImages(product: ProductRecord) {
   return imageUrls;
 }
 
-function findProductInQueryValue(value: unknown, productId: string, depth = 0): ProductRecord | null {
-  if (!value || depth > 5) return null;
-
-  if (Array.isArray(value)) {
-    const direct = findProductById(value as ProductRecord[], productId);
-    if (direct) return direct;
-
-    for (const item of value) {
-      const found = findProductInQueryValue(item, productId, depth + 1);
-      if (found) return found;
-    }
-
-    return null;
-  }
-
-  if (typeof value !== "object") return null;
-
-  const record = value as Record<string, unknown>;
-  const product = record.product ? findProductInQueryValue([record.product], productId, depth + 1) : null;
-  if (product) return product;
-
-  for (const key of ["products", "items", "page", "catalog", "tree", "sections", "showcases"]) {
-    const found = findProductInQueryValue(record[key], productId, depth + 1);
-    if (found) return found;
-  }
-
-  return null;
-}
-
-function findCachedProduct(queryClient: QueryClient, productId: string) {
-  for (const [, value] of queryClient.getQueriesData({ queryKey: ["catalog"] })) {
-    const product = findProductInQueryValue(value, productId);
-    if (product) return product;
-  }
-
-  return null;
-}
-
 export default function ProductPage() {
   const params = useParams();
   const rawSlug = params?.slug ?? params?.id ?? "";
   const productId = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
   const queryClient = useQueryClient();
-  const cachedProduct = useMemo(
-    () => (productId ? findCachedProduct(queryClient, productId) : null),
-    [productId, queryClient]
-  );
+  const structureQuery = useQuery({
+    queryKey: ["catalog", "page-structure", "product", productId],
+    queryFn: () => getPageBootstrap(() => getProductDetailPageStructure(productId)),
+    enabled: Boolean(productId),
+  });
   const productQuery = useQuery<ProductDetailResult>({
     queryKey: ["catalog", "product", productId],
     queryFn: () => getProductDetail(productId),
     enabled: Boolean(productId),
-    placeholderData: cachedProduct
-      ? {
-          product: cachedProduct,
-          comments: [],
-          recommendations: [],
-        }
-      : undefined,
   });
+  const structureProduct = structureQuery.data?.page.products[0] ?? null;
   const fetchedProduct = productQuery.data?.product ?? null;
-  const loadingProduct = fetchedProduct ?? cachedProduct ?? LOADING_PRODUCT;
-  const catalogLoading = productQuery.isLoading && !fetchedProduct;
-  const product = fetchedProduct ?? (catalogLoading ? loadingProduct : null);
+  const catalogLoading = !fetchedProduct;
+  const product = fetchedProduct ?? structureProduct;
+  useStructureRouteLoading(structureQuery.isLoading && !structureQuery.data);
   const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [text, setText] = useState("");
   const [rating, setRating] = useState<number | undefined>(undefined);
@@ -203,6 +149,9 @@ export default function ProductPage() {
 
   const colorStock = useMemo(() => normalizeColorStock(product?.colorStock), [product]);
   const colorOptions = useMemo(() => Object.entries(colorStock), [colorStock]);
+  const structureColorCount = Number(product?.colorCount);
+  const showColorSection = colorOptions.length > 0
+    || (catalogLoading && (product?.hasColors === true || (Number.isFinite(structureColorCount) && structureColorCount > 0)));
   const firstAvailableColor = useMemo(
     () => colorOptions.find(([, count]) => count > 0)?.[0] ?? "",
     [colorOptions]
@@ -318,6 +267,7 @@ export default function ProductPage() {
   };
 
   if (!product) {
+    if (structureQuery.isLoading || productQuery.isLoading) return null;
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-4 bg-primary-base p-6">
         <CustomEmptyState description="محصول موردنظر در فروشگاه پیدا نشد." />
@@ -327,7 +277,7 @@ export default function ProductPage() {
 
   const discountPercent = getDiscountPercent(product);
   const hasColorOptions = colorOptions.length > 0;
-  const available = isProductAvailable(product) && (!hasColorOptions || Boolean(firstAvailableColor));
+  const available = isProductAvailable(product) && (!hasColorOptions || Boolean(firstAvailableColor) || catalogLoading);
   const finalPrice = formatPrice(getFinalPrice(product));
   const originalPrice = formatPrice(product.originalPrice);
   const dimensions = formatDimensions(product);
@@ -341,84 +291,100 @@ export default function ProductPage() {
     ["ابعاد", dimensions],
     ["تاریخ انتشار", formatDate(product.publishedAt)],
   ].filter(([, value]) => String(value ?? "").trim());
-  const visibleDetailRows = catalogLoading && detailRows.length === 0
-    ? [
-        ["برند", "وال"],
-        ["فروشنده", "فروشگاه وال"],
-        ["کد کالا", "کد کالا"],
-        ["سال تولید", "۱۴۰۳"],
-        ["وزن", "۱ کیلوگرم"],
-        ["ابعاد", "۱۰ × ۱۰ × ۱۰"],
-      ]
-    : detailRows;
+  const structureSpecCount = Number(product.specCount);
+  const visibleDetailRows = detailRows.length > 0
+    ? detailRows
+    : catalogLoading && Number.isFinite(structureSpecCount) && structureSpecCount > 0
+      ? Array.from({ length: structureSpecCount }, (_, index) => [`مشخصات ${index + 1}`, "مقدار مشخصات"])
+      : [];
+  const showDiscount = discountPercent > 0 || (catalogLoading && product.hasDiscount === true);
+  const showBadge = Boolean(String(product.badge ?? "").trim()) || (catalogLoading && product.hasBadge === true);
+  const productDescription = String(product.description ?? "").trim();
+  const showDescription = Boolean(productDescription) || (catalogLoading && product.hasDescription === true);
+  const displayedReviewCount = catalogLoading
+    ? (Number.isFinite(Number(product.reviewCount)) ? Math.max(0, Math.round(Number(product.reviewCount))) : reviews.length)
+    : reviews.length;
+  const displayedAvgRating = catalogLoading
+    ? Number(product.ratingAverage ?? 0)
+    : avgRating;
+  const loadingReviews = catalogLoading && displayedReviewCount > 0 && reviews.length === 0
+    ? Array.from({ length: displayedReviewCount }, (_, index) => ({
+        id: `loading-review-${index}`,
+        author: "خریدار",
+        text: "متن دیدگاه خریدار برای هم‌اندازه بودن اسکلتون بارگذاری.",
+        rating: 5,
+        createdAt: new Date().toISOString(),
+      }))
+    : reviews;
   const finalPriceDate = formatDate(product.updatedAt || product.publishedAt || product.createdAt);
   const productGalleryImages = getProductGalleryImages(product);
+  const galleryImageCount = Number.isFinite(Number(product.imageCount))
+    ? Math.max(productGalleryImages.length, Math.round(Number(product.imageCount)))
+    : productGalleryImages.length;
 
   return (
     <main className="min-h-full bg-primary-base text-primary-text">
       <div className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
 
         <div className="flex w-full flex-col gap-6 lg:flex-row lg:items-start">
+          <Loading loading="skeleton-structure" isLoading={catalogLoading}>
           <section className="relative flex w-full flex-col gap-6 overflow-hidden rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm lg:w-[42rem] lg:max-w-[42rem] lg:shrink-0">
-            {!catalogLoading ? <ProductCardBadge label={product.badge} /> : null}
+            {showBadge ? <ProductCardBadge label={product.badge} /> : null}
             <div className="flex w-full flex-col gap-4">
-              <ProductImageGallery imageUrls={productGalleryImages} title={product.title} isLoading={catalogLoading} />
+              <ProductImageGallery
+                imageUrls={productGalleryImages}
+                title={product.title}
+                isLoading={catalogLoading}
+                imageCount={galleryImageCount}
+              />
             </div>
 
             <div className="flex min-w-0 flex-col gap-5">
               <div className="flex flex-col gap-3">
-              <Loading loading="skeleton-item" isLoading={catalogLoading}>
                 <AppHeading level={1} className="text-3xl font-bold leading-tight text-primary-text">{product.title}</AppHeading>
-              </Loading>
 
-                <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                  <button
-                    type="button"
-                    onClick={scrollToReviews}
-                    disabled={catalogLoading}
-                    className="flex w-fit flex-wrap items-center gap-3 rounded-lg text-right transition-opacity hover:opacity-80 disabled:pointer-events-none"
-                  >
-                    <StarRating value={avgRating} size="md" />
-                    <span className="text-sm font-semibold text-primary-text">
-                      {avgRating > 0 ? avgRating.toFixed(1) : "بدون امتیاز"}
-                    </span>
-                    <span className="text-sm text-secondary-text">
-                      ({reviews.length} دیدگاه)
-                    </span>
-                  </button>
-                </Loading>
+                <button
+                  type="button"
+                  onClick={scrollToReviews}
+                  disabled={catalogLoading}
+                  className="flex w-fit flex-wrap items-center gap-3 rounded-lg text-right transition-opacity hover:opacity-80 disabled:pointer-events-none"
+                >
+                  <StarRating value={displayedAvgRating} size="md" />
+                  <span className="text-sm font-semibold text-primary-text">
+                    {displayedAvgRating > 0 ? displayedAvgRating.toFixed(1) : "بدون امتیاز"}
+                  </span>
+                  <span className="text-sm text-secondary-text">
+                    ({displayedReviewCount} دیدگاه)
+                  </span>
+                </button>
             </div>
 
             <div className="flex flex-col gap-1 rounded-xl border border-primary-border bg-primary-card p-4">
-              {(originalPrice && discountPercent > 0) || catalogLoading ? (
-                <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                  <div className="text-sm text-danger-text-nomode line-through">{originalPrice || formatPrice(0)}</div>
-                </Loading>
+              {showDiscount ? (
+                <div className="text-sm text-danger-text-nomode line-through">{originalPrice || formatPrice(0)}</div>
               ) : null}
               <div className="flex flex-wrap items-center gap-3">
-                <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                  <div className="text-3xl font-bold text-primary">{finalPrice || "بدون قیمت"}</div>
-                </Loading>
-                {discountPercent > 0 || catalogLoading ? (
-                  <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                    <CustomTag size="xs" rounded="full">
-                      <span>{discountPercent || 10}٪ تخفیف</span>
-                    </CustomTag>
-                  </Loading>
+                <div className="text-3xl font-bold text-primary">{finalPrice || "بدون قیمت"}</div>
+                {showDiscount ? (
+                  <CustomTag size="xs" rounded="full">
+                    <span>{discountPercent > 0 ? `${discountPercent}٪ تخفیف` : "تخفیف"}</span>
+                  </CustomTag>
                 ) : null}
               </div>
             </div>
 
-            {hasColorOptions ? (
+            {showColorSection ? (
               <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-card p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-bold text-primary-text">رنگ‌های موجود</div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${firstAvailableColor ? "bg-success-bg-nomode text-success-text-nomode" : "bg-danger-bg-nomode text-danger-text-nomode"}`}>
-                    {firstAvailableColor ? "موجود" : "ناموجود"}
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${firstAvailableColor || catalogLoading ? "bg-success-bg-nomode text-success-text-nomode" : "bg-danger-bg-nomode text-danger-text-nomode"}`}>
+                    {firstAvailableColor || catalogLoading ? "موجود" : "ناموجود"}
                   </span>
                 </div>
                 <ColorStockDots
-                  value={product.colorStock}
+                  value={hasColorOptions ? product.colorStock : Object.fromEntries(
+                    Array.from({ length: Math.max(1, Number.isFinite(structureColorCount) ? structureColorCount : 1) }, (_, index) => [`color-${index}`, 1])
+                  )}
                   selectedColor={selectedColor}
                   onSelect={setSelectedColor}
                   disabledUnavailable
@@ -429,23 +395,23 @@ export default function ProductPage() {
             ) : null}
 
             <div className="flex flex-wrap gap-3">
-              <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                <CustomButton
-                  type="button"
-                  variant="success"
-                  icon={<IoBagAddOutline />}
-                  disabled={catalogLoading || !available}
-                  onClick={() => {
-                    if (!catalogLoading) addToCart(product);
-                  }}
-                >
-                  <span>{available ? "افزودن" : "ناموجود"}</span>
-                </CustomButton>
-              </Loading>
+              <CustomButton
+                type="button"
+                variant="success"
+                icon={<IoBagAddOutline />}
+                disabled={catalogLoading || !available}
+                onClick={() => {
+                  if (!catalogLoading) addToCart(product);
+                }}
+              >
+                <span>{available ? "افزودن" : "ناموجود"}</span>
+              </CustomButton>
             </div>
             </div>
           </section>
+          </Loading>
 
+        <Loading loading="skeleton-structure" isLoading={catalogLoading}>
         <section id="product-tabs" className="flex min-w-0 flex-1 flex-col gap-4">
           <div className="flex w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain border-b border-primary-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {PRODUCT_TABS.map((tab) => (
@@ -469,22 +435,22 @@ export default function ProductPage() {
                 </div>
                 <div className="flex flex-col gap-3">
                   {visibleDetailRows.length > 0 ? visibleDetailRows.map(([label, value]) => (
-                    <Loading key={String(label)} loading="skeleton-item" isLoading={catalogLoading}>
-                      <div className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
-                        <span className="text-xs font-semibold text-secondary-text">{label}</span>
-                        <span className="text-sm font-bold text-primary-text">{String(value)}</span>
-                      </div>
-                    </Loading>
+                    <div key={String(label)} className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
+                      <span className="text-xs font-semibold text-secondary-text">{label}</span>
+                      <span className="text-sm font-bold text-primary-text">{String(value)}</span>
+                    </div>
                   )) : (
                     <CustomEmptyState description="اطلاعات تکمیلی برای این محصول وجود ندارد." size="sm" />
                   )}
                 </div>
                 <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
                   <AppHeading level={3} className="text-sm font-bold text-primary-text">توضیحات محصول</AppHeading>
-                  {product.description.trim() ? (
-                    <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                      <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">{product.description}</div>
-                    </Loading>
+                  {showDescription ? (
+                    <div className="whitespace-pre-wrap text-sm leading-7 text-secondary-text">
+                      {productDescription || (catalogLoading
+                        ? "توضیحات محصول برای هم‌اندازه بودن اسکلتون بارگذاری در حال آماده‌سازی است و پس از دریافت دادهٔ کامل جایگزین می‌شود."
+                        : "توضیحات محصول")}
+                    </div>
                   ) : (
                     <CustomEmptyState description="توضیحی برای این محصول وجود ندارد." size="sm" />
                   )}
@@ -494,7 +460,7 @@ export default function ProductPage() {
 
           {activeTab === "reviews" ? (
               <ProductReviewsSection
-                reviews={reviews}
+                reviews={loadingReviews}
                 text={text}
                 rating={rating}
                 userRating={userRating}
@@ -519,13 +485,12 @@ export default function ProductPage() {
                       {finalPriceDate ? `ثبت شده در ${finalPriceDate}` : "تاریخ ثبت قیمت موجود نیست"}
                     </span>
                   </div>
-                    <Loading loading="skeleton-item" isLoading={catalogLoading}>
-                      <span className="text-lg font-bold text-primary">{finalPrice || "بدون قیمت"}</span>
-                    </Loading>
+                    <span className="text-lg font-bold text-primary">{finalPrice || "بدون قیمت"}</span>
                 </div>
               </section>
           ) : null}
         </section>
+        </Loading>
         </div>
       </div>
     </main>

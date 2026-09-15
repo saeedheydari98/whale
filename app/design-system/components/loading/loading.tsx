@@ -240,6 +240,8 @@ function collectionProbeInnerClass(className?: string) {
 }
 
 function collectionItemElement(probe: HTMLElement) {
+  const marked = probe.querySelector<HTMLElement>("[data-loading-item='true']");
+  if (marked) return marked;
   const sourced = probe.querySelector<HTMLElement>("[data-loading-source='true']");
   const card = sourced?.firstElementChild ?? probe.firstElementChild ?? probe;
   return card instanceof HTMLElement ? card : probe;
@@ -259,28 +261,25 @@ function collectionAxis(container: HTMLElement) {
   };
 }
 
-function usedItemSize(item: HTMLElement, container: HTMLElement, wrap: boolean) {
+function usedItemSize(item: HTMLElement, container: HTMLElement, _wrap: boolean) {
   const style = getComputedStyle(item);
   const maxWidth = numericStyleValue(style.maxWidth);
   const minWidth = numericStyleValue(style.minWidth);
   const containerWidth = container.getBoundingClientRect().width;
   const rect = item.getBoundingClientRect();
-  const stretched = containerWidth > 0 && rect.width >= containerWidth - 1;
-  let width = Math.max(rect.width, item.offsetWidth, item.scrollWidth);
+  let width = Math.max(rect.width, item.offsetWidth);
+  let height = Math.max(rect.height, item.offsetHeight);
 
-  if (maxWidth > 0) {
-    const layoutWidth = Math.min(maxWidth, containerWidth || maxWidth);
-    width = wrap || stretched || width <= 0
-      ? layoutWidth
-      : Math.min(Math.max(width, minWidth), layoutWidth);
-  } else if (wrap && containerWidth > 0 && (stretched || width > containerWidth)) {
-    width = containerWidth;
+  // Prefer the item's intrinsic box. Never stretch a probe card to the full
+  // container width just because a wrapper used max-w-full / w-full.
+  if (width <= 0) width = Math.max(minWidth, item.scrollWidth);
+  if (height <= 0) height = Math.max(item.scrollHeight, minWidth);
+  if (maxWidth > 0 && maxWidth < containerWidth && width > maxWidth) {
+    width = maxWidth;
   }
+  if (minWidth > 0) width = Math.max(width, minWidth);
 
-  return {
-    width,
-    height: Math.max(rect.height, item.offsetHeight),
-  };
+  return { width, height };
 }
 
 function fitAlong(available: number, size: number, gap: number) {
@@ -519,9 +518,12 @@ export function DynamicLoadingCollection<T>({
   }, [hasMore, isLoading, isLoadingMore, onLoadMore]);
 
   const remaining = knownTotal === undefined ? capacity : Math.max(0, knownTotal - items.length);
+  const measuredCapacity = capacity > 0
+    ? capacity
+    : (isLoading && knownTotal !== undefined && knownTotal > 0 ? Math.min(knownTotal, 1) : 0);
   const skeletonCount = isLoading
-    ? (knownTotal === 0 ? 0 : Math.min(capacity, knownTotal ?? capacity))
-    : isLoadingMore ? Math.min(capacity, remaining) : 0;
+    ? (knownTotal === 0 ? 0 : Math.min(measuredCapacity, knownTotal ?? measuredCapacity))
+    : isLoadingMore ? Math.min(Math.max(capacity, 1), remaining) : 0;
 
   return (
     <>

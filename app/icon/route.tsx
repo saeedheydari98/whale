@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
 import { GiSpermWhale } from "react-icons/gi";
-import { prisma } from "@/lib/prisma";
 import { resolveColor, type ThemeColorKey, type ThemeStyle } from "@/app/design-system/theme/theme";
 
 export const runtime = "nodejs";
@@ -41,36 +40,11 @@ function asThemeStyle(value: string | null): ThemeStyle | null {
   return value && themeStyleKeys.has(value as ThemeStyle) ? value as ThemeStyle : null;
 }
 
-async function readThemeForIcon() {
-  try {
-    const model = (prisma as { adminTheme?: { findFirst?: () => Promise<unknown> } }).adminTheme;
-    if (!model || typeof model.findFirst !== "function") {
-      return defaultTheme;
-    }
-
-    const record = await model.findFirst();
-    if (!record || typeof record !== "object") {
-      return defaultTheme;
-    }
-
-    const themeRecord = record as { primary?: unknown; style?: unknown };
-    const primary = asThemeColor(typeof themeRecord.primary === "string" ? themeRecord.primary : null)
-      ?? defaultTheme.primary;
-    const style = asThemeStyle(typeof themeRecord.style === "string" ? themeRecord.style : null)
-      ?? defaultTheme.style;
-
-    return { primary, style };
-  } catch {
-    return defaultTheme;
-  }
-}
-
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const storedTheme = await readThemeForIcon();
   const theme = {
-    primary: asThemeColor(url.searchParams.get("primary") ?? url.searchParams.get("theme")) ?? storedTheme.primary,
-    style: asThemeStyle(url.searchParams.get("style")) ?? storedTheme.style,
+    primary: asThemeColor(url.searchParams.get("primary") ?? url.searchParams.get("theme")) ?? defaultTheme.primary,
+    style: asThemeStyle(url.searchParams.get("style")) ?? defaultTheme.style,
   };
   const backgroundColor = resolveColor(theme.primary, theme.style, 500);
   const iconColor = resolveColor(theme.primary, theme.style, 50);
