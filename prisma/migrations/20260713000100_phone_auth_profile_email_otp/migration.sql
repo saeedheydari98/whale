@@ -23,7 +23,7 @@ DECLARE
   old_superadmin_id INTEGER;
   phone_superadmin_id INTEGER;
 BEGIN
-  SELECT "id" INTO old_superadmin_id FROM "User" WHERE "username" = 'saeedheydari98' LIMIT 1;
+  SELECT "id" INTO old_superadmin_id FROM "User" WHERE "username" = 'whalestore' LIMIT 1;
   SELECT "id" INTO phone_superadmin_id FROM "User" WHERE "username" = '09176991556' LIMIT 1;
 
   IF old_superadmin_id IS NOT NULL AND phone_superadmin_id IS NULL THEN

@@ -1,3 +1,3 @@
 UPDATE "User"
 SET "role" = 'superadmin'
-WHERE "username" = 'saeedheydari98';
+WHERE "username" = 'whalestore';

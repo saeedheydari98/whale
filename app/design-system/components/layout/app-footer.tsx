@@ -118,13 +118,13 @@ export function AppFooter() {
                 <span>09176991556</span>
               </a>
               <a
-                href="mailto:saeedheydri.98@gmail.com"
+                href="mailto:whalestoresupport@gmail.com"
                 dir="ltr"
-                aria-label="ارسال ایمیل به سعید حیدری"
+                aria-label="ارسال ایمیل به پشتیبانی وال استور"
                 className="flex items-center gap-2 text-secondary-text transition-colors hover:text-primary focus-visible:text-primary"
               >
                 <SiGmail className="text-lg" aria-hidden="true" />
-                <span>saeedheydri.98@gmail.com</span>
+                <span>whalestoresupport@gmail.com</span>
               </a>
               <a
                 href="https://github.com/saeedheydari98"
