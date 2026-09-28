@@ -151,7 +151,7 @@ export function AppFooter() {
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link href="/about-wahlle" className="text-sm font-bold text-secondary-text transition-colors hover:text-primary">
+            <Link href="/about-wahle" className="text-sm font-bold text-secondary-text transition-colors hover:text-primary">
               درباره وال
             </Link>
           </div>
