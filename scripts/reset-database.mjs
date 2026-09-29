@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 const SUPERADMIN_PHONE = "09176991556";
+const SUPERADMIN_EMAIL = "whalestoresupport@gmail.com";
 
 const prisma = new PrismaClient();
 
@@ -46,6 +47,7 @@ async function resetDatabase() {
         where: { id: superadmin.id },
         data: {
           role: "superadmin",
+          email: SUPERADMIN_EMAIL,
           avatarUrl: null,
           refreshTokenHash: null,
           resetTokenHash: null,
