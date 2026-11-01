@@ -15,6 +15,23 @@ const COLOR_MAP: Record<string, string> = {
   pink: "#ec4899",
 };
 
+const COLOR_LABELS: Record<string, string> = {
+  black: "مشکی",
+  white: "سفید",
+  gray: "خاکستری",
+  red: "قرمز",
+  blue: "آبی",
+  green: "سبز",
+  yellow: "زرد",
+  orange: "نارنجی",
+  purple: "بنفش",
+  pink: "صورتی",
+};
+
+export function colorLabel(color: string) {
+  return COLOR_LABELS[color.toLowerCase()] ?? color;
+}
+
 export function getStockColorValue(color: string) {
   return COLOR_MAP[color.toLowerCase()] ?? color;
 }

@@ -29,7 +29,7 @@ export function rateLimit(
   }
 
   if (bucket.count >= limit) {
-    return apiFail("rate limit exceeded", 429);
+    return apiFail("تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.", 429);
   }
 
   bucket.count += 1;

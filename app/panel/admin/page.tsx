@@ -24,6 +24,7 @@ import { AdminUsersPanel } from "@/app/panel/admin/admin-users-panel";
 import { AdminDiscountsPanel } from "@/app/panel/admin/admin-discounts-panel";
 import { AdminOrdersPanel } from "@/app/panel/admin/admin-orders-panel";
 import { AppHeading } from "@/app/design-system/components/ui/text";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { getAdminPanelStructure, type AdminPanelStructure } from "@/lib/admin-structure";
 import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
@@ -47,10 +48,13 @@ export default function AdminPanelPage() {
   const [activeTab, setActiveTab] = useState<AdminPanelTab>("theme");
   const [structure, setStructure] = useState<AdminPanelStructure | null>(null);
   const [structureReady, setStructureReady] = useState(false);
+  const [structureError, setStructureError] = useState("");
+  useTransientAppMessage(structureError);
 
   useEffect(() => {
     if (hasAdminAccess !== true) return;
     let cancelled = false;
+    setStructureError("");
     void getAdminPanelStructure()
       .then((next) => {
         if (cancelled) return;
@@ -58,7 +62,9 @@ export default function AdminPanelPage() {
         setStructureReady(true);
       })
       .catch(() => {
-        if (!cancelled) setStructureReady(true);
+        if (cancelled) return;
+        setStructureError("دریافت ساختار پنل مدیریت انجام نشد.");
+        setStructureReady(true);
       });
     return () => {
       cancelled = true;
@@ -152,9 +158,16 @@ export default function AdminPanelPage() {
 
           {activeTab === "theme" ? <AdminThemePanel /> : null}
           {activeTab === "security" && isSuperadmin ? <AdminSecurityPanel /> : null}
-          {activeTab === "orders" ? <AdminOrdersPanel totalCount={structure?.orders} /> : null}
+          {activeTab === "orders" ? (
+            <AdminOrdersPanel
+              totalCount={structure?.orders}
+              inPersonCount={structure?.inPersonOrders}
+              productsCount={structure?.products}
+              usersCount={structure?.users}
+            />
+          ) : null}
           {activeTab === "users" ? <AdminUsersPanel totalCount={structure?.users} /> : null}
-          {activeTab === "discounts" ? <AdminDiscountsPanel /> : null}
+          {activeTab === "discounts" ? <AdminDiscountsPanel totalUsersCount={structure?.users} /> : null}
           {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" ? (
             <AdminProductsPanel section={activeTab} />
           ) : null}

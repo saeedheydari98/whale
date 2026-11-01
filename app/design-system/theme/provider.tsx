@@ -65,6 +65,9 @@ function readStoredMode(): ThemeMode {
   if (cachedUser?.user) return cachedUser.user.themeMode;
 
   try {
+    const sessionMode = window.sessionStorage.getItem("theme-mode");
+    if (isThemeMode(sessionMode)) return sessionMode;
+
     const deviceMode = localStorage.getItem(DEVICE_THEME_MODE_STORAGE_KEY);
     if (isThemeMode(deviceMode)) return deviceMode;
   } catch {

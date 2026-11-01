@@ -138,11 +138,10 @@ async function getAdminCatalogSection(section: AdminCatalogLoadSection, options?
   const json = await fetchJsonDeduped<{
     ok?: boolean;
     data?: { catalog?: unknown };
-    message?: string;
-    error?: string;
+    showMessage?: string;
   }>(catalogSectionUrl(section, options), { force: options?.force });
 
-  if (json?.ok === false) throw new Error(json.message || json.error || "دریافت اطلاعات فروشگاه ممکن نشد.");
+  if (json?.ok === false) throw new Error(json.showMessage || "دریافت اطلاعات فروشگاه ممکن نشد.");
   return toProductsCache(json?.data?.catalog);
 }
 
@@ -184,11 +183,10 @@ async function getAdminStorefrontLayout(options?: { force?: boolean }) {
   const json = await fetchJsonDeduped<{
     ok?: boolean;
     data?: { storefront?: unknown };
-    message?: string;
-    error?: string;
+    showMessage?: string;
   }>(`${ADMIN_CATALOG_SECTION_URL}/storefront`, { force: options?.force });
 
-  if (json?.ok === false) throw new Error(json.message || json.error || "دریافت چیدمان فروشگاه ممکن نشد.");
+  if (json?.ok === false) throw new Error(json.showMessage || "دریافت چیدمان فروشگاه ممکن نشد.");
   return normalizeStorefrontLayout(json?.data?.storefront);
 }
 
@@ -681,13 +679,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
 
     const loadStructure = async () => {
       try {
-        let next = await getAdminPanelStructure();
-        if (!next) {
-          await new Promise((resolve) => window.setTimeout(resolve, 250));
-          next = await getAdminPanelStructure({ force: true });
-        }
+        const next = await getAdminPanelStructure();
         if (!cancelled) setStructure(next);
-        if (!cancelled && !next) setStatus("دریافت ساختار پنل ممکن نشد.");
       } catch {
         if (!cancelled) setStatus("دریافت ساختار پنل ممکن نشد.");
       }
@@ -1185,7 +1178,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           continue;
         }
 
-        throw new Error(data?.message || data?.error || "ذخیره اطلاعات فروشگاه ناموفق بود.");
+        throw new Error(data?.showMessage || "ذخیره اطلاعات فروشگاه ناموفق بود.");
       }
 
       throw new Error("ذخیره اطلاعات فروشگاه بعد از چند تلاش ناموفق بود.");
@@ -1239,12 +1232,12 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         data = {
           ...data,
           message: visibleStatusMessage(
-            data?.message || data?.error ? new Error(String(data?.message || data?.error)) : null,
+            data?.showMessage ? new Error(String(data.showMessage)) : null,
             "ذخیره چیدمان فروشگاه ناموفق بود."
           ),
           error: undefined,
         };
-        throw new Error(String(data.message));
+        throw new Error(String(data.showMessage));
       }
 
       clearProductsCache();

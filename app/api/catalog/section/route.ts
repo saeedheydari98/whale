@@ -13,7 +13,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const type = String(url.searchParams.get("type") ?? "").trim();
     const id = String(url.searchParams.get("id") ?? "").trim();
-    if (!type || !id) return apiFail("type and id are required.", 400);
+    if (!type || !id) return apiFail("نوع و شناسه الزامی است.", 400);
     return apiOk(await getPageSectionData(url.searchParams));
   } catch (error) {
     console.error("Catalog section GET error:", error);

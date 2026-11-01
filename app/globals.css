@@ -10,6 +10,95 @@ h1, h2, h3, h4, h5, h6 {
   color: inherit;
 }
 
+:where(
+  a[href]:not([aria-disabled="true"]),
+  area[href],
+  button:not(:disabled):not([aria-disabled="true"]),
+  input[type="button"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="file"]:not(:disabled),
+  input[type="image"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="reset"]:not(:disabled),
+  input[type="submit"]:not(:disabled),
+  label[for],
+  label:has(input:not(:disabled)),
+  select:not(:disabled),
+  summary,
+  [role="button"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not([aria-disabled="true"]),
+  [role="link"]:not([aria-disabled="true"]),
+  [role="menuitem"]:not([aria-disabled="true"]),
+  [role="option"]:not([aria-disabled="true"]),
+  [role="radio"]:not([aria-disabled="true"]),
+  [role="switch"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"])
+) {
+  cursor: pointer;
+}
+
+table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+th,
+td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+[data-app-table] {
+  width: 100%;
+  min-width: 0;
+}
+
+[data-app-table] [data-app-table-row] {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.5rem;
+  align-items: center;
+}
+
+[data-app-table][data-app-table-columns="8"] [data-app-table-row] {
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+[data-app-table] [data-app-table-row] > * {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.table-overflow-tooltip {
+  position: fixed;
+  z-index: 11000;
+  max-width: min(24rem, calc(100vw - 1rem));
+  overflow-wrap: anywhere;
+  border: 1px solid var(--primary-border);
+  border-radius: 0.5rem;
+  background: var(--primary-card);
+  padding: 0.5rem 0.75rem;
+  color: var(--primary-text);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  text-align: start;
+  white-space: normal;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
+  pointer-events: none;
+}
+
 /* =========================
    Base Variables
 ========================= */

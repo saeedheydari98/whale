@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { runtimeEnv } from "@/lib/env";
 import { EMAIL_PATTERN, OTP_CODE_PATTERN } from "@/lib/validation-patterns";
 
 const SMTP_CONNECTION_ERROR_CODES = new Set([
@@ -24,28 +25,17 @@ type OtpMail = {
   html: string;
 };
 
-function trimEnv(value: string | undefined) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
+/** Runtime-only reads so Next/Vercel cannot bake empty Gmail secrets at build. */
 function gmailConfig() {
-  const user = process.env.GMAIL_SMTP_USER;
-  const appPassword = process.env.GMAIL_SMTP_APP_PASSWORD;
-  const fromName = process.env.GMAIL_FROM_NAME;
-  const webhookUrl = process.env.GMAIL_WEBHOOK_URL;
-  const webhookSecret = process.env.GMAIL_WEBHOOK_SECRET;
-  const oauthClientId = process.env.GMAIL_OAUTH_CLIENT_ID;
-  const oauthClientSecret = process.env.GMAIL_OAUTH_CLIENT_SECRET;
-  const oauthRefreshToken = process.env.GMAIL_OAUTH_REFRESH_TOKEN;
   return {
-    user: trimEnv(user).toLowerCase(),
-    appPassword: trimEnv(appPassword).replace(/\s+/g, ""),
-    fromName: trimEnv(fromName) || "Whale",
-    webhookUrl: trimEnv(webhookUrl),
-    webhookSecret: trimEnv(webhookSecret),
-    oauthClientId: trimEnv(oauthClientId),
-    oauthClientSecret: trimEnv(oauthClientSecret),
-    oauthRefreshToken: trimEnv(oauthRefreshToken),
+    user: (runtimeEnv("GMAIL_SMTP_USER") || "").toLowerCase(),
+    appPassword: (runtimeEnv("GMAIL_SMTP_APP_PASSWORD") || "").replace(/\s+/g, ""),
+    fromName: runtimeEnv("GMAIL_FROM_NAME") || "Whale",
+    webhookUrl: runtimeEnv("GMAIL_WEBHOOK_URL") || "",
+    webhookSecret: runtimeEnv("GMAIL_WEBHOOK_SECRET") || "",
+    oauthClientId: runtimeEnv("GMAIL_OAUTH_CLIENT_ID") || "",
+    oauthClientSecret: runtimeEnv("GMAIL_OAUTH_CLIENT_SECRET") || "",
+    oauthRefreshToken: runtimeEnv("GMAIL_OAUTH_REFRESH_TOKEN") || "",
   };
 }
 

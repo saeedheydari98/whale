@@ -52,7 +52,10 @@ export async function POST(request: Request) {
     return apiOk({
       security: { hasCode: false, isPanelLocked: false },
       access: { isAdminUnlocked: false, status: requestRecord.status },
-    }, { message: "درخواست برای مدیر ارشد ارسال شد." });
+    }, {
+      message: "ADMIN_ACCESS_REQUEST_SUBMITTED",
+      showMessage: "درخواست برای مدیر ارشد ارسال شد.",
+    });
   } catch (error) {
     console.error("Admin access request compatibility error:", error);
     return apiServerError();

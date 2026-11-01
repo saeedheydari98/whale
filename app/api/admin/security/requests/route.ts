@@ -10,11 +10,23 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const reviewSchema = z.object({
-  id: z.string().min(1),
-  action: z.enum(["approve", "reject", "revoke"]).optional(),
-  approved: z.boolean().optional(),
-});
+const reviewSchema = z.union([
+  z.object({
+    userId: z.coerce.number().int().positive(),
+    action: z.literal("grant"),
+  }),
+  z.object({
+    id: z.string().min(1),
+    action: z.enum(["approve", "reject", "revoke"]).optional(),
+    approved: z.boolean().optional(),
+  }),
+]);
+
+type ReviewRequestPayload = {
+  id: string;
+  action?: "approve" | "reject" | "revoke";
+  approved?: boolean;
+};
 
 type AdminRequestWithUser = Awaited<ReturnType<typeof readAdminRequest>>;
 
@@ -76,7 +88,7 @@ function toPublicRequest(request: NonNullable<AdminRequestWithUser>) {
   };
 }
 
-function actionFromPayload(data: z.infer<typeof reviewSchema>) {
+function actionFromPayload(data: ReviewRequestPayload) {
   if (data.action) return data.action;
   return data.approved ? "approve" : "reject";
 }
@@ -129,7 +141,10 @@ export async function POST(request: Request) {
     if (auth.user.role === "admin" || auth.user.role === "superadmin") {
       return apiOk(
         { request: null, access: { isAdminUnlocked: true } },
-        { message: "دسترسی مدیریت برای حساب شما فعال است." }
+        {
+          message: "ADMIN_ACCESS_ALREADY_GRANTED",
+          showMessage: "دسترسی مدیریت برای حساب شما فعال است.",
+        }
       );
     }
 
@@ -166,7 +181,11 @@ export async function POST(request: Request) {
 
     return apiOk(
       { request: toPublicRequest(fullRequest), access: { isAdminUnlocked: false, status: saved.status } },
-      { status: existing ? 200 : 201, message: "درخواست برای مدیر ارشد ارسال شد." }
+      {
+        status: existing ? 200 : 201,
+        message: "ADMIN_ACCESS_REQUEST_SUBMITTED",
+        showMessage: "درخواست برای مدیر ارشد ارسال شد.",
+      }
     );
   } catch (error) {
     console.error("Admin access requests POST error:", error);
@@ -184,6 +203,59 @@ export async function PATCH(request: Request) {
   if (!parsed.ok) return parsed.response;
 
   try {
+    if ("userId" in parsed.data) {
+      const targetUser = await prisma.user.findUnique({
+        where: { id: parsed.data.userId },
+        select: {
+          id: true,
+          username: true,
+          role: true,
+          profiles: {
+            orderBy: { updatedAt: "desc" },
+            take: 1,
+            select: { phone: true },
+          },
+        },
+      });
+      if (!targetUser) return apiFail("کاربر پیدا نشد.", 404);
+      if (targetUser.username === SUPERADMIN_PHONE || targetUser.role === "superadmin") {
+        return apiFail("دسترسی مدیر ارشد قابل تغییر نیست.", 400);
+      }
+
+      const phone = String(targetUser.profiles[0]?.phone || targetUser.username || "").trim();
+      if (!phone) return apiFail("شماره موبایل این کاربر ثبت نشده است.", 400);
+
+      const existingRequest = await prisma.adminAccessRequest.findFirst({
+        where: { userId: targetUser.id },
+        orderBy: { updatedAt: "desc" },
+      });
+      const accessRequest = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.user.update({
+          where: { id: targetUser.id },
+          data: { role: "admin" },
+        });
+
+        return existingRequest
+          ? tx.adminAccessRequest.update({
+              where: { id: existingRequest.id },
+              data: { username: phone, status: "approved" },
+            })
+          : tx.adminAccessRequest.create({
+              data: { userId: targetUser.id, username: phone, status: "approved" },
+            });
+      });
+
+      const fullRequest = await readAdminRequest(accessRequest.id);
+      if (!fullRequest) return apiFail("سابقه دسترسی پیدا نشد.", 404);
+      return apiOk(
+        { request: toPublicRequest(fullRequest) },
+        {
+          message: "ADMIN_ACCESS_GRANTED",
+          showMessage: "دسترسی مدیریت برای کاربر فعال شد.",
+        }
+      );
+    }
+
     const targetRequest = await readAdminRequest(parsed.data.id);
     if (!targetRequest) return apiFail("درخواست مدیریت پیدا نشد.", 404);
     if (targetRequest.user.username === SUPERADMIN_PHONE || targetRequest.user.role === "superadmin") {
@@ -220,7 +292,8 @@ export async function PATCH(request: Request) {
     return apiOk(
       { request: toPublicRequest(updated) },
       {
-        message:
+        message: `ADMIN_ACCESS_${action.toUpperCase()}_COMPLETED`,
+        showMessage:
           action === "approve"
             ? "دسترسی مدیریت تایید شد."
             : action === "revoke"

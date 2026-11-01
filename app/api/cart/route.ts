@@ -310,6 +310,9 @@ export async function POST(request: Request) {
     return apiOk({
       user: { profile: savedCart.profile },
       cart: { items: savedCart.items.map(cartItemDto) },
+    }, {
+      message: "CART_UPDATED",
+      showMessage: "سبد خرید با موفقیت به‌روز شد.",
     });
   } catch (error) {
     console.error("Cart POST error:", error);
@@ -336,7 +339,10 @@ export async function PATCH(request: Request) {
       shippingMethod: normalizeShippingMethod(body.shippingMethod),
       discountCode: body.discountCode,
     });
-    return apiOk({ user: { profile }, cart: { items: [] }, checkout: result });
+    return apiOk({ user: { profile }, cart: { items: [] }, checkout: result }, {
+      message: "ORDER_CREATED",
+      showMessage: "سفارش با موفقیت ثبت شد.",
+    });
   } catch (error) {
     console.error("Cart checkout error:", error);
     if (error instanceof CheckoutError) return apiFail(error.message, error.status);
@@ -350,12 +356,18 @@ export async function DELETE(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const profile = await findLegacyProfile(request, body.profile ?? {});
-  if (!profile) return apiOk({ user: { profile: null }, cart: { items: [] } });
+  if (!profile) return apiOk({ user: { profile: null }, cart: { items: [] } }, {
+    message: "CART_CLEARED",
+    showMessage: "سبد خرید خالی شد.",
+  });
 
   try {
     const cart = await activeCartForProfile(profile.id);
     await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
-    return apiOk({ user: { profile }, cart: { items: [] } });
+    return apiOk({ user: { profile }, cart: { items: [] } }, {
+      message: "CART_CLEARED",
+      showMessage: "سبد خرید خالی شد.",
+    });
   } catch (error) {
     console.error("Cart DELETE error:", error);
     return apiServerError();

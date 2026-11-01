@@ -7,6 +7,7 @@ import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
 import { AppFooter } from "./design-system/components/layout/app-footer";
 import { AdminPanelFloatButton } from "./design-system/components/layout/admin-panel-float-button";
+import { TableOverflowTooltip } from "./design-system/components/ui/table-overflow-tooltip";
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppUserProvider } from "@/lib/app-user-context";
@@ -78,7 +79,10 @@ const initialThemeScript = `
     }
     var mode = cachedUser
       ? (cachedUser.themeMode === "dark" ? "dark" : "light")
-      : localStorage.getItem("${DEVICE_THEME_MODE_STORAGE_KEY}");
+      : sessionStorage.getItem("theme-mode");
+    if (mode !== "dark" && mode !== "light") {
+      mode = localStorage.getItem("${DEVICE_THEME_MODE_STORAGE_KEY}");
+    }
     if (mode !== "dark") mode = "light";
     root.classList.toggle("dark", mode === "dark");
   } catch (error) {}
@@ -103,8 +107,14 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   icons: {
-    icon: [{ url: "/icon", type: "image/png", sizes: "32x32" }],
-    apple: [{ url: "/icon", type: "image/png", sizes: "32x32" }],
+    // The icon route resolves the active theme from the database, so the very
+    // first request already carries the real brand color. The media queries let
+    // the browser pick the light or dark background on its own.
+    icon: [
+      { url: "/icon?mode=light", type: "image/png", sizes: "32x32", media: "(prefers-color-scheme: light)" },
+      { url: "/icon?mode=dark", type: "image/png", sizes: "32x32", media: "(prefers-color-scheme: dark)" },
+    ],
+    apple: [{ url: "/icon?mode=light", type: "image/png", sizes: "32x32" }],
   },
 };
 
@@ -151,6 +161,7 @@ export default function RootLayout({
         <Suspense fallback={<Loading loading="fullscreen" />}>
           <RouteLoadingController />
         </Suspense>
+        <TableOverflowTooltip />
         <AppThemeProvider>
           <AppUserProvider>
             <AppNotificationProvider>

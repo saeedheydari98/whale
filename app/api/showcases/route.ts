@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { apiFail, apiOk } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   const id = url.searchParams.get("id") ?? null;
 
   if (!hasShowcaseModel) {
-    return NextResponse.json({ ok: true, data: id ? { showcase: null } : { showcases: [] } });
+    return apiOk(id ? { showcase: null } : { showcases: [] });
   }
 
   try {
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
           banners: true,
         },
       });
-      return NextResponse.json({ ok: true, data: { showcase: showcase ?? null } });
+      return apiOk({ showcase: showcase ?? null });
     }
 
     const showcases = await prisma.showcase.findMany({
@@ -75,10 +75,10 @@ export async function GET(request: Request) {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
-    return NextResponse.json({ ok: true, data: { showcases } });
+    return apiOk({ showcases });
   } catch (error) {
     console.error("Showcases GET error:", error);
-    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد.", data: { showcases: [] } }, { status: 500 });
+    return apiFail("خطای سرور رخ داد.", 500, [], { showcases: [] });
   }
 }
 
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
   const incoming = body.showcase ?? body;
 
   if (!incoming || !incoming.id && !incoming.title) {
-    return NextResponse.json({ ok: false, error: "اطلاعات ارسالی معتبر نیست." }, { status: 400 });
+    return apiFail("اطلاعات ارسالی معتبر نیست.", 400);
   }
 
   try {
@@ -155,9 +155,12 @@ export async function POST(request: Request) {
       return sc;
     });
 
-    return NextResponse.json({ ok: true, data: { showcase: result } });
+    return apiOk({ showcase: result }, {
+      message: "SHOWCASE_SAVED",
+      showMessage: "ویترین با موفقیت ذخیره شد.",
+    });
   } catch (error) {
     console.error("Showcases POST error:", error);
-    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد." }, { status: 500 });
+    return apiFail("خطای سرور رخ داد.", 500);
   }
 }

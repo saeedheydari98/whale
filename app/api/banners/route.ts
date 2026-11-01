@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { apiFail, apiOk } from "@/lib/api/response";
 import { readImageMetaRecord as readImageMeta } from "@/lib/catalog-utils";
 
 export const dynamic = "force-dynamic";
@@ -121,16 +121,10 @@ export async function GET(request: Request) {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
-    return NextResponse.json({
-      ok: true,
-      data: { banners: banners.map(toClientBanner) },
-    });
+    return apiOk({ banners: banners.map(toClientBanner) });
   } catch (error) {
     console.error("Banners GET error:", error);
-    return NextResponse.json(
-      { ok: false, error: "خطای سرور رخ داد.", data: { banners: [] } },
-      { status: 500 }
-    );
+    return apiFail("خطای سرور رخ داد.", 500, [], { banners: [] });
   }
 }
 
@@ -180,12 +174,12 @@ export async function POST(request: Request) {
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
 
-    return NextResponse.json({
-      ok: true,
-      data: { banners: saved.map(toClientBanner) },
+    return apiOk({ banners: saved.map(toClientBanner) }, {
+      message: "BANNERS_SAVED",
+      showMessage: "بنرها با موفقیت ذخیره شدند.",
     });
   } catch (error) {
     console.error("Banners POST error:", error);
-    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد." }, { status: 500 });
+    return apiFail("خطای سرور رخ داد.", 500);
   }
 }

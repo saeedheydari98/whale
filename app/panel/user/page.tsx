@@ -19,6 +19,7 @@ import { formatPersianDate } from "@/lib/date-format";
 import type { OrderStatusEventRecord } from "@/lib/order-status";
 import { formatAmount } from "@/lib/price-format";
 import { AppHeading } from "@/app/design-system/components/ui/text";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { clearUserProfile } from "@/lib/user-profile";
 import { UserProfilePanel } from "./user-profile-panel";
 import { UserDiscountsPanel } from "./user-discounts-panel";
@@ -262,9 +263,12 @@ export default function UserPanelPage() {
   const [activeTab, setActiveTab] = useState<"profile" | "orders" | "discounts" | "wallet">("profile");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
+  const [structureError, setStructureError] = useState("");
   const [structure, setStructure] = useState<UserPanelStructure | null>(null);
   const [structureReady, setStructureReady] = useState(false);
   const isLoggedIn = Boolean(appUserData?.user);
+  useTransientAppMessage(logoutError);
+  useTransientAppMessage(structureError);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -275,6 +279,7 @@ export default function UserPanelPage() {
 
     let cancelled = false;
     setStructureReady(false);
+    setStructureError("");
     void getUserPanelStructure()
       .then((next) => {
         if (cancelled) return;
@@ -282,7 +287,9 @@ export default function UserPanelPage() {
         setStructureReady(true);
       })
       .catch(() => {
-        if (!cancelled) setStructureReady(true);
+        if (cancelled) return;
+        setStructureError("دریافت ساختار پنل کاربری انجام نشد.");
+        setStructureReady(true);
       });
     return () => {
       cancelled = true;
@@ -362,11 +369,6 @@ export default function UserPanelPage() {
             </CustomButton>
           ) : null}
         </div>
-        {logoutError ? (
-          <div className="rounded-md border border-danger-border-nomode bg-danger-bg-nomode p-2 text-sm font-semibold text-danger-text-nomode">
-            <span>{logoutError}</span>
-          </div>
-        ) : null}
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
         {activeTab === "profile" ? <UserProfilePanel onCompleted={handleProfileCompleted} /> : null}
         {activeTab === "orders" ? <UserOrdersPanel totalCount={structure?.orders} /> : null}

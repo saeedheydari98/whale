@@ -19,7 +19,10 @@ export async function POST(request: Request) {
       shippingMethod: normalizeShippingMethod(body.shippingMethod),
       discountCode: body.discountCode,
     });
-    return apiOk({ checkout: result });
+    return apiOk({ checkout: result }, {
+      message: "ORDER_CREATED",
+      showMessage: "سفارش با موفقیت ثبت شد.",
+    });
   } catch (error) {
     if (error instanceof CheckoutError) return apiFail(error.message, error.status);
     console.error("Checkout error:", error);

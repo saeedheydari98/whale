@@ -28,6 +28,7 @@ type EmailOtpAuthFormProps = {
 
 type AuthResponse = {
   ok?: boolean;
+  showMessage?: string;
   message?: string;
   error?: string;
   data?: {
@@ -135,14 +136,12 @@ export function EmailOtpAuthForm({
       if (!response.ok || payload?.ok === false) {
         const retryAfter = Number(payload?.data?.retryAfterSeconds);
         if (Number.isFinite(retryAfter) && retryAfter > 0) setCooldown(Math.ceil(retryAfter));
-        throw new Error(payload?.message || payload?.error || "ارسال کد ورود ناموفق بود.");
+        throw new Error(payload?.showMessage || "ارسال کد ورود ناموفق بود.");
       }
       setCodeDigits(emptyOtpDigits());
       setCodeSent(true);
       setCooldown(Math.max(1, Math.round(Number(payload?.data?.retryAfterSeconds) || 60)));
-      setStatus(payload?.data?.developmentCode
-        ? `کد توسعه: ${payload.data.developmentCode}`
-        : `کد ورود به ${email.trim().toLowerCase()} ارسال شد.`);
+      setStatus("");
       window.requestAnimationFrame(() => focusOtpInput(0));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "ارسال کد ورود ناموفق بود.");
@@ -168,7 +167,7 @@ export function EmailOtpAuthForm({
       const payload = await response.json().catch(() => null) as AuthResponse | null;
       const user = payload?.data?.user ?? null;
       if (!response.ok || payload?.ok === false || !user) {
-        throw new Error(payload?.message || payload?.error || "کد ورود تأیید نشد.");
+        throw new Error(payload?.showMessage || "کد ورود تأیید نشد.");
       }
       await onSuccess({ user, profileComplete: payload?.data?.profileComplete === true });
     } catch (error) {

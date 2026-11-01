@@ -21,22 +21,29 @@ DATABASE_URL=
 ## Vercel
 
 همان سه مقدار جیمیل را در داشبورد پروژه بگذارید، بعد یک Redeploy بزنید. بدون Redeploy مقدار جدید به تابع‌ها نمی‌رسد.
+کد Gmail را در runtime می‌خواند (`runtimeEnv`)؛ با این حال اگر App Password روی Vercel قدیمی/اشتباه باشد، `/api/auth/request-otp` با **503** و پیام «امکان ارسال کد ورود وجود ندارد» برمی‌گردد.
 
 1. در [Vercel](https://vercel.com) پروژه `whalestore` را باز کنید.
 2. `Settings` → `Environment Variables`.
-3. این کلیدها را برای محیط **Production** (و در صورت نیاز Preview) بگذارید یا اصلاح کنید:
+3. این کلیدها را برای محیط **Production** (و در صورت نیاز Preview) بگذارید یا اصلاح کنید — **دقیقاً همان مقادیر `.env` لوکال که با `node scripts/test-gmail-smtp.mjs` موفق شده‌اند**:
 
 | Key | مقدار |
 | --- | --- |
-| `GMAIL_SMTP_USER` | همان ایمیل جیمیل خودتان |
-| `GMAIL_SMTP_APP_PASSWORD` | App Password (فاصله‌ها مهم نیستند) |
-| `GMAIL_FROM_NAME` | مثلاً `Whale` |
+| `GMAIL_SMTP_USER` | `whalestoresupport@gmail.com` |
+| `GMAIL_SMTP_APP_PASSWORD` | App Password اکانت پشتیبانی (۱۶ کاراکتر) |
+| `GMAIL_FROM_NAME` | مثلاً `whalestore` |
 | `JWT_SECRET` | یک رشتهٔ تصادفی و محرمانه؛ در پروداکشن اجباری است |
 | `DATABASE_URL` | همان دیتابیس پروداکشن |
 
 4. اگر `GMAIL_WEBHOOK_URL` را قبلاً برای آزمایش گذاشته‌اید و اسکریپت آماده نیست، آن را **حذف** کنید تا ارسال دوباره از SMTP جیمیل برود.
 5. `Deployments` → آخرین دیپلوی → `Redeploy` (یا یک پوش جدید بعد از این تغییر کد). گزینهٔ «Use existing Build Cache» را خاموش کنید.
 6. روی سایت پروداکشن یک بار «ارسال کد» را بزنید و اینباکس/اسپم همان ایمیلی که وارد کرده‌اید را چک کنید.
+
+لوکال برای اطمینان از App Password:
+
+```bash
+node scripts/test-gmail-smtp.mjs
+```
 
 `AUTH_OTP_EXPOSE_CODE` را در پروداکشن نگذارید.
 

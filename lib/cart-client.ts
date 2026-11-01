@@ -327,7 +327,7 @@ async function loadCartFromApi(options?: { silent?: boolean }) {
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "بارگذاری سبد خرید ناموفق بود.");
+    throw new Error(data?.showMessage || "بارگذاری سبد خرید ناموفق بود.");
   }
   const apiItems = readCartItemsFromApiData(data);
   return {
@@ -347,7 +347,7 @@ async function saveCartToApi(items: CartItemRecord[], profile?: UserProfile | nu
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "ذخیره سبد خرید ناموفق بود.");
+    throw new Error(data?.showMessage || "ذخیره سبد خرید ناموفق بود.");
   }
   const apiItems = readCartItemsFromApiData(data);
   return Array.isArray(apiItems)
@@ -366,7 +366,7 @@ async function clearCartFromApi(profile?: UserProfile | null, options?: { silent
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "پاک کردن سبد خرید ناموفق بود.");
+    throw new Error(data?.showMessage || "پاک کردن سبد خرید ناموفق بود.");
   }
   return [];
 }
@@ -404,15 +404,20 @@ export async function getCart(user: AuthClientUser | null | undefined = readCach
   return { items: readLocalCart(user), profile };
 }
 
-export async function persistCart(items: CartItemRecord[], profile = readUserProfile()) {
+export async function persistCart(
+  items: CartItemRecord[],
+  profile = readUserProfile(),
+  options?: { notify?: boolean }
+) {
   const user = readCachedAuthUser();
   const mutationVersion = beginCartMutation(user);
   const nextItems = dedupeCartItems(items);
   writeLocalCart(nextItems, user);
+  const silent = options?.notify === false;
 
   if (nextItems.length === 0) {
     if (canUseApiCart(profile, user)) {
-      const cleared = await enqueueCartApiMutation(() => clearCartFromApi(profile, { silent: true }))
+      const cleared = await enqueueCartApiMutation(() => clearCartFromApi(profile, { silent }))
         .then(() => true, () => false);
       if (cleared && mutationVersion === cartMutationVersion) markCartSynchronized(user);
     }
@@ -424,7 +429,7 @@ export async function persistCart(items: CartItemRecord[], profile = readUserPro
   }
 
   try {
-    const savedItems = await enqueueCartApiMutation(() => saveCartToApi(nextItems, profile, { silent: true }));
+    const savedItems = await enqueueCartApiMutation(() => saveCartToApi(nextItems, profile, { silent }));
     if (mutationVersion !== cartMutationVersion) return readLocalCart(user);
     markCartSynchronized(user);
     writeLocalCart(savedItems, user);
@@ -512,8 +517,9 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
         ),
       ];
 
+  const apiNotifies = canUseApiCart(readUserProfile(), cartUser);
   const savedItems = await persistCart(nextCart);
-  notifyCartSuccess(`${product.title} به سبد خرید اضافه شد.`);
+  if (!apiNotifies) notifyCartSuccess(`${product.title} به سبد خرید اضافه شد.`);
   return savedItems;
 }
 
@@ -528,9 +534,12 @@ export async function updateCartQuantity(target: CartItemRecord, quantity: numbe
           getItemKey(item) === key ? { ...item, quantity: nextQuantity } : item
         );
 
-  const savedItems = await persistCart(nextCart);
+  const apiNotifies = canUseApiCart(readUserProfile(), readCachedAuthUser());
+  const savedItems = await persistCart(nextCart, readUserProfile(), { notify: options?.notify !== false });
   if (options?.notify !== false) {
-    notifyCartSuccess(quantity <= 0 || nextQuantity <= 0 ? "محصول از سبد خرید حذف شد." : "سبد خرید به‌روزرسانی شد.");
+    if (!apiNotifies) {
+      notifyCartSuccess(quantity <= 0 || nextQuantity <= 0 ? "محصول از سبد خرید حذف شد." : "سبد خرید به‌روزرسانی شد.");
+    }
   }
   return savedItems;
 }
@@ -578,9 +587,10 @@ export async function updateCartColorQuantity(
     }];
   });
 
-  const savedItems = await persistCart(nextCart);
+  const apiNotifies = canUseApiCart(readUserProfile(), readCachedAuthUser());
+  const savedItems = await persistCart(nextCart, readUserProfile(), { notify: options?.notify !== false });
   if (options?.notify !== false) {
-    notifyCartSuccess("سبد خرید به‌روزرسانی شد.");
+    if (!apiNotifies) notifyCartSuccess("سبد خرید به‌روزرسانی شد.");
   }
   return savedItems;
 }
@@ -628,8 +638,10 @@ export function selectCartItemColor(
 }
 
 export async function clearCart() {
+  const user = readCachedAuthUser();
+  const apiNotifies = canUseApiCart(readUserProfile(), user);
   const savedItems = await persistCart([]);
-  notifyCartSuccess("سبد خرید خالی شد.");
+  if (!apiNotifies) notifyCartSuccess("سبد خرید خالی شد.");
   return savedItems;
 }
 
@@ -641,7 +653,7 @@ export async function getCheckoutQuote(options: CheckoutOptions): Promise<Checko
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false || !data?.data?.quote) {
-    throw new Error(data?.message || data?.error || "استعلام مبلغ پرداخت انجام نشد.");
+    throw new Error(data?.showMessage || "استعلام مبلغ پرداخت انجام نشد.");
   }
   return data.data.quote as CheckoutQuote;
 }
@@ -662,7 +674,7 @@ export async function checkoutCart(profile = readUserProfile(), options: Checkou
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "ثبت سفارش ناموفق بود.");
+    throw new Error(data?.showMessage || "ثبت سفارش ناموفق بود.");
   }
 
   markCartSynchronized(user);

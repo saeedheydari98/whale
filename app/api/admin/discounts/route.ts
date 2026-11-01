@@ -40,15 +40,11 @@ export async function GET(request: Request) {
   const auth = await guard(request);
   if (!auth.ok) return auth.response;
   try {
-    const [settings, rules, users] = await Promise.all([
+    const [settings, rules] = await Promise.all([
       readWithRetry(() => prisma.commerceSetting.findUnique({ where: { id: 1 } })),
       readWithRetry(() => prisma.discountRule.findMany({ orderBy: { createdAt: "desc" }, include: { _count: { select: { discountCodes: true } } } })),
-      readWithRetry(() => prisma.user.findMany({
-        orderBy: { createdAt: "desc" },
-        select: { id: true, name: true, username: true, email: true, walletBalance: true, profiles: { take: 1, select: { firstName: true, lastName: true, phone: true } } },
-      })),
     ]);
-    return apiOk({ settings: settings ?? { cashbackPercent: 0, postalShippingFee: 30000 }, rules, users });
+    return apiOk({ settings: settings ?? { cashbackPercent: 0, postalShippingFee: 30000 }, rules });
   } catch (error) {
     console.error("Admin discounts GET error:", error);
     return apiServerError("دریافت تنظیمات تخفیف انجام نشد.");
@@ -60,7 +56,10 @@ export async function POST(request: Request) {
   if (!auth.ok) return auth.response;
   const body = await request.json().catch(() => ({})) as Record<string, unknown>;
   try {
-    if (body.action === "run_rules") return apiOk({ result: await runDiscountRules() });
+    if (body.action === "run_rules") return apiOk({ result: await runDiscountRules() }, {
+      message: "DISCOUNT_RULES_EXECUTED",
+      showMessage: "قوانین تخفیف اجرا شدند.",
+    });
     if (body.action === "issue_manual") {
       const name = String(body.name ?? "").trim();
       const userId = Math.round(Number(body.userId));
@@ -73,12 +72,18 @@ export async function POST(request: Request) {
       if (type === "percentage" && (!Number.isFinite(percent) || percent < 1 || percent > 100)) return apiFail("درصد تخفیف نامعتبر است.", 400);
       const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
       if (!user) return apiFail("کاربر پیدا نشد.", 404);
-      return apiOk(await issueDiscountCode({ userId, name, type, percent, validDays }));
+      return apiOk(await issueDiscountCode({ userId, name, type, percent, validDays }), {
+        message: "DISCOUNT_CODE_ISSUED",
+        showMessage: "کد تخفیف برای کاربر صادر شد.",
+      });
     }
     const parsed = validateRule(body);
     if (!parsed.ok) return apiFail(parsed.message, 400);
     const rule = await prisma.discountRule.create({ data: parsed.data });
-    return apiOk({ rule });
+    return apiOk({ rule }, {
+      message: "DISCOUNT_RULE_CREATED",
+      showMessage: "قانون تخفیف ثبت شد.",
+    });
   } catch (error) {
     console.error("Admin discounts POST error:", error);
     return apiServerError("ثبت تخفیف انجام نشد.");
@@ -94,7 +99,10 @@ export async function PATCH(request: Request) {
       const cashbackPercent = Math.round(Number(body.cashbackPercent));
       if (!Number.isFinite(cashbackPercent) || cashbackPercent < 0 || cashbackPercent > 100) return apiFail("درصد بازگشت وجه نامعتبر است.", 400);
       const settings = await prisma.commerceSetting.upsert({ where: { id: 1 }, update: { cashbackPercent }, create: { id: 1, cashbackPercent, postalShippingFee: 30000 } });
-      return apiOk({ settings });
+      return apiOk({ settings }, {
+        message: "COMMERCE_SETTINGS_UPDATED",
+        showMessage: "تنظیمات بازگشت وجه ذخیره شد.",
+      });
     }
     const id = String(body.id ?? "").trim();
     if (!id) return apiFail("کد تخفیف نامعتبر است.", 400);
@@ -118,10 +126,16 @@ export async function PATCH(request: Request) {
           },
         }),
       ]);
-      return apiOk({ rule });
+      return apiOk({ rule }, {
+        message: "DISCOUNT_RULE_UPDATED",
+        showMessage: "کد تخفیف ویرایش شد.",
+      });
     }
     const rule = await prisma.discountRule.update({ where: { id }, data: { active: body.active === true } });
-    return apiOk({ rule });
+    return apiOk({ rule }, {
+      message: "DISCOUNT_RULE_STATUS_UPDATED",
+      showMessage: body.active === true ? "کد تخفیف فعال شد." : "کد تخفیف غیرفعال شد.",
+    });
   } catch (error) {
     console.error("Admin discounts PATCH error:", error);
     return apiServerError("ویرایش تخفیف انجام نشد.");
@@ -136,7 +150,10 @@ export async function DELETE(request: Request) {
   if (!id) return apiFail("کد تخفیف نامعتبر است.", 400);
   try {
     await prisma.discountRule.delete({ where: { id } });
-    return apiOk({ deleted: true });
+    return apiOk({ deleted: true }, {
+      message: "DISCOUNT_RULE_DELETED",
+      showMessage: "کد تخفیف حذف شد.",
+    });
   } catch (error) {
     console.error("Admin discounts DELETE error:", error);
     return apiServerError("حذف کد تخفیف انجام نشد.");

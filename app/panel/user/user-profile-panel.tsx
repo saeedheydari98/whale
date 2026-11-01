@@ -160,7 +160,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
       setProfileDraft(savedProfile);
       setShowRequiredErrors(false);
       const localCart = readLocalCart();
-      if (localCart.length > 0) void persistCart(localCart, savedProfile);
+      if (localCart.length > 0) void persistCart(localCart, savedProfile, { notify: false });
       setStatus("پروفایل تکمیل و ذخیره شد.");
       await onCompleted?.(savedProfile);
     } catch (error) {
@@ -189,11 +189,9 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             maxLength={PERSIAN_NAME_MAX_LENGTH}
             required
             invalid={Boolean(fieldErrors.firstName)}
-            aria-describedby={fieldErrors.firstName ? "profile-first-name-error" : undefined}
             aria-label="نام"
             onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
           />
-          {fieldErrors.firstName ? <span id="profile-first-name-error" className="text-xs text-danger-text-nomode">{fieldErrors.firstName}</span> : null}
         </div>
         <div className="flex flex-col gap-1">
           <CustomInput
@@ -204,11 +202,9 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             maxLength={PERSIAN_NAME_MAX_LENGTH}
             required
             invalid={Boolean(fieldErrors.lastName)}
-            aria-describedby={fieldErrors.lastName ? "profile-last-name-error" : undefined}
             aria-label="نام خانوادگی"
             onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
           />
-          {fieldErrors.lastName ? <span id="profile-last-name-error" className="text-xs text-danger-text-nomode">{fieldErrors.lastName}</span> : null}
         </div>
         <div className="flex flex-col gap-1">
           <CustomInput
@@ -216,11 +212,9 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             label="شماره موبایل"
             placeholder="شماره موبایل"
             invalid={Boolean(fieldErrors.phone)}
-            aria-describedby={fieldErrors.phone ? "profile-phone-error" : undefined}
             aria-label="شماره موبایل"
             disabled
           />
-          {fieldErrors.phone ? <span id="profile-phone-error" className="text-xs text-danger-text-nomode">{fieldErrors.phone}</span> : null}
         </div>
         <div className="flex flex-col gap-1">
           <CustomInput
@@ -229,11 +223,9 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             label="ایمیل"
             placeholder="ایمیل"
             invalid={Boolean(fieldErrors.email)}
-            aria-describedby={fieldErrors.email ? "profile-email-error" : undefined}
             aria-label="ایمیل"
             disabled
           />
-          {fieldErrors.email ? <span id="profile-email-error" className="text-xs text-danger-text-nomode">{fieldErrors.email}</span> : null}
         </div>
         <div className="flex flex-col gap-2 md:col-span-2">
           <CustomInput
@@ -244,11 +236,9 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             maxLength={200}
             required
             invalid={Boolean(fieldErrors.address)}
-            aria-describedby={fieldErrors.address ? "profile-address-error" : undefined}
             aria-label="آدرس کامل"
             onChange={(event) => updateProfileDraft({ address: event.target.value })}
           />
-          {fieldErrors.address ? <span id="profile-address-error" className="text-xs text-danger-text-nomode">{fieldErrors.address}</span> : null}
         </div>
       </div>
       <CustomButton fullWidth icon={<IoSaveOutline />} isLoading={isSavingProfile} onClick={() => void saveProfile()}>

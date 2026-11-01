@@ -10,28 +10,41 @@ import React, {
   useState,
   type ReactNode,
 } from "react";
-import { IoAlertCircleOutline, IoCheckmarkCircleOutline, IoClose } from "react-icons/io5";
+import {
+  IoAlertCircleOutline,
+  IoCheckmarkCircleOutline,
+  IoClose,
+  IoInformationCircleOutline,
+  IoWarningOutline,
+} from "react-icons/io5";
 import {
   APP_NOTIFY_EVENT,
   NOTIFICATION_SILENT_HEADER,
   notifyApp,
   type AppNotificationPayload,
+  type AppNotificationType,
 } from "@/lib/app-notifications";
 
 export { APP_NOTIFY_EVENT, NOTIFICATION_SILENT_HEADER, notifyApp };
 
-type NotificationItem = Required<AppNotificationPayload> & {
+type NotificationItem = {
   id: number;
+  type: AppNotificationType;
+  message: string;
+  time: number;
 };
 
 type NotificationContextValue = {
   notify: (payload: AppNotificationPayload) => void;
-  success: (message: string) => void;
-  error: (message: string) => void;
+  apiNotificationTime: () => number;
+  success: (message: string, time?: number) => void;
+  error: (message: string, time?: number) => void;
+  info: (message: string, time?: number) => void;
+  warning: (message: string, time?: number) => void;
 };
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
-const ERROR_MESSAGE_PATTERN = /نشد|ناموفق|خطا|نامعتبر|الزامی|لطفاً|باید|نیست|وارد کنید|وارد حساب شوید|پیدا نشد|کامل کنید|مجاز نیست|دسترسی ندارید/;
+const ERROR_MESSAGE_PATTERN = /نشد|ناموفق|خطا|نامعتبر|الزامی|لطفاً|باید|نیست|وارد کنید|وارد حساب شوید|پیدا نشد|کامل کنید|مجاز نیست|دسترسی ندارید|failed|invalid|error|required|unauthorized/i;
 
 function isMutationMethod(method: string) {
   return method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
@@ -40,7 +53,9 @@ function isMutationMethod(method: string) {
 function isQuietMutation(url: string) {
   try {
     const pathname = new URL(url, window.location.origin).pathname;
-    return pathname === "/api/user/structure";
+    return pathname === "/api/user/structure"
+      || pathname === "/api/cart/quote"
+      || pathname === "/api/admin/orders/in-person/quote";
   } catch {
     return url.includes("/api/user/structure");
   }
@@ -70,58 +85,67 @@ function hasSilentHeader(input: RequestInfo | URL, init?: RequestInit) {
   return headers.get(NOTIFICATION_SILENT_HEADER) === "true" || headers.get("x-notify") === "false";
 }
 
-function getSuccessMessage(method: string, url: string) {
-  if (url.includes("/api/theme")) return "ظاهر فروشگاه با موفقیت ذخیره شد.";
-  if (url.includes("/api/auth/verify-otp")) return "ورود با موفقیت انجام شد.";
-  if (url.includes("/api/auth/logout")) return "خروج با موفقیت انجام شد.";
-  if (url.includes("/comments")) {
-    if (method === "DELETE") return "دیدگاه با موفقیت حذف شد.";
-    if (method === "PUT" || method === "PATCH") return "دیدگاه با موفقیت به‌روزرسانی شد.";
-    return "دیدگاه با موفقیت ثبت شد.";
-  }
-  if (url.includes("/api/cart") && method === "PATCH") return "پرداخت با موفقیت انجام شد.";
-  if (url.includes("/api/cart") && method === "DELETE") return "سبد خرید خالی شد.";
-  if (url.includes("/api/cart")) return "سبد خرید به‌روزرسانی شد.";
-  if (url.includes("/api/profile") || url.includes("/api/user/profile") || url.includes("/api/app/user")) return "پروفایل با موفقیت ذخیره شد.";
-  if (url.includes("/api/admin/security")) return "تنظیمات امنیتی با موفقیت ذخیره شد.";
-  if (url.includes("/api/admin/discounts")) {
-    if (method === "DELETE") return "کد تخفیف با موفقیت حذف شد.";
-    if (method === "POST") return "کد تخفیف با موفقیت ثبت شد.";
-    return "تنظیمات تخفیف با موفقیت ذخیره شد.";
-  }
-  if (url.includes("/api/admin/theme") || url.includes("/api/theme/admin")) return "ظاهر فروشگاه با موفقیت ذخیره شد.";
-  if (url.includes("/api/banners")) return method === "DELETE" ? "بنر با موفقیت حذف شد." : "بنر با موفقیت ذخیره شد.";
-  if (url.includes("/api/showcases")) return method === "DELETE" ? "ویترین با موفقیت حذف شد." : "ویترین با موفقیت ذخیره شد.";
-  if (url.includes("/api/products")) return method === "DELETE" ? "آیتم با موفقیت حذف شد." : "اطلاعات فروشگاه با موفقیت ذخیره شد.";
-  if (method === "DELETE") return "حذف با موفقیت انجام شد.";
-  if (method === "POST") return "ثبت با موفقیت انجام شد.";
-  return "تغییرات با موفقیت ذخیره شد.";
-}
-
-function getErrorMessage(data: unknown) {
-  const record = data && typeof data === "object" ? data as { message?: unknown; error?: unknown } : null;
-  const raw = String(record?.message ?? record?.error ?? "").trim();
-  const normalized = raw.toLowerCase();
-
-  if (!raw) return "عملیات ناموفق بود.";
-  if (normalized === "complete profile is required" || normalized === "complete profile is required.") {
-    return "برای این عملیات اطلاعات پروفایل باید کامل باشد.";
-  }
-  if (normalized === "server error") return "خطای سرور رخ داد.";
-  return raw;
-}
-
 function parseResponseData(response: Response) {
   return response.clone().json().catch(() => null);
 }
 
+type AppNotificationViewProps = NotificationItem & {
+  onClose: (id: number) => void;
+};
+
+function AppNotification({ id, type, message, time, onClose }: AppNotificationViewProps) {
+  useEffect(() => {
+    if (time <= 0) return;
+    const timer = window.setTimeout(() => onClose(id), time * 1000);
+    return () => window.clearTimeout(timer);
+  }, [id, onClose, time]);
+
+  const isSuccess = type === "success";
+  const isError = type === "error";
+  const isWarning = type === "warning";
+  const Icon = isSuccess
+    ? IoCheckmarkCircleOutline
+    : isError
+      ? IoAlertCircleOutline
+      : isWarning
+        ? IoWarningOutline
+        : IoInformationCircleOutline;
+
+  return (
+    <div
+      role={isError ? "alert" : "status"}
+      className={`pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-md border px-3 py-2 text-sm font-semibold shadow-lg backdrop-blur ${
+        isSuccess
+          ? "border-success-border-nomode bg-success-base text-success-text-nomode"
+          : isError
+            ? "border-danger-border-nomode bg-danger-base text-danger-text-nomode"
+            : isWarning
+              ? "border-warning-border bg-warning-bg text-warning-text"
+              : "border-primary-border bg-primary-card text-primary-text"
+      }`}
+    >
+      <Icon className="shrink-0 text-xl" aria-hidden="true" />
+      <span className="min-w-0 flex-1">{message}</span>
+      <button
+        type="button"
+        className="flex shrink-0 items-center justify-center rounded-md p-1 transition hover:bg-primary-base/60"
+        aria-label="بستن پیام"
+        onClick={() => onClose(id)}
+      >
+        <IoClose aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
 export function AppNotificationProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [item, setItem] = useState<NotificationItem | null>(null);
   const notifyRef = useRef<(payload: AppNotificationPayload) => void>(() => undefined);
   const recentNotificationRef = useRef({ key: "", time: 0 });
+  const lastApiNotificationTimeRef = useRef(0);
 
   const remove = useCallback((id: number) => {
-    setItems((current) => current.filter((item) => item.id !== id));
+    setItem((current) => current?.id === id ? null : current);
   }, []);
 
   const notify = useCallback((payload: AppNotificationPayload) => {
@@ -134,12 +158,8 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
     recentNotificationRef.current = { key, time: now };
 
     const id = now + Math.round(Math.random() * 1000);
-    setItems((current) => [
-      ...current.slice(-3),
-      { id, type, message },
-    ]);
-    window.setTimeout(() => remove(id), 4200);
-  }, [remove]);
+    setItem({ id, type, message, time: payload.time ?? 2 });
+  }, []);
 
   useEffect(() => {
     notifyRef.current = notify;
@@ -167,27 +187,22 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
       try {
         const response = await originalFetch(input, init);
 
-        if (shouldInspect) {
-          void parseResponseData(response).then((data) => {
-            if (!response.ok || data?.ok === false) {
-              notifyRef.current({ type: "error", message: getErrorMessage(data) });
-              return;
-            }
+        if (shouldInspect && (isMutationMethod(method) || !response.ok)) {
+          const data = await parseResponseData(response);
+          const record = data && typeof data === "object"
+            ? data as { ok?: unknown; showMessage?: unknown }
+            : null;
+          const showMessage = typeof record?.showMessage === "string" ? record.showMessage.trim() : "";
+          const isError = !response.ok || record?.ok === false;
 
-            if (shouldNotifySuccess) {
-              notifyRef.current({
-                type: "success",
-                message: String(data?.message ?? "").trim() || getSuccessMessage(method, url),
-              });
-            }
-          });
+          if (showMessage && (isError || shouldNotifySuccess)) {
+            lastApiNotificationTimeRef.current = Date.now();
+            notifyRef.current({ type: isError ? "error" : "success", message: showMessage });
+          }
         }
 
         return response;
       } catch (error) {
-        if (shouldInspect) {
-          notifyRef.current({ type: "error", message: "ارتباط با سرور ناموفق بود." });
-        }
         throw error;
       }
     };
@@ -199,44 +214,18 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<NotificationContextValue>(() => ({
     notify,
-    success: (message) => notify({ type: "success", message }),
-    error: (message) => notify({ type: "error", message }),
+    apiNotificationTime: () => lastApiNotificationTimeRef.current,
+    success: (message, time) => notify({ type: "success", message, time }),
+    error: (message, time) => notify({ type: "error", message, time }),
+    info: (message, time) => notify({ type: "info", message, time }),
+    warning: (message, time) => notify({ type: "warning", message, time }),
   }), [notify]);
 
   return (
     <NotificationContext.Provider value={value}>
       {children}
       <div className="pointer-events-none fixed left-4 right-4 top-24 z-[80] flex flex-col items-center gap-2">
-        {items.map((item) => {
-          const isSuccess = item.type === "success";
-          const isError = item.type === "error";
-          const Icon = isSuccess ? IoCheckmarkCircleOutline : IoAlertCircleOutline;
-
-          return (
-            <div
-              key={item.id}
-              role={isError ? "alert" : "status"}
-              className={`pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-md border px-3 py-2 text-sm font-semibold shadow-lg backdrop-blur ${
-                isSuccess
-                  ? "border-success-border-nomode bg-success-base text-success-text-nomode"
-                  : isError
-                    ? "border-danger-border-nomode bg-danger-base text-danger-text-nomode"
-                    : "border-primary-border bg-primary-card text-primary-text"
-              }`}
-            >
-              <Icon className="shrink-0 text-xl" aria-hidden="true" />
-              <span className="min-w-0 flex-1">{item.message}</span>
-              <button
-                type="button"
-                className="flex shrink-0 items-center justify-center rounded-md p-1 transition hover:bg-primary-base/60"
-                aria-label="بستن پیام"
-                onClick={() => remove(item.id)}
-              >
-                <IoClose aria-hidden="true" />
-              </button>
-            </div>
-          );
-        })}
+        {item ? <AppNotification {...item} onClose={remove} /> : null}
       </div>
     </NotificationContext.Provider>
   );
@@ -250,12 +239,13 @@ export function useAppNotification() {
   return context;
 }
 
-export function useTransientAppMessage(message: string) {
-  const { notify } = useAppNotification();
+export function useTransientAppMessage(message: string, time = 2) {
+  const context = useAppNotification();
 
   useEffect(() => {
     const normalized = message.trim();
     if (!normalized) return;
-    notify({ type: ERROR_MESSAGE_PATTERN.test(normalized) ? "error" : "success", message: normalized });
-  }, [message, notify]);
+    if (Date.now() - context.apiNotificationTime() < 1500) return;
+    context.notify({ type: ERROR_MESSAGE_PATTERN.test(normalized) ? "error" : "success", message: normalized, time });
+  }, [context.apiNotificationTime, context.notify, message, time]);
 }

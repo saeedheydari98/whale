@@ -286,23 +286,24 @@ export const openApiDocument = {
         properties: {
           ok: { type: "boolean", enum: [true] },
           data: {},
-          message: { type: "string" },
+          message: { type: "string", description: "Standardized English code for developers." },
+          showMessage: { type: "string", description: "Persian message displayed to the user." },
         },
-        required: ["ok"],
+        required: ["ok", "message", "showMessage"],
       },
       ApiError: {
         type: "object",
         properties: {
           ok: { type: "boolean", enum: [false] },
-          message: { type: "string" },
-          error: { type: "string" },
+          message: { type: "string", description: "Standardized English error code for developers." },
+          showMessage: { type: "string", description: "Persian message displayed to the user." },
           errors: {
             type: "array",
             items: ref("ValidationIssue"),
           },
           data: {},
         },
-        required: ["ok"],
+        required: ["ok", "message", "showMessage"],
       },
       ValidationIssue: {
         type: "object",
@@ -903,6 +904,7 @@ export const openApiDocument = {
         properties: {
           products: { type: "integer" },
           orders: { type: "integer" },
+          inPersonOrders: { type: "integer" },
           users: { type: "integer" },
           banners: { type: "integer" },
           showcases: {
@@ -948,7 +950,7 @@ export const openApiDocument = {
             required: ["home", "categories", "products"],
           },
         },
-        required: ["products", "orders", "users", "banners", "showcases", "categoryGroups", "brandGroups", "storefront"],
+        required: ["products", "orders", "inPersonOrders", "users", "banners", "showcases", "categoryGroups", "brandGroups", "storefront"],
       },
       AdminDashboard: {
         type: "object",

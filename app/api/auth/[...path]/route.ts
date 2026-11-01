@@ -18,7 +18,7 @@ import {
   verifyHashedToken,
   verifyToken,
 } from "@/lib/api/auth";
-import { MissingAuthSecretError } from "@/lib/env";
+import { MissingAuthSecretError, runtimeEnv } from "@/lib/env";
 import { sendAuthOtpEmail } from "@/lib/gmail";
 import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
 import { runDiscountRules } from "@/lib/api/discount-service";
@@ -232,7 +232,12 @@ export async function POST(request: Request, context: Context) {
         sent: true,
         retryAfterSeconds: OTP_COOLDOWN_SECONDS,
         expiresInSeconds: OTP_EXPIRES_MINUTES * 60,
-        developmentCode: process.env.AUTH_OTP_EXPOSE_CODE === "true" ? code : undefined,
+        developmentCode: runtimeEnv("AUTH_OTP_EXPOSE_CODE") === "true" ? code : undefined,
+      }, {
+        message: "OTP_SENT",
+        showMessage: runtimeEnv("AUTH_OTP_EXPOSE_CODE") === "true"
+          ? `کد ورود برای ${identity.email} ارسال شد. کد توسعه: ${code}`
+          : `کد ورود به ${identity.email} ارسال شد.`,
       });
     }
 
@@ -281,14 +286,20 @@ export async function POST(request: Request, context: Context) {
           return null;
         }),
       ]);
-      return apiOk({ user: publicUser(user), profileComplete, ...tokens });
+      return apiOk({ user: publicUser(user), profileComplete, ...tokens }, {
+        message: "AUTHENTICATION_SUCCEEDED",
+        showMessage: "ورود با موفقیت انجام شد.",
+      });
     }
 
     if (action === "logout") {
       const user = await getAuthUser(request);
       if (user) await prisma.user.update({ where: { id: user.id }, data: { refreshTokenHash: null } });
       await clearAuthCookies();
-      return apiOk({ loggedOut: true });
+      return apiOk({ loggedOut: true }, {
+        message: "LOGOUT_SUCCEEDED",
+        showMessage: "خروج با موفقیت انجام شد.",
+      });
     }
 
     if (action === "refresh-token") {

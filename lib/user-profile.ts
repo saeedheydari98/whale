@@ -142,7 +142,7 @@ export function clearUserProfile(user?: AuthClientUser | null, options?: { emit?
 export async function fetchUserProfile(options?: { write?: boolean; emit?: boolean; force?: boolean }) {
   const data = await fetchJsonDeduped<any>(USER_PROFILE_API_URL, { force: options?.force });
   if (data?.ok === false) {
-    throw new Error(data?.message || data?.error || "بارگذاری پروفایل ناموفق بود.");
+    throw new Error(data?.showMessage || "بارگذاری پروفایل ناموفق بود.");
   }
 
   const profileData = readProfileFromApiData(data);
@@ -168,7 +168,7 @@ export async function saveUserProfile(profile: UserProfile) {
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || "ذخیره پروفایل ناموفق بود.");
+    throw new Error(data?.showMessage || "ذخیره پروفایل ناموفق بود.");
   }
 
   const savedProfile = normalizeUserProfile(readProfileFromApiData(data) ?? nextProfile);

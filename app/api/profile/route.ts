@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { EMAIL_PATTERN, PERSIAN_NAME_PATTERN, PHONE_PATTERN } from "@/lib/validation-patterns";
+import { apiFail, apiOk } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const phone = String(url.searchParams.get("phone") ?? "").trim();
 
   if (!phone) {
-    return NextResponse.json({ ok: true, data: { user: { profile: null } } });
+    return apiOk({ user: { profile: null } });
   }
 
   try {
@@ -42,10 +42,10 @@ export async function GET(request: Request) {
       where: { phone },
       orderBy: { updatedAt: "desc" },
     });
-    return NextResponse.json({ ok: true, data: { user: { profile } } });
+    return apiOk({ user: { profile } });
   } catch (error) {
     console.error("Profile GET error:", error);
-    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد.", data: { user: { profile: null } } }, { status: 500 });
+    return apiFail("خطای سرور رخ داد.", 500, [], { user: { profile: null } });
   }
 }
 
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   const includesAdminUnlocked = typeof rawProfile?.isAdminUnlocked === "boolean";
 
   if (!isComplete(profile)) {
-    return NextResponse.json({ ok: false, error: "برای ادامه باید پروفایل را کامل کنید." }, { status: 400 });
+    return apiFail("برای ادامه باید پروفایل را کامل کنید.", 400);
   }
 
   try {
@@ -89,9 +89,12 @@ export async function POST(request: Request) {
         },
       });
 
-    return NextResponse.json({ ok: true, data: { user: { profile: saved } } });
+    return apiOk({ user: { profile: saved } }, {
+      message: "PROFILE_SAVED",
+      showMessage: "پروفایل با موفقیت ذخیره شد.",
+    });
   } catch (error) {
     console.error("Profile POST error:", error);
-    return NextResponse.json({ ok: false, error: "خطای سرور رخ داد." }, { status: 500 });
+    return apiFail("خطای سرور رخ داد.", 500);
   }
 }

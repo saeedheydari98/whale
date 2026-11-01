@@ -222,7 +222,7 @@ async function fetchAppThemePayload(options?: { force?: boolean }) {
 
   for (let attempt = 0; attempt <= APP_THEME_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
-      const payload = await fetchJsonDeduped<{ ok?: boolean; data?: { theme?: unknown }; message?: string; error?: string }>(
+      const payload = await fetchJsonDeduped<{ ok?: boolean; data?: { theme?: unknown }; showMessage?: string }>(
         APP_THEME_API_URL,
         {
           force: options?.force || attempt > 0,
@@ -230,7 +230,7 @@ async function fetchAppThemePayload(options?: { force?: boolean }) {
         }
       );
       if (isApiFailure(payload)) {
-        throw new Error(payload?.message || payload?.error || "بارگذاری تم ناموفق بود.");
+        throw new Error(payload?.showMessage || "بارگذاری تم ناموفق بود.");
       }
       return payload;
     } catch (error) {
@@ -259,7 +259,7 @@ export async function saveAppTheme(theme: AppThemeData) {
   });
   const payload = await res.json().catch(() => null);
   if (!res.ok || payload?.ok === false) {
-    throw new Error(payload?.message || payload?.error || "ذخیره تم ناموفق بود.");
+    throw new Error(payload?.showMessage || "ذخیره تم ناموفق بود.");
   }
 
   const nextTheme = readThemePayload(payload, payloadTheme);

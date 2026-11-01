@@ -185,3 +185,45 @@ export const adminCodeSchema = z.object({
   currentCode: z.string().optional(),
   username: z.string().trim().toLowerCase().optional(),
 });
+
+export const inPersonOrderLineSchema = z.object({
+  productId: z.coerce.number().int().positive(),
+  title: z.string().trim().min(1),
+  description: z.string().trim().optional().default(""),
+  price: z.string().trim().min(1),
+  originalPrice: z.string().trim().optional().nullable(),
+  discountPrice: z.string().trim().optional().nullable(),
+  discountPercent: z.coerce.number().int().min(0).optional().nullable(),
+  imageUrl: z.string().trim().optional().nullable(),
+  selectedColor: z.string().trim().optional().nullable(),
+  quantity: z.coerce.number().int().min(1),
+});
+
+export const inPersonCustomerSchema = z.object({
+  firstName: z.string().trim().min(1).regex(PERSIAN_NAME_PATTERN, "نام باید حروف فارسی باشد."),
+  lastName: z.string().trim().min(1).regex(PERSIAN_NAME_PATTERN, "نام خانوادگی باید حروف فارسی باشد."),
+  phone: z.string().trim().regex(PHONE_PATTERN, "شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد."),
+  email: z.string().trim().toLowerCase().regex(EMAIL_PATTERN, "ایمیل معتبر وارد کنید."),
+  address: z.string().trim().min(5, "نشانی باید حداقل ۵ کاراکتر باشد.").max(200),
+});
+
+export const inPersonOrderSchema = z.object({
+  customerUserId: z.coerce.number().int().positive().optional().nullable(),
+  newCustomer: inPersonCustomerSchema.optional().nullable(),
+  discountCode: z.string().trim().optional(),
+  useWallet: z.boolean().optional(),
+  lines: z.array(inPersonOrderLineSchema).min(1, "حداقل یک محصول انتخاب کنید."),
+}).superRefine(({ lines }, context) => {
+  const productIds = new Set<number>();
+  lines.forEach((line, index) => {
+    if (productIds.has(line.productId)) {
+      context.addIssue({
+        code: "custom",
+        path: ["lines", index, "productId"],
+        message: "هر محصول را فقط یک‌بار به سفارش اضافه کنید.",
+      });
+      return;
+    }
+    productIds.add(line.productId);
+  });
+});

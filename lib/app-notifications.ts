@@ -3,11 +3,12 @@
 export const APP_NOTIFY_EVENT = "app-notify";
 export const NOTIFICATION_SILENT_HEADER = "x-skip-notification";
 
-export type AppNotificationType = "success" | "error" | "info";
+export type AppNotificationType = "success" | "error" | "info" | "warning";
 
 export type AppNotificationPayload = {
   type?: AppNotificationType;
   message: string;
+  time?: number;
 };
 
 export function notifyApp(payload: AppNotificationPayload) {

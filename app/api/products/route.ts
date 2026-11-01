@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchesSearchQuery } from "@/lib/product-search";
@@ -9,6 +8,7 @@ import { getCatalogStructure, getProductList } from "@/lib/api/catalog-layer-ser
 import { findInvalidWebpImageValue } from "@/lib/image-upload";
 import { getBannerImageData, getPlacement, getProductIdentityKey } from "@/lib/catalog-utils";
 import { normalizeColorStock } from "@/lib/color-counts";
+import { apiFail, apiOk } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -760,7 +760,6 @@ function catalogErrorMessage(error: unknown) {
   if (code === "P2002") return "مقدار تکراری ثبت شده است.";
   if (code === "P2003") return "رکورد مرتبط معتبر نیست.";
   if (code === "P2025") return "رکورد پیدا نشد.";
-  if (process.env.NODE_ENV !== "production" && error instanceof Error) return error.message;
   return "خطای سرور رخ داد.";
 }
 
@@ -808,13 +807,13 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
 
   if (!hasProductModel) {
-    return NextResponse.json({ ok: true, data: { type: "root", placement: 0 } });
+    return apiOk({ type: "root", placement: 0 });
   }
 
   try {
     if (url.searchParams.get("structure") === "1") {
       const structure = await getCatalogStructure(url.searchParams);
-      return NextResponse.json({ ok: true, data: structure });
+      return apiOk(structure);
     }
 
     const result = await getProductList(url.searchParams, {
@@ -822,19 +821,10 @@ export async function GET(request: Request) {
     });
     const { items, ...pagination } = result.products;
 
-    return NextResponse.json({
-      ok: true,
-      data: {
-        products: items,
-        pagination,
-      },
-    });
+    return apiOk({ products: items, pagination });
   } catch (error) {
     console.error("Products GET error:", error);
-    return NextResponse.json(
-      { ok: false, error: catalogErrorMessage(error), data: { type: "root", placement: 0 } },
-      { status: 500 }
-    );
+    return apiFail(catalogErrorMessage(error), 500, [], { type: "root", placement: 0 });
   }
 }
 
@@ -905,7 +895,7 @@ export async function POST(request: Request) {
 
   const missingCategory = normalized.some((p) => !String(p.categoryId ?? "").trim());
   if (missingCategory) {
-    return NextResponse.json({ ok: false, error: "دسته بندی برای همه محصولات الزامی است." }, { status: 400 });
+    return apiFail("دسته بندی برای همه محصولات الزامی است.", 400);
   }
 
   const invalidWebpImage = findInvalidWebpImageValue([
@@ -916,11 +906,11 @@ export async function POST(request: Request) {
     ...banners.flatMap((item) => getImageUrls(item)),
   ]);
   if (invalidWebpImage) {
-    return NextResponse.json({ ok: false, error: invalidWebpImage }, { status: 400 });
+    return apiFail(invalidWebpImage, 400);
   }
 
   if (!hasProductModel) {
-    return NextResponse.json({ ok: false, error: "product model is unavailable" }, { status: 500 });
+    return apiFail("مدل محصول در دسترس نیست.", 500);
   }
 
   try {
@@ -1247,12 +1237,12 @@ export async function POST(request: Request) {
 
     await invalidateCatalogCache("products.post");
 
-    return NextResponse.json({
-      ok: true,
-      data: tree,
+    return apiOk(tree, {
+      message: "PRODUCT_CATALOG_SAVED",
+      showMessage: "اطلاعات فروشگاه با موفقیت ذخیره شد.",
     });
   } catch (error) {
     console.error("Products POST error:", error);
-    return NextResponse.json({ ok: false, error: catalogErrorMessage(error) }, { status: 500 });
+    return apiFail(catalogErrorMessage(error), 500);
   }
 }

@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { requireAdmin } from "@/lib/api/auth";
+import { apiFail, apiOk } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -113,26 +113,17 @@ async function loadTheme() {
   }
 }
 
-function toThemeResponse(theme: ThemeConfig) {
-  return NextResponse.json({
-    ok: true,
-    data: {
-      theme,
-    },
-  });
+function toThemeResponse(theme: ThemeConfig, saved = false) {
+  return apiOk({ theme }, saved ? {
+    message: "THEME_SAVED",
+    showMessage: "ظاهر فروشگاه با موفقیت ذخیره شد.",
+  } : {});
 }
 
 function toThemeSaveErrorResponse() {
-  return NextResponse.json(
-    {
-      ok: false,
-      message: "ذخیره تم ناموفق بود.",
-      data: {
-        theme: cachedTheme?.theme ?? defaultTheme,
-      },
-    },
-    { status: 500 }
-  );
+  return apiFail("ذخیره تم ناموفق بود.", 500, [], {
+    theme: cachedTheme?.theme ?? defaultTheme,
+  });
 }
 
 function guard(request: Request) {
@@ -160,7 +151,7 @@ export async function POST(request: Request) {
 
   if (!(await ensureThemeStorage().catch(() => false))) {
     writeCachedTheme(nextTheme);
-    return toThemeResponse(nextTheme);
+    return toThemeResponse(nextTheme, true);
   }
 
   try {
@@ -183,7 +174,7 @@ export async function POST(request: Request) {
 
     const savedTheme = normalizeTheme(record);
     writeCachedTheme(savedTheme);
-    return toThemeResponse(savedTheme);
+    return toThemeResponse(savedTheme, true);
   } catch (error) {
     console.error("Theme save error:", error);
     return toThemeSaveErrorResponse();

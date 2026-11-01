@@ -16,6 +16,7 @@ export type AdminStorefrontStructure = {
 export type AdminPanelStructure = {
   products: number;
   orders: number;
+  inPersonOrders: number;
   users: number;
   banners: number;
   showcases: AdminCountItem[];
@@ -67,6 +68,7 @@ export function normalizeAdminPanelStructure(value: unknown): AdminPanelStructur
   return {
     products: asCount(nested.products),
     orders: asCount(nested.orders),
+    inPersonOrders: asCount(nested.inPersonOrders),
     users: asCount(nested.users),
     banners: asCount(nested.banners),
     showcases: asCountItems(record.showcases),
@@ -80,10 +82,11 @@ export async function getAdminPanelStructure(options?: { force?: boolean }) {
   const json = await fetchJsonDeduped<{
     ok?: boolean;
     data?: { structure?: unknown };
-    message?: string;
-    error?: string;
+    showMessage?: string;
   }>(ADMIN_STRUCTURE_URL, { force: options?.force });
 
-  if (json?.ok === false) throw new Error(json.message || json.error || "دریافت ساختار پنل ممکن نشد.");
-  return normalizeAdminPanelStructure(json?.data?.structure);
+  if (json?.ok === false) throw new Error(json.showMessage || "دریافت ساختار پنل ممکن نشد.");
+  const structure = normalizeAdminPanelStructure(json?.data?.structure);
+  if (!structure) throw new Error("پاسخ ساختار پنل مدیریت معتبر نیست.");
+  return structure;
 }

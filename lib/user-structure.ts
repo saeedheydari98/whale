@@ -28,11 +28,10 @@ export async function getUserPanelStructure(options?: { force?: boolean }) {
   const json = await fetchJsonDeduped<{
     ok?: boolean;
     data?: { structure?: unknown };
-    message?: string;
-    error?: string;
+    showMessage?: string;
   }>(USER_STRUCTURE_URL, { force: options?.force });
 
-  if (json?.ok === false) throw new Error(json.message || json.error || "دریافت ساختار حساب ممکن نشد.");
+  if (json?.ok === false) throw new Error(json.showMessage || "دریافت ساختار حساب ممکن نشد.");
   return normalizeUserPanelStructure(json?.data?.structure);
 }
 
@@ -49,11 +48,10 @@ export async function markUserDiscountsSeen() {
   const json = await response.json().catch(() => null) as {
     ok?: boolean;
     data?: { structure?: unknown };
-    message?: string;
-    error?: string;
+    showMessage?: string;
   } | null;
   if (!response.ok || json?.ok === false) {
-    throw new Error(json?.message || json?.error || "به‌روزرسانی ساختار حساب ممکن نشد.");
+    throw new Error(json?.showMessage || "به‌روزرسانی ساختار حساب ممکن نشد.");
   }
   invalidateFetchCache(USER_STRUCTURE_URL);
   return normalizeUserPanelStructure(json?.data?.structure);

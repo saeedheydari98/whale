@@ -72,6 +72,7 @@ type DynamicLoadingCollectionProps<T> = {
   isLoadingMore?: boolean;
   onLoadMore?: () => void;
   onCapacityChange?: (capacity: number) => void;
+  viewportLimited?: boolean;
   lazy?: boolean;
   structure?: LoadingStructure;
 };
@@ -468,6 +469,7 @@ export function DynamicLoadingCollection<T>({
   isLoadingMore = false,
   onLoadMore,
   onCapacityChange,
+  viewportLimited = false,
   lazy = false,
   structure,
 }: DynamicLoadingCollectionProps<T>) {
@@ -480,6 +482,7 @@ export function DynamicLoadingCollection<T>({
     ? Math.max(0, Math.round(Number(totalCount ?? structure?.count)))
     : undefined;
   const fillViewport = Boolean(onCapacityChange || hasMore || onLoadMore);
+  const measureViewport = fillViewport || viewportLimited;
   const itemShellClass = collectionItemShellClass(className);
   const probeInnerClass = collectionProbeInnerClass(className);
 
@@ -489,7 +492,7 @@ export function DynamicLoadingCollection<T>({
     if (!container || !probe) return;
 
     const update = () => {
-      const next = measuredCollectionCapacity(container, probe, fillViewport, knownTotal);
+      const next = measuredCollectionCapacity(container, probe, measureViewport, knownTotal);
       if (next <= 0) return;
       setCapacity((current) => current === next ? current : next);
       setMeasured(true);
@@ -503,7 +506,7 @@ export function DynamicLoadingCollection<T>({
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [capacity, fillViewport, isLoading, isLoadingMore, knownTotal, renderSkeleton]);
+  }, [capacity, measureViewport, isLoading, isLoadingMore, knownTotal, renderSkeleton]);
 
   React.useImperativeHandle(externalContainerRef, () => containerRef.current as HTMLDivElement);
 

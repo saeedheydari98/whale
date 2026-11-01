@@ -38,8 +38,8 @@ export function OrderStatusTag({ status }: OrderStatusTagProps) {
       : "border-warning-border bg-warning-bg text-warning-text";
 
   return (
-    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold ${className}`}>
-      <span>{ORDER_STATUS_LABELS[normalizedStatus]}</span>
+    <span className={`inline-flex max-w-full min-w-0 items-center overflow-hidden rounded-full border px-3 py-1 text-xs font-bold ${className}`}>
+      <span className="block min-w-0 truncate">{ORDER_STATUS_LABELS[normalizedStatus]}</span>
     </span>
   );
 }

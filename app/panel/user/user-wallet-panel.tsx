@@ -30,7 +30,7 @@ export function UserWalletPanel() {
     try {
       const response = await fetch("/api/user/wallet", { cache: "no-store" });
       const data = await response.json().catch(() => null);
-      if (!response.ok || data?.ok === false) throw new Error(data?.message || "دریافت کیف پول انجام نشد.");
+      if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "دریافت کیف پول انجام نشد.");
       setWallet({
         balance: Number(data.data.wallet?.balance) || 0,
         transactions: Array.isArray(data.data.wallet?.transactions) ? data.data.wallet.transactions : [],

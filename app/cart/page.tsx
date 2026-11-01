@@ -183,7 +183,7 @@ export default function CartPage() {
     setIsCheckoutLoading(true);
     setCheckoutMessage("");
     try {
-      await persistCart(checkoutItems, savedProfile);
+      await persistCart(checkoutItems, savedProfile, { notify: false });
       const nextItems = await checkoutCart(savedProfile, { shippingMethod, discountCode });
       purchasedItems.forEach((item) => {
         if (item.productId) {
@@ -192,7 +192,6 @@ export default function CartPage() {
       });
       setItems(nextItems);
       setIsCheckoutModalOpen(false);
-      setCheckoutMessage("پرداخت با موفقیت انجام شد.");
     } catch (error) {
       setCheckoutMessage(error instanceof Error ? error.message : "پرداخت ناموفق بود.");
     } finally {
@@ -225,7 +224,7 @@ export default function CartPage() {
     setIsCheckoutLoading(true);
     setCheckoutMessage("");
     try {
-      await persistCart(checkoutItems, savedProfile);
+      await persistCart(checkoutItems, savedProfile, { notify: false });
       const quote = await getCheckoutQuote({ shippingMethod: "pickup", discountCode: "" });
       setShippingMethod("pickup");
       setDiscountCode("");

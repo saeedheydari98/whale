@@ -51,7 +51,7 @@ function invalidateAdminRequestsCache() {
 async function readApiJson(response: Response, fallbackMessage: string) {
   const data = await response.json().catch(() => null);
   if (!response.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error || fallbackMessage);
+    throw new Error(data?.showMessage || fallbackMessage);
   }
   return data;
 }
@@ -115,6 +115,19 @@ export async function reviewAdminAccessRequest(
     body: JSON.stringify({ id, action }),
   });
   const data = await readApiJson(response, "به‌روزرسانی درخواست ناموفق بود.");
+  invalidateAdminRequestsCache();
+  clearAppUserCache();
+  emitAdminAccessUpdated();
+  return data?.data?.request as AdminAccessRequestRecord | null;
+}
+
+export async function grantAdminAccessToUser(userId: number) {
+  const response = await fetch(ADMIN_REQUESTS_ENDPOINT, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, action: "grant" }),
+  });
+  const data = await readApiJson(response, "اعطای دسترسی مدیریت ناموفق بود.");
   invalidateAdminRequestsCache();
   clearAppUserCache();
   emitAdminAccessUpdated();

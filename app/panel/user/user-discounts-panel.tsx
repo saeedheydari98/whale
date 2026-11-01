@@ -35,7 +35,7 @@ export function UserDiscountsPanel({ totalCount }: { totalCount?: number }) {
     try {
       const response = await fetch("/api/user/wallet", { cache: "no-store" });
       const data = await response.json().catch(() => null);
-      if (!response.ok || data?.ok === false) throw new Error(data?.message || "دریافت کدهای تخفیف انجام نشد.");
+      if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "دریافت کدهای تخفیف انجام نشد.");
       const nextCodes = Array.isArray(data?.data?.wallet?.discountCodes) ? data.data.wallet.discountCodes as WalletCode[] : [];
       setCodes(nextCodes);
       setLoadedAt(Date.now());

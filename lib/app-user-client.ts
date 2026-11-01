@@ -198,7 +198,7 @@ function writeUserCache(data: AppUserData) {
 
   const claimedCart = claimGuestCartForUser(data.user);
   if (claimedCart) {
-    void persistCart(claimedCart).catch(() => undefined);
+    void persistCart(claimedCart, undefined, { notify: false }).catch(() => undefined);
   }
 
   if (typeof window === "undefined") return;
@@ -308,8 +308,7 @@ export async function fetchAppUser(options?: { force?: boolean }) {
 type AppUserApiPayload = {
   ok?: boolean;
   data?: AppUserDataInput;
-  message?: string;
-  error?: string;
+  showMessage?: string;
 };
 
 async function fetchAppUserPayload(options?: { force?: boolean }) {
@@ -322,7 +321,7 @@ async function fetchAppUserPayload(options?: { force?: boolean }) {
         staleMs: APP_USER_CACHE_MS,
       });
       if (isApiFailure(payload)) {
-        throw new Error(payload?.message || payload?.error || "بارگذاری اطلاعات کاربر ناموفق بود.");
+        throw new Error(payload?.showMessage || "بارگذاری اطلاعات کاربر ناموفق بود.");
       }
       return payload;
     } catch (error) {
@@ -402,7 +401,7 @@ export async function saveAppUserThemeMode(mode: "light" | "dark") {
         },
       });
     }
-    throw new Error(payload?.message || payload?.error || "ذخیره حالت نمایش ناموفق بود.");
+    throw new Error(payload?.showMessage || "ذخیره حالت نمایش ناموفق بود.");
   }
 
   invalidateFetchCache("/api/app/user");

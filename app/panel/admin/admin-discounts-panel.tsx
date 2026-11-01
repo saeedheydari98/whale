@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { IoCreateOutline, IoFlashOutline, IoGiftOutline, IoPeopleOutline, IoReloadOutline, IoSaveOutline, IoSearchOutline, IoTrashOutline, IoWalletOutline } from "react-icons/io5";
+import { useEffect, useState } from "react";
+import { IoCreateOutline, IoFlashOutline, IoGiftOutline, IoPeopleOutline, IoReloadOutline, IoSaveOutline, IoTrashOutline, IoWalletOutline } from "react-icons/io5";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -9,10 +9,10 @@ import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state"
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
-import { AdminUserCompactRow, adminUserMatchesSearch, getAdminUserTitle } from "@/app/panel/admin/admin-user-compact-row";
+import { getAdminUserTitle } from "@/app/panel/admin/admin-user-compact-row";
+import { AdminUsersPanel, type AdminUser } from "@/app/panel/admin/admin-users-panel";
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount, readFormattedPriceNumber } from "@/lib/price-format";
-import { NOTIFICATION_SILENT_HEADER } from "@/lib/app-notifications";
 import { AppHeading } from "@/app/design-system/components/ui/text";
 import Loading from "@/app/design-system/components/loading/loading";
 
@@ -34,14 +34,6 @@ type DiscountRule = {
 type DiscountRuleDraft = Pick<DiscountRule, "name" | "audienceType" | "minimumValue" | "lookbackDays" | "discountType" | "validDays"> & {
   percent: number;
 };
-type DiscountUser = {
-  id: number;
-  name?: string | null;
-  username?: string | null;
-  email?: string | null;
-  profiles: Array<{ firstName: string; lastName: string; phone: string }>;
-};
-
 function audienceLabel(rule: DiscountRule) {
   if (rule.audienceType === "new_users") return `کاربران عضو‌شده در ${rule.lookbackDays} روز اخیر`;
   if (rule.audienceType === "purchase_count") return `حداقل ${rule.minimumValue} خرید در ${rule.lookbackDays} روز اخیر`;
@@ -111,40 +103,32 @@ function DiscountRuleFields({ namePrefix, value, nameInvalid, onChange }: Discou
   );
 }
 
-export function AdminDiscountsPanel() {
+export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: number }) {
   const [rules, setRules] = useState<DiscountRule[]>([]);
-  const [users, setUsers] = useState<DiscountUser[]>([]);
   const [cashbackPercent, setCashbackPercent] = useState(0);
   const [ruleDraft, setRuleDraft] = useState<DiscountRuleDraft>(DEFAULT_DISCOUNT_RULE);
   const [nameInvalid, setNameInvalid] = useState(false);
   const [editingRule, setEditingRule] = useState<DiscountRule | null>(null);
   const [editDraft, setEditDraft] = useState<DiscountRuleDraft | null>(null);
   const [editNameInvalid, setEditNameInvalid] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<DiscountUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [manualName, setManualName] = useState("");
   const [manualNameInvalid, setManualNameInvalid] = useState(false);
   const [manualType, setManualType] = useState<DiscountType>("percentage");
   const [manualPercent, setManualPercent] = useState(10);
   const [manualValidDays, setManualValidDays] = useState(30);
-  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   useTransientAppMessage(message);
-  const filteredUsers = useMemo(
-    () => users.filter((user) => adminUserMatchesSearch(user, userSearchQuery)),
-    [userSearchQuery, users]
-  );
-
   const load = async () => {
     setLoading(true);
     setMessage("");
     try {
       const response = await fetch("/api/admin/discounts", { cache: "no-store" });
       const data = await response.json().catch(() => null);
-      if (!response.ok || data?.ok === false) throw new Error(data?.message || "دریافت تخفیف‌ها انجام نشد.");
+      if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "دریافت تخفیف‌ها انجام نشد.");
       setRules(Array.isArray(data?.data?.rules) ? data.data.rules : []);
-      setUsers(Array.isArray(data?.data?.users) ? data.data.users : []);
       setCashbackPercent(Number(data?.data?.settings?.cashbackPercent) || 0);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "دریافت تخفیف‌ها انجام نشد.");
@@ -161,11 +145,11 @@ export function AdminDiscountsPanel() {
   const request = async (method: string, body: Record<string, unknown>) => {
     const response = await fetch("/api/admin/discounts", {
       method,
-      headers: { "Content-Type": "application/json", [NOTIFICATION_SILENT_HEADER]: "true" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     const data = await response.json().catch(() => null);
-    if (!response.ok || data?.ok === false) throw new Error(data?.message || "عملیات انجام نشد.");
+    if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "عملیات انجام نشد.");
     return data;
   };
 
@@ -288,7 +272,7 @@ export function AdminDiscountsPanel() {
   };
 
   return (
-    <Loading loading="skeleton-structure" isLoading={loading && rules.length === 0 && users.length === 0}>
+    <Loading loading="skeleton-structure" isLoading={loading && rules.length === 0}>
     <section className="flex w-full flex-col gap-3 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
@@ -364,35 +348,12 @@ export function AdminDiscountsPanel() {
       <CustomAccordion
         title="صدور دستی کد"
         leading={<IoPeopleOutline aria-hidden="true" />}
-        meta={`${filteredUsers.length} از ${users.length} کاربر`}
+        meta="انتخاب کاربر برای صدور کد"
         defaultOpen={false}
         showStatusLabel={false}
         contentClassName="gap-2 p-2"
       >
-        <CustomInput
-          type="search"
-          name="discount-user-search"
-          autoComplete="off"
-          spellCheck={false}
-          value={userSearchQuery}
-          label="جست‌وجوی کاربران برای صدور کد"
-          aria-label="جست‌وجوی کاربران با نام، موبایل یا ایمیل"
-          placeholder="نام، موبایل یا ایمیل…"
-          icon={<IoSearchOutline aria-hidden="true" />}
-          onChange={(event) => setUserSearchQuery(event.target.value)}
-        />
-        {!loading && users.length === 0 ? <CustomEmptyState description="کاربری برای صدور کد پیدا نشد." size="sm" /> : null}
-        {!loading && users.length > 0 && filteredUsers.length === 0 ? <CustomEmptyState description="کاربری مطابق جست‌وجو پیدا نشد." size="sm" /> : null}
-        <div className="flex w-full flex-col gap-1.5" aria-live="polite">
-          {filteredUsers.map((user) => (
-            <AdminUserCompactRow
-              key={user.id}
-              user={user}
-              trailing={<span>انتخاب</span>}
-              onSelect={() => setSelectedUser(user)}
-            />
-          ))}
-        </div>
+        <AdminUsersPanel totalCount={totalUsersCount} onSelectUser={setSelectedUser} />
       </CustomAccordion>
 
       <CustomModal open={Boolean(editingRule && editDraft)} onClose={closeRuleEditor} title="ویرایش کد تخفیف" isLoading={saving} closeOnBackdrop={!saving}>

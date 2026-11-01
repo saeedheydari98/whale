@@ -6,6 +6,7 @@ import { parseJsonBody, validationError } from "@/lib/api/validation";
 import { requireAdmin } from "@/lib/api/auth";
 import { bannerSchema, productSchema, showcaseSchema } from "@/lib/api/schemas";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
+import { readWithRetry } from "@/lib/api/read-retry";
 import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
 import { readImageMetaRecord as readImageMeta, readStoredImageUrls } from "@/lib/catalog-utils";
 import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUSES } from "@/lib/order-status";
@@ -64,12 +65,20 @@ async function readAdminOrders() {
 
   return orders.map((order: any) => ({
     id: order.id,
+    orderType: order.orderType,
     status: order.status,
     fulfillmentStatus: order.fulfillmentStatus,
     trackingCode: order.trackingCode,
     shippedAt: order.shippedAt,
     statusHistory: order.statusHistory,
     total: order.total,
+    subtotal: order.subtotal,
+    discountAmount: order.discountAmount,
+    walletAmount: order.walletAmount,
+    shippingAmount: order.shippingAmount,
+    shippingMethod: order.shippingMethod,
+    discountCode: order.discountCode,
+    cashbackEarned: order.cashbackEarned,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     user: order.user,
@@ -474,6 +483,7 @@ async function readAdminCatalogStructure() {
     banners,
     users,
     orders,
+    inPersonOrders,
     showcases,
     categoryGroups,
     brandGroups,
@@ -482,11 +492,12 @@ async function readAdminCatalogStructure() {
     productRefs,
     storefrontLayout,
   ] = await Promise.all([
-    prisma.product.count(),
-    prisma.banner.count(),
-    prisma.user.count(),
-    prisma.order.count(),
-    prisma.showcase.findMany({
+    readWithRetry(() => prisma.product.count()),
+    readWithRetry(() => prisma.banner.count()),
+    readWithRetry(() => prisma.user.count()),
+    readWithRetry(() => prisma.order.count()),
+    readWithRetry(() => prisma.order.count({ where: { orderType: "in_person" } })),
+    readWithRetry(() => prisma.showcase.findMany({
       select: {
         id: true,
         mode: true,
@@ -495,19 +506,19 @@ async function readAdminCatalogStructure() {
         manualProductIds: true,
       },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.categoryGroup.findMany({
+    })),
+    readWithRetry(() => prisma.categoryGroup.findMany({
       select: { id: true, _count: { select: { categories: true } } },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.brandGroup.findMany({
+    })),
+    readWithRetry(() => prisma.brandGroup.findMany({
       select: { id: true, _count: { select: { brands: true } } },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.category.count({ where: { groupId: null } }),
-    prisma.brand.count({ where: { groupId: null } }),
-    readAdminProductRefs(),
-    readAdminStorefrontLayout(),
+    })),
+    readWithRetry(() => prisma.category.count({ where: { groupId: null } })),
+    readWithRetry(() => prisma.brand.count({ where: { groupId: null } })),
+    readWithRetry(() => readAdminProductRefs()),
+    readWithRetry(() => readAdminStorefrontLayout()),
   ]);
 
   const categoryItems = categoryGroups.map((group) => ({
@@ -529,6 +540,7 @@ async function readAdminCatalogStructure() {
   return {
     products,
     orders,
+    inPersonOrders,
     users,
     banners,
     showcases: showcases.map((showcase) => ({

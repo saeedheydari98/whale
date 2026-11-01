@@ -200,7 +200,7 @@ export default function ProductPage() {
       });
       const data = await response.json();
       if (!response.ok || data?.ok === false) {
-        throw new Error(data?.message || "دیدگاه ثبت نشد.");
+        throw new Error(data?.showMessage || "دیدگاه ثبت نشد.");
       }
       const createdComment = data?.data?.comment;
       const createdReview = createdComment ? mapReviews([createdComment])[0] : null;
