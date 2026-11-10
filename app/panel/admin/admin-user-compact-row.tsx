@@ -1,3 +1,4 @@
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
 import type { ReactNode } from "react";
 
 export type CompactAdminUser = {
@@ -79,14 +80,14 @@ export function AdminUserCompactRow({ user, meta, trailing, onSelect }: AdminUse
 
   if (onSelect) {
     return (
-      <button
+      <CustomActionButton
         type="button"
         aria-label={`انتخاب ${getAdminUserTitle(user)}`}
         className={`${className} cursor-pointer transition-colors hover:border-primary focus-visible:ring-2 focus-visible:ring-primary`}
         onClick={onSelect}
       >
         <RowContent user={user} meta={meta} trailing={trailing} />
-      </button>
+      </CustomActionButton>
     );
   }
 

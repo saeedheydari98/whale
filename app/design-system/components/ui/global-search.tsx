@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { FiSearch } from "react-icons/fi";
@@ -223,7 +225,7 @@ export function GlobalSearch() {
             aria-label="جستجوی محصولات"
           />
 
-          <button
+          <CustomActionButton
             type="button"
             onClick={() => {
               if (isMobile && !expanded) {
@@ -236,17 +238,17 @@ export function GlobalSearch() {
             className={`absolute top-1/2 flex -translate-y-1/2 items-center justify-center text-secondary-text md:right-1.5 md:p-0.5 ${isOpen ? "right-1.5 p-0.5" : "left-1/2 -translate-x-1/2 p-0.5 md:left-auto md:translate-x-0"}`}
           >
             <FiSearch />
-          </button>
+          </CustomActionButton>
 
           {isMobile && expanded ? (
-            <button
+            <CustomActionButton
               type="button"
               onClick={close}
               aria-label="بستن جستجو"
               className="absolute left-1.5 top-1/2 flex -translate-y-1/2 items-center justify-center p-0.5 text-secondary-text"
             >
               <IoClose />
-            </button>
+            </CustomActionButton>
           ) : null}
         </div>
       </form>
@@ -256,7 +258,7 @@ export function GlobalSearch() {
           {loading ? (
             <Loading loading="skeleton-structure" isLoading>
               <div className="flex max-h-80 flex-col overflow-y-auto">
-                <button type="button" className="flex items-center gap-3 border-b border-primary-border bg-transparent px-3 py-2 text-right">
+                <CustomActionButton type="button" className="flex items-center gap-3 border-b border-primary-border bg-transparent px-3 py-2 text-right">
                   <span data-loading-leaf className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
                     <span className="text-xs font-bold text-secondary-text">تصویر</span>
                   </span>
@@ -264,13 +266,13 @@ export function GlobalSearch() {
                     <span className="line-clamp-1 text-sm font-bold text-primary-text">نتیجه جست‌وجوی محصول</span>
                     <span className="line-clamp-1 text-xs font-semibold text-secondary-text">قیمت محصول</span>
                   </span>
-                </button>
+                </CustomActionButton>
               </div>
             </Loading>
           ) : results.length > 0 ? (
             <div className="flex max-h-80 flex-col overflow-y-auto">
               {results.map((product) => (
-                <button
+                <CustomActionButton
                   key={product.id}
                   type="button"
                   className="flex items-center gap-3 border-b border-primary-border bg-transparent px-3 py-2 text-right transition hover:bg-primary-bg"
@@ -288,7 +290,7 @@ export function GlobalSearch() {
                     <span className="line-clamp-1 text-sm font-bold text-primary-text">{product.title}</span>
                     <span className="line-clamp-1 text-xs font-semibold text-secondary-text">{formatAmount(product.discountPrice || product.price) || product.discountPrice || product.price}</span>
                   </span>
-                </button>
+                </CustomActionButton>
               ))}
             </div>
           ) : (

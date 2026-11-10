@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { requireAdmin } from "@/lib/api/auth";
 import { apiFail, apiOk } from "@/lib/api/response";
+import { writeCachedServerTheme } from "@/lib/app-theme-server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -59,6 +60,7 @@ function readCachedTheme() {
 
 function writeCachedTheme(theme: ThemeConfig) {
   cachedTheme = { at: Date.now(), theme };
+  writeCachedServerTheme(theme);
 }
 
 async function ensureThemeStorage() {

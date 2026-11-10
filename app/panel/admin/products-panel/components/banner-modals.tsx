@@ -1,7 +1,12 @@
 "use client";
 
-import { IoAdd, IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
+import { CustomFileUpload } from "@/app/design-system/components/ui/file-upload";
+
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
+import { IoAdd, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomSelectionButton } from "@/app/design-system/components/ui/selection";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
@@ -9,7 +14,7 @@ import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import type { BannerForm, ShowcaseForm } from "../types";
-import { AdminModalSection } from "./admin-modal-section";
+import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
 
 type BannerModalsProps = {
   showcases: ShowcaseForm[];
@@ -137,7 +142,7 @@ function BannerModal({
     <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {banner ? (
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
-          <AdminModalSection
+          <CustomModalSection
             title="اطلاعات بنر"
             status={hasTitle ? "complete" : "optional"}
             meta="عنوان و ترتیب اصلی"
@@ -150,9 +155,9 @@ function BannerModal({
               placeholder="ترتیب نمایش"
               onChange={(event) => onPatch({ homeSortOrder: Number(event.target.value), sortOrder: Number(event.target.value) })}
             />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="محل نمایش بنر"
             status={hasTarget ? "complete" : "incomplete"}
             meta="خانه، دسته‌بندی یا ویترین"
@@ -162,21 +167,18 @@ function BannerModal({
               <BannerTargetCheckbox label="خانه" checked={banner.showOnHome} onChange={(showOnHome) => onPatch({ showOnHome })} />
               <BannerTargetCheckbox label="دسته‌بندی" checked={banner.showOnCategories} onChange={(showOnCategories) => onPatch({ showOnCategories })} />
               <BannerTargetCheckbox label="ویترین" checked={banner.showOnProducts} onChange={(showOnProducts) => onPatch({ showOnProducts })} />
-              <label className="hidden cursor-pointer items-center gap-2 rounded-md border border-primary-border bg-primary-card px-3 py-2 text-sm font-semibold text-primary-text">
-                <input
-                  type="checkbox"
-                  checked={banner.showOnShowcase}
-                  onChange={(event) => {
-                    const showOnShowcase = event.target.checked;
+              <CustomSelectionButton
+                  className="hidden" role="checkbox" selected={banner.showOnShowcase}
+                  onClick={() => {
+                    const showOnShowcase = !banner.showOnShowcase;
                     onPatch({
                       showOnShowcase,
                       showcaseId: showOnShowcase ? banner.showcaseId || showcases[0]?.id || "" : banner.showcaseId,
                     });
                   }}
-                  className="h-4 w-4 accent-primary"
-                />
+              >
                 <span>ویترین</span>
-              </label>
+              </CustomSelectionButton>
             </div>
             {banner.showOnShowcase ? (
               <div className="flex flex-col gap-2 sm:flex-row">
@@ -196,9 +198,9 @@ function BannerModal({
                 />
               </div>
             ) : null}
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="زمان‌بندی و اندازه"
             status={timingComplete ? "complete" : "incomplete"}
             meta="تغییر خودکار و ارتفاع بنر"
@@ -208,9 +210,9 @@ function BannerModal({
             <CustomInput name={`${errorKey}-interval-seconds`} type="number" min={1} max={60} step={1} value={banner.intervalSeconds} placeholder="زمان تغییر خودکار" onChange={(event) => onPatch({ intervalSeconds: Number(event.target.value) })} />
             <CustomInput name={`${errorKey}-height-percent`} type="number" min={10} max={100} step={1} value={banner.heightPercent} placeholder="درصد ارتفاع" onChange={(event) => onPatch({ heightPercent: Number(event.target.value) })} />
             </div>
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="تصاویر بنر"
             status={hasImages ? "complete" : "incomplete"}
             invalid={hasRequiredError(errorKey) && !hasImages}
@@ -224,29 +226,25 @@ function BannerModal({
                 <span>افزودن</span>
               </CustomButton>
             </div>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-4 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
-              <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-              <span className="text-sm font-semibold">بارگذاری تصاویر WebP</span>
-              <input type="file" accept={WEBP_IMAGE_ACCEPT} multiple className="hidden" onChange={(event) => onUpload(event.target.files)} />
-            </label>
+            <CustomFileUpload label="بارگذاری تصاویر WebP" accept={WEBP_IMAGE_ACCEPT} multiple onSelectFiles={(files) => onUpload(files)} />
             <div className="flex gap-2 overflow-x-auto pb-2">
               {banner.imageUrls.length === 0 && emptyPreviewLabel ? <span className="text-sm text-secondary-text">{emptyPreviewLabel}</span> : null}
               {banner.imageUrls.map((item, index) => (
                 <div key={`${item}-${index}`} className="flex min-w-40 flex-col gap-2">
-                  <button type="button" className="h-24 overflow-hidden rounded-md border border-primary-border bg-primary-media" onClick={() => onPreview(item)} aria-label="باز کردن تصویر بنر">
+                  <CustomActionButton type="button" className="h-24 overflow-hidden rounded-md border border-primary-border bg-primary-media" onClick={() => onPreview(item)} aria-label="باز کردن تصویر بنر">
                     <AppImage src={item} alt={`تصویر بنر ${index + 1}`} width={160} height={90} className="h-full w-full object-cover" />
-                  </button>
+                  </CustomActionButton>
                   <CustomButton variant="danger" size="sm" icon={<IoTrashOutline />} onClick={() => onRemoveImage(item)}>
                     <span>حذف</span>
                   </CustomButton>
                 </div>
               ))}
             </div>
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection title="وضعیت" status="optional" meta={banner.active ? "فعال" : "مخفی"}>
+          <CustomModalSection title="وضعیت" status="optional" meta={banner.active ? "فعال" : "مخفی"}>
             <CustomSwitch checked={banner.active} onChange={(active) => onPatch({ active })} label={banner.active ? "فعال" : "مخفی"} size="sm" />
-          </AdminModalSection>
+          </CustomModalSection>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
@@ -272,9 +270,8 @@ type BannerTargetCheckboxProps = {
 
 function BannerTargetCheckbox({ label, checked, onChange }: BannerTargetCheckboxProps) {
   return (
-    <label className="flex cursor-pointer items-center gap-2 rounded-md border border-primary-border bg-primary-card px-3 py-2 text-sm font-semibold text-primary-text">
-      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 accent-primary" />
+    <CustomSelectionButton selected={checked} role="checkbox" onClick={() => onChange(!checked)}>
       <span>{label}</span>
-    </label>
+    </CustomSelectionButton>
   );
 }

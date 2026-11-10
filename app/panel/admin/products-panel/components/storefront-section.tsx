@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomTabs } from "@/app/design-system/components/ui/tabs";
+
 import { useEffect, useState } from "react";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
@@ -22,6 +24,7 @@ type StorefrontSectionProps = {
   onUpdateBrandGroupPlacement: (groupId: string, sortOrder: number) => void | Promise<void>;
   isLoading?: boolean;
   totalCount?: number;
+  isSaving?: boolean;
 };
 
 const loadingStorefrontEntry: StorefrontDisplayEntry = {
@@ -43,7 +46,7 @@ const loadingStorefrontEntry: StorefrontDisplayEntry = {
 
 function StorefrontEntryRow({
   entry,
-  tab,
+  position,
   draggingKey,
   isLoading,
   setDraggingKey,
@@ -54,7 +57,7 @@ function StorefrontEntryRow({
   onUpdateBrandGroupPlacement,
 }: {
   entry: StorefrontDisplayEntry;
-  tab: StorefrontLayoutTab;
+  position: number;
   draggingKey: string | null;
   isLoading: boolean;
   setDraggingKey: (key: string | null) => void;
@@ -65,7 +68,7 @@ function StorefrontEntryRow({
   onUpdateBrandGroupPlacement: (groupId: string, sortOrder: number) => void | Promise<void>;
 }) {
   const key = storefrontKey(entry);
-  const entrySortOrder = getEntrySortOrder(entry, tab);
+
 
   return (
     <div
@@ -102,7 +105,7 @@ function StorefrontEntryRow({
         <span className="text-xs text-secondary-text">{entryFallbackTitle(entry.type)}</span>
       </div>
       <StorefrontOrderInput
-        value={entrySortOrder}
+        value={position}
         disabled={isLoading}
         onCommit={(sortOrder) => {
           if (entry.type === "banner") return onUpdateBannerPlacement(entry.item, sortOrder);
@@ -128,27 +131,14 @@ export function StorefrontSection({
   onUpdateBrandGroupPlacement,
   isLoading = false,
   totalCount,
+  isSaving = false,
 }: StorefrontSectionProps) {
   const visibleDisplaySections = displaySections;
   const showEmpty = totalCount === 0 || (!isLoading && visibleDisplaySections.length === 0);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain border-b border-primary-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {STOREFRONT_TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            aria-pressed={tab === item.id}
-            onClick={() => setTab(item.id)}
-            className={`min-w-max grow whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition-colors hover:bg-primary-soft sm:px-4 sm:text-sm ${
-              tab === item.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
-            }`}
-          >
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </div>
+      <CustomTabs items={STOREFRONT_TABS} value={tab} onChange={setTab} disabled={isSaving} variant="secondary" ariaLabel="صفحه‌ی چیدمان" />
 
       {showEmpty ? (
         <CustomEmptyState description="هنوز بخشی برای این صفحه چیده نشده است." size="sm" />
@@ -162,12 +152,12 @@ export function StorefrontSection({
         className="flex flex-col gap-4"
         getKey={(entry) => storefrontKey(entry)}
         lazy
-        renderItem={(entry) => (
+        renderItem={(entry, index) => (
           <StorefrontEntryRow
             entry={entry}
-            tab={tab}
+            position={index + 1}
             draggingKey={draggingKey}
-            isLoading={false}
+            isLoading={isSaving}
             setDraggingKey={setDraggingKey}
             onReorder={onReorder}
             onUpdateBannerPlacement={onUpdateBannerPlacement}
@@ -180,7 +170,7 @@ export function StorefrontSection({
           <Loading loading="skeleton-structure" isLoading>
             <StorefrontEntryRow
               entry={loadingStorefrontEntry}
-              tab={tab}
+              position={1}
               draggingKey={null}
               isLoading
               setDraggingKey={() => undefined}
@@ -241,16 +231,6 @@ function StorefrontOrderInput({ value, disabled, onCommit }: StorefrontOrderInpu
       }}
     />
   );
-}
-
-function getEntrySortOrder(entry: StorefrontDisplayEntry, tab: StorefrontLayoutTab) {
-  if (entry.type === "banner") {
-    if (tab === "categories") return entry.item.categorySortOrder;
-    if (tab === "products") return entry.item.productSortOrder;
-    return entry.item.homeSortOrder;
-  }
-
-  return entry.item.sortOrder;
 }
 
 function entryFallbackTitle(type: StorefrontDisplayEntry["type"]) {

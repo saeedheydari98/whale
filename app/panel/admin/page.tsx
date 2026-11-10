@@ -145,7 +145,7 @@ export default function AdminPanelPage() {
           <div className="flex w-full flex-col gap-6">
             <section className="flex flex-col gap-4">
               <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
-              <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
+              <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
             </section>
           </div>
         </Loading>
@@ -153,7 +153,7 @@ export default function AdminPanelPage() {
         <div className="flex w-full flex-col gap-6">
           <section className="flex flex-col gap-4">
             <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
-            <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
+            <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
           </section>
 
           {activeTab === "theme" ? <AdminThemePanel /> : null}

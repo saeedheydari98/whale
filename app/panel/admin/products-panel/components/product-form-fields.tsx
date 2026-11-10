@@ -1,51 +1,28 @@
 "use client";
-
 import { useState, type ReactNode } from "react";
-import { IoCheckmarkSharp } from "react-icons/io5";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
-import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
-import { getStockColorValue } from "@/app/design-system/components/ui/color-stock-dots";
+import { ColorStockDots, colorLabel as productColorLabel } from "@/app/design-system/components/ui/color-stock-dots";
+import { CustomSelectionOption as SelectableOption, CustomSelectionSummary as SelectionSummary } from "@/app/design-system/components/ui/selection";
 import { PRODUCT_COLOR_OPTIONS } from "../constants";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
 import { normalizeColorStock } from "../utils";
-
-const PRODUCT_COLOR_LABELS: Record<string, string> = {
-  black: "مشکی",
-  white: "سفید",
-  gray: "خاکستری",
-  red: "قرمز",
-  blue: "آبی",
-  green: "سبز",
-  yellow: "زرد",
-  orange: "نارنجی",
-  purple: "بنفش",
-  pink: "صورتی",
-};
-
-function productColorLabel(color: string) {
-  return PRODUCT_COLOR_LABELS[color] ?? color;
-}
-
 function normalizeStockCount(count: number) {
   return Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0;
 }
-
 type InventoryControlsProps = {
   product: ProductForm;
   onChange: (patch: Partial<ProductForm>) => void;
 };
-
 export function InventoryControls({ product, onChange }: InventoryControlsProps) {
   const colorStock = normalizeColorStock(product.colorStock);
-  const [selectedColor, setSelectedColor] = useState(PRODUCT_COLOR_OPTIONS[0]);
+  const [selectedColor, setSelectedColor] = useState<string>(PRODUCT_COLOR_OPTIONS[0]);
   const totalStock = Math.max(0, Math.round(Number(product.stockQuantity ?? 0)));
   const assignedStock = PRODUCT_COLOR_OPTIONS.reduce((sum, color) => sum + Number(colorStock[color] ?? 0), 0);
   const stockMatchesTotal = assignedStock === totalStock;
   const selectedCount = Number(colorStock[selectedColor] ?? 0);
-
   const updateColorStock = (color: string, count: number) => {
     onChange({
       colorStock: {
@@ -54,7 +31,6 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
       },
     });
   };
-
   return (
     <div
       data-invalid={!stockMatchesTotal ? "true" : undefined}
@@ -85,29 +61,10 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
           />
         </div>
       </div>
-
       <div className="flex items-stretch gap-2 rounded-md border border-primary-border bg-primary-bg p-1.5">
         <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
-          {PRODUCT_COLOR_OPTIONS.map((color) => {
-            const count = Number(colorStock[color] ?? 0);
-            const selected = color === selectedColor;
-            return (
-              <button
-                key={color}
-                type="button"
-                aria-label={`موجودی رنگ ${productColorLabel(color)}`}
-                onClick={() => setSelectedColor(color)}
-                className={`flex h-8 w-8 items-center justify-center rounded-full border text-[9px] font-bold tabular-nums transition hover:scale-105 ${
-                  selected ? "border-primary text-primary-text ring-2 ring-primary-border" : "border-primary-border text-primary-text"
-                }`}
-                style={{ backgroundColor: getStockColorValue(color) }}
-              >
-                <span className="rounded-full bg-primary-base/85 px-1 leading-4">{count > 10 ? "+10" : count}</span>
-              </button>
-            );
-          })}
+          <ColorStockDots value={Object.fromEntries(PRODUCT_COLOR_OPTIONS.map((color) => [color, colorStock[color] ?? 0]))} selectedColor={selectedColor} onSelect={setSelectedColor} size="md" />
         </div>
-
         <div className="flex w-24 shrink-0 flex-col gap-1">
           <span className="truncate text-[11px] font-bold text-primary-text">{productColorLabel(selectedColor)}</span>
           <CustomInput
@@ -123,7 +80,6 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
           />
         </div>
       </div>
-
       {!stockMatchesTotal ? (
         <span className="text-xs font-semibold text-danger-text">
           مجموع رنگ‌ها باید با موجودی کل برابر باشد.
@@ -132,7 +88,6 @@ export function InventoryControls({ product, onChange }: InventoryControlsProps)
     </div>
   );
 }
-
 type ProductPlacementFieldsProps = {
   product: ProductForm;
   showcases: ShowcaseForm[];
@@ -142,9 +97,7 @@ type ProductPlacementFieldsProps = {
   hasRequiredError: (key: string) => boolean;
   categoryErrorKey: string;
 };
-
 type PlacementSectionId = "categories" | "showcases" | "brand";
-
 export function ProductPlacementFields({
   product,
   showcases,
@@ -171,7 +124,6 @@ export function ProductPlacementFields({
   const selectedCategoryLabels = selectedCategoryIds.map((id) => categories.find((category) => category.id === id)?.title || id);
   const selectedShowcaseLabels = selectedShowcaseIds.map((id) => showcases.find((showcase) => showcase.id === id)?.title || id);
   const selectedBrandLabels = product.brand ? [selectedBrand?.title || "بدون برند"] : [];
-
   const toggleCategory = (categoryId: string) => {
     if (selectedCategoryIds.includes(categoryId)) {
       if (selectedCategoryIds.length <= 1) return;
@@ -179,25 +131,21 @@ export function ProductPlacementFields({
       onChange({ categoryId: categoryIds[0] ?? "", categoryIds });
       return;
     }
-
     const categoryIds = [...selectedCategoryIds, categoryId];
     onChange({ categoryId: categoryIds[0] ?? categoryId, categoryIds });
   };
-
   const toggleShowcase = (showcaseId: string) => {
     const showcaseIds = selectedShowcaseIds.includes(showcaseId)
       ? selectedShowcaseIds.filter((id) => id !== showcaseId)
       : [...selectedShowcaseIds, showcaseId];
     onChange({ showcaseId: showcaseIds[0] ?? "", showcaseIds });
   };
-
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-bold text-primary-text">جایگاه محصول</div>
         <span className="text-[11px] font-semibold text-secondary-text">دسته‌بندی، ویترین و برند</span>
       </div>
-
       <SelectionGroup
         id="categories"
         title="دسته‌بندی"
@@ -223,7 +171,6 @@ export function ProductPlacementFields({
           <CustomEmptyState description="دسته‌بندی‌ای برای انتخاب وجود ندارد." size="sm" className="w-full" />
         )}
       </SelectionGroup>
-
       <SelectionGroup
         id="showcases"
         title="ویترین"
@@ -248,7 +195,6 @@ export function ProductPlacementFields({
           <CustomEmptyState description="ویترینی برای انتخاب وجود ندارد." size="sm" className="w-full" />
         )}
       </SelectionGroup>
-
       <SelectionGroup
         id="brand"
         title="برند"
@@ -278,12 +224,10 @@ export function ProductPlacementFields({
     </div>
   );
 }
-
 type ProductAdvancedFieldsProps = {
   product: ProductForm;
   onChange: (patch: Partial<ProductForm>) => void;
 };
-
 export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFieldsProps) {
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-primary-border bg-primary-card p-3">
@@ -337,7 +281,6 @@ export function ProductAdvancedFields({ product, onChange }: ProductAdvancedFiel
     </div>
   );
 }
-
 type SelectionGroupProps = {
   id: PlacementSectionId;
   title: string;
@@ -350,7 +293,6 @@ type SelectionGroupProps = {
   onToggle: (open: boolean) => void;
   children: ReactNode;
 };
-
 function SelectionGroup({
   id,
   title,
@@ -364,7 +306,6 @@ function SelectionGroup({
   children,
 }: SelectionGroupProps) {
   const hasSelection = selectedLabels.some(Boolean);
-
   return (
     <CustomAccordion
       title={title}
@@ -380,69 +321,5 @@ function SelectionGroup({
         {children}
       </div>
     </CustomAccordion>
-  );
-}
-
-function SelectionSummary({ labels, emptyLabel }: { labels: string[]; emptyLabel: string }) {
-  const visibleLabels = labels.filter(Boolean).slice(0, 3);
-  const hiddenCount = Math.max(0, labels.filter(Boolean).length - visibleLabels.length);
-
-  return (
-    <div className="flex min-h-7 flex-wrap items-center gap-1.5">
-      {visibleLabels.length > 0 ? (
-        visibleLabels.map((label) => (
-          <span key={label} className="max-w-36 truncate rounded-full bg-primary-soft px-2 py-1 text-[11px] font-semibold text-primary-text">
-            {label}
-          </span>
-        ))
-      ) : (
-        <span className="rounded-full border border-dashed border-primary-border px-2 py-1 text-[11px] font-semibold text-secondary-text">
-          {emptyLabel}
-        </span>
-      )}
-      {hiddenCount > 0 ? (
-        <span className="rounded-full bg-primary text-[11px] font-bold text-primary-contrast px-2 py-1">
-          +{hiddenCount}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
-type SelectableOptionProps = {
-  label: string;
-  imageUrl?: string;
-  selected: boolean;
-  role: "checkbox" | "radio";
-  onClick: () => void;
-};
-
-function SelectableOption({ label, imageUrl, selected, role, onClick }: SelectableOptionProps) {
-  return (
-    <button
-      type="button"
-      role={role}
-      aria-checked={selected}
-      onClick={onClick}
-      className={`flex min-h-8 items-center gap-1.5 rounded-md border p-1.5 text-start transition-all duration-150 ${
-        selected
-          ? "min-w-32 flex-[1_1_9rem] border-primary bg-primary-soft text-primary-text shadow-sm"
-          : "min-w-24 flex-[0_1_7rem] border-primary-border bg-primary-bg text-secondary-text hover:bg-primary-soft"
-      }`}
-    >
-      <span
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border text-xs ${
-          selected ? "border-primary bg-primary text-primary-contrast" : "border-primary-border bg-primary-card"
-        }`}
-      >
-        {selected ? <IoCheckmarkSharp aria-hidden="true" /> : null}
-      </span>
-      {imageUrl ? (
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary-border bg-primary-media">
-          <AppImage src={imageUrl} alt={label} width={80} height={80} className="h-full w-full object-cover" />
-        </span>
-      ) : null}
-      <span className="min-w-0 flex-1 truncate text-xs font-semibold">{label}</span>
-    </button>
   );
 }

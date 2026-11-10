@@ -1,5 +1,7 @@
 "use client";
 
+import { compareStorefrontEntries } from "@/lib/storefront-order";
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -172,7 +174,7 @@ export default function CategoriesPage() {
       })
       .filter((section) => section.itemCount > 0);
 
-    return [...bannerSections, ...categorySections].sort((a, b) => a.sortOrder - b.sortOrder);
+    return [...bannerSections, ...categorySections].sort(compareStorefrontEntries);
   }, [banners, categoryGroups, visibleCategories]);
 
   return (

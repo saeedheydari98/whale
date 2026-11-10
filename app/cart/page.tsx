@@ -1,10 +1,14 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
+
 import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../design-system/components/ui/button";
+import { CustomTabs } from "../design-system/components/ui/tabs";
 import { CustomEmptyState } from "../design-system/components/ui/empty-state";
 import { CustomInput } from "../design-system/components/ui/input";
 import { EmailOtpAuthForm } from "../design-system/components/ui/email-otp-auth-form";
@@ -23,7 +27,6 @@ import {
   persistCart,
   readLocalCart,
   removeCartItem,
-  selectCartItemColor,
   updateCartColorQuantity,
   updateCartQuantity,
   type CartItemRecord,
@@ -47,7 +50,9 @@ import {
   readFormattedPriceNumber as readPriceNumber,
 } from "@/lib/price-format";
 import { getProductDetail } from "@/lib/products-client";
-import { ColorStockDots, normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
+import { normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
+import { ColorQuantityPicker } from "../design-system/components/ui/color-quantity-picker";
+import { colorSelectionTotal } from "@/lib/cart-color-selection";
 
 export default function CartPage() {
   const [items, setItems] = useState<CartItemRecord[]>([]);
@@ -135,11 +140,8 @@ export default function CartPage() {
 
     const selectedEntries = Object.entries(getCartItemColorSelection(item))
       .filter(([, count]) => count > 0);
-    if (selectedEntries.length !== 1) return true;
-
-    const [selectedColor, selectedCount] = selectedEntries[0];
-    const availableCount = colorEntries.find((entry) => entry.color === selectedColor)?.count ?? 0;
-    return selectedCount !== item.quantity || availableCount < item.quantity;
+    if (colorSelectionTotal(Object.fromEntries(selectedEntries)) !== item.quantity) return true;
+    return selectedEntries.some(([color, count]) => (colorEntries.find((entry) => entry.color === color)?.count ?? 0) < count);
   }), [items, products]);
 
   const removeItem = async (target: CartItemRecord) => {
@@ -148,22 +150,12 @@ export default function CartPage() {
   };
 
   const updateQuantity = async (target: CartItemRecord, nextQuantity: number) => {
-    const colorEntries = Object.entries(getCartItemColorSelection(target))
-      .filter(([, count]) => count > 0);
-    const hasColorStock = normalizeStockEntries(target.colorStock).length > 0;
-    const activeColor = colorEntries.length === 1 && colorEntries[0][1] === target.quantity
-      ? colorEntries[0][0]
-      : "";
-    if (hasColorStock && !activeColor) return;
-
-    const nextItems = hasColorStock
-      ? await updateCartColorQuantity(target, activeColor, nextQuantity)
-      : await updateCartQuantity(target, nextQuantity);
+    const nextItems = await updateCartQuantity(target, nextQuantity);
     setItems(nextItems);
   };
 
-  const selectItemColor = (target: CartItemRecord, color: string) => {
-    setItems(selectCartItemColor(target, color, { items, user: authUser }));
+  const changeItemColorCount = async (target: CartItemRecord, color: string, count: number) => {
+    setItems(await updateCartColorQuantity(target, color, count));
   };
 
   const clearCart = async () => {
@@ -183,7 +175,7 @@ export default function CartPage() {
     setIsCheckoutLoading(true);
     setCheckoutMessage("");
     try {
-      await persistCart(checkoutItems, savedProfile, { notify: false });
+      await persistCart(checkoutItems, savedProfile, { notify: false, throwOnError: true });
       const nextItems = await checkoutCart(savedProfile, { shippingMethod, discountCode });
       purchasedItems.forEach((item) => {
         if (item.productId) {
@@ -224,7 +216,7 @@ export default function CartPage() {
     setIsCheckoutLoading(true);
     setCheckoutMessage("");
     try {
-      await persistCart(checkoutItems, savedProfile, { notify: false });
+      await persistCart(checkoutItems, savedProfile, { notify: false, throwOnError: true });
       const quote = await getCheckoutQuote({ shippingMethod: "pickup", discountCode: "" });
       setShippingMethod("pickup");
       setDiscountCode("");
@@ -351,14 +343,8 @@ export default function CartPage() {
               const colorEntries = normalizeStockEntries(productColorStock);
               const hasColorStock = colorEntries.length > 0;
               const colorSelection = getCartItemColorSelection({ ...item, colorStock: productColorStock });
-              const selectedColorEntries = Object.entries(colorSelection).filter(([, count]) => count > 0);
-              const activeColor = selectedColorEntries.length === 1
-                && selectedColorEntries[0][1] === item.quantity
-                ? selectedColorEntries[0][0]
-                : "";
               const isAvailable = (product?.isAvailable ?? item.isAvailable) !== false
                 && normalizedStockLimit > 0;
-              const activeColorStock = colorEntries.find((entry) => entry.color === activeColor)?.count ?? 0;
               const syncedItem = {
                 ...item,
                 selectedColors: colorSelection,
@@ -369,16 +355,16 @@ export default function CartPage() {
               };
               const canIncrease = !isCheckoutLoading
                 && isAvailable
-                && item.quantity < normalizedStockLimit
-                && (!hasColorStock || (Boolean(activeColor) && item.quantity < activeColorStock));
+                && item.quantity < normalizedStockLimit;
               return (
                 <article
-                  key={String(item.id ?? `${item.title}-${index}-${item.selectedColor ?? ""}`)}
-                  className="flex w-full max-w-xl justify-self-center items-center gap-3 rounded-md border border-primary-border bg-primary-card p-2 lg:max-w-none"
+                  data-card-family="cartLine"
+                  key={String(item.productId ?? item.id ?? `${item.title}-${index}`)}
+                  className={collectionCardClasses("cartLine", "flex max-w-xl justify-self-center items-center gap-2 rounded-md border border-primary-border bg-primary-card p-2 lg:max-w-none")}
                 >
-                  <button
+                  <CustomActionButton
                     type="button"
-                    className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
                     onClick={() => openImagePreview(item.imageUrl || undefined)}
                     disabled={!item.imageUrl}
                     aria-label="باز کردن تصویر محصول"
@@ -388,23 +374,14 @@ export default function CartPage() {
                     ) : (
                       <IoBagHandleOutline className="text-2xl text-primary" aria-hidden="true" />
                     )}
-                  </button>
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <AppHeading level={2} className="truncate text-sm font-bold">{item.title}</AppHeading>
+                  </CustomActionButton>
+                  <div className="flex min-w-0 flex-1 flex-col gap-1">
+                    <AppHeading level={2} className="shrink-0 truncate text-sm font-bold">{item.title}</AppHeading>
                     {hasColorStock ? (
-                      <div className="flex items-center gap-1.5">
-                        <ColorStockDots
-                          value={productColorStock}
-                          selectedColor={activeColor}
-                          onSelect={(color) => selectItemColor(syncedItem, color)}
-                          disabledUnavailable
-                          minimumCount={item.quantity}
-                          showCount={false}
-                          size="sm"
-                        />
-                      </div>
+                      <ColorQuantityPicker colorStock={productColorStock} selection={colorSelection} stockQuantity={normalizedStockLimit}
+                        disabled={isCheckoutLoading} onChange={(color, count) => { void changeItemColorCount(syncedItem, color, count); }} />
                     ) : null}
-                    <div className="truncate text-xs font-semibold text-primary">
+                    <div className="shrink-0 truncate text-xs font-semibold text-primary">
                       {item.originalPrice && getDiscountPercent(item) > 0 && (
                         <span className="mr-2 text-danger-text-nomode line-through">
                           {formatPrice(item.originalPrice)}
@@ -414,7 +391,7 @@ export default function CartPage() {
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-stretch gap-1">
-                    <div className="flex items-center gap-1">
+                    {!hasColorStock ? <div className="flex items-center gap-1">
                       <CustomButton
                         variant="neutral"
                         size="sm"
@@ -429,24 +406,20 @@ export default function CartPage() {
                         variant="neutral"
                         size="sm"
                         className="h-8 min-w-8 p-0"
-                        disabled={isCheckoutLoading || (hasColorStock && !activeColor)}
+                        disabled={isCheckoutLoading}
                         onClick={() => updateQuantity(syncedItem, item.quantity - 1)}
                       >
                         -
                       </CustomButton>
-                    </div>
-                    <CustomButton
-                      variant="danger"
-                      size="sm"
-                      icon={<IoTrashOutline />}
-                      className="h-8"
-                      fullWidth
+                    </div> : <span className="text-center text-xs font-bold">{item.quantity}</span>}
+                    <CustomActionButton
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-danger-border-nomode bg-danger-base text-danger-text-nomode"
                       disabled={isCheckoutLoading}
                       onClick={() => removeItem(item)}
                       aria-label="حذف محصول"
                     >
-                      حذف
-                    </CustomButton>
+                      <IoTrashOutline className="text-sm" aria-hidden="true" />
+                    </CustomActionButton>
                   </div>
                 </article>
               );
@@ -481,30 +454,15 @@ export default function CartPage() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <div className="text-sm font-bold text-primary-text"><span>روش تحویل</span></div>
-              <div className="flex gap-2">
-                <CustomButton
-                  fullWidth
-                  variant={shippingMethod === "pickup" ? "primary" : "neutral"}
-                  disabled={isCheckoutLoading}
-                  onClick={() => {
-                    setShippingMethod("pickup");
-                    void requestCheckoutQuote("pickup", discountCode);
-                  }}
-                >
-                  <span>تحویل حضوری</span>
-                </CustomButton>
-                <CustomButton
-                  fullWidth
-                  variant={shippingMethod === "post" ? "primary" : "neutral"}
-                  disabled={isCheckoutLoading}
-                  onClick={() => {
-                    setShippingMethod("post");
-                    void requestCheckoutQuote("post", discountCode);
-                  }}
-                >
-                  <span>ارسال با پست ({formatPrice(30000)})</span>
-                </CustomButton>
-              </div>
+              <CustomTabs<CheckoutOptions["shippingMethod"]>
+                variant="tertiary" ariaLabel="روش تحویل" disabled={isCheckoutLoading}
+                items={[{ id: "pickup", label: "تحویل حضوری" }, { id: "post", label: `ارسال با پست (${formatPrice(30000)})` }]}
+                value={shippingMethod}
+                onChange={(method) => {
+                  setShippingMethod(method);
+                  void requestCheckoutQuote(method, discountCode);
+                }}
+              />
             </div>
 
             <div className="flex items-end gap-2">

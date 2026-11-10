@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import React from "react";
 import { IoEyeOffOutline, IoEyeOutline } from "react-icons/io5";
 import { resolveControlCssVars, UICommonVariant } from "../../variants/ui.variant";
@@ -7,6 +9,17 @@ import { borderVariants, cx, glassSurfaceClasses, GradientDirection, interaction
 import Loading, { LoadingVariant } from "../loading/loading";
 
 type CustomInputElement = HTMLInputElement | HTMLTextAreaElement;
+
+export function CustomOtpDigitInput({ className, ...props }: Omit<React.ComponentPropsWithRef<"input">, "type" | "inputMode" | "pattern" | "maxLength">) {
+  return (
+    <input
+      {...props}
+      type="text" inputMode="numeric" pattern="[0-9]*" maxLength={1} dir="ltr"
+      className={cx("h-12 min-w-0 max-w-12 flex-1 rounded-md border border-primary-border bg-primary-bg p-0 text-center text-xl font-bold leading-[3rem] text-primary-text outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary-border disabled:cursor-not-allowed disabled:opacity-60", className)}
+      style={{ direction: "ltr", textAlign: "center", paddingInline: 0 }}
+    />
+  );
+}
 
 type CustomInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size' | 'height' | 'onChange' | 'onBlur' | 'onFocus'> &
   Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'size' | 'height' | 'onChange' | 'onBlur' | 'onFocus'> & {
@@ -126,7 +139,7 @@ export function CustomInput({
     onFocus?.(event);
   };
   const resolvedIconAfter = iconAfter ?? (isPassword ? (
-    <button
+    <CustomActionButton
       type="button"
       aria-label={showPassword ? "پنهان کردن رمز عبور" : "نمایش رمز عبور"}
       className="flex items-center justify-center text-lg font-bold text-primary-text transition-colors hover:text-primary"
@@ -134,7 +147,7 @@ export function CustomInput({
       disabled={isDisabled}
     >
       {showPassword ? <IoEyeOffOutline /> : <IoEyeOutline />}
-    </button>
+    </CustomActionButton>
   ) : null);
   const controlClassName = cx(
     "peer relative z-10 bg-transparent text-primary-text placeholder:text-secondary-text",
@@ -169,6 +182,7 @@ export function CustomInput({
         <textarea
           {...(rest as React.TextareaHTMLAttributes<HTMLTextAreaElement>)}
           id={resolvedId}
+          aria-label={rest["aria-label"] ?? (rest["aria-labelledby"] ? undefined : labelText || undefined)}
           value={displayedValue}
           placeholder={resolvedPlaceholder}
           onChange={handleChange}
@@ -183,6 +197,7 @@ export function CustomInput({
         <input
           {...(rest as React.InputHTMLAttributes<HTMLInputElement>)}
           id={resolvedId}
+          aria-label={rest["aria-label"] ?? (rest["aria-labelledby"] ? undefined : labelText || undefined)}
           type={isPassword && showPassword ? "text" : type}
           value={displayedValue}
           placeholder={resolvedPlaceholder}

@@ -78,7 +78,7 @@ export type PriceLike = {
 };
 
 export function getFinalPriceValue(item: PriceLike) {
-  return String(item.discountPrice ?? item.price ?? "");
+  return String(item.discountPrice ?? "").trim() || String(item.price ?? "");
 }
 
 export function getDiscountPercentValue(item: PriceLike) {

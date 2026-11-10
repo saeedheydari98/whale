@@ -5,6 +5,7 @@ import { IoCreateOutline, IoFlashOutline, IoGiftOutline, IoPeopleOutline, IoRelo
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomTabs } from "@/app/design-system/components/ui/tabs";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
@@ -83,11 +84,11 @@ function DiscountRuleFields({ namePrefix, value, nameInvalid, onChange }: Discou
         placeholder="نام کد تخفیف"
         onChange={(event) => onChange({ name: event.target.value })}
       />
-      <div className="flex flex-wrap gap-2">
-        <CustomButton size="sm" variant={value.audienceType === "new_users" ? "primary" : "neutral"} onClick={() => onChange({ audienceType: "new_users" })}><span>کاربران جدید</span></CustomButton>
-        <CustomButton size="sm" variant={value.audienceType === "purchase_count" ? "primary" : "neutral"} onClick={() => onChange({ audienceType: "purchase_count" })}><span>تعداد خرید</span></CustomButton>
-        <CustomButton size="sm" variant={value.audienceType === "purchase_amount" ? "primary" : "neutral"} onClick={() => onChange({ audienceType: "purchase_amount" })}><span>مبلغ خرید</span></CustomButton>
-      </div>
+      <CustomTabs<AudienceType>
+        variant="tertiary" ariaLabel="گروه هدف تخفیف"
+        items={[{ id: "new_users", label: "کاربران جدید" }, { id: "purchase_count", label: "تعداد خرید" }, { id: "purchase_amount", label: "مبلغ خرید" }]}
+        value={value.audienceType} onChange={(audienceType) => onChange({ audienceType })}
+      />
       <div className="flex flex-wrap gap-2">
         {value.audienceType === "purchase_count" ? <CustomInput name={`${namePrefix}-minimum-purchase-count`} type="number" min={1} value={value.minimumValue} label="حداقل تعداد خرید" fullWidth={false} className="w-48" onChange={(event) => onChange({ minimumValue: Number(event.target.value) })} /> : null}
         {value.audienceType === "purchase_amount" ? <CustomInput name={`${namePrefix}-minimum-purchase-amount`} inputMode="numeric" value={formatAmount(value.minimumValue)} label="حداقل مبلغ خرید" fullWidth={false} className="w-48" onChange={(event) => onChange({ minimumValue: readFormattedPriceNumber(event.target.value) })} /> : null}
@@ -95,8 +96,11 @@ function DiscountRuleFields({ namePrefix, value, nameInvalid, onChange }: Discou
         <CustomInput name={`${namePrefix}-valid-days`} type="number" min={1} max={3650} value={value.validDays} label="اعتبار کد (روز)" fullWidth={false} className="w-48" onChange={(event) => onChange({ validDays: Number(event.target.value) })} />
       </div>
       <div className="flex flex-wrap items-end gap-2">
-        <CustomButton size="sm" variant={value.discountType === "percentage" ? "primary" : "neutral"} onClick={() => onChange({ discountType: "percentage" })}><span>تخفیف درصدی</span></CustomButton>
-        <CustomButton size="sm" variant={value.discountType === "free_shipping" ? "primary" : "neutral"} onClick={() => onChange({ discountType: "free_shipping" })}><span>ارسال رایگان</span></CustomButton>
+        <CustomTabs<DiscountType>
+          variant="tertiary" ariaLabel="نوع تخفیف"
+          items={[{ id: "percentage", label: "تخفیف درصدی" }, { id: "free_shipping", label: "ارسال رایگان" }]}
+          value={value.discountType} onChange={(discountType) => onChange({ discountType })}
+        />
         {value.discountType === "percentage" ? <CustomInput name={`${namePrefix}-discount-percent`} type="number" min={1} max={100} value={value.percent} label="درصد تخفیف" fullWidth={false} className="w-40" onChange={(event) => onChange({ percent: Number(event.target.value) })} /> : null}
       </div>
     </div>
@@ -377,7 +381,7 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
         <div className="flex flex-col gap-3">
           <span className="text-sm font-bold">{selectedUser ? getAdminUserTitle(selectedUser) : ""}</span>
           <CustomInput name="manual-discount-name" autoComplete="off" spellCheck={false} required invalid={manualNameInvalid} value={manualName} label="نام کد تخفیف" placeholder="نام کد تخفیف " onChange={(event) => { setManualName(event.target.value); setManualNameInvalid(false); }} />
-          <div className="flex gap-2"><CustomButton fullWidth variant={manualType === "percentage" ? "primary" : "neutral"} onClick={() => setManualType("percentage")}><span>درصدی</span></CustomButton><CustomButton fullWidth variant={manualType === "free_shipping" ? "primary" : "neutral"} onClick={() => setManualType("free_shipping")}><span>ارسال رایگان</span></CustomButton></div>
+          <CustomTabs<DiscountType> variant="tertiary" ariaLabel="نوع کد دستی" items={[{ id: "percentage", label: "درصدی" }, { id: "free_shipping", label: "ارسال رایگان" }]} value={manualType} onChange={setManualType} />
           {manualType === "percentage" ? <CustomInput name="manual-discount-percent" type="number" min={1} max={100} value={manualPercent} label="درصد تخفیف" onChange={(event) => setManualPercent(Number(event.target.value))} /> : null}
           <CustomInput name="manual-discount-valid-days" type="number" min={1} max={3650} value={manualValidDays} label="اعتبار کد (روز)" onChange={(event) => setManualValidDays(Number(event.target.value))} />
           <CustomButton icon={<IoGiftOutline aria-hidden="true" />} isLoading={saving} onClick={() => void issueManual()}><span>صدور کد ۶ کاراکتری</span></CustomButton>

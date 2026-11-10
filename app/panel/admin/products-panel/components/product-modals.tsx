@@ -1,7 +1,11 @@
 "use client";
 
+import { CustomFileUpload } from "@/app/design-system/components/ui/file-upload";
+
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { useEffect, useState } from "react";
-import { IoAdd, IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
+import { IoAdd, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomInput } from "@/app/design-system/components/ui/input";
@@ -9,7 +13,7 @@ import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import type { BrandForm, CategoryForm, ProductForm, ShowcaseForm } from "../types";
 import { formatAmount, getProductImageUrls, hasMatchingColorStock } from "../utils";
-import { AdminModalSection } from "./admin-modal-section";
+import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
 import { InventoryControls, ProductAdvancedFields, ProductPlacementFields } from "./product-form-fields";
 
 type ProductModalsProps = {
@@ -166,7 +170,7 @@ function ProductModal({
     <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {product ? (
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
-          <AdminModalSection
+          <CustomModalSection
             title="اطلاعات محصول"
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(titleErrorKey) && !hasTitle}
@@ -177,9 +181,9 @@ function ProductModal({
             <CustomInput value={product.slug} placeholder="اسلاگ" onChange={(event) => onPatch({ slug: event.target.value })} />
             <CustomInput value={product.badge} placeholder="برچسب" onChange={(event) => onPatch({ badge: event.target.value })} />
             <CustomInput value={product.ctaHref} placeholder="لینک دکمه" onChange={(event) => onPatch({ ctaHref: event.target.value })} />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="قیمت"
             status={hasPrice ? "complete" : "incomplete"}
             invalid={hasRequiredError(priceErrorKey) && !hasPrice}
@@ -204,9 +208,9 @@ function ProductModal({
                 درصد تخفیف از اختلاف دو قیمت محاسبه می‌شود.
               </span>
             </div>
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="محل نمایش"
             status={hasPlacement ? "complete" : "incomplete"}
             invalid={hasRequiredError(categoryErrorKey) && !hasPlacement}
@@ -223,9 +227,9 @@ function ProductModal({
               categoryErrorKey={categoryErrorKey}
             />
             <CustomInput type="number" value={product.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="موجودی"
             status={inventoryComplete ? "complete" : "incomplete"}
             invalid={hasRequiredError(inventoryErrorKey) && !inventoryComplete}
@@ -233,13 +237,13 @@ function ProductModal({
             defaultOpen={!inventoryComplete}
           >
             <InventoryControls product={product} onChange={onPatch} />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection title="جزئیات و وضعیت" status="optional" meta="وزن، ابعاد، سال تولید، کد کالا و وضعیت انتشار">
+          <CustomModalSection title="جزئیات و وضعیت" status="optional" meta="وزن، ابعاد، سال تولید، کد کالا و وضعیت انتشار">
             <ProductAdvancedFields product={product} onChange={onPatch} />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="توضیحات"
             status={hasDescription ? "complete" : "optional"}
             meta="متن معرفی محصول"
@@ -250,9 +254,9 @@ function ProductModal({
               placeholder="توضیحات"
               onChange={(event) => onPatch({ description: event.target.value })}
             />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="تصاویر محصول"
             status={hasImages ? "complete" : "incomplete"}
             meta="گالری محصول و تصویر اصلی کارت"
@@ -265,18 +269,14 @@ function ProductModal({
                 <span>افزودن</span>
               </CustomButton>
             </div>
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-4 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
-              <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-              <span className="text-sm font-semibold">بارگذاری تصاویر WebP</span>
-              <input type="file" accept={WEBP_IMAGE_ACCEPT} multiple className="hidden" onChange={(event) => onImageUpload(event.target.files)} />
-            </label>
+            <CustomFileUpload label="بارگذاری تصاویر WebP" accept={WEBP_IMAGE_ACCEPT} multiple onSelectFiles={(files) => onImageUpload(files)} />
             <div className="flex gap-2 overflow-x-auto pb-2">
               {productImages.length === 0 ? <span className="text-sm text-secondary-text">پیش‌نمایش تصویر</span> : null}
               {productImages.map((item, index) => (
                 <div key={`${item}-${index}`} className="flex min-w-40 flex-col gap-2">
-                  <button type="button" className="h-24 overflow-hidden rounded-md border border-primary-border bg-primary-media" onClick={() => onPreview(item)} aria-label="باز کردن تصویر محصول">
+                  <CustomActionButton type="button" className="h-24 overflow-hidden rounded-md border border-primary-border bg-primary-media" onClick={() => onPreview(item)} aria-label="باز کردن تصویر محصول">
                     <AppImage src={item} alt={`تصویر محصول ${index + 1}`} width={160} height={160} className="h-full w-full object-cover" />
-                  </button>
+                  </CustomActionButton>
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-[11px] font-semibold text-secondary-text">{index === 0 ? "اصلی" : index + 1}</span>
                     <CustomButton variant="danger" size="sm" icon={<IoTrashOutline />} onClick={() => onRemoveImage(item)}>
@@ -286,7 +286,7 @@ function ProductModal({
                 </div>
               ))}
             </div>
-          </AdminModalSection>
+          </CustomModalSection>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton isLoading={saving} loading="dots" loadingText="در حال ذخیره…" fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>

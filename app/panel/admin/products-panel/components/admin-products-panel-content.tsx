@@ -163,6 +163,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
       {section === "storefront" ? (
         <StorefrontSection
           displaySections={panel.displaySections}
+          isSaving={panel.saving}
           tab={panel.storefrontLayoutTab}
           draggingKey={panel.draggingStorefrontKey}
           setTab={panel.setStorefrontLayoutTab}

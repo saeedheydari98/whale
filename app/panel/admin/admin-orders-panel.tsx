@@ -1,5 +1,11 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
+import { CustomTable, CustomTableRow, CustomSortHeader as OrderSortHeaderButton } from "@/app/design-system/components/ui/table";
+
+import { CustomTabs } from "@/app/design-system/components/ui/tabs";
+
 import { useEffect, useMemo, useState } from "react";
 import { IoAddOutline, IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -19,6 +25,7 @@ import { formatAmount, toLatinDigits } from "@/lib/price-format";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { AppHeading } from "@/app/design-system/components/ui/text";
 import { AdminInPersonOrderForm } from "@/app/panel/admin/admin-in-person-order-form";
+import { getAdminPanelStructure } from "@/lib/admin-structure";
 
 type AdminOrderItem = {
   id: string;
@@ -128,33 +135,6 @@ function compareOrders(
   return factor * first.id.localeCompare(second.id, "fa");
 }
 
-function OrderSortHeaderButton({
-  label,
-  active,
-  direction,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  direction: AdminOrderSortDirection;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full min-w-0 items-center justify-center gap-1 text-center text-[11px] font-bold transition-colors ${
-        active ? "text-primary" : "text-secondary-text hover:text-primary-text"
-      }`}
-    >
-      <span className="truncate">{label}</span>
-      <span aria-hidden="true" className="shrink-0 tabular-nums">
-        {active ? (direction === "asc" ? "↑" : "↓") : "↕"}
-      </span>
-    </button>
-  );
-}
-
 function jalaliToGregorian(jalaliYear: number, jalaliMonth: number, jalaliDay: number) {
   const jy = jalaliYear + 1595;
   let days = -355668 + (365 * jy) + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jalaliDay;
@@ -219,6 +199,7 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
   const [sortKey, setSortKey] = useState<AdminOrderSortKey>("createdAt");
   const [sortDirection, setSortDirection] = useState<AdminOrderSortDirection>("desc");
   const [inPersonModalOpen, setInPersonModalOpen] = useState(false);
+  const [inPersonOptionCounts, setInPersonOptionCounts] = useState<{ products?: number; users?: number } | null>(null);
 
   const scopedOrders = useMemo(
     () => orders.filter((order) => isInPersonOrder(order) === (view === "in_person")),
@@ -318,6 +299,19 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
     }
   };
 
+  const openInPersonOrder = async () => {
+    setInPersonOptionCounts(null);
+    setInPersonModalOpen(true);
+    try {
+      // Counts can change while other admin tabs create products or customers.
+      const current = await getAdminPanelStructure({ force: true });
+      setInPersonOptionCounts({ products: current.products, users: current.users });
+    } catch {
+      setInPersonOptionCounts({ products: productsCount, users: usersCount });
+      setMessage("دریافت ساختار سفارش حضوری انجام نشد.");
+    }
+  };
+
   const handleInPersonOrderCreated = () => {
     invalidateFetchCache(ADMIN_ORDERS_URL);
     setCreatedInPersonCount((count) => count + 1);
@@ -328,24 +322,10 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
 
   return (
     <section className="flex w-full flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
-      <div className="flex w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain border-b border-primary-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {([
+      <CustomTabs items={([
           { id: "online", label: "سفارش‌های آنلاین" },
           { id: "in_person", label: "سفارش‌های حضوری" },
-        ] as const).map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            aria-pressed={view === tab.id}
-            onClick={() => setView(tab.id)}
-            className={`min-w-max grow whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition-colors hover:bg-primary-soft sm:px-4 sm:text-sm ${
-              view === tab.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
-            }`}
-          >
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+        ] as const)} value={view} onChange={setView} variant="secondary" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
@@ -372,50 +352,50 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
         <CustomEmptyState description={hasFilters ? "نتیجه‌ای با این فیلترها پیدا نشد." : view === "in_person" ? "هنوز سفارش حضوری ثبت نشده است." : "هنوز سفارشی ثبت نشده است."} />
       ) : null}
 
-      <div className="w-full overflow-x-auto overscroll-x-contain">
-        <div data-app-table data-app-table-columns="7" className="flex min-w-230 flex-col gap-1.5">
-          <div data-app-table-row className="flex items-center gap-2 rounded-md border border-primary-border bg-primary-card px-2.5 py-2">
-            <div className="w-40 shrink-0">
-              <OrderSortHeaderButton label="شناسه سفارش" active={sortKey === "id"} direction={sortDirection} onClick={() => toggleSort("id")} />
-            </div>
-            <div className="w-40 shrink-0">
-              <OrderSortHeaderButton label="مشتری / تماس" active={sortKey === "customer"} direction={sortDirection} onClick={() => toggleSort("customer")} />
-            </div>
-            <div className="w-28 shrink-0">
-              <OrderSortHeaderButton label="وضعیت" active={sortKey === "status"} direction={sortDirection} onClick={() => toggleSort("status")} />
-            </div>
-            <div className="w-32 shrink-0">
-              <OrderSortHeaderButton label="تاریخ ثبت" active={sortKey === "createdAt"} direction={sortDirection} onClick={() => toggleSort("createdAt")} />
-            </div>
-            <div className="w-20 shrink-0">
-              <OrderSortHeaderButton label="تعداد اقلام" active={sortKey === "items"} direction={sortDirection} onClick={() => toggleSort("items")} />
-            </div>
-            <div className="w-32 shrink-0">
-              <OrderSortHeaderButton label="مبلغ پرداختی" active={sortKey === "total"} direction={sortDirection} onClick={() => toggleSort("total")} />
-            </div>
-            <div className="w-32 shrink-0">
-              <span className="text-[11px] font-bold text-secondary-text">عملیات</span>
-            </div>
-          </div>
+      <CustomTable>
 
-          <DynamicLoadingCollection
-            items={visibleOrders}
-            isLoading={loading}
-            totalCount={collectionTotalCount}
-            className="flex w-full flex-col gap-1.5"
-            getKey={(order) => order.id}
-            lazy
-            renderItem={(order) => (
-              <AdminOrderTableRow order={order} onViewDetails={setSelectedOrder} />
-            )}
-            renderSkeleton={() => (
-              <Loading loading="skeleton-structure" isLoading>
-                <AdminOrderTableRow order={loadingOrder} onViewDetails={() => undefined} isLoading />
-              </Loading>
-            )}
-          />
-        </div>
-      </div>
+        <CustomTableRow>
+          <div className="w-40 shrink-0">
+            <OrderSortHeaderButton label="شناسه سفارش" active={sortKey === "id"} direction={sortDirection} onClick={() => toggleSort("id")} />
+          </div>
+          <div className="w-40 shrink-0">
+            <OrderSortHeaderButton label="مشتری / تماس" active={sortKey === "customer"} direction={sortDirection} onClick={() => toggleSort("customer")} />
+          </div>
+          <div className="w-28 shrink-0">
+            <OrderSortHeaderButton label="وضعیت" active={sortKey === "status"} direction={sortDirection} onClick={() => toggleSort("status")} />
+          </div>
+          <div className="w-32 shrink-0">
+            <OrderSortHeaderButton label="تاریخ ثبت" active={sortKey === "createdAt"} direction={sortDirection} onClick={() => toggleSort("createdAt")} />
+          </div>
+          <div className="w-20 shrink-0">
+            <OrderSortHeaderButton label="تعداد اقلام" active={sortKey === "items"} direction={sortDirection} onClick={() => toggleSort("items")} />
+          </div>
+          <div className="w-32 shrink-0">
+            <OrderSortHeaderButton label="مبلغ پرداختی" active={sortKey === "total"} direction={sortDirection} onClick={() => toggleSort("total")} />
+          </div>
+          <div className="w-32 shrink-0">
+            <span className="text-[11px] font-bold text-secondary-text">عملیات</span>
+          </div>
+        </CustomTableRow>
+
+        <DynamicLoadingCollection
+          items={visibleOrders}
+          isLoading={loading}
+          totalCount={collectionTotalCount}
+          className="flex w-full flex-col gap-1.5"
+          getKey={(order) => order.id}
+          lazy
+          renderItem={(order) => (
+            <AdminOrderTableRow order={order} onViewDetails={setSelectedOrder} />
+          )}
+          renderSkeleton={() => (
+            <Loading loading="skeleton-structure" isLoading>
+              <AdminOrderTableRow order={loadingOrder} onViewDetails={() => undefined} isLoading />
+            </Loading>
+          )}
+        />
+
+      </CustomTable>
       <CustomModal open={Boolean(selectedOrder)} onClose={() => setSelectedOrder(null)} title="جزئیات سفارش" size="lg" closeOnBackdrop>
         {selectedOrder ? (
           <AdminOrderDetailsModalContent
@@ -432,8 +412,8 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
       <CustomModal open={inPersonModalOpen} onClose={() => setInPersonModalOpen(false)} title="ثبت سفارش حضوری" size="lg" closeOnBackdrop>
         {inPersonModalOpen ? (
           <AdminInPersonOrderForm
-            productsCount={productsCount}
-            usersCount={usersCount}
+            productsCount={inPersonOptionCounts?.products}
+            usersCount={inPersonOptionCounts?.users}
             onCreated={handleInPersonOrderCreated}
             onClose={() => setInPersonModalOpen(false)}
           />
@@ -446,7 +426,7 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
           icon={<IoAddOutline />}
           position="bottom-right"
           shadow="lg"
-          onClick={() => setInPersonModalOpen(true)}
+          onClick={() => void openInPersonOrder()}
         />
       ) : null}
     </section>
@@ -459,7 +439,7 @@ function AdminOrderTableRow({ order, onViewDetails, isLoading = false }: {
   isLoading?: boolean;
 }) {
   return (
-    <div data-app-table-row className="flex min-w-230 items-center gap-2 rounded-md border border-primary-border bg-primary-card px-2.5 py-2">
+    <CustomTableRow>
       <div className="w-40 shrink-0">
         <span className="block truncate text-xs font-bold text-primary-text">{order.id}</span>
         {isInPersonOrder(order) ? <span className="text-[10px] text-primary">حضوری</span> : null}
@@ -487,7 +467,7 @@ function AdminOrderTableRow({ order, onViewDetails, isLoading = false }: {
           <span>مشاهده اطلاعات</span>
         </CustomButton>
       </div>
-    </div>
+    </CustomTableRow>
   );
 }
 
@@ -536,9 +516,9 @@ function AdminOrderDetailsModalContent({ order, trackingValue, saving, onPreview
         <div className="flex flex-col gap-2">
           {order.items.map((item) => (
             <div key={item.id} className="flex items-center gap-2.5 border-b border-primary-border pb-2 last:border-b-0 last:pb-0">
-              <button type="button" className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? onPreview(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
+              <CustomActionButton type="button" className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media" onClick={() => item.imageUrl ? onPreview(item.imageUrl) : undefined} disabled={!item.imageUrl} aria-label="باز کردن تصویر محصول">
                 {item.imageUrl ? <AppImage src={item.imageUrl} alt={item.title} width={112} height={112} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
-              </button>
+              </CustomActionButton>
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="truncate text-sm font-bold text-primary-text">{item.title}</span>
                 <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { compareStorefrontEntries, moveStorefrontEntry } from "@/lib/storefront-order";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ADMIN_STRUCTURE_URL, getAdminPanelStructure, type AdminPanelStructure } from "@/lib/admin-structure";
 import { clearProductsCache, getProducts, type ProductsCache } from "@/lib/products-client";
@@ -394,7 +395,7 @@ function mergeStorefrontGroups(current: CatalogLinkGroupForm[], layoutGroups: Ca
 }
 
 function sortStorefrontLayoutItems(items: StorefrontLayoutItem[]) {
-  return [...items].sort((a, b) => a.sortOrder - b.sortOrder);
+  return [...items].sort(compareStorefrontEntries);
 }
 
 function toStorefrontLayoutItem(type: StorefrontLayoutItemType, id: string, title: string, sortOrder: number): StorefrontLayoutItem {
@@ -553,6 +554,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [loadedSections, setLoadedSections] = useState<LoadedAdminCatalogSections>(initialLoadedSections);
   const [productFormReferencesLoaded, setProductFormReferencesLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const layoutSavingRef = useRef(false);
   const [status, setStatus] = useState("");
   const [requiredErrors, setRequiredErrors] = useState<string[]>([]);
   const [previewImage, setPreviewImage] = useState("");
@@ -705,10 +707,6 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const sortedBrands = useMemo(() => [...brands].sort((a, b) => a.sortOrder - b.sortOrder), [brands]);
   const sortedBrandGroups = useMemo(() => [...brandGroups].sort((a, b) => a.sortOrder - b.sortOrder), [brandGroups]);
   const sortedBanners = useMemo(() => [...banners].sort((a, b) => a.sortOrder - b.sortOrder), [banners]);
-  const nextDisplayOrder = useMemo(() => {
-    const orders = [...sortedShowcases, ...sortedBanners].map((item) => item.sortOrder);
-    return (Math.max(0, ...orders) || 0) + 1;
-  }, [sortedBanners, sortedShowcases]);
   const nextCategoryOrder = useMemo(() => (Math.max(0, ...sortedCategories.map((item) => item.sortOrder)) || 0) + 1, [sortedCategories]);
 
   const displaySections = useMemo<StorefrontDisplayEntry[]>(() => {
@@ -735,7 +733,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           sortOrder: Number(group.sortOrder ?? 1),
         }));
 
-      return [...bannerSections, ...(groupedCategorySections.length > 0 ? groupedCategorySections : categorySections)].sort((a, b) => a.sortOrder - b.sortOrder);
+      return [...bannerSections, ...(groupedCategorySections.length > 0 ? groupedCategorySections : categorySections)].sort(compareStorefrontEntries);
     }
 
     if (storefrontLayoutTab === "products") {
@@ -752,7 +750,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         sortOrder: showcase.sortOrder,
       }));
 
-      return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
+      return [...bannerSections, ...showcaseSections].sort(compareStorefrontEntries);
     }
 
     const brandSections = sortedBrands.length > 0
@@ -779,7 +777,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
           sortOrder: Number(banner.homeSortOrder ?? banner.sortOrder),
         })),
       ...(groupedBrandSections.length > 0 ? groupedBrandSections : brandSections),
-    ].sort((a, b) => a.sortOrder - b.sortOrder);
+    ].sort(compareStorefrontEntries);
   }, [sortedBanners, sortedBrandGroups, sortedBrands, sortedCategories, sortedCategoryGroups, sortedShowcases, storefrontLayoutTab]);
 
   const sectionTotalCount = collectionTotal(activeSection, structure, storefrontLayoutTab);
@@ -830,7 +828,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         };
       }
 
-      if (sectionTotalCount === 0) {
+      if (structure && Object.values(structure.storefront).every((count) => count === 0)) {
         setLoadedSections((current) => markCatalogSectionsLoaded(current, ["storefront"]));
         setLoading(false);
         return () => {
@@ -1348,13 +1346,21 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     })();
   };
 
+  const nextStorefrontOrders = async () => {
+    const layout = await getAdminStorefrontLayout({ force: true });
+    return {
+      home: Math.max(0, ...layout.home.map((item) => item.sortOrder)) + 1,
+      categories: Math.max(0, ...layout.categories.map((item) => item.sortOrder)) + 1,
+      products: Math.max(0, ...layout.products.map((item) => item.sortOrder)) + 1,
+    };
+  };
   const openShowcaseModal = () => {
     void (async () => {
-      await ensureProductFormReferences();
+      const [, orders] = await Promise.all([ensureProductFormReferences(), nextStorefrontOrders()]);
       setRequiredErrors([]);
-      setDraftShowcase({ ...createShowcase(), sortOrder: nextDisplayOrder });
+      setDraftShowcase({ ...createShowcase(), sortOrder: orders.products });
       setIsShowcaseOpen(true);
-    })();
+    })().catch((error) => setStatus(visibleStatusMessage(error, "دریافت چیدمان فروشگاه ممکن نشد.")));
   };
 
   const openCategoryModal = (groupId?: string) => {
@@ -1370,17 +1376,23 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openCategoryGroupModal = () => {
-    setRequiredErrors([]);
-    setDraftCategoryGroup({ ...createCatalogLinkGroup("category"), sortOrder: (Math.max(0, ...sortedCategoryGroups.map((group) => group.sortOrder)) || 0) + 1 });
-    setCategoryGroupLinkIds([]);
-    setIsCategoryGroupOpen(true);
+    void (async () => {
+      const orders = await nextStorefrontOrders();
+      setRequiredErrors([]);
+      setDraftCategoryGroup({ ...createCatalogLinkGroup("category"), sortOrder: orders.categories });
+      setCategoryGroupLinkIds([]);
+      setIsCategoryGroupOpen(true);
+    })().catch((error) => setStatus(visibleStatusMessage(error, "دریافت چیدمان فروشگاه ممکن نشد.")));
   };
 
   const openBrandGroupModal = () => {
-    setRequiredErrors([]);
-    setDraftBrandGroup({ ...createCatalogLinkGroup("brand"), sortOrder: (Math.max(0, ...sortedBrandGroups.map((group) => group.sortOrder)) || 0) + 1 });
-    setBrandGroupLinkIds([]);
-    setIsBrandGroupOpen(true);
+    void (async () => {
+      const orders = await nextStorefrontOrders();
+      setRequiredErrors([]);
+      setDraftBrandGroup({ ...createCatalogLinkGroup("brand"), sortOrder: orders.home });
+      setBrandGroupLinkIds([]);
+      setIsBrandGroupOpen(true);
+    })().catch((error) => setStatus(visibleStatusMessage(error, "دریافت چیدمان فروشگاه ممکن نشد.")));
   };
 
   const openEditCategoryGroupModal = (group: CatalogLinkGroupForm) => {
@@ -1398,10 +1410,13 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openBannerModal = () => {
-    setRequiredErrors([]);
-    setDraftBanner({ ...createBanner(), homeSortOrder: nextDisplayOrder, showcaseSortOrder: nextDisplayOrder, sortOrder: nextDisplayOrder });
-    setDraftBannerImageUrl("");
-    setIsBannerOpen(true);
+    void (async () => {
+      const orders = await nextStorefrontOrders();
+      setRequiredErrors([]);
+      setDraftBanner({ ...createBanner(), homeSortOrder: orders.home, showcaseSortOrder: orders.products, categorySortOrder: orders.categories, productSortOrder: orders.products, sortOrder: orders.home });
+      setDraftBannerImageUrl("");
+      setIsBannerOpen(true);
+    })().catch((error) => setStatus(visibleStatusMessage(error, "دریافت چیدمان فروشگاه ممکن نشد.")));
   };
 
   const openEditShowcaseModal = (showcase: ShowcaseForm) => {
@@ -1945,48 +1960,24 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     await persistProducts(nextProducts);
   };
 
-  const updateBannerPlacement = async (banner: BannerForm, sortOrder: number) => {
-    const nextBanners = banners.map((item) => {
-      if (item.id !== banner.id) return item;
-      if (storefrontLayoutTab === "categories") return { ...item, categorySortOrder: sortOrder };
-      if (storefrontLayoutTab === "products") return { ...item, productSortOrder: sortOrder };
-      return { ...item, homeSortOrder: sortOrder, sortOrder };
-    });
-    setBanners(nextBanners);
-    const saved = await persistStorefrontLayout(nextBanners, showcases, categoryGroups, brandGroups);
-    if (!saved) setBanners(banners);
+  const moveStorefrontSectionToPosition = (key: string, position: number) => {
+    const target = displaySections[Math.max(0, Math.min(displaySections.length - 1, Math.round(position) - 1))];
+    if (target) return reorderStorefrontSections(key, storefrontKey(target));
   };
-
-  const updateShowcasePlacement = async (showcase: ShowcaseForm, sortOrder: number) => {
-    const nextShowcases = showcases.map((item) => (item.id === showcase.id ? { ...item, sortOrder } : item));
-    setShowcases(nextShowcases);
-    const saved = await persistStorefrontLayout(banners, nextShowcases, categoryGroups, brandGroups);
-    if (!saved) setShowcases(showcases);
-  };
-
-  const updateCategoryGroupPlacement = async (groupId: string, sortOrder: number) => {
-    const nextCategoryGroups = categoryGroups.map((item) => (item.id === groupId ? { ...item, sortOrder } : item));
-    setCategoryGroups(nextCategoryGroups);
-    const saved = await persistStorefrontLayout(banners, showcases, nextCategoryGroups, brandGroups);
-    if (!saved) setCategoryGroups(categoryGroups);
-  };
-
-  const updateBrandGroupPlacement = async (groupId: string, sortOrder: number) => {
-    const nextBrandGroups = brandGroups.map((item) => (item.id === groupId ? { ...item, sortOrder } : item));
-    setBrandGroups(nextBrandGroups);
-    const saved = await persistStorefrontLayout(banners, showcases, categoryGroups, nextBrandGroups);
-    if (!saved) setBrandGroups(brandGroups);
-  };
+  const updateBannerPlacement = (banner: BannerForm, position: number) => moveStorefrontSectionToPosition(`banner:${banner.id}`, position);
+  const updateShowcasePlacement = (showcase: ShowcaseForm, position: number) => moveStorefrontSectionToPosition(`showcase:${showcase.id}`, position);
+  const updateCategoryGroupPlacement = (id: string, position: number) => moveStorefrontSectionToPosition(`categoryGroup:${id}`, position);
+  const updateBrandGroupPlacement = (id: string, position: number) => moveStorefrontSectionToPosition(`brandGroup:${id}`, position);
 
   const reorderStorefrontSections = async (sourceKey: string, targetKey: string) => {
-    if (!sourceKey || sourceKey === targetKey) return;
+    if (saving || layoutSavingRef.current || !sourceKey || sourceKey === targetKey) return;
     const ordered = displaySections.map((entry) => ({ type: entry.type, item: entry.item, key: storefrontKey(entry) }));
     const sourceIndex = ordered.findIndex((entry) => entry.key === sourceKey);
     const targetIndex = ordered.findIndex((entry) => entry.key === targetKey);
     if (sourceIndex < 0 || targetIndex < 0) return;
-    const [moved] = ordered.splice(sourceIndex, 1);
-    ordered.splice(targetIndex, 0, moved);
-    const nextOrder = new Map(ordered.map((entry, index) => [entry.key, index + 1]));
+    layoutSavingRef.current = true;
+    const reordered = moveStorefrontEntry(ordered, sourceIndex, targetIndex + 1);
+    const nextOrder = new Map(reordered.map((entry, index) => [entry.key, index + 1]));
     const nextBanners = banners.map((banner) => ({
       ...banner,
       homeSortOrder: storefrontLayoutTab === "home" ? nextOrder.get(`banner:${banner.id}`) ?? banner.homeSortOrder : banner.homeSortOrder,
@@ -2015,7 +2006,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     setBrands(nextBrands);
     setCategoryGroups(nextCategoryGroups);
     setBrandGroups(nextBrandGroups);
-    const saved = await persistStorefrontLayout(nextBanners, nextShowcases, nextCategoryGroups, nextBrandGroups, false);
+    const saved = await persistStorefrontLayout(nextBanners, nextShowcases, nextCategoryGroups, nextBrandGroups, false)
+      .finally(() => { layoutSavingRef.current = false; });
     if (!saved) {
       setBanners(banners);
       setShowcases(showcases);

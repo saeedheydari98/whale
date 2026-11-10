@@ -212,18 +212,14 @@ function observeUntilVisible(node: Element, onVisible: () => void, rootMargin = 
     return () => globalThis.clearTimeout(timer);
   }
 
-  if (isInViewport(node.getBoundingClientRect())) {
-    onVisible();
-    return () => undefined;
-  }
-
+  const appScrollRoot = scrollRoot();
   const observer = new IntersectionObserver(
     ([entry]) => {
       if (!entry?.isIntersecting) return;
       onVisible();
       observer.disconnect();
     },
-    { root: scrollRoot(), rootMargin, threshold: 0.01 }
+    { root: appScrollRoot?.contains(node) ? appScrollRoot : null, rootMargin, threshold: 0.01 }
   );
   observer.observe(node);
   return () => observer.disconnect();
@@ -264,9 +260,13 @@ function collectionAxis(container: HTMLElement) {
 
 function usedItemSize(item: HTMLElement, container: HTMLElement, _wrap: boolean) {
   const style = getComputedStyle(item);
-  const maxWidth = numericStyleValue(style.maxWidth);
-  const minWidth = numericStyleValue(style.minWidth);
   const containerWidth = container.getBoundingClientRect().width;
+  // Computed max-width can remain "100%"; it is a percentage, not 100px.
+  const resolveInlineSize = (value: string) => value.endsWith("%")
+    ? containerWidth * numericStyleValue(value) / 100
+    : numericStyleValue(value);
+  const maxWidth = resolveInlineSize(style.maxWidth);
+  const minWidth = resolveInlineSize(style.minWidth);
   const rect = item.getBoundingClientRect();
   let width = Math.max(rect.width, item.offsetWidth);
   let height = Math.max(rect.height, item.offsetHeight);
@@ -301,7 +301,31 @@ function viewportBottom() {
 function laidOutCollectionItems(container: HTMLElement) {
   return Array.from(container.children).filter((child): child is HTMLElement => (
     child instanceof HTMLElement && child.getAttribute("data-loading-probe") !== "true"
+      && !child.hasAttribute("data-loading-sentinel")
   ));
+}
+
+function collectionViewport(container: HTMLElement) {
+  let top = Math.max(0, container.getBoundingClientRect().top);
+  let bottom = viewportBottom();
+  let scrolled = false;
+  let ancestor: HTMLElement | null = container;
+  while (ancestor) {
+    const style = window.getComputedStyle(ancestor);
+    if (/auto|scroll/.test(style.overflowY)) {
+      const bounds = ancestor.getBoundingClientRect();
+      const maxHeight = numericStyleValue(style.maxHeight);
+      // overflow-x:auto also computes overflow-y:auto. A naturally growing
+      // horizontal wrapper must not cap the list at its first placeholder's height.
+      if (maxHeight > 0 || ancestor.scrollHeight > ancestor.clientHeight) {
+        top = Math.max(top, bounds.top);
+        bottom = Math.min(bottom, bounds.top + (maxHeight > 0 ? maxHeight : ancestor.clientHeight));
+      }
+      scrolled ||= ancestor.scrollTop > 0;
+    }
+    ancestor = ancestor.parentElement;
+  }
+  return { top, bottom, scrolled };
 }
 
 function countItemsFittingLayout(
@@ -312,7 +336,7 @@ function countItemsFittingLayout(
 ) {
   if (items.length === 0) return 0;
   const containerRect = container.getBoundingClientRect();
-  const bottomLimit = viewportBottom();
+  const bottomLimit = collectionViewport(container).bottom;
 
   if (nowrapRow) {
     let count = 0;
@@ -369,8 +393,12 @@ function extraItemsFromUnusedSpace(
     return fitAlong(remaining, itemWidth, columnGap);
   }
 
-  const remaining = viewportBottom() - lastRect.bottom - rowGap;
-  return fitAlong(remaining, itemHeight, rowGap) * Math.max(1, columns);
+  const remaining = collectionViewport(container).bottom - lastRect.bottom - rowGap;
+  const remainingInline = rtl
+    ? lastRect.left - containerRect.left - columnGap
+    : containerRect.right - lastRect.right - columnGap;
+  const inCurrentRow = Math.min(Math.max(0, columns - 1), fitAlong(remainingInline, itemWidth, columnGap));
+  return inCurrentRow + fitAlong(remaining, itemHeight, rowGap) * Math.max(1, columns);
 }
 
 function measuredCollectionCapacity(
@@ -386,8 +414,9 @@ function measuredCollectionCapacity(
   if (knownTotal !== undefined && !fillViewport) return knownTotal;
 
   const containerRect = container.getBoundingClientRect();
+  const viewport = collectionViewport(container);
   const availableWidth = Math.max(0, containerRect.width);
-  const availableHeight = Math.max(0, viewportBottom() - containerRect.top);
+  const availableHeight = Math.max(0, viewport.bottom - viewport.top);
   const columns = axis.column ? 1 : Math.max(1, fitAlong(availableWidth, itemWidth, axis.columnGap));
   const rows = axis.nowrapRow || !fillViewport
     ? 1
@@ -395,7 +424,9 @@ function measuredCollectionCapacity(
   let next = Math.max(0, columns * rows);
 
   const items = laidOutCollectionItems(container);
-  if (items.length > 0) {
+  // Scrolling changes item coordinates, not the number of rows fitting the viewport.
+  // Confirm against laid-out items only before scrolling has offset those coordinates.
+  if (items.length > 0 && !viewport.scrolled) {
     const fitted = countItemsFittingLayout(container, items, fillViewport, axis.nowrapRow);
     if (fitted > 0) {
       if (fitted < items.length) {
@@ -560,8 +591,8 @@ export function DynamicLoadingCollection<T>({
               <div key={`loading-more-${index}`} className={itemShellClass}>{renderSkeleton(items.length + index)}</div>
             ))
           : null}
+        {onLoadMore && hasMore ? <div ref={sentinelRef} data-loading-sentinel className="h-0 w-full shrink-0 overflow-hidden" aria-hidden="true" /> : null}
       </div>
-      {onLoadMore ? <div ref={sentinelRef} className="h-0 w-full overflow-hidden" aria-hidden="true" /> : null}
     </>
   );
 }

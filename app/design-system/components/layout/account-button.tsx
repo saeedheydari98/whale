@@ -1,5 +1,9 @@
 "use client";
 
+import { headerNavigationClasses, headerNavigationStyle, footerNavigationClasses, footerNavigationIconClasses, footerNavigationIndicatorClasses } from "@/app/design-system/variants/navigation.variant";
+
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { useEffect, useState } from "react";
 import { IoPersonCircleOutline } from "react-icons/io5";
 import {
@@ -57,31 +61,23 @@ export function AccountButton({
   const initial = label.trim().charAt(0).toUpperCase();
   const showsInitial = Boolean(mounted && user && initial);
   const isFooter = variant === "footer";
-  const className = isFooter
-    ? `flex h-10 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-[10px] font-bold transition-colors ${
-        active ? "text-primary" : "text-secondary-text hover:text-primary"
-      }`
-    : `flex h-20 shrink-0 items-center justify-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors ${
-        active ? "text-primary-text" : "border-transparent text-primary-text hover:text-primary"
-      }`;
+  const className = isFooter ? footerNavigationClasses(active) : `${headerNavigationClasses(active)} shrink-0`;
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   return (
-    <button
+    <CustomActionButton
       type="button"
       className={className}
       aria-label="حساب کاربری"
       aria-current={active ? "page" : undefined}
-      style={!isFooter && active ? { borderBottomColor: "color-mix(in srgb, var(--primary-border) 58%, var(--primary-text))" } : undefined}
+      style={!isFooter ? headerNavigationStyle(active) : undefined}
       onClick={onOpen}
     >
       <span className={isFooter
-        ? `flex h-6 min-w-8 items-center justify-center rounded-full text-base transition ${
-            active ? "bg-primary text-primary-contrast shadow-sm ring-1 ring-primary-border" : "text-secondary-text"
-          }`
+        ? footerNavigationIconClasses(active)
         : showsInitial
           ? "flex h-7 w-7 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-xs font-bold"
           : "flex items-center justify-center text-lg"
@@ -90,8 +86,8 @@ export function AccountButton({
       </span>
       <span className={isFooter ? "max-w-full truncate leading-none" : undefined}>حساب کاربری</span>
       {isFooter ? (
-        <span className={`h-0.5 rounded-full transition-all ${active ? "w-4 bg-primary" : "w-1 bg-transparent"}`} aria-hidden="true" />
+        <span className={footerNavigationIndicatorClasses(active)} aria-hidden="true" />
       ) : null}
-    </button>
+    </CustomActionButton>
   );
 }

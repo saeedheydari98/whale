@@ -175,6 +175,31 @@ export const cartItemSchema = z.object({
   quantity: z.coerce.number().int().min(1).optional(),
 });
 
+export const cartSnapshotSchema = z.object({
+  profile: z.object({
+    firstName: z.string().nullable().optional(),
+    lastName: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    email: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
+    isAdminUnlocked: z.boolean().optional(),
+  }).optional(),
+  items: z.array(z.object({
+    productId: z.union([z.number().int().positive(), z.string()]).nullable().optional(),
+    id: z.union([z.number().int().positive(), z.string()]).nullable().optional(),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    price: z.string().optional(),
+    originalPrice: z.string().nullable().optional(),
+    discountPrice: z.string().nullable().optional(),
+    discountPercent: z.union([z.number().finite(), z.string()]).nullable().optional(),
+    imageUrl: z.string().nullable().optional(),
+    selectedColor: z.string().nullable().optional(),
+    selectedColors: z.record(z.string(), z.coerce.number().int().min(0).max(2147483647)).nullable().optional(),
+    quantity: z.coerce.number().int().min(1).max(2147483647).optional(),
+  })),
+});
+
 export const quantitySchema = z.object({
   quantity: z.coerce.number().int().min(1),
 });
@@ -197,6 +222,13 @@ export const inPersonOrderLineSchema = z.object({
   imageUrl: z.string().trim().optional().nullable(),
   selectedColor: z.string().trim().optional().nullable(),
   quantity: z.coerce.number().int().min(1),
+});
+
+export const inPersonOrderOptionsSchema = z.object({
+  kind: z.enum(["products", "customers"]),
+  limit: z.coerce.number().int().positive().max(100),
+  offset: z.coerce.number().int().nonnegative().default(0),
+  q: z.string().trim().max(200).default(""),
 });
 
 export const inPersonCustomerSchema = z.object({

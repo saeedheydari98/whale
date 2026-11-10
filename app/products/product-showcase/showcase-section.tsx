@@ -1,5 +1,9 @@
 "use client";
 
+import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
+
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { FiExternalLink } from "react-icons/fi";
 import { IoBagAddOutline, IoBagHandleOutline } from "react-icons/io5";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
@@ -68,15 +72,15 @@ export function ProductShowcaseCard({
   return (
     <article
       data-loading-item="true"
-      className={`relative flex h-44 w-72 shrink-0 flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
+      data-card-family="product" className={collectionCardClasses("product", `relative flex flex-col overflow-hidden rounded-lg border bg-primary-card shadow-sm ${
         isLoading ? "border-border-default" : "border-primary-border"
-      }`}
+      }`)}
     >
       {!isLoading ? <ProductCardBadge label={product?.badge} /> : null}
-      <div className="flex min-h-0 flex-1 gap-3 p-3">
-        <button
+      <div className="flex min-h-0 flex-1 gap-2 p-2">
+        <CustomActionButton
           type="button"
-          className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+          className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
           onClick={() => onPreview?.(primaryImage)}
           disabled={isLoading || !primaryImage || !onPreview}
           aria-label="باز کردن تصویر محصول"
@@ -92,7 +96,7 @@ export function ProductShowcaseCard({
           ) : (
             <IoBagHandleOutline className="text-4xl text-primary" aria-hidden="true" />
           )}
-        </button>
+        </CustomActionButton>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-1">
           <AppHeading level={titleLevel} className="line-clamp-1 text-sm font-bold">{productTitle}</AppHeading>
@@ -115,7 +119,7 @@ export function ProductShowcaseCard({
         </div>
       </div>
       <div
-        className={`flex h-12 shrink-0 items-center gap-2 border-t px-3 ${
+        className={`flex h-10 shrink-0 items-center gap-2 border-t px-2 ${
           isLoading ? "border-border-default" : "border-primary-border"
         }`}
       >
@@ -123,7 +127,7 @@ export function ProductShowcaseCard({
           type="button"
           variant="success"
           rounded="md"
-          size="sm"
+          size="xs"
           className="flex-1"
           fullWidth
           icon={<IoBagAddOutline />}
@@ -134,6 +138,7 @@ export function ProductShowcaseCard({
         </CustomButton>
         <div className="flex flex-1 gap-2 w-full">
           <ProductLink
+            size="xs"
             iconAfter={<FiExternalLink size={18} />}
             className="w-full flex justify-center items-center gap-1"
             productId={productId}

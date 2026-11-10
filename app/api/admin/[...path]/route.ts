@@ -1,3 +1,4 @@
+import { compareStorefrontEntries } from "@/lib/storefront-order";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
@@ -208,7 +209,7 @@ function getBannerLayout(banner: BannerLayoutRecord) {
 }
 
 function sortLayoutItems(items: StorefrontLayoutItem[]) {
-  return [...items].sort((a, b) => a.sortOrder - b.sortOrder);
+  return [...items].sort(compareStorefrontEntries);
 }
 
 function toLayoutItem(type: StorefrontLayoutItemType, item: { id: string; title?: string | null }, sortOrder: number): StorefrontLayoutItem {
@@ -667,10 +668,11 @@ async function updateAdminStorefrontLayout(body: unknown) {
         .filter((item): item is { id?: unknown; sortOrder?: unknown } => Boolean(item?.id) && optionalNumber(item?.sortOrder) !== undefined)
     : [];
 
+  await prisma.$transaction(async (tx) => {
   if (bannerPatches.length > 0) {
     const ids = bannerPatches.map((patch) => String(patch.id ?? "").trim()).filter(Boolean);
     const existingBanners: BannerLayoutRecord[] = ids.length > 0
-      ? await prisma.banner.findMany({
+      ? await tx.banner.findMany({
           where: { id: { in: Array.from(new Set(ids)) } },
           select: {
             id: true,
@@ -696,7 +698,7 @@ async function updateAdminStorefrontLayout(body: unknown) {
         : currentLayout.showcaseId;
       const nextHomeSortOrder = optionalNumber(patch.homeSortOrder ?? patch.sortOrder) ?? currentLayout.homeSortOrder;
 
-      await prisma.banner.update({
+      await tx.banner.update({
         where: { id },
         data: {
           images: imagesMeta as any,
@@ -712,25 +714,27 @@ async function updateAdminStorefrontLayout(body: unknown) {
   const brandGroupPatches = hasLayoutItems ? layoutOrderPatches(storefrontLayout.home, "brandGroup") : orderPatch(layout.brandGroups);
 
   for (const item of showcasePatches) {
-    await prisma.showcase.updateMany({
+    await tx.showcase.updateMany({
       where: { id: String(item.id) },
       data: { sortOrder: optionalNumber(item.sortOrder) },
     });
   }
 
   for (const item of categoryGroupPatches) {
-    await prisma.categoryGroup.updateMany({
+    await tx.categoryGroup.updateMany({
       where: { id: String(item.id) },
       data: { sortOrder: optionalNumber(item.sortOrder) },
     });
   }
 
   for (const item of brandGroupPatches) {
-    await prisma.brandGroup.updateMany({
+    await tx.brandGroup.updateMany({
       where: { id: String(item.id) },
       data: { sortOrder: optionalNumber(item.sortOrder) },
     });
   }
+
+  }, { timeout: 30000 });
 
   await invalidateCatalogCache("admin.storefront-layout");
 }

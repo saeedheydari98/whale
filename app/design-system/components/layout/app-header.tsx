@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { IoArrowForward, IoHomeOutline, IoStorefrontOutline } from "react-icons/io5";
@@ -159,14 +161,14 @@ export function AppHeader() {
         {/* Left: logo, theme toggle, global search */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {showMobileBack ? (
-            <button
+            <CustomActionButton
               type="button"
               onClick={() => router.back()}
               aria-label="بازگشت"
               className="flex shrink-0 items-center justify-center p-1 text-xl text-primary-text transition-colors hover:text-primary"
             >
               <IoArrowForward />
-            </button>
+            </CustomActionButton>
           ) : null}
           <div className="shrink-0 text-primary-base-nomode"><GiSpermWhale size={40}/></div>
           <div className="shrink-0">

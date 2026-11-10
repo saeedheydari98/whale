@@ -1,5 +1,7 @@
 "use client";
 
+import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
+
 import { useMemo } from "react";
 import { IoCheckmarkCircle, IoChatbubbleEllipsesOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -97,7 +99,7 @@ export function ProductReviewsSection({
 
       <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12">
         <aside className="flex w-full flex-col gap-5 lg:max-w-xs lg:shrink-0">
-            <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-card p-5">
+            <div data-card-family="review" className={collectionCardClasses("review", "flex flex-col gap-2 rounded-xl border border-primary-border bg-primary-card p-2")}>
             <div className="text-4xl font-bold leading-none text-primary-text">
               {avgRating > 0 ? avgRating.toFixed(1) : "—"}
             </div>
@@ -212,11 +214,11 @@ export function ProductReviewsSection({
                 {reviews.map((review) => (
                   <article
                     key={review.id}
-                    className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-card p-5"
+                    data-card-family="review" className={collectionCardClasses("review", "flex flex-col gap-2 rounded-xl border border-primary-border bg-primary-card p-2")}
                   >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex flex-col gap-2">
-                        <div className="text-sm font-bold text-primary-text">{review.author || "مهمان"}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-1 items-center gap-2">
+                        <div className="min-w-0 truncate text-xs font-bold text-primary-text">{review.author || "مهمان"}</div>
                         {review.rating ? (
                           <div className="flex flex-wrap items-center gap-2">
                             <StarRating value={review.rating} size="sm" />
@@ -230,7 +232,7 @@ export function ProductReviewsSection({
                       </div>
                       <div className="text-xs text-secondary-text">{formatReviewDate(review.createdAt)}</div>
                     </div>
-                    <div className="text-sm leading-6 text-primary-text whitespace-pre-wrap">{review.text}</div>
+                    <div className="min-h-0 line-clamp-2 text-xs leading-5 text-primary-text whitespace-pre-wrap">{review.text}</div>
                   </article>
                 ))}
               </div>

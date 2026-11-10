@@ -1,43 +1,31 @@
 "use client";
-
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+import { useEffect, useState } from "react";
 import { PiStarFourFill } from "react-icons/pi";
-
 interface ToggleProps {
   checked?: boolean;
   onChange?: (checked: boolean) => void;
 }
-
 export default function Toggle({ checked, onChange }: ToggleProps) {
   const [dark, setDark] = useState(checked || false);
-
   useEffect(() => {
     if (checked !== undefined) {
       setDark(checked);
     }
   }, [checked]);
-
   const handleToggle = () => {
     const newValue = !dark;
     setDark(newValue);
     onChange?.(newValue);
   };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    handleToggle();
-  };
-
   return (
-    <div
+    <CustomActionButton
       role="switch"
       aria-checked={dark}
       aria-label="تغییر حالت روز و شب"
       tabIndex={0}
       className="relative h-8.5 w-15 cursor-pointer select-none outline-none [-webkit-tap-highlight-color:transparent] focus:outline-none focus-visible:outline-none"
       onClick={handleToggle}
-      onKeyDown={handleKeyDown}
       onMouseDown={(event) => event.preventDefault()}
     >
       <div
@@ -54,7 +42,6 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
         {!dark && (
           <div className="absolute w-4 h-4 top-[9px] left-2 rounded-full bg-yellow-400 shadow-[0_0_8px_#facc15]" />
         )}
-
         {/* CLOUDS */}
         {!dark && (
           <div className="absolute inset-0">
@@ -68,7 +55,6 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
             </div>
           </div>
         )}
-
         {/* STARS */}
         {dark && (
           <div className="absolute inset-0">
@@ -78,7 +64,6 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
             <PiStarFourFill className="absolute top-[22px] left-4 w-1.5 h-1.5 text-white drop-shadow-[0_0_2px_white] animate-[twinkle_4s_infinite_3s]" />
           </div>
         )}
-
         {/* KNOB */}
         <div
           className={`
@@ -104,6 +89,6 @@ export default function Toggle({ checked, onChange }: ToggleProps) {
           )}
         </div>
       </div>
-    </div>
+    </CustomActionButton>
   );
 }

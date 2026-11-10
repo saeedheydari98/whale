@@ -61,9 +61,8 @@ export function invalidateServerThemeCache() {
 }
 
 /**
- * Reads the active admin theme from the database. Used by `/api/theme` and by the
- * icon route so the very first favicon request already carries the real brand
- * color instead of the gray fallback.
+ * Reads the active admin theme for the icon route. `/api/theme` also updates this
+ * cache whenever it loads or saves the theme.
  */
 export async function loadServerTheme(): Promise<ServerThemeConfig> {
   const cached = readCachedServerTheme();

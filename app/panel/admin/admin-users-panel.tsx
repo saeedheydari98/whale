@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomTable, CustomTableRow, CustomSortHeader as SortHeaderButton } from "@/app/design-system/components/ui/table";
+
 import { useEffect, useMemo, useState } from "react";
 import { IoReloadOutline, IoSearchOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -76,33 +78,6 @@ function compareUsers(a: AdminUser, b: AdminUser, key: SortKey, direction: SortD
   return factor * ((a[key] as number) - (b[key] as number));
 }
 
-function SortHeaderButton({
-  label,
-  active,
-  direction,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  direction: SortDirection;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex w-full min-w-0 items-center justify-center gap-1 text-center text-[11px] font-bold transition-colors ${
-        active ? "text-primary" : "text-secondary-text hover:text-primary-text"
-      }`}
-    >
-      <span className="truncate">{label}</span>
-      <span aria-hidden="true" className="shrink-0 tabular-nums">
-        {active ? (direction === "asc" ? "↑" : "↓") : "↕"}
-      </span>
-    </button>
-  );
-}
-
 function UserTableRow({
   user,
   onSelectUser,
@@ -113,7 +88,7 @@ function UserTableRow({
   isLoading?: boolean;
 }) {
   return (
-    <div data-app-table-row className="flex min-w-230 items-center gap-2 rounded-md border border-primary-border bg-primary-card px-2.5 py-2">
+    <CustomTableRow>
       <div className="flex w-44 shrink-0 flex-col gap-0.5">
         <AppHeading level={3} className="truncate text-xs font-bold text-primary-text">
           {getAdminUserTitle(user)}
@@ -147,7 +122,7 @@ function UserTableRow({
           </CustomButton>
         </div>
       ) : null}
-    </div>
+    </CustomTableRow>
   );
 }
 
@@ -231,7 +206,7 @@ export function AdminUsersPanel({ totalCount, onSelectUser }: AdminUsersPanelPro
             {visibleUsers.length.toLocaleString("fa-IR")} از {matchingUserCount.toLocaleString("fa-IR")} حساب کاربری
           </span>
         </div>
-        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void load()} isLoading={loading}>
+        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void load()} disabled={loading}>
           <span>به‌روزرسانی</span>
         </CustomButton>
       </div>
@@ -270,90 +245,86 @@ export function AdminUsersPanel({ totalCount, onSelectUser }: AdminUsersPanelPro
         <CustomEmptyState description="کاربری مطابق جست‌وجو یا فیلتر پیدا نشد." size="sm" />
       ) : null}
 
-      <div className="w-full overflow-x-auto overscroll-x-contain">
-        <div
-          data-app-table
-          data-app-table-columns={onSelectUser ? "8" : "7"}
-          className="flex min-w-230 flex-col gap-1.5"
-        >
-          <div data-app-table-row className="flex items-center gap-2 rounded-md border border-primary-border bg-primary-card px-2.5 py-2">
-            <div className="w-44 shrink-0">
-              <SortHeaderButton
-                label="نام / تماس"
-                active={sortKey === "name"}
-                direction={sortDirection}
-                onClick={() => toggleSort("name")}
-              />
-            </div>
-            <div className="w-24 shrink-0">
-              <SortHeaderButton
-                label="نقش"
-                active={sortKey === "role"}
-                direction={sortDirection}
-                onClick={() => toggleSort("role")}
-              />
-            </div>
-            <div className="w-28 shrink-0">
-              <SortHeaderButton
-                label="ثبت‌نام"
-                active={sortKey === "createdAt"}
-                direction={sortDirection}
-                onClick={() => toggleSort("createdAt")}
-              />
-            </div>
-            <div className="w-20 shrink-0">
-              <SortHeaderButton
-                label="تعداد خرید"
-                active={sortKey === "orderCount"}
-                direction={sortDirection}
-                onClick={() => toggleSort("orderCount")}
-              />
-            </div>
-            <div className="w-28 shrink-0">
-              <SortHeaderButton
-                label="مبلغ کل خرید"
-                active={sortKey === "orderTotal"}
-                direction={sortDirection}
-                onClick={() => toggleSort("orderTotal")}
-              />
-            </div>
-            <div className="w-28 shrink-0">
-              <SortHeaderButton
-                label="آخرین خرید"
-                active={sortKey === "lastOrderAt"}
-                direction={sortDirection}
-                onClick={() => toggleSort("lastOrderAt")}
-              />
-            </div>
-            <div className="w-28 shrink-0">
-              <SortHeaderButton
-                label="کیف پول"
-                active={sortKey === "walletBalance"}
-                direction={sortDirection}
-                onClick={() => toggleSort("walletBalance")}
-              />
-            </div>
-            {onSelectUser ? <div className="w-24 shrink-0"><span className="text-[11px] font-bold text-secondary-text">عملیات</span></div> : null}
-          </div>
+      <CustomTable columns={onSelectUser ? 8 : 7}>
 
-          <DynamicLoadingCollection
-            items={visibleUsers}
-            isLoading={loading && users.length === 0}
-            totalCount={collectionTotalCount}
-            viewportLimited
-            className="flex w-full flex-col gap-1.5"
-            containerProps={{ "aria-live": "polite" }}
-            getKey={(user) => user.id}
-            lazy
-            renderItem={(user) => <UserTableRow user={user} onSelectUser={onSelectUser} />}
-            renderSkeleton={() => (
-              <Loading loading="skeleton-structure" isLoading>
-                <UserTableRow user={loadingUser} onSelectUser={onSelectUser} isLoading />
-              </Loading>
-            )}
-          />
-        </div>
-      </div>
+        <CustomTableRow>
+          <div className="w-44 shrink-0">
+            <SortHeaderButton
+              label="نام / تماس"
+              active={sortKey === "name"}
+              direction={sortDirection}
+              onClick={() => toggleSort("name")}
+            />
+          </div>
+          <div className="w-24 shrink-0">
+            <SortHeaderButton
+              label="نقش"
+              active={sortKey === "role"}
+              direction={sortDirection}
+              onClick={() => toggleSort("role")}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <SortHeaderButton
+              label="ثبت‌نام"
+              active={sortKey === "createdAt"}
+              direction={sortDirection}
+              onClick={() => toggleSort("createdAt")}
+            />
+          </div>
+          <div className="w-20 shrink-0">
+            <SortHeaderButton
+              label="تعداد خرید"
+              active={sortKey === "orderCount"}
+              direction={sortDirection}
+              onClick={() => toggleSort("orderCount")}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <SortHeaderButton
+              label="مبلغ کل خرید"
+              active={sortKey === "orderTotal"}
+              direction={sortDirection}
+              onClick={() => toggleSort("orderTotal")}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <SortHeaderButton
+              label="آخرین خرید"
+              active={sortKey === "lastOrderAt"}
+              direction={sortDirection}
+              onClick={() => toggleSort("lastOrderAt")}
+            />
+          </div>
+          <div className="w-28 shrink-0">
+            <SortHeaderButton
+              label="کیف پول"
+              active={sortKey === "walletBalance"}
+              direction={sortDirection}
+              onClick={() => toggleSort("walletBalance")}
+            />
+          </div>
+          {onSelectUser ? <div className="w-24 shrink-0"><span className="text-[11px] font-bold text-secondary-text">عملیات</span></div> : null}
+        </CustomTableRow>
+
+        <DynamicLoadingCollection
+          items={visibleUsers}
+          isLoading={loading}
+          totalCount={collectionTotalCount}
+          viewportLimited
+          className="flex w-full flex-col gap-1.5"
+          containerProps={{ "aria-live": "polite" }}
+          getKey={(user) => user.id}
+          lazy
+          renderItem={(user) => <UserTableRow user={user} onSelectUser={onSelectUser} />}
+          renderSkeleton={() => (
+            <Loading loading="skeleton-structure" isLoading>
+              <UserTableRow user={loadingUser} onSelectUser={onSelectUser} isLoading />
+            </Loading>
+          )}
+        />
+
+      </CustomTable>
     </section>
   );
 }

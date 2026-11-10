@@ -1,20 +1,26 @@
 "use client";
 
 import { type ReactNode } from "react";
-import { cx, glassSurfaceClasses } from "../../variants/shared.variant";
+import { cx } from "../../variants/shared.variant";
+import { type SelectionLevel } from "../../variants/selection.variant";
+import { CustomSelectionButton, CustomSelectionGroup } from "./selection";
 
 export type CustomTabItem<TValue extends string = string> = {
   id: TValue;
   label: string;
   icon?: ReactNode;
   badge?: number;
+  disabled?: boolean;
 };
 
 type CustomTabsProps<TValue extends string = string> = {
-  items: Array<CustomTabItem<TValue>>;
+  items: readonly CustomTabItem<TValue>[];
   value: TValue;
   onChange: (value: TValue) => void;
   className?: string;
+  variant?: SelectionLevel;
+  ariaLabel?: string;
+  disabled?: boolean;
 };
 
 export function CustomTabs<TValue extends string = string>({
@@ -22,23 +28,37 @@ export function CustomTabs<TValue extends string = string>({
   value,
   onChange,
   className = "",
+  variant = "primary",
+  ariaLabel,
+  disabled = false,
 }: CustomTabsProps<TValue>) {
   return (
-    <div className={cx("flex w-full flex-nowrap gap-1 overflow-x-auto overscroll-x-contain rounded-xl bg-primary-soft p-1 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", glassSurfaceClasses, className)}>
+    <CustomSelectionGroup
+      aria-label={ariaLabel}
+      variant={variant}
+      className={className}
+      onKeyDown={(event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button[aria-pressed]:not(:disabled)"));
+        const index = buttons.indexOf(event.target as HTMLButtonElement);
+        if (index < 0 || buttons.length === 0) return;
+        event.preventDefault();
+        const rtl = getComputedStyle(event.currentTarget).direction === "rtl";
+        const step = (event.key === "ArrowRight") !== rtl ? 1 : -1;
+        const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + step + buttons.length) % buttons.length;
+        buttons[next].focus();
+        buttons[next].click();
+      }}
+    >
       {items.map((item) => {
         const active = value === item.id;
 
         return (
-          <button
+          <CustomSelectionButton
             key={item.id}
-            type="button"
-            aria-pressed={active}
-            className={cx(
-              "flex h-11 shrink-0 basis-28 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition hover:brightness-105 md:basis-auto",
-              active
-                ? "bg-primary text-primary-contrast shadow-sm"
-                : "bg-primary-card text-primary-text hover:bg-primary-bg hover:text-primary"
-            )}
+            selected={active}
+            variant={variant}
+            disabled={disabled || item.disabled}
             aria-label={item.badge && item.badge > 0 ? `${item.label}، ${item.badge} مورد جدید` : undefined}
             onClick={() => onChange(item.id)}
           >
@@ -52,9 +72,9 @@ export function CustomTabs<TValue extends string = string>({
                 {item.badge}
               </span>
             ) : null}
-          </button>
+          </CustomSelectionButton>
         );
       })}
-    </div>
+    </CustomSelectionGroup>
   );
 }

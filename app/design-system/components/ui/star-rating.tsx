@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import React, { useState } from "react";
 import { IoStar, IoStarHalf, IoStarOutline } from "react-icons/io5";
 import { cx } from "../../variants/shared.variant";
@@ -65,7 +67,7 @@ export function StarRating({
     }
 
     return (
-      <button
+      <CustomActionButton
         key={starNumber}
         type="button"
         disabled={disabled}
@@ -80,7 +82,7 @@ export function StarRating({
         aria-label={`امتیاز ${starNumber} از ${max} ستاره`}
       >
         {icon}
-      </button>
+      </CustomActionButton>
     );
   };
 

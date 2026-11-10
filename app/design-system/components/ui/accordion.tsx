@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { useId, useState, type ReactNode } from "react";
 import { IoAlertCircleOutline, IoCheckmarkCircleOutline, IoChevronDown, IoInformationCircleOutline } from "react-icons/io5";
 import { glassSurfaceClasses } from "../../variants/shared.variant";
@@ -92,7 +94,7 @@ export function CustomAccordion({
     <div className={`flex flex-col gap-1 rounded-lg p-1 ${glassSurfaceClasses} ${shellClasses()} ${className}`}>
       <div className="flex min-w-0 items-center gap-2">
         {heading ? <div className="min-w-0 flex-1">{heading}</div> : null}
-        <button
+        <CustomActionButton
           type="button"
           aria-controls={contentId}
           aria-expanded={resolvedOpen}
@@ -111,7 +113,7 @@ export function CustomAccordion({
             ) : null}
             <IoChevronDown className={`text-base transition ${resolvedOpen ? "rotate-180" : ""}`} aria-hidden="true" />
           </span>
-        </button>
+        </CustomActionButton>
       </div>
       {resolvedOpen ? (
         <div id={contentId} className={`flex flex-col gap-1.5 ${contentClassName}`}>

@@ -1,5 +1,7 @@
 "use client";
 
+import { headerNavigationClasses, headerNavigationStyle, isNavigationActive } from "@/app/design-system/variants/navigation.variant";
+
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
@@ -15,21 +17,15 @@ type HeaderNavLinkProps = {
 
 export function HeaderNavLink({ href, children, icon, className, onClick }: HeaderNavLinkProps) {
   const pathname = usePathname();
-  const active = href === "/"
-    ? pathname === "/" || pathname.startsWith("/brand/")
-    : pathname === href || pathname.startsWith(`${href}/`);
+  const active = isNavigationActive(pathname, href);
 
   return (
     <Link
       href={href}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={cx(
-        "flex h-20 items-center justify-center gap-2 border-b-2 px-4 text-sm font-semibold transition-colors",
-        active ? "text-primary-text" : "border-transparent text-primary-text hover:text-primary",
-        className
-      )}
-      style={active ? { borderBottomColor: "color-mix(in srgb, var(--primary-border) 58%, var(--primary-text))" } : undefined}
+      className={cx(headerNavigationClasses(active), className)}
+      style={headerNavigationStyle(active)}
     >
       {icon ? <span className="text-lg">{icon}</span> : null}
       <span>{children}</span>

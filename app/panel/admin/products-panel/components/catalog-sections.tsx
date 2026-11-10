@@ -1,5 +1,7 @@
 "use client";
 
+import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
+
 import { IoAdd } from "react-icons/io5";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -199,19 +201,19 @@ function CategoryAdminCard({
         setDraggingCategoryId(null);
       }}
       onDragEnd={() => setDraggingCategoryId(null)}
-      className={`flex h-40 w-44 shrink-0 flex-col items-center gap-1 overflow-hidden rounded-lg border bg-primary-card p-2 shadow-sm ${
+      data-card-family="catalogLink" className={collectionCardClasses("catalogLink", `flex flex-col items-center gap-1 overflow-hidden rounded-lg border bg-primary-card p-2 shadow-sm ${
         isLoading
           ? "cursor-default border-border-default"
           : draggingCategoryId === category.id
             ? "cursor-grab border-primary opacity-70 active:cursor-grabbing"
             : "cursor-grab border-primary-border active:cursor-grabbing"
-      }`}
+      }`)}
     >
       <div className="flex w-full flex-col items-center">
         <CategoryOption label={category.title} imageUrl={category.imageUrl} size="sm" shape="rounded" onImageClick={() => onPreview(category.imageUrl)} />
       </div>
       <div className="flex w-full justify-center gap-2">
-        <CustomButton size="sm" variant="edit" disabled={isLoading} onClick={() => onEditCategory(category)}>
+        <CustomButton size="xs" variant="edit" disabled={isLoading} onClick={() => onEditCategory(category)}>
           <span>ویرایش</span>
         </CustomButton>
         <div className="flex items-center rounded-md border border-primary-border px-2 text-xs font-semibold text-secondary-text">
@@ -391,19 +393,19 @@ function BrandAdminCard({
         setDraggingBrandId(null);
       }}
       onDragEnd={() => setDraggingBrandId(null)}
-      className={`flex h-40 w-44 shrink-0 flex-col items-center gap-1 overflow-hidden rounded-lg border bg-primary-card p-2 shadow-sm ${
+      data-card-family="catalogLink" className={collectionCardClasses("catalogLink", `flex flex-col items-center gap-1 overflow-hidden rounded-lg border bg-primary-card p-2 shadow-sm ${
         isLoading
           ? "cursor-default border-border-default"
           : draggingBrandId === brand.id
             ? "cursor-grab border-primary opacity-70 active:cursor-grabbing"
             : "cursor-grab border-primary-border active:cursor-grabbing"
-      }`}
+      }`)}
     >
       <div className="flex w-full flex-col items-center">
         <CategoryOption label={brand.title} imageUrl={brand.imageUrl} size="sm" onImageClick={() => onPreview(brand.imageUrl)} />
       </div>
       <div className="flex w-full justify-center gap-2">
-        <CustomButton size="sm" variant="edit" disabled={isLoading} onClick={() => onEditBrand(brand)}>
+        <CustomButton size="xs" variant="edit" disabled={isLoading} onClick={() => onEditBrand(brand)}>
           <span>ویرایش</span>
         </CustomButton>
         <div className="flex items-center rounded-md border border-primary-border px-2 text-xs font-semibold text-secondary-text">

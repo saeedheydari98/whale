@@ -2,6 +2,7 @@
 
 import { IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomSelectionButton } from "@/app/design-system/components/ui/selection";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
@@ -9,7 +10,7 @@ import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { SHOWCASE_SORT_OPTIONS } from "../constants";
 import type { CategoryForm, ProductForm, ShowcaseForm } from "../types";
 import { toggleProductId } from "../utils";
-import { AdminModalSection } from "./admin-modal-section";
+import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
 
 type ShowcaseModalsProps = {
   products: ProductForm[];
@@ -100,7 +101,7 @@ function ShowcaseModal({
     <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {showcase ? (
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
-          <AdminModalSection
+          <CustomModalSection
             title="اطلاعات ویترین"
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(requiredErrorKey) && !hasTitle}
@@ -114,9 +115,9 @@ function ShowcaseModal({
               onChange={(event) => onPatch({ title: event.target.value })}
             />
             <CustomInput type="number" value={showcase.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="حالت و محصولات"
             status={ruleComplete ? "complete" : "incomplete"}
             meta={showcase.mode === "auto" ? "قانون خودکار" : "انتخاب دستی محصول"}
@@ -131,11 +132,11 @@ function ShowcaseModal({
             ) : (
               <ManualShowcaseProducts showcase={showcase} products={products} onPatch={onPatch} />
             )}
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection title="وضعیت" status="optional" meta={showcase.active ? "فعال" : "مخفی"}>
+          <CustomModalSection title="وضعیت" status="optional" meta={showcase.active ? "فعال" : "مخفی"}>
             <CustomSwitch checked={showcase.active} onChange={(active) => onPatch({ active })} label={showcase.active ? "فعال" : "مخفی"} size="sm" />
-          </AdminModalSection>
+          </CustomModalSection>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             {onDelete ? (
@@ -187,14 +188,14 @@ function ManualShowcaseProducts({ showcase, products, onPatch }: ShowcaseFieldsP
       <div className="text-xs font-bold text-secondary-text">محصولات دستی</div>
       <div className="flex max-h-48 flex-col gap-2 overflow-y-auto">
         {products.map((product) => (
-          <CustomButton
+          <CustomSelectionButton
             key={product.id}
-            variant={showcase.manualProductIds.map(String).includes(String(product.id)) ? "primary" : "neutral"}
-            size="sm"
+            selected={showcase.manualProductIds.map(String).includes(String(product.id))}
+            role="checkbox"
             onClick={() => onPatch({ manualProductIds: toggleProductId(showcase.manualProductIds, product.id) })}
           >
             <span>{product.title}</span>
-          </CustomButton>
+          </CustomSelectionButton>
         ))}
       </div>
     </div>

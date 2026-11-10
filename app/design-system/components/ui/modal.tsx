@@ -73,7 +73,7 @@ export function CustomModal({
         rounded={rounded}
         border={border}
         gradient={gradient}
-        className="max-h-[90vh] w-full max-w-lg overflow-y-auto text-primary-text"
+        className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden text-primary-text [&>div]:flex [&>div]:min-h-0 [&>div]:flex-col [&>div>div]:flex [&>div>div]:min-h-0 [&>div>div]:flex-col"
         style={{
           backgroundColor: cardBackgroundColor,
           ...resolveGradientStyle(cardBackgroundColor, gradient, `var(--${variant}-border)`),
@@ -86,14 +86,14 @@ export function CustomModal({
         loading={loading}
         loadingText={loadingText}
       >
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between gap-3">
+        <div className="flex min-h-0 flex-col gap-3">
+          <div data-modal-header className="flex shrink-0 items-center justify-between gap-3">
             <AppHeading level={2} id={titleId} className="text-xl font-bold">{title}</AppHeading>
             <CustomButton variant="danger" size="sm" onClick={onClose} disabled={isLoading}>
               {closeText || closeIcon}
             </CustomButton>
           </div>
-          <div>{children}</div>
+          <div data-modal-body className="min-h-0 overflow-y-auto overscroll-contain">{children}</div>
         </div>
       </CustomCard>
     </div>

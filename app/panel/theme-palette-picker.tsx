@@ -1,8 +1,9 @@
 "use client";
 
+import { CustomSelectionButton } from "@/app/design-system/components/ui/selection";
+
 import { ReactNode, useState } from "react";
 import { IoCheckmark } from "react-icons/io5";
-import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { getContrastColor } from "@/app/design-system/theme/color-utils";
 import { resolveColor, ThemeColorKey, ThemeStyle, ThemeTone } from "@/app/design-system/theme/theme";
@@ -195,8 +196,10 @@ export function ThemePalettePicker({
             const textColor = getThemeContrastColor(background, color, selectedStyle);
 
             return (
-              <button
+              <CustomSelectionButton
                 key={color}
+                selected={selected}
+                variant="swatch"
                 type="button"
                 aria-label={colorLabels[color]}
                 className="flex h-9 w-9 cursor-pointer touch-manipulation items-center justify-center rounded-full border transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary-border focus-visible:ring-offset-2"
@@ -212,7 +215,7 @@ export function ThemePalettePicker({
                 }}
               >
                 {selected ? <IoCheckmark aria-hidden="true" /> : null}
-              </button>
+              </CustomSelectionButton>
             );
           })}
         </PaletteSection>
@@ -242,10 +245,10 @@ export function ThemePalettePicker({
             const textColor = getThemeContrastColor(background, selectedColor, item);
 
             return (
-              <CustomButton
+              <CustomSelectionButton
                 key={item}
-                rounded="full"
-                size="sm"
+                selected={selected}
+                className="rounded-full"
                 style={{
                   backgroundColor: background,
                   borderColor: selected ? getContrastColor(background) : hexToRgba(background, 0.45),
@@ -254,14 +257,14 @@ export function ThemePalettePicker({
                   boxShadow: selected ? `0 0 0 2px ${hexToRgba(background, 0.45)}` : "none",
                   color: textColor,
                 }}
-                icon={selected ? <IoCheckmark aria-hidden="true" /> : undefined}
                 disabled={disabled}
                 onClick={() => {
                   if (!disabled) void onChange({ style: item });
                 }}
               >
+                {selected ? <IoCheckmark aria-hidden="true" /> : null}
                 {styleLabels[item]}
-              </CustomButton>
+              </CustomSelectionButton>
             );
           })}
         </PaletteSection>

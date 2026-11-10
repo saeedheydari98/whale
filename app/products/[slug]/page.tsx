@@ -1,5 +1,9 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
+import { CustomTabs } from "@/app/design-system/components/ui/tabs";
+
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
@@ -21,7 +25,8 @@ import { StarRating } from "@/app/design-system/components/ui/star-rating";
 import Loading, { useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import { ProductImageGallery } from "./product-image-gallery";
-import ColorStockDots from "@/app/design-system/components/ui/color-stock-dots";
+import { ColorQuantityPicker } from "@/app/design-system/components/ui/color-quantity-picker";
+import { colorSelectionTotal, updateColorSelection, type CartColorSelection } from "@/lib/cart-color-selection";
 import { ProductCardBadge } from "@/app/design-system/components/ui/product-card-badge";
 import { AppHeading } from "@/app/design-system/components/ui/text";
 import { getPageBootstrap } from "@/lib/page-bootstrap-client";
@@ -131,7 +136,7 @@ export default function ProductPage() {
   useTransientAppMessage(reviewError);
   const [cartMessage, setCartMessage] = useState("");
   useTransientAppMessage(cartMessage);
-  const [selectedColor, setSelectedColor] = useState("");
+  const [selectedColors, setSelectedColors] = useState<CartColorSelection | null>(null);
   const [activeTab, setActiveTab] = useState<ProductTab>("details");
 
   const productApiId = product?.id;
@@ -241,19 +246,12 @@ export default function ProductPage() {
       return;
     }
 
-    const cartColor = selectedColor || firstAvailableColor;
-    if (colorOptions.length > 0 && !cartColor) {
-      setCartMessage("برای افزودن این محصول باید یک رنگ موجود انتخاب کنید.");
-      window.setTimeout(() => setCartMessage(""), 2000);
-      return;
-    }
-
-    if (cartColor && cartColor !== selectedColor) {
-      setSelectedColor(cartColor);
-    }
+    const colors = selectedColors ?? (firstAvailableColor ? { [firstAvailableColor]: 1 } : {});
+    const requestedQuantity = colorOptions.length > 0 ? colorSelectionTotal(colors) : 1;
+    if (requestedQuantity <= 0) return;
 
     try {
-      await addProductToCart(item, 1, cartColor);
+      await addProductToCart(item, requestedQuantity, colors);
       setCartMessage(`${item.title} به سبد خرید اضافه شد.`);
     } catch (error) {
       setCartMessage(error instanceof Error ? error.message : "افزودن به سبد خرید ناموفق بود.");
@@ -343,7 +341,7 @@ export default function ProductPage() {
               <div className="flex flex-col gap-3">
                 <AppHeading level={1} className="text-3xl font-bold leading-tight text-primary-text">{product.title}</AppHeading>
 
-                <button
+                <CustomActionButton
                   type="button"
                   onClick={scrollToReviews}
                   disabled={catalogLoading}
@@ -356,7 +354,7 @@ export default function ProductPage() {
                   <span className="text-sm text-secondary-text">
                     ({displayedReviewCount} دیدگاه)
                   </span>
-                </button>
+                </CustomActionButton>
             </div>
 
             <div className="flex flex-col gap-1 rounded-xl border border-primary-border bg-primary-card p-4">
@@ -381,15 +379,14 @@ export default function ProductPage() {
                     {firstAvailableColor || catalogLoading ? "موجود" : "ناموجود"}
                   </span>
                 </div>
-                <ColorStockDots
-                  value={hasColorOptions ? product.colorStock : Object.fromEntries(
-                    Array.from({ length: Math.max(1, Number.isFinite(structureColorCount) ? structureColorCount : 1) }, (_, index) => [`color-${index}`, 1])
-                  )}
-                  selectedColor={selectedColor}
-                  onSelect={setSelectedColor}
-                  disabledUnavailable
-                  showCount={false}
-                  size="md"
+                <ColorQuantityPicker
+                  colorStock={product.colorStock}
+                  selection={selectedColors ?? (firstAvailableColor ? { [firstAvailableColor]: 1 } : {})}
+                  stockQuantity={Number(product.stockQuantity) || 0}
+                  disabled={catalogLoading}
+                  onChange={(color, count) => setSelectedColors((current) => updateColorSelection(
+                    current ?? (firstAvailableColor ? { [firstAvailableColor]: 1 } : {}), color, count, product.colorStock, Number(product.stockQuantity) || 0
+                  ))}
                 />
               </div>
             ) : null}
@@ -399,7 +396,7 @@ export default function ProductPage() {
                 type="button"
                 variant="success"
                 icon={<IoBagAddOutline />}
-                disabled={catalogLoading || !available}
+                disabled={catalogLoading || !available || (hasColorOptions && colorSelectionTotal(selectedColors ?? (firstAvailableColor ? { [firstAvailableColor]: 1 } : {})) <= 0)}
                 onClick={() => {
                   if (!catalogLoading) addToCart(product);
                 }}
@@ -413,20 +410,7 @@ export default function ProductPage() {
 
         <Loading loading="skeleton-structure" isLoading={catalogLoading}>
         <section id="product-tabs" className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain border-b border-primary-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {PRODUCT_TABS.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`min-w-max grow whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition-colors hover:bg-primary-soft sm:px-4 sm:text-sm ${
-                  activeTab === tab.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
-                }`}
-              >
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
+          <CustomTabs items={PRODUCT_TABS} value={activeTab} onChange={setActiveTab} variant="secondary" ariaLabel="اطلاعات محصول" />
 
           {activeTab === "details" ? (
               <section className="flex flex-col gap-6 rounded-2xl border border-primary-border bg-primary-soft p-6">

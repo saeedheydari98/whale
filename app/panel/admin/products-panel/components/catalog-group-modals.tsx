@@ -8,7 +8,7 @@ import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import type { BrandForm, CatalogLinkGroupForm, CategoryForm } from "../types";
-import { AdminModalSection } from "./admin-modal-section";
+import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
 
 type CatalogGroupModalsProps = {
   categories: CategoryForm[];
@@ -141,7 +141,7 @@ function CatalogGroupModal({
     <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {item ? (
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
-          <AdminModalSection
+          <CustomModalSection
             title="اطلاعات بخش"
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(errorKey) && !hasTitle}
@@ -160,9 +160,9 @@ function CatalogGroupModal({
               placeholder="ترتیب نمایش بخش"
               onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })}
             />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="لینک‌های داخل بخش"
             status={hasLinks ? "complete" : "incomplete"}
             meta={`${selectedIds.length} انتخاب`}
@@ -189,16 +189,16 @@ function CatalogGroupModal({
                 />
               ))}
             </div>
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection title="وضعیت" status="optional" meta={item.active ? "فعال" : "مخفی"}>
+          <CustomModalSection title="وضعیت" status="optional" meta={item.active ? "فعال" : "مخفی"}>
             <CustomSwitch
               checked={item.active}
               onChange={(active) => onPatch({ active })}
               label={item.active ? "فعال" : "مخفی"}
               size="sm"
             />
-          </AdminModalSection>
+          </CustomModalSection>
           <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>
             <span>ذخیره بخش</span>
           </CustomButton>

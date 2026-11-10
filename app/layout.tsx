@@ -7,13 +7,14 @@ import { AppHeader } from "./design-system/components/layout/app-header";
 import "./globals.css";
 import { AppFooter } from "./design-system/components/layout/app-footer";
 import { AdminPanelFloatButton } from "./design-system/components/layout/admin-panel-float-button";
-import { TableOverflowTooltip } from "./design-system/components/ui/table-overflow-tooltip";
+import { AppOverflowTooltip } from "./design-system/components/ui/overflow-tooltip";
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppUserProvider } from "@/lib/app-user-context";
 import { AppThemeProvider } from "@/lib/app-theme-provider";
 import { createTheme, resolveColor } from "./design-system/theme/theme";
 import { generateCSSVariables } from "./design-system/theme/css-vars";
+import { applyDocumentFavicon } from "./design-system/theme/favicon";
 import {
   APP_THEME_CACHE_TTL_MS,
   APP_THEME_STORAGE_KEY,
@@ -58,7 +59,7 @@ const initialThemeScript = `
 (function() {
   try {
     var root = document.documentElement;
-    var userCache = JSON.parse(localStorage.getItem("app-user:v1") || "null");
+    var userCache = JSON.parse(localStorage.getItem("app-user:v2") || localStorage.getItem("app-user:v1") || "null");
     var cachedUser = userCache && userCache.data && userCache.data.user;
     var themeCache = JSON.parse(sessionStorage.getItem("${APP_THEME_STORAGE_KEY}") || "null");
     var vars = JSON.parse(sessionStorage.getItem("${THEME_CSS_VARS_STORAGE_KEY}") || "{}");
@@ -85,6 +86,9 @@ const initialThemeScript = `
     }
     if (mode !== "dark") mode = "light";
     root.classList.toggle("dark", mode === "dark");
+    if (hasFreshTheme && variableKeys.length > 0) {
+      (${applyDocumentFavicon.toString()})(mode, vars);
+    }
   } catch (error) {}
 })();
 `;
@@ -107,13 +111,6 @@ export const metadata: Metadata = {
     template: `%s | ${SITE_NAME}`,
   },
   icons: {
-    // The icon route resolves the active theme from the database, so the very
-    // first request already carries the real brand color. The media queries let
-    // the browser pick the light or dark background on its own.
-    icon: [
-      { url: "/icon?mode=light", type: "image/png", sizes: "32x32", media: "(prefers-color-scheme: light)" },
-      { url: "/icon?mode=dark", type: "image/png", sizes: "32x32", media: "(prefers-color-scheme: dark)" },
-    ],
     apple: [{ url: "/icon?mode=light", type: "image/png", sizes: "32x32" }],
   },
 };
@@ -133,7 +130,14 @@ export default function RootLayout({
       data-theme-ready="false"
       suppressHydrationWarning
     >
+      <head>
+        <link id="app-theme-favicon" rel="icon" type="image/svg+xml" sizes="any" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" suppressHydrationWarning />
+      </head>
       <body className="h-[100dvh] overflow-hidden bg-primary-base text-right" dir="rtl">
+        <svg id="app-favicon-template" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" aria-hidden="true" style={{ display: "none" }}>
+          <rect data-favicon-background width="32" height="32" rx="8" />
+          <GiSpermWhale data-favicon-symbol x="2" y="2" size={28} />
+        </svg>
         <JsonLd data={organizationJsonLd()} />
         <JsonLd data={websiteJsonLd()} />
         <JsonLd data={breadcrumbJsonLd([{ name: SITE_NAME, path: "/" }])} />
@@ -161,7 +165,7 @@ export default function RootLayout({
         <Suspense fallback={<Loading loading="fullscreen" />}>
           <RouteLoadingController />
         </Suspense>
-        <TableOverflowTooltip />
+        <AppOverflowTooltip />
         <AppThemeProvider>
           <AppUserProvider>
             <AppNotificationProvider>

@@ -1,8 +1,11 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import React from "react";
 import { GiSpermWhale } from "react-icons/gi";
 import { cx } from "../../variants/shared.variant";
+import { collectionCardSizes } from "../../variants/collection-card.variant";
 import { AppImage } from "./app-image";
 
 type CategoryOptionProps = {
@@ -19,19 +22,19 @@ type CategoryOptionProps = {
 
 const sizeClasses = {
   sm: {
-    image: "h-14 w-14",
+    image: "h-10 w-10",
     text: "text-xs",
-    frame: "h-27 w-28",
+    frame: collectionCardSizes.catalogOptionSm,
   },
   md: {
-    image: "h-20 w-20",
+    image: "h-14 w-14",
     text: "text-sm",
-    frame: "h-32 w-28",
+    frame: collectionCardSizes.catalogOptionMd,
   },
   lg: {
-    image: "h-24 w-24",
+    image: "h-16 w-16",
     text: "text-base",
-    frame: "h-36 w-28",
+    frame: collectionCardSizes.catalogOptionLg,
   },
 };
 
@@ -65,9 +68,9 @@ export function CategoryOption({
   const content = (
     <>
       {onImageClick && !onClick && imageUrl ? (
-        <button type="button" className={shape === "circle" ? "rounded-full" : "rounded-xl"} onClick={onImageClick} aria-label="باز کردن تصویر">
+        <CustomActionButton type="button" className={shape === "circle" ? "rounded-full" : "rounded-xl"} onClick={onImageClick} aria-label="باز کردن تصویر">
           {imageContent}
-        </button>
+        </CustomActionButton>
       ) : imageContent}
       <span className={cx("line-clamp-1 min-h-5 w-full max-w-24 text-center font-bold text-primary-text", sizeClasses[size].text)}>
         {label}
@@ -77,18 +80,18 @@ export function CategoryOption({
 
   if (!onClick) {
     return (
-      <div data-loading-item="true" className={cx("flex shrink-0 flex-col items-center gap-2 overflow-hidden p-2", sizeClasses[size].frame, className)}>
+      <div data-loading-item="true" className={cx("flex shrink-0 flex-col items-center gap-1 overflow-hidden p-1", sizeClasses[size].frame, className)}>
         {content}
       </div>
     );
   }
 
   return (
-    <button
+    <CustomActionButton
       type="button"
       data-loading-item="true"
       className={cx(
-        "flex shrink-0 cursor-pointer flex-col items-center gap-2 overflow-hidden rounded-lg border border-transparent p-2 transition hover:scale-[1.03] hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-60",
+        "flex shrink-0 cursor-pointer flex-col items-center gap-1 overflow-hidden rounded-lg border border-transparent p-1 transition hover:scale-[1.03] hover:bg-primary-soft disabled:cursor-not-allowed disabled:opacity-60",
         sizeClasses[size].frame,
         selected ? "border-primary-border bg-primary-soft" : "bg-transparent",
         className
@@ -97,7 +100,7 @@ export function CategoryOption({
       onClick={onClick}
     >
       {content}
-    </button>
+    </CustomActionButton>
   );
 }
 

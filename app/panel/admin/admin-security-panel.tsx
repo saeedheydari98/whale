@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomTabs } from "@/app/design-system/components/ui/tabs";
+
 import { useEffect, useMemo, useState } from "react";
 import {
   IoCheckmarkCircleOutline,
@@ -174,24 +176,10 @@ export function AdminSecurityPanel() {
           </div>
         </div>
 
-        <div className="flex w-full flex-nowrap gap-2 overflow-x-auto overscroll-x-contain border-b border-primary-border [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {([
+        <CustomTabs items={([
             { id: "requests", label: "درخواست‌ها و سوابق" },
             { id: "users", label: "جست‌وجو و اعطای دسترسی" },
-          ] as const).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              aria-pressed={view === tab.id}
-              onClick={() => setView(tab.id)}
-              className={`min-w-max grow whitespace-nowrap border-b-2 px-3 py-3 text-xs font-semibold transition-colors hover:bg-primary-soft sm:px-4 sm:text-sm ${
-                view === tab.id ? "border-primary text-primary-text" : "border-transparent text-secondary-text"
-              }`}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
+          ] as const)} value={view} onChange={setView} variant="secondary" />
 
         <div className="flex flex-wrap gap-3">
           <div className="flex min-w-40 flex-1 flex-col gap-1 rounded-lg border border-primary-border bg-primary-card p-3">

@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import Link from "next/link";
 import React from "react";
 
@@ -155,7 +157,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
   }
 
   return (
-    <button
+    <CustomActionButton
       {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}
       disabled={isDisabled}
       onClick={onClick}
@@ -174,6 +176,6 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
       className={classes}
     >
       {content}
-    </button>
+    </CustomActionButton>
   );
 };

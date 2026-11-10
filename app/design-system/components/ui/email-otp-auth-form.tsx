@@ -1,9 +1,8 @@
 "use client";
-
 import { useEffect, useRef, useState } from "react";
 import { IoArrowForwardOutline, IoLogInOutline, IoMailOutline } from "react-icons/io5";
 import { CustomButton } from "./button";
-import { CustomInput } from "./input";
+import { CustomInput, CustomOtpDigitInput } from "./input";
 import { useTransientAppMessage } from "../feedback/notification-provider";
 import type { AuthClientUser } from "@/lib/auth-client";
 import {
@@ -13,19 +12,15 @@ import {
   PHONE_PATTERN,
   PHONE_PATTERN_SOURCE,
 } from "@/lib/validation-patterns";
-
 const OTP_LENGTH = 6;
-
 function emptyOtpDigits() {
   return Array.from({ length: OTP_LENGTH }, () => "");
 }
-
 type EmailOtpAuthFormProps = {
   purpose?: "login" | "admin";
   onSuccess: (result: { user: AuthClientUser; profileComplete: boolean }) => void | Promise<void>;
   submitLabel?: string;
 };
-
 type AuthResponse = {
   ok?: boolean;
   showMessage?: string;
@@ -38,7 +33,6 @@ type AuthResponse = {
     developmentCode?: string;
   };
 };
-
 export function EmailOtpAuthForm({
   purpose = "login",
   onSuccess,
@@ -54,7 +48,6 @@ export function EmailOtpAuthForm({
   const [loading, setLoading] = useState(false);
   const otpInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const code = codeDigits.join("");
-
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = window.setInterval(() => {
@@ -62,18 +55,15 @@ export function EmailOtpAuthForm({
     }, 1000);
     return () => window.clearInterval(timer);
   }, [cooldown]);
-
   const resetVerification = () => {
     setCodeDigits(emptyOtpDigits());
     setCodeSent(false);
     setCooldown(0);
     setStatus("");
   };
-
   const focusOtpInput = (index: number) => {
     otpInputRefs.current[Math.max(0, Math.min(index, OTP_LENGTH - 1))]?.focus();
   };
-
   const fillOtpDigits = (startIndex: number, value: string) => {
     const digits = value.replace(NON_ASCII_DIGIT_PATTERN, "").slice(0, OTP_LENGTH - startIndex).split("");
     if (digits.length === 0) return;
@@ -87,14 +77,12 @@ export function EmailOtpAuthForm({
     focusOtpInput(Math.min(startIndex + digits.length, OTP_LENGTH - 1));
     setStatus("");
   };
-
   const updateOtpDigit = (index: number, value: string) => {
     const digits = value.replace(NON_ASCII_DIGIT_PATTERN, "");
     if (digits.length > 1) {
       fillOtpDigits(index, digits);
       return;
     }
-
     setCodeDigits((current) => {
       const next = [...current];
       next[index] = digits;
@@ -103,13 +91,11 @@ export function EmailOtpAuthForm({
     if (digits && index < OTP_LENGTH - 1) focusOtpInput(index + 1);
     setStatus("");
   };
-
   const returnToIdentity = () => {
     setCodeDigits(emptyOtpDigits());
     setCodeSent(false);
     setStatus("");
   };
-
   const validateIdentity = () => {
     if (!PHONE_PATTERN.test(phone.trim())) {
       setStatus("شماره موبایل باید با ۰۹ شروع شود و ۱۱ رقم باشد.");
@@ -121,7 +107,6 @@ export function EmailOtpAuthForm({
     }
     return true;
   };
-
   const requestCode = async () => {
     if (!validateIdentity() || cooldown > 0) return;
     setLoading(true);
@@ -149,7 +134,6 @@ export function EmailOtpAuthForm({
       setLoading(false);
     }
   };
-
   const verifyCode = async () => {
     if (!validateIdentity()) return;
     if (!OTP_CODE_PATTERN.test(code)) {
@@ -176,7 +160,6 @@ export function EmailOtpAuthForm({
       setLoading(false);
     }
   };
-
   return (
     <div className="flex flex-col gap-3">
       {codeSent ? (
@@ -201,21 +184,14 @@ export function EmailOtpAuthForm({
               fillOtpDigits(0, pastedDigits);
             }}>
               {codeDigits.map((digit, index) => (
-                <input
+                <CustomOtpDigitInput
                   key={index}
                   ref={(element) => {
                     otpInputRefs.current[index] = element;
                   }}
                   value={digit}
-                  dir="ltr"
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={1}
                   autoComplete={index === 0 ? "one-time-code" : "off"}
                   aria-label={`رقم ${index + 1} از کد ورود`}
-                  className="h-12 min-w-0 max-w-12 flex-1 rounded-md border border-primary-border bg-primary-bg p-0 text-center text-xl font-bold leading-[3rem] text-primary-text outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary-border disabled:cursor-not-allowed disabled:opacity-60"
-                  style={{ direction: "ltr", textAlign: "center", paddingInline: 0 }}
                   disabled={loading}
                   onChange={(event) => updateOtpDigit(index, event.target.value)}
                   onFocus={(event) => event.currentTarget.select()}

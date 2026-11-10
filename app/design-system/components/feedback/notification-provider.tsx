@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import React, {
   createContext,
   useCallback,
@@ -36,7 +38,7 @@ type NotificationItem = {
 
 type NotificationContextValue = {
   notify: (payload: AppNotificationPayload) => void;
-  apiNotificationTime: () => number;
+  wasMessageShown: (message: string) => boolean;
   success: (message: string, time?: number) => void;
   error: (message: string, time?: number) => void;
   info: (message: string, time?: number) => void;
@@ -126,14 +128,14 @@ function AppNotification({ id, type, message, time, onClose }: AppNotificationVi
     >
       <Icon className="shrink-0 text-xl" aria-hidden="true" />
       <span className="min-w-0 flex-1">{message}</span>
-      <button
+      <CustomActionButton
         type="button"
         className="flex shrink-0 items-center justify-center rounded-md p-1 transition hover:bg-primary-base/60"
         aria-label="بستن پیام"
         onClick={() => onClose(id)}
       >
         <IoClose aria-hidden="true" />
-      </button>
+      </CustomActionButton>
     </div>
   );
 }
@@ -141,8 +143,7 @@ function AppNotification({ id, type, message, time, onClose }: AppNotificationVi
 export function AppNotificationProvider({ children }: { children: ReactNode }) {
   const [item, setItem] = useState<NotificationItem | null>(null);
   const notifyRef = useRef<(payload: AppNotificationPayload) => void>(() => undefined);
-  const recentNotificationRef = useRef({ key: "", time: 0 });
-  const lastApiNotificationTimeRef = useRef(0);
+  const recentNotificationRef = useRef({ key: "", message: "", time: 0 });
 
   const remove = useCallback((id: number) => {
     setItem((current) => current?.id === id ? null : current);
@@ -155,7 +156,7 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
     const key = `${type}:${message}`;
     const now = Date.now();
     if (recentNotificationRef.current.key === key && now - recentNotificationRef.current.time < 800) return;
-    recentNotificationRef.current = { key, time: now };
+    recentNotificationRef.current = { key, message, time: now };
 
     const id = now + Math.round(Math.random() * 1000);
     setItem({ id, type, message, time: payload.time ?? 2 });
@@ -196,7 +197,6 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
           const isError = !response.ok || record?.ok === false;
 
           if (showMessage && (isError || shouldNotifySuccess)) {
-            lastApiNotificationTimeRef.current = Date.now();
             notifyRef.current({ type: isError ? "error" : "success", message: showMessage });
           }
         }
@@ -214,7 +214,8 @@ export function AppNotificationProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<NotificationContextValue>(() => ({
     notify,
-    apiNotificationTime: () => lastApiNotificationTimeRef.current,
+    wasMessageShown: (message) => recentNotificationRef.current.message === message
+      && Date.now() - recentNotificationRef.current.time < 1500,
     success: (message, time) => notify({ type: "success", message, time }),
     error: (message, time) => notify({ type: "error", message, time }),
     info: (message, time) => notify({ type: "info", message, time }),
@@ -245,7 +246,7 @@ export function useTransientAppMessage(message: string, time = 2) {
   useEffect(() => {
     const normalized = message.trim();
     if (!normalized) return;
-    if (Date.now() - context.apiNotificationTime() < 1500) return;
+    if (context.wasMessageShown(normalized)) return;
     context.notify({ type: ERROR_MESSAGE_PATTERN.test(normalized) ? "error" : "success", message: normalized, time });
-  }, [context.apiNotificationTime, context.notify, message, time]);
+  }, [context.wasMessageShown, context.notify, message, time]);
 }

@@ -1,5 +1,8 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline, IoTicketOutline, IoWalletOutline } from "react-icons/io5";
@@ -154,7 +157,7 @@ function UserOrdersPanel({ totalCount }: { totalCount?: number }) {
           <AppHeading level={2} className="text-base font-bold text-primary-text">سفارش ها</AppHeading>
         </Loading>
         <Loading loading="skeleton-item" isLoading={loading}>
-          <span className="text-sm text-primary-text">
+          <span className="block text-sm text-primary-text">
             برای ثبت دیدگاه و امتیاز، وارد صفحه محصول شوید.
           </span>
         </Loading>
@@ -206,52 +209,54 @@ function UserOrderCard({ order, onSelect, onPreview }: {
   onPreview: (imageUrl: string) => void;
 }) {
   return (
-    <article className="flex w-full max-w-md flex-col gap-3 rounded-md border border-primary-border bg-primary-base p-3 text-right">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-bold text-primary-text">سفارش {order.id.slice(-8)}</span>
-          <span className="text-xs text-secondary-text">{formatPersianDate(order.createdAt)}</span>
+    <article data-card-family="userOrder" className={collectionCardClasses("userOrder", "flex flex-col gap-2 rounded-md border border-primary-border bg-primary-base p-2 text-right")}>
+      <div className="flex h-7 shrink-0 items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="text-xs font-bold text-primary-text">سفارش {order.id.slice(-8)}</span>
+          <span className="text-[10px] leading-none text-secondary-text">{formatPersianDate(order.createdAt)}</span>
         </div>
-        <div>
+        <div className="max-w-1/2 shrink-0 overflow-hidden">
           <OrderStatusTag status={order.fulfillmentStatus} />
         </div>
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-primary-border pt-3">
+      <div data-order-items className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain border-t border-primary-border pt-1">
         {order.items.map((item) => (
-          <div key={item.id} className="flex items-center gap-3">
-            <button
+          <div key={item.id} className="flex shrink-0 items-center gap-2">
+            <CustomActionButton
               type="button"
-              className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
+              className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media"
               onClick={() => {
                 if (item.imageUrl) onPreview(item.imageUrl);
               }}
               disabled={!item.imageUrl}
               aria-label="باز کردن تصویر محصول"
             >
-              {item.imageUrl ? <AppImage src={item.imageUrl} alt={item.title} width={112} height={112} className="h-full w-full object-cover" /> : <span className="text-[10px] text-secondary-text">بدون تصویر</span>}
-            </button>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <AppHeading level={3} className="truncate text-sm font-bold text-primary-text">{item.title}</AppHeading>
-              <span className="text-xs text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
-              <span className="text-xs font-semibold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
+              {item.imageUrl ? <AppImage src={item.imageUrl} alt={item.title} width={112} height={112} className="h-full w-full object-cover" /> : <IoReceiptOutline className="text-base text-primary" aria-hidden="true" />}
+            </CustomActionButton>
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <AppHeading level={3} className="truncate text-xs font-bold text-primary-text">{item.title}</AppHeading>
+              <div className="flex items-center gap-2 text-[10px]">
+                <span className="min-w-0 flex-1 truncate text-secondary-text">تعداد: {item.quantity}{item.selectedColor ? ` | رنگ: ${item.selectedColor}` : ""}</span>
+                <span className="max-w-1/2 truncate font-semibold text-primary">{formatAmount(item.discountPrice || item.price, { fallback: "بدون قیمت" })}</span>
+              </div>
             </div>
             {item.productId ? (
-              <ProductLink productId={item.productId} productTitle={item.title} size="sm">مشاهده</ProductLink>
+              <ProductLink productId={item.productId} productTitle={item.title} size="xs">مشاهده</ProductLink>
             ) : null}
           </div>
         ))}
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-primary-border pt-2">
-        <CustomButton size="sm" variant="neutral" onClick={onSelect}>
+      <div className="flex shrink-0 items-center justify-between gap-2 border-t border-primary-border pt-1">
+        <CustomButton size="xs" variant="neutral" onClick={onSelect}>
           <span>مشاهده مسیر سفارش</span>
         </CustomButton>
-        {order.trackingCode ? <span className="text-xs font-bold text-primary-text">کد پیگیری: {order.trackingCode}</span> : null}
+        {order.trackingCode ? <span className="min-w-0 flex-1 truncate text-end text-[10px] font-bold text-primary-text">کد پیگیری: {order.trackingCode}</span> : null}
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-secondary-text">{order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
-        <span className="text-sm font-bold text-primary">پرداختی: {formatAmount(order.total ?? "0")}</span>
+      <div className="flex shrink-0 items-center justify-between gap-2">
+        <span className="text-[10px] text-secondary-text">{order.shippingMethod === "post" ? "ارسال با پست" : "تحویل حضوری"}</span>
+        <span className="min-w-0 truncate text-end text-xs font-bold text-primary">پرداختی: {formatAmount(order.total ?? "0")}</span>
       </div>
     </article>
   );
@@ -369,7 +374,7 @@ export default function UserPanelPage() {
             </CustomButton>
           ) : null}
         </div>
-        <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} />
+        <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل کاربری" />
         {activeTab === "profile" ? <UserProfilePanel onCompleted={handleProfileCompleted} /> : null}
         {activeTab === "orders" ? <UserOrdersPanel totalCount={structure?.orders} /> : null}
         {activeTab === "discounts" ? <UserDiscountsPanel totalCount={structure?.discounts} /> : null}

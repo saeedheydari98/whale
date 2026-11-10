@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import React from "react";
 import { resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cx, glassSurfaceClasses, GradientDirection, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
@@ -47,9 +49,11 @@ export function CustomSwitch({
 
   return (
     <label className="inline-flex items-center gap-2">
-      <button
+      <CustomActionButton
         type="button"
-        aria-pressed={checked}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
         disabled={isDisabled}
         onClick={() => onChange(!checked)}
         onMouseDown={(event) => event.preventDefault()}
@@ -81,7 +85,7 @@ export function CustomSwitch({
             )}
           />
         )}
-      </button>
+      </CustomActionButton>
       {label && <span>{label}</span>}
       {isLoading && loadingText && <span className="text-sm text-secondary-text">{loadingText}</span>}
     </label>

@@ -1,5 +1,7 @@
 "use client";
 
+import { footerNavigationClasses, footerNavigationIconClasses, footerNavigationIndicatorClasses, isNavigationActive } from "@/app/design-system/variants/navigation.variant";
+
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -38,9 +40,7 @@ export function AppFooter() {
   const [authOpen, setAuthOpen] = useState(false);
   const [language, setLanguage] = useState<"fa" | "en">("fa");
   const visibleNavItems = mobileNavItems;
-  const isActiveLink = (href: string) => href === "/"
-    ? pathname === "/" || pathname.startsWith("/brand/")
-    : pathname === href || pathname.startsWith(`${href}/`);
+  const isActiveLink = (href: string) => isNavigationActive(pathname, href);
 
   useEffect(() => {
     if (!appUserData) return;
@@ -77,17 +77,13 @@ export function AppFooter() {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex h-10 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-md text-[10px] font-bold transition-colors ${
-                  active ? "text-primary" : "text-secondary-text hover:text-primary"
-                }`}
+                className={footerNavigationClasses(active)}
               >
-                <span className={`flex h-6 min-w-8 items-center justify-center rounded-full text-base transition ${
-                  active ? "bg-primary text-primary-contrast shadow-sm ring-1 ring-primary-border" : "text-secondary-text"
-                }`}>
+                <span className={footerNavigationIconClasses(active)}>
                   {item.icon}
                 </span>
                 <span className="max-w-full truncate leading-none">{item.label}</span>
-                <span className={`h-0.5 rounded-full transition-all ${active ? "w-4 bg-primary" : "w-1 bg-transparent"}`} aria-hidden="true" />
+                <span className={footerNavigationIndicatorClasses(active)} aria-hidden="true" />
               </Link>
             );
           })}

@@ -1,5 +1,12 @@
 "use client";
 
+import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
+
+import { ColorQuantityPicker } from "@/app/design-system/components/ui/color-quantity-picker";
+import { updateColorSelection } from "@/lib/cart-color-selection";
+
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IoAddOutline, IoCheckmarkCircleOutline, IoCloseOutline, IoSearchOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -7,13 +14,15 @@ import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state"
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
-import { colorLabel, getStockColorValue, normalizeStockEntries } from "@/app/design-system/components/ui/color-stock-dots";
+import { normalizeStockEntries } from "@/app/design-system/components/ui/color-stock-dots";
 import { AppHeading } from "@/app/design-system/components/ui/text";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { colorSelectionTotal, serializeColorSelection } from "@/lib/cart-color-selection";
 import { formatAmount, readFormattedPriceNumber } from "@/lib/price-format";
-import { fetchJsonDeduped } from "@/lib/fetch-json";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
+import { CustomTabs } from "@/app/design-system/components/ui/tabs";
 
 export type AdminInPersonProduct = {
   id: number;
@@ -75,8 +84,7 @@ type NewCustomerForm = {
   address: string;
 };
 
-const ADMIN_PRODUCTS_URL = "/api/admin/products";
-const ADMIN_USERS_URL = "/api/admin/users";
+const IN_PERSON_OPTIONS_URL = "/api/admin/orders/in-person/options";
 const IN_PERSON_ORDERS_URL = "/api/admin/orders/in-person";
 const IN_PERSON_QUOTE_URL = "/api/admin/orders/in-person/quote";
 
@@ -103,24 +111,6 @@ function customerLabel(customer: AdminInPersonCustomer) {
   const profile = customer.profiles?.[0];
   const name = `${profile?.firstName ?? ""} ${profile?.lastName ?? ""}`.trim();
   return name || customer.name || customer.username || `کاربر ${customer.id}`;
-}
-
-function customerSearchText(customer: AdminInPersonCustomer) {
-  const profile = customer.profiles?.[0];
-  return [
-    customer.id,
-    customer.name,
-    customer.username,
-    customer.email,
-    profile?.firstName,
-    profile?.lastName,
-    profile?.phone,
-    profile?.email,
-  ].filter(Boolean).join(" ").toLowerCase();
-}
-
-function productSearchText(product: AdminInPersonProduct) {
-  return [product.id, product.title, product.description].filter(Boolean).join(" ").toLowerCase();
 }
 
 function unitPrice(product: AdminInPersonProduct) {
@@ -161,12 +151,59 @@ type AdminInPersonOrderFormProps = {
   onClose: () => void;
 };
 
+type InPersonOptionsPage<T> = { items: T[]; total: number; nextOffset: number | null };
+
+function useInPersonOptions<T>(kind: "products" | "customers", search: string, count: number | undefined, enabled = true) {
+  const [capacity, setCapacity] = useState(0);
+  const [query, setQuery] = useState(search.trim());
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  const pendingSearch = query !== search.trim();
+  const empty = !query && count === 0;
+  const result = useInfiniteQuery<InPersonOptionsPage<T>>({
+    queryKey: ["admin", "in-person-options", kind, query, capacity],
+    enabled: enabled && count !== undefined && capacity > 0 && !empty && !pendingSearch,
+    initialPageParam: 0,
+    // Keep the matching count while a resize changes the measured page size.
+    // Otherwise a small search result can oscillate between its count and the viewport capacity.
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[3] === query ? previous : undefined,
+    queryFn: async ({ pageParam, signal }) => {
+      const params = new URLSearchParams({ kind, q: query, limit: String(capacity), offset: String(pageParam) });
+      const response = await fetch(`${IN_PERSON_OPTIONS_URL}?${params}`, { cache: "no-store", signal });
+      const payload = await response.json();
+      if (!response.ok || payload?.ok === false) {
+        throw new Error(payload?.showMessage || "دریافت اطلاعات سفارش حضوری انجام نشد.");
+      }
+      return payload.data as InPersonOptionsPage<T>;
+    },
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const items = useMemo(() => empty || pendingSearch ? [] : result.data?.pages.flatMap((page) => page.items) ?? [],
+    [empty, pendingSearch, result.data]);
+  return {
+    items,
+    capacity,
+    total: pendingSearch ? undefined : result.data?.pages[0]?.total ?? (query ? undefined : count),
+    isLoading: enabled && !empty && (pendingSearch || result.isPending || result.isPlaceholderData),
+    isLoadingMore: result.isFetchingNextPage,
+    hasMore: !pendingSearch && result.hasNextPage && !result.isError,
+    error: result.error?.message ?? "",
+    onCapacityChange: count === undefined ? undefined : setCapacity,
+    onLoadMore: () => {
+      if (!pendingSearch && result.hasNextPage && !result.isFetching) void result.fetchNextPage();
+    },
+  };
+}
+
 export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, onClose }: AdminInPersonOrderFormProps) {
-  const [products, setProducts] = useState<AdminInPersonProduct[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
   const [productQuery, setProductQuery] = useState("");
-  const [customers, setCustomers] = useState<AdminInPersonCustomer[]>([]);
-  const [customersLoading, setCustomersLoading] = useState(true);
   const [customerQuery, setCustomerQuery] = useState("");
   const [customer, setCustomer] = useState<AdminInPersonCustomer | null>(null);
   const [customerMode, setCustomerMode] = useState<"existing" | "new">("existing");
@@ -182,60 +219,10 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
   const [message, setMessage] = useState("");
   useTransientAppMessage(message);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const response = await fetchJsonDeduped<{ ok?: boolean; showMessage?: string; data?: { products?: AdminInPersonProduct[] } }>(ADMIN_PRODUCTS_URL, { force: true });
-        if (cancelled) return;
-        if (response?.ok === false) throw new Error(response.showMessage || "دریافت اطلاعات ناموفق بود.");
-        setProducts(Array.isArray(response?.data?.products) ? response.data.products : []);
-      } catch {
-        if (!cancelled) {
-          setProducts([]);
-          setMessage("دریافت محصولات ممکن نشد.");
-        }
-      } finally {
-        if (!cancelled) setProductsLoading(false);
-      }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const response = await fetch(ADMIN_USERS_URL, { cache: "no-store" });
-        const data = await response.json().catch(() => null) as { ok?: boolean; showMessage?: string; data?: { users?: AdminInPersonCustomer[] } } | null;
-        if (cancelled) return;
-        if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "دریافت کاربران ممکن نشد.");
-        setCustomers(Array.isArray(data?.data?.users) ? data.data.users : []);
-      } catch {
-        if (!cancelled) {
-          setCustomers([]);
-          setMessage("دریافت کاربران ممکن نشد.");
-        }
-      } finally {
-        if (!cancelled) setCustomersLoading(false);
-      }
-    };
-    void load();
-    return () => { cancelled = true; };
-  }, []);
-
-  const filteredProducts = useMemo(() => {
-    const query = productQuery.trim().toLowerCase();
-    if (!query) return products;
-    return products.filter((product) => productSearchText(product).includes(query));
-  }, [productQuery, products]);
-
-  const filteredCustomers = useMemo(() => {
-    const query = customerQuery.trim().toLowerCase();
-    if (!query) return customers;
-    return customers.filter((entry) => customerSearchText(entry).includes(query));
-  }, [customerQuery, customers]);
+  const productOptions = useInPersonOptions<AdminInPersonProduct>("products", productQuery, productsCount);
+  const customerOptions = useInPersonOptions<AdminInPersonCustomer>("customers", customerQuery, usersCount, customerMode === "existing" && !customer);
+  useTransientAppMessage(productOptions.error);
+  useTransientAppMessage(customerOptions.error);
 
   const payloadLines = useMemo(() => buildPayloadLines(lines), [lines]);
   const subtotal = useMemo(
@@ -244,11 +231,14 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
   );
 
   const addProduct = useCallback((product: AdminInPersonProduct) => {
+    if (product.stockQuantity <= 0) return;
     setLines((current) => {
       const existing = current.find((line) => line.product.id === product.id);
       if (!existing) return [...current, createLine(product)];
       if (normalizeStockEntries(product.colorStock).length > 0) return current;
-      return current.map((line) => (line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line));
+      return current.map((line) => (line.product.id === product.id
+        ? { ...line, quantity: Math.min(line.quantity + 1, line.product.stockQuantity) }
+        : line));
     });
   }, []);
 
@@ -267,10 +257,7 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
   const setLineColorCount = useCallback((key: string, color: string, count: number) => {
     setLines((current) => current.map((line) => {
       if (line.key !== key) return line;
-      const colorCounts = { ...line.colorCounts };
-      const next = Math.max(0, Math.round(Number(count) || 0));
-      if (next > 0) colorCounts[color] = next;
-      else delete colorCounts[color];
+      const colorCounts = updateColorSelection(line.colorCounts, color, count, line.product.colorStock, line.product.stockQuantity);
       return { ...line, colorCounts, quantity: colorSelectionTotal(colorCounts) };
     }));
   }, []);
@@ -405,8 +392,23 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
 
   return (
     <div className="flex flex-col gap-4">
-      <section className="flex flex-col gap-2">
-        <AppHeading level={3} className="text-sm font-bold text-primary-text">مشتری</AppHeading>
+      <CustomModalSection
+        title="مشتری"
+        status={customerMode === "new" ? newCustomerReady ? "complete" : "incomplete" : customer ? "complete" : "optional"}
+        meta={customerMode === "new" ? "مشتری جدید" : customer ? customerLabel(customer) : "مشتری انتخاب نشده؛ سفارش بدون حساب"}
+        defaultOpen
+      >
+        <CustomTabs<"existing" | "new">
+          variant="tertiary"
+          ariaLabel="نوع مشتری"
+          items={[{ id: "existing", label: "مشتری موجود" }, { id: "new", label: "مشتری جدید" }]}
+          value={customerMode}
+          onChange={(mode) => {
+            setCustomerMode(mode);
+            if (mode === "existing") setNewCustomer({ firstName: "", lastName: "", phone: "", email: "", address: "" });
+            else { setCustomer(null); setUseWallet(false); setDiscountCode(""); }
+          }}
+        />
         {customerMode === "new" ? (
           <div className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-2">
             <span className="text-xs font-bold text-secondary-text">اطلاعات کاربر جدید (همزمان اکانت ساخته می‌شود)</span>
@@ -433,7 +435,7 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
                 <CustomInput
                   value={newCustomer.phone}
                   label="شماره موبایل"
-                  placeholder="۰۹۱۲۱۲۳۴۵۶۷"
+                  placeholder="شماره موبایل"
                   inputMode="tel"
                   maxLength={11}
                   onChange={(event) => setNewCustomer((current) => ({ ...current, phone: event.target.value }))}
@@ -444,7 +446,7 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
                   value={newCustomer.email}
                   type="email"
                   label="ایمیل"
-                  placeholder="name@example.com"
+                  placeholder="ایمیل"
                   onChange={(event) => setNewCustomer((current) => ({ ...current, email: event.target.value }))}
                 />
               </div>
@@ -485,72 +487,64 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
               icon={<IoSearchOutline aria-hidden="true" />}
               onChange={(event) => setCustomerQuery(event.target.value)}
             />
-            {!customersLoading && filteredCustomers.length === 0 ? (
+            {!customerOptions.isLoading && customerOptions.items.length === 0 ? (
               <CustomEmptyState description="مشتری مطابق جست‌وجو پیدا نشد." size="sm" />
             ) : null}
-            <DynamicLoadingCollection
-              items={filteredCustomers}
-              isLoading={customersLoading && customers.length === 0}
-              totalCount={customersLoading && customerQuery.trim()
-                ? undefined
-                : customersLoading
-                  ? usersCount
-                : customerQuery.trim() ? filteredCustomers.length : usersCount}
-              className="flex max-h-56 w-full flex-col gap-1.5 overflow-y-auto"
-              getKey={(entry) => entry.id}
-              renderItem={(entry) => (
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-between gap-2 rounded-md border border-primary-border bg-primary-card p-2 text-start transition hover:border-primary"
-                  onClick={() => { setCustomer(entry); setCustomerQuery(""); }}
-                >
-                  <span className="flex min-w-0 flex-col gap-0.5">
-                    <span className="truncate text-sm font-bold text-primary-text">{customerLabel(entry)}</span>
-                    <span className="truncate text-xs text-secondary-text">
-                      {entry.profiles?.[0]?.phone || entry.username || entry.email || "بدون شماره"}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs text-secondary-text">کیف پول: {formatAmount(entry.walletBalance)}</span>
-                </button>
-              )}
-              renderSkeleton={() => (
-                <Loading loading="skeleton-structure" isLoading>
-                  <button
+            <div className={`flex max-h-56 w-full flex-col overflow-y-auto ${customerOptions.total !== 0 && (customerOptions.total ?? Infinity) > customerOptions.capacity ? "h-56" : ""}`}>
+              <DynamicLoadingCollection
+                items={customerOptions.items}
+                isLoading={customerOptions.isLoading}
+                totalCount={customerOptions.total}
+                onCapacityChange={customerOptions.onCapacityChange}
+                hasMore={customerOptions.hasMore}
+                isLoadingMore={customerOptions.isLoadingMore}
+                onLoadMore={customerOptions.onLoadMore}
+                lazy
+                className="flex w-full flex-col gap-1.5"
+                getKey={(entry) => entry.id}
+                renderItem={(entry) => (
+                  <CustomActionButton
                     type="button"
-                    disabled
-                    className="flex w-full items-center justify-between gap-2 rounded-md border border-primary-border bg-primary-card p-2 text-start"
+                    className="flex w-full items-center justify-between gap-2 rounded-md border border-primary-border bg-primary-card p-2 text-start transition hover:border-primary"
+                    onClick={() => { setCustomer(entry); setCustomerQuery(""); }}
                   >
                     <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-sm font-bold text-primary-text">{customerLabel(loadingCustomer)}</span>
-                      <span className="truncate text-xs text-secondary-text">{loadingCustomer.profiles[0].phone}</span>
+                      <span className="truncate text-sm font-bold text-primary-text">{customerLabel(entry)}</span>
+                      <span className="truncate text-xs text-secondary-text">
+                        {entry.profiles?.[0]?.phone || entry.username || entry.email || "بدون شماره"}
+                      </span>
                     </span>
-                    <span className="shrink-0 text-xs text-secondary-text">کیف پول: {formatAmount(loadingCustomer.walletBalance)}</span>
-                  </button>
-                </Loading>
-              )}
-            />
+                    <span className="shrink-0 text-xs text-secondary-text">کیف پول: {formatAmount(entry.walletBalance)}</span>
+                  </CustomActionButton>
+                )}
+                renderSkeleton={() => (
+                  <Loading loading="skeleton-structure" isLoading>
+                    <CustomActionButton
+                      type="button"
+                      disabled
+                      className="flex w-full items-center justify-between gap-2 rounded-md border border-primary-border bg-primary-card p-2 text-start"
+                    >
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate text-sm font-bold text-primary-text">{customerLabel(loadingCustomer)}</span>
+                        <span className="truncate text-xs text-secondary-text">{loadingCustomer.profiles[0].phone}</span>
+                      </span>
+                      <span className="shrink-0 text-xs text-secondary-text">کیف پول: {formatAmount(loadingCustomer.walletBalance)}</span>
+                    </CustomActionButton>
+                  </Loading>
+                )}
+              />
+            </div>
           </>
         )}
-        <div className="flex flex-wrap items-center gap-2">
-          <CustomButton
-            size="sm"
-            variant={customerMode === "existing" ? "primary" : "neutral"}
-            onClick={() => { setCustomerMode("existing"); setNewCustomer({ firstName: "", lastName: "", phone: "", email: "", address: "" }); }}
-          >
-            <span>مشتری موجود</span>
-          </CustomButton>
-          <CustomButton
-            size="sm"
-            variant={customerMode === "new" ? "primary" : "neutral"}
-            onClick={() => { setCustomerMode("new"); setCustomer(null); setUseWallet(false); setDiscountCode(""); }}
-          >
-            <span>کاربر جدید</span>
-          </CustomButton>
-        </div>
-      </section>
 
-      <section className="flex flex-col gap-2">
-        <AppHeading level={3} className="text-sm font-bold text-primary-text">محصولات</AppHeading>
+      </CustomModalSection>
+
+      <CustomModalSection
+        title="محصولات"
+        status={lines.length > 0 ? "complete" : "incomplete"}
+        meta={lines.length > 0 ? `${lines.length.toLocaleString("fa-IR")} محصول انتخاب شده` : "محصولی انتخاب نشده"}
+        defaultOpen
+      >
         <CustomInput
           type="search"
           name="in-person-product-search"
@@ -563,68 +557,75 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
           icon={<IoSearchOutline aria-hidden="true" />}
           onChange={(event) => setProductQuery(event.target.value)}
         />
-        {!productsLoading && filteredProducts.length === 0 ? (
+        {!productOptions.isLoading && productOptions.items.length === 0 ? (
           <CustomEmptyState description="محصولی مطابق جست‌وجو پیدا نشد." size="sm" />
         ) : null}
-        <DynamicLoadingCollection
-          items={filteredProducts}
-          isLoading={productsLoading && products.length === 0}
-          totalCount={productsLoading && productQuery.trim()
-            ? undefined
-            : productsLoading
-              ? productsCount
-            : productQuery.trim() ? filteredProducts.length : productsCount}
-          className="flex max-h-64 w-full flex-col gap-1.5 overflow-y-auto"
-          getKey={(product) => product.id}
-          renderItem={(product) => (
-            <div className="flex w-full items-center gap-2 rounded-md border border-primary-border bg-primary-card p-2">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
-                {product.imageUrl ? (
-                  <AppImage src={product.imageUrl} alt={product.title} width={80} height={80} className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-[10px] text-secondary-text">بدون تصویر</span>
-                )}
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-sm font-bold text-primary-text">{product.title}</span>
-                <span className="truncate text-xs text-secondary-text">
-                  {formatAmount(product.discountPrice || product.price)} · موجودی: {product.stockQuantity}
-                </span>
-              </span>
-              <CustomButton
-                size="sm"
-                variant="neutral"
-                icon={<IoAddOutline />}
-                disabled={product.stockQuantity <= 0}
-                onClick={() => addProduct(product)}
-              >
-                <span>افزودن</span>
-              </CustomButton>
-            </div>
-          )}
-          renderSkeleton={() => (
-            <Loading loading="skeleton-structure" isLoading>
+        <div className={`flex max-h-64 w-full flex-col overflow-y-auto ${productOptions.total !== 0 && (productOptions.total ?? Infinity) > productOptions.capacity ? "h-64" : ""}`}>
+          <DynamicLoadingCollection
+            items={productOptions.items}
+            isLoading={productOptions.isLoading}
+            totalCount={productOptions.total}
+            onCapacityChange={productOptions.onCapacityChange}
+            hasMore={productOptions.hasMore}
+            isLoadingMore={productOptions.isLoadingMore}
+            onLoadMore={productOptions.onLoadMore}
+            lazy
+            className="flex w-full flex-col gap-1.5"
+            getKey={(product) => product.id}
+            renderItem={(product) => (
               <div className="flex w-full items-center gap-2 rounded-md border border-primary-border bg-primary-card p-2">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
-                  <span className="text-[10px] text-secondary-text">بدون تصویر</span>
+                  {product.imageUrl ? (
+                    <AppImage src={product.imageUrl} alt={product.title} width={80} height={80} className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] text-secondary-text">بدون تصویر</span>
+                  )}
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-sm font-bold text-primary-text">{loadingProduct.title}</span>
+                  <span className="truncate text-sm font-bold text-primary-text">{product.title}</span>
                   <span className="truncate text-xs text-secondary-text">
-                    {formatAmount(loadingProduct.price)} · موجودی: {loadingProduct.stockQuantity}
+                    {formatAmount(product.discountPrice || product.price)} · موجودی: {product.stockQuantity}
                   </span>
                 </span>
-                <CustomButton size="sm" variant="neutral" icon={<IoAddOutline />} disabled>
+                <CustomButton
+                  size="sm"
+                  variant="neutral"
+                  icon={<IoAddOutline />}
+                  disabled={product.stockQuantity <= 0}
+                  onClick={() => addProduct(product)}
+                >
                   <span>افزودن</span>
                 </CustomButton>
               </div>
-            </Loading>
-          )}
-        />
-      </section>
+            )}
+            renderSkeleton={() => (
+              <Loading loading="skeleton-structure" isLoading>
+                <div className="flex w-full items-center gap-2 rounded-md border border-primary-border bg-primary-card p-2">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
+                    <span className="text-[10px] text-secondary-text">بدون تصویر</span>
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="truncate text-sm font-bold text-primary-text">{loadingProduct.title}</span>
+                    <span className="truncate text-xs text-secondary-text">
+                      {formatAmount(loadingProduct.price)} · موجودی: {loadingProduct.stockQuantity}
+                    </span>
+                  </span>
+                  <CustomButton size="sm" variant="neutral" icon={<IoAddOutline />} disabled>
+                    <span>افزودن</span>
+                  </CustomButton>
+                </div>
+              </Loading>
+            )}
+          />
+        </div>
+      </CustomModalSection>
 
-      <section className="flex flex-col gap-2">
-        <AppHeading level={3} className="text-sm font-bold text-primary-text">سبد خرید</AppHeading>
+      <CustomModalSection
+        title="سبد خرید"
+        status={payloadLines.length > 0 && !incompleteColorLine ? "complete" : "incomplete"}
+        meta={incompleteColorLine ? "تعداد رنگ‌ها را تکمیل کنید" : payloadLines.length > 0 ? `${lines.reduce((sum, line) => sum + line.quantity, 0).toLocaleString("fa-IR")} عدد کالا` : "سبد خرید خالی است"}
+        defaultOpen
+      >
         {lines.length === 0 ? (
           <CustomEmptyState description="هنوز محصولی به سبد خرید اضافه نشده است." size="sm" />
         ) : (
@@ -632,8 +633,8 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
             {lines.map((line) => {
               const colorEntries = normalizeStockEntries(line.product.colorStock);
               return (
-                <div key={line.key} className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-2">
-                  <div className="flex items-start justify-between gap-2">
+                <div key={line.key} data-card-family="inPersonLine" className={collectionCardClasses("inPersonLine", "flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-2")}>
+                  <div className="flex shrink-0 items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <AppHeading level={4} className="truncate text-sm font-bold text-primary-text">{line.product.title}</AppHeading>
                       <span className="truncate text-xs text-secondary-text">
@@ -646,31 +647,9 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
                   </div>
 
                   {colorEntries.length > 0 ? (
-                    <div className="flex flex-col gap-1.5">
-                      {colorEntries.map((entry) => (
-                        <div key={entry.color} className="flex items-center gap-2">
-                          <span
-                            className="h-6 w-6 shrink-0 rounded-full border border-primary-border"
-                            style={{ backgroundColor: getStockColorValue(entry.color) }}
-                            aria-hidden="true"
-                          />
-                          <span className="w-16 shrink-0 truncate text-xs text-secondary-text">{colorLabel(entry.color)}</span>
-                          <span className="w-14 shrink-0 truncate text-[11px] text-secondary-text">موجودی: {entry.count}</span>
-                          <div className="w-20 shrink-0">
-                            <CustomInput
-                              type="number"
-                              min={0}
-                              max={entry.count}
-                              step={1}
-                              size="sm"
-                              fullWidth={false}
-                              value={line.colorCounts[entry.color] ?? 0}
-                              aria-label={`تعداد رنگ ${colorLabel(entry.color)} برای ${line.product.title}`}
-                              onChange={(event) => setLineColorCount(line.key, entry.color, Number(event.target.value))}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                      <ColorQuantityPicker colorStock={line.product.colorStock} selection={line.colorCounts} stockQuantity={line.product.stockQuantity}
+                        onChange={(color, count) => setLineColorCount(line.key, color, count)} />
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
@@ -696,7 +675,7 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between gap-2 border-t border-primary-border pt-2">
+                  <div className="flex shrink-0 items-center justify-between gap-2 border-t border-primary-border pt-2">
                     <span className="text-xs text-secondary-text">تعداد کل: {line.quantity}</span>
                     <span className="text-sm font-bold text-primary">{formatAmount(unitPrice(line.product) * line.quantity)}</span>
                   </div>
@@ -705,10 +684,14 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
             })}
           </div>
         )}
-      </section>
+      </CustomModalSection>
 
-      <section className="flex flex-col gap-2 border-t border-primary-border pt-3">
-        <AppHeading level={3} className="text-sm font-bold text-primary-text">پرداخت و تخفیف</AppHeading>
+      <CustomModalSection
+        title="پرداخت و تخفیف"
+        status={activeQuote && !quoteDataLoading && !incompleteColorLine ? "complete" : "incomplete"}
+        meta={discountCode.trim() ? `کد تخفیف: ${discountCode.trim()}` : "بدون کد تخفیف"}
+        defaultOpen
+      >
         <div className="flex flex-wrap items-end gap-2">
           <CustomInput
             value={discountCode}
@@ -772,21 +755,22 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
           </span>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          <CustomButton
-            variant="primary"
-            icon={<IoCheckmarkCircleOutline />}
-            isLoading={submitting}
-            disabled={payloadLines.length === 0 || Boolean(incompleteColorLine)}
-            onClick={() => void submitOrder()}
-          >
-            <span>ثبت سفارش حضوری</span>
-          </CustomButton>
-          <CustomButton variant="neutral" onClick={onClose}>
-            <span>انصراف</span>
-          </CustomButton>
-        </div>
-      </section>
+      </CustomModalSection>
+
+      <div className="flex flex-wrap gap-2">
+        <CustomButton
+          variant="primary"
+          icon={<IoCheckmarkCircleOutline />}
+          isLoading={submitting}
+          disabled={payloadLines.length === 0 || Boolean(incompleteColorLine)}
+          onClick={() => void submitOrder()}
+        >
+          <span>ثبت سفارش حضوری</span>
+        </CustomButton>
+        <CustomButton variant="neutral" onClick={onClose}>
+          <span>انصراف</span>
+        </CustomButton>
+      </div>
     </div>
   );
 }

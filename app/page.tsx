@@ -1,5 +1,7 @@
 "use client";
 
+import { compareStorefrontEntries } from "@/lib/storefront-order";
+
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -172,7 +174,7 @@ export default function Home() {
       })
       .filter((section) => section.itemCount > 0);
 
-    return [...bannerSections, ...brandSections].sort((a, b) => a.sortOrder - b.sortOrder);
+    return [...bannerSections, ...brandSections].sort(compareStorefrontEntries);
   }, [banners, brandGroups, brands]);
   const firstName = appUserData?.user?.profile?.firstName?.trim()
     || appUserData?.user?.name?.trim().split(/\s+/)[0]

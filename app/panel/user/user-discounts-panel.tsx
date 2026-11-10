@@ -1,5 +1,7 @@
 "use client";
 
+import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
+
 import { useEffect, useState } from "react";
 import { IoCopyOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -94,11 +96,11 @@ export function UserDiscountsPanel({ totalCount }: { totalCount?: number }) {
 
 function DiscountCodeCard({ code, onCopy }: { code: WalletCode; onCopy: () => void }) {
   return (
-    <div className="flex h-33 w-56 shrink-0 flex-col gap-1 overflow-hidden rounded-md border border-primary-border bg-primary-base p-3">
+    <div data-card-family="discount" className={collectionCardClasses("discount", "flex flex-col gap-1 overflow-hidden rounded-md border border-primary-border bg-primary-base p-2")}>
       <AppHeading level={3} className="truncate text-sm font-bold text-primary-text">{code.name}</AppHeading>
       <span className="flex min-w-0 items-center justify-between gap-2">
         <span dir="ltr" translate="no" className="min-w-0 truncate text-lg font-bold tracking-[0.3em] text-primary">{code.code}</span>
-        <CustomButton size="sm" variant="neutral" icon={<IoCopyOutline aria-hidden="true" />} onClick={onCopy}>
+        <CustomButton size="xs" variant="neutral" icon={<IoCopyOutline aria-hidden="true" />} onClick={onCopy}>
           <span>کپی</span>
         </CustomButton>
       </span>

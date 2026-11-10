@@ -1,6 +1,8 @@
 "use client";
 
-import { IoCloudUploadOutline, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
+import { CustomFileUpload } from "@/app/design-system/components/ui/file-upload";
+
+import { IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
@@ -9,7 +11,7 @@ import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import CategoryOption from "@/app/design-system/components/ui/category-option";
 import { WEBP_IMAGE_ACCEPT } from "@/lib/image-upload";
 import type { BrandForm, CatalogLinkGroupForm, CategoryForm } from "../types";
-import { AdminModalSection } from "./admin-modal-section";
+import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
 
 type CategoryBrandModalsProps = {
   categoryGroups: CatalogLinkGroupForm[];
@@ -188,7 +190,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
     <CustomModal open={open} onClose={onClose} title={title} rounded="lg" shadow="lg" closeOnBackdrop={false}>
       {item ? (
         <div className="flex max-h-[80vh] flex-col gap-3 overflow-y-auto">
-          <AdminModalSection
+          <CustomModalSection
             title="اطلاعات"
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(requiredErrorKey) && !hasTitle}
@@ -202,9 +204,9 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
               onChange={(event) => onPatch({ title: event.target.value } as Partial<TItem>)}
             />
             <CustomInput value={item.slug} placeholder="نامک" onChange={(event) => onPatch({ slug: event.target.value } as Partial<TItem>)} />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="تصویر"
             status={hasImage ? "complete" : "incomplete"}
             meta="تصویر WebP و پیش‌نمایش"
@@ -212,15 +214,11 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
           >
             <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
             <CustomInput value={item.imageUrl} placeholder={imagePlaceholder} onChange={(event) => onPatch({ imageUrl: event.target.value } as Partial<TItem>)} />
-            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-primary-border bg-primary-card py-3 text-sm font-semibold text-secondary-text transition hover:bg-primary-bg">
-              <IoCloudUploadOutline className="text-xl" aria-hidden="true" />
-              <span className="text-sm font-semibold">{uploadLabel}</span>
-              <input type="file" accept={WEBP_IMAGE_ACCEPT} className="hidden" onChange={(event) => onImageUpload(event.target.files?.[0] ?? null)} />
-            </label>
+            <CustomFileUpload label={uploadLabel} accept={WEBP_IMAGE_ACCEPT} onSelectFiles={(files) => onImageUpload(files?.[0] ?? null)} />
             <CategoryOption label={item.title || previewFallback} imageUrl={item.imageUrl} onImageClick={() => onPreview(item.imageUrl)} />
-          </AdminModalSection>
+          </CustomModalSection>
 
-          <AdminModalSection
+          <CustomModalSection
             title="جایگاه و وضعیت"
             status={hasGroup ? "complete" : "optional"}
             meta={item.active ? "فعال" : "مخفی"}
@@ -235,7 +233,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
             </CustomSelect>
             <CustomInput type="number" value={item.sortOrder} placeholder={sortPlaceholder} onChange={(event) => onPatch({ sortOrder: Number(event.target.value) } as Partial<TItem>)} />
             <CustomSwitch checked={item.active} onChange={(active) => onPatch({ active } as Partial<TItem>)} label={item.active ? "فعال" : "مخفی"} size="sm" />
-          </AdminModalSection>
+          </CustomModalSection>
 
           <div className="flex flex-col gap-2 sm:flex-row">
             <CustomButton fullWidth icon={<IoSaveOutline />} onClick={onSubmit}>

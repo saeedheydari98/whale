@@ -39,6 +39,17 @@ export function colorSelectionTotal(selection: CartColorSelection) {
   return Object.values(selection).reduce((sum, count) => sum + Math.max(0, Math.round(Number(count) || 0)), 0);
 }
 
+export function updateColorSelection(selection: CartColorSelection, color: string, count: number, colorStock: unknown, stockQuantity: number) {
+  const stock = normalizeCartColorStock(colorStock);
+  const otherColors = colorSelectionTotal(selection) - (selection[color] ?? 0);
+  const limit = Object.keys(stock).length > 0 ? stock[color] ?? 0 : stockQuantity;
+  const nextCount = Math.max(0, Math.min(Math.round(Number(count) || 0), limit, stockQuantity - otherColors));
+  const next = { ...selection };
+  if (nextCount > 0) next[color] = nextCount;
+  else delete next[color];
+  return next;
+}
+
 export function serializeColorSelection(selection: CartColorSelection) {
   const normalized = normalizeColorSelection(selection);
   const entries = Object.entries(normalized);

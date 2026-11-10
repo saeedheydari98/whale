@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getAuthUser } from "@/lib/api/auth";
+import { parseJsonBody } from "@/lib/api/validation";
+import { cartSnapshotSchema } from "@/lib/api/schemas";
 import { cartItemDto, getOrCreateActiveCart } from "@/lib/api/catalog-service";
 import { CheckoutError, completeCheckout, normalizeShippingMethod } from "@/lib/api/checkout-service";
 import {
@@ -141,8 +143,7 @@ async function findLegacyProfile(request: Request, bodyProfile?: ProfilePayload)
   });
 }
 
-async function upsertLegacyProfile(request: Request, profile: ReturnType<typeof normalizeProfile>) {
-  const authUser = await getAuthUser(request);
+async function upsertLegacyProfile(authUser: Awaited<ReturnType<typeof getAuthUser>>, profile: ReturnType<typeof normalizeProfile>) {
   const existing = authUser
     ? await prisma.customerProfile.findFirst({ where: { userId: authUser.id } })
     : await prisma.customerProfile.findFirst({
@@ -158,6 +159,9 @@ async function upsertLegacyProfile(request: Request, profile: ReturnType<typeof 
     address: profile.address,
     isAdminUnlocked: profile.isAdminUnlocked,
   };
+  if (existing && Object.entries(profileData).every(([key, value]) => existing[key as keyof typeof existing] === value)) {
+    return existing;
+  }
 
   return existing
     ? prisma.customerProfile.update({
@@ -212,35 +216,37 @@ export async function POST(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
 
-  const body = await request.json().catch(() => ({}));
+  const parsed = await parseJsonBody(request, cartSnapshotSchema);
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
   const profile = normalizeProfile(body.profile ?? {});
-  const items: ReturnType<typeof normalizeCartItem>[] = Array.isArray(body.items)
-    ? body.items.map(normalizeCartItem)
-    : [];
-  const authUser = await getAuthUser(request);
+  // Merge before checking stock so duplicate product rows share the same limit.
+  const items = mergeCartItems(body.items.map(normalizeCartItem));
   const hasCompleteProfile = isProfileComplete(profile);
-  if (!authUser && !hasCompleteProfile) return apiFail("برای ادامه باید پروفایل را کامل کنید.", 400);
 
   try {
-    const cart = hasCompleteProfile
-      ? await upsertLegacyProfile(request, profile).then((savedProfile) => activeCartForProfile(savedProfile.id))
-      : await getOrCreateActiveCart(authUser!.id);
     const requestedProductIds = items
       .map((item) => item.productId)
       .filter((id): id is number => typeof id === "number");
-    const products: CartProductSnapshot[] = requestedProductIds.length
-      ? await prisma.product.findMany({
+    const [authUser, products] = await Promise.all([
+      getAuthUser(request),
+      requestedProductIds.length ? prisma.product.findMany({
           where: { id: { in: Array.from(new Set(requestedProductIds)) } },
           select: { id: true, stockQuantity: true, colorStock: true, isAvailable: true, active: true, isActive: true },
         })
-      : [];
+      : Promise.resolve<CartProductSnapshot[]>([]),
+    ]);
+    if (!authUser && !hasCompleteProfile) return apiFail("برای ادامه باید پروفایل را کامل کنید.", 400);
     const productsById = new Map(products.map((product) => [product.id, product]));
     let rejectedItemTitle = "";
     const safeItems = mergeCartItems(
       items
         .map((item) => {
           const product = item.productId ? productsById.get(item.productId) : null;
-          if (!product) return { ...item, productId: null };
+          if (!product) {
+            if (item.productId) { rejectedItemTitle ||= item.title; return null; }
+            return item;
+          }
 
           const colorStock = normalizeColorStock(product.colorStock);
           const hasColorStock = Object.keys(colorStock).length > 0;
@@ -257,6 +263,11 @@ export async function POST(request: Request) {
             };
           }
 
+          // A cart may contain a draft with no color; checkout validates the final selection.
+          if (colorSelectionTotal(item.selectedColors) === 0) {
+            return { ...item, selectedColors: {}, selectedColor: null, quantity: Math.min(item.quantity, productStock) };
+          }
+
           const selectedColors = Object.fromEntries(
             Object.entries(item.selectedColors)
               .map(([color, count]) => [
@@ -266,7 +277,7 @@ export async function POST(request: Request) {
               .filter(([, count]) => count > 0)
           );
           const selectedTotal = colorSelectionTotal(selectedColors);
-          if (selectedTotal <= 0) {
+          if (selectedTotal <= 0 || selectedTotal > productStock) {
             rejectedItemTitle ||= item.title;
             return null;
           }
@@ -285,11 +296,14 @@ export async function POST(request: Request) {
       return apiFail(`موجودی ${rejectedItemTitle} تغییر کرده است؛ لطفاً دوباره انتخاب کنید.`, 409);
     }
 
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const cart = hasCompleteProfile
+      ? await upsertLegacyProfile(authUser, profile).then((savedProfile) => activeCartForProfile(savedProfile.id))
+      : await getOrCreateActiveCart(authUser!.id);
+    const savedItems = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-      for (const item of safeItems) {
-        await tx.cartItem.create({
-          data: {
+      if (safeItems.length > 0) {
+        await tx.cartItem.createMany({
+          data: safeItems.map((item) => ({
             cartId: cart.id,
             productId: item.productId,
             title: item.title,
@@ -301,15 +315,15 @@ export async function POST(request: Request) {
             imageUrl: item.imageUrl,
             selectedColor: item.selectedColor,
             quantity: item.quantity,
-          },
+          })),
         });
       }
+      return tx.cartItem.findMany({ where: { cartId: cart.id }, orderBy: { createdAt: "asc" } });
     });
 
-    const savedCart = await activeCartForProfile(cart.profileId);
     return apiOk({
-      user: { profile: savedCart.profile },
-      cart: { items: savedCart.items.map(cartItemDto) },
+      user: { profile: cart.profile },
+      cart: { items: savedItems.map(cartItemDto) },
     }, {
       message: "CART_UPDATED",
       showMessage: "سبد خرید با موفقیت به‌روز شد.",

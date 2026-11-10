@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from "react";
 import { IoBagHandleOutline } from "react-icons/io5";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
@@ -114,7 +116,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false, image
         {...galleryDrag.dragHandlers}
       >
         {activeImage && !isLoading ? (
-          <button
+          <CustomActionButton
             type="button"
             className={`flex h-full w-full will-change-transform ${shouldAnimateRail ? "transition-transform duration-300 ease-out" : ""}`}
             style={{
@@ -139,7 +141,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false, image
                 className="h-full w-full min-w-full flex-none object-cover"
               />
             ))}
-          </button>
+          </CustomActionButton>
         ) : (
           <IoBagHandleOutline className="text-6xl text-primary" aria-hidden="true" />
         )}
@@ -147,7 +149,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false, image
       {showDots ? (
         <div className="flex justify-center gap-2">
           {Array.from({ length: Math.max(images.length, knownImageCount) }, (_, index) => (
-            <button
+            <CustomActionButton
               key={`gallery-dot-${index}`}
               type="button"
               data-drag-ignore="true"
@@ -161,7 +163,7 @@ export function ProductImageGallery({ imageUrls, title, isLoading = false, image
               aria-label={`نمایش تصویر محصول ${index + 1}`}
             >
               <span className="sr-only">{index + 1}</span>
-            </button>
+            </CustomActionButton>
           ))}
         </div>
       ) : null}

@@ -15,6 +15,7 @@ import {
 } from "@/lib/auth-client";
 import {
   colorSelectionTotal,
+  updateColorSelection,
   normalizeCartColorStock,
   normalizeColorSelection,
   parseSerializedColorSelection,
@@ -90,6 +91,12 @@ type CartApiData = {
     profile?: unknown;
   };
 };
+
+class CartApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
 
 export type CheckoutOptions = {
   shippingMethod: "pickup" | "post";
@@ -347,7 +354,7 @@ async function saveCartToApi(items: CartItemRecord[], profile?: UserProfile | nu
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.showMessage || "ذخیره سبد خرید ناموفق بود.");
+    throw new CartApiError(data?.showMessage || "ذخیره سبد خرید ناموفق بود.", res.status);
   }
   const apiItems = readCartItemsFromApiData(data);
   return Array.isArray(apiItems)
@@ -366,7 +373,7 @@ async function clearCartFromApi(profile?: UserProfile | null, options?: { silent
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || data?.ok === false) {
-    throw new Error(data?.showMessage || "پاک کردن سبد خرید ناموفق بود.");
+    throw new CartApiError(data?.showMessage || "پاک کردن سبد خرید ناموفق بود.", res.status);
   }
   return [];
 }
@@ -407,40 +414,44 @@ export async function getCart(user: AuthClientUser | null | undefined = readCach
 export async function persistCart(
   items: CartItemRecord[],
   profile = readUserProfile(),
-  options?: { notify?: boolean }
+  options?: { notify?: boolean; throwOnError?: boolean }
 ) {
   const user = readCachedAuthUser();
+  const previousItems = readLocalCart(user);
+  const wasPending = pendingLocalCartKeys.has(getCartStorageKey(user));
   const mutationVersion = beginCartMutation(user);
   const nextItems = dedupeCartItems(items);
   writeLocalCart(nextItems, user);
   const silent = options?.notify === false;
-
-  if (nextItems.length === 0) {
-    if (canUseApiCart(profile, user)) {
-      const cleared = await enqueueCartApiMutation(() => clearCartFromApi(profile, { silent }))
-        .then(() => true, () => false);
-      if (cleared && mutationVersion === cartMutationVersion) markCartSynchronized(user);
-    }
-    return nextItems;
-  }
 
   if (!canUseApiCart(profile, user)) {
     return nextItems;
   }
 
   try {
-    const savedItems = await enqueueCartApiMutation(() => saveCartToApi(nextItems, profile, { silent }));
+    const savedItems = await enqueueCartApiMutation(() => nextItems.length === 0
+      ? clearCartFromApi(profile, { silent })
+      : saveCartToApi(nextItems, profile, { silent }));
     if (mutationVersion !== cartMutationVersion) return readLocalCart(user);
     markCartSynchronized(user);
     writeLocalCart(savedItems, user);
     return savedItems;
-  } catch {
-    console.warn("Cart API save failed; using local cart.");
-    return nextItems;
+  } catch (error) {
+    const failure = error instanceof CartApiError ? error : new Error("ذخیره سبد خرید انجام نشد؛ لطفاً دوباره تلاش کنید.");
+    // A rejected mutation must not leave an item that the server refused in the cart.
+    // Keep network failures pending for the existing local/offline recovery flow.
+    if (error instanceof CartApiError && error.status >= 400 && error.status < 500
+      && mutationVersion === cartMutationVersion) {
+      writeLocalCart(previousItems, user);
+      if (!wasPending) markCartSynchronized(user);
+    }
+    if (!silent) notifyCartError(failure.message);
+    if (options?.throwOnError) throw failure;
+    return readLocalCart(user);
   }
 }
 
-export async function addProductToCart(product: ProductRecord, quantity = 1, selectedColor = "") {
+export async function addProductToCart(product: ProductRecord, quantity = 1, selectedColor: string | CartColorSelection = "") {
   const stockLimit = getStockLimit(product);
   if (product.isAvailable === false || stockLimit <= 0) {
     const message = "محصول ناموجود است.";
@@ -452,25 +463,36 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
   const key = String(productId ?? `${product.title}-${product.description}-${product.price}`);
   const colorStock = normalizeCartColorStock(product.colorStock);
   const hasColorStock = Object.keys(colorStock).length > 0;
-  const cartColor = selectedColor.trim();
-  const requestedQuantity = Math.max(1, Math.round(Number(quantity) || 1));
+  const cartColor = typeof selectedColor === "string"
+    ? selectedColor.trim() || Object.entries(colorStock).find(([, count]) => count > 0)?.[0] || ""
+    : "";
+  const requestedColors = typeof selectedColor === "string"
+    ? cartColor ? { [cartColor]: Math.max(1, Math.round(Number(quantity) || 1)) } : {}
+    : normalizeColorSelection(selectedColor);
+  const requestedQuantity = colorSelectionTotal(requestedColors) || Math.max(1, Math.round(Number(quantity) || 1));
+
+  if (hasColorStock && colorSelectionTotal(requestedColors) <= 0) {
+    const message = "هیچ رنگ موجودی برای این محصول وجود ندارد.";
+    notifyCartError(message);
+    throw new Error(message);
+  }
 
   const cartUser = readCachedAuthUser() ?? await fetchCurrentUser({ allowStaleOnError: true });
   claimGuestCartForUser(cartUser);
   const currentCart = readLocalCart(cartUser);
   const existing = currentCart.find((item) => getItemKey(item) === key);
   const existingSelection = existing ? getCartItemColorSelection(existing) : {};
-  const nextSelection = hasColorStock && !cartColor ? {} : { ...existingSelection };
+  const nextSelection = { ...existingSelection };
 
-  if (hasColorStock && cartColor) {
-    const nextColorQuantity = (nextSelection[cartColor] ?? 0) + requestedQuantity;
-    const colorLimit = colorStock[cartColor] ?? 0;
+  for (const [color, count] of hasColorStock ? Object.entries(requestedColors) : []) {
+    const nextColorQuantity = (nextSelection[color] ?? 0) + count;
+    const colorLimit = colorStock[color] ?? 0;
     if (nextColorQuantity > colorLimit) {
-      const message = `موجودی رنگ ${cartColor} کافی نیست.`;
+      const message = `موجودی رنگ ${color} کافی نیست.`;
       notifyCartError(message);
       throw new Error(message);
     }
-    nextSelection[cartColor] = nextColorQuantity;
+    nextSelection[color] = nextColorQuantity;
   }
 
   const nextQuantity = hasColorStock
@@ -483,7 +505,7 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
     throw new Error(message);
   }
 
-  if (nextQuantity > stockLimit) {
+  if (nextQuantity > stockLimit || (!hasColorStock && (existing?.quantity ?? 0) + requestedQuantity > stockLimit)) {
     const message = "موجودی محصول کافی نیست.";
     notifyCartError(message);
     throw new Error(message);
@@ -517,10 +539,15 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
         ),
       ];
 
-  const apiNotifies = canUseApiCart(readUserProfile(), cartUser);
-  const savedItems = await persistCart(nextCart);
-  if (!apiNotifies) notifyCartSuccess(`${product.title} به سبد خرید اضافه شد.`);
-  return savedItems;
+  try {
+    // One explicit result message for both guest and account carts, including network errors.
+    const savedItems = await persistCart(nextCart, readUserProfile(), { notify: false, throwOnError: true });
+    notifyCartSuccess(`${product.title} به سبد خرید اضافه شد.`);
+    return savedItems;
+  } catch (error) {
+    notifyCartError(error instanceof Error ? error.message : "افزودن به سبد خرید ناموفق بود.");
+    throw error;
+  }
 }
 
 export async function updateCartQuantity(target: CartItemRecord, quantity: number, options?: { notify?: boolean }) {
@@ -562,19 +589,9 @@ export async function updateCartColorQuantity(
     const colorStock = Object.keys(targetColorStock).length > 0
       ? targetColorStock
       : normalizeCartColorStock(item.colorStock);
-    const stockLimit = getStockLimit(item);
+    const stockLimit = getStockLimit(target);
     const currentSelection = getCartItemColorSelection(item);
-    const nextSelection = { ...currentSelection };
-    const totalWithoutColor = colorSelectionTotal(currentSelection) - (currentSelection[colorName] ?? 0);
-    const colorLimit = colorStock[colorName] ?? stockLimit;
-    const totalLimit = Number.isFinite(stockLimit) ? Math.max(0, stockLimit - totalWithoutColor) : Number.POSITIVE_INFINITY;
-    const nextColorQuantity = Math.max(0, Math.min(Math.round(Number(quantity) || 0), colorLimit, totalLimit));
-
-    if (nextColorQuantity > 0) {
-      nextSelection[colorName] = nextColorQuantity;
-    } else {
-      delete nextSelection[colorName];
-    }
+    const nextSelection = updateColorSelection(currentSelection, colorName, quantity, colorStock, stockLimit);
 
     const nextQuantity = colorSelectionTotal(nextSelection);
     if (nextQuantity <= 0) return [];

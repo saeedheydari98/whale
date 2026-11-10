@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+@layer base {
+  /* Shrink text within flex layouts; explicit utility sizes still take precedence. */
+  :where(div, span, article, section, a, button) { min-width: 0; }
+
+  /* Shared policy for terminal text. Rich layouts, controls, and explicit multiline
+     utilities retain their own flow; no per-page measuring or DOM rewriting. */
+  :where(div, span, a, button, h1, h2, h3, h4, h5, h6):not(:has(> *)):not(:empty):not([data-text-wrap]):not(pre *):not(code *):not(.sr-only) {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :where(span):not(:has(> *)):not(:empty):not(.sr-only) { display: inline-block; }
+}
+
 /* Headings take size/weight from explicit text-* / font-* classes, same as div/span. */
 h1, h2, h3, h4, h5, h6 {
   margin: 0;
@@ -81,7 +96,7 @@ td {
   text-align: center;
 }
 
-.table-overflow-tooltip {
+.app-overflow-tooltip {
   position: fixed;
   z-index: 11000;
   max-width: min(24rem, calc(100vw - 1rem));
@@ -96,7 +111,10 @@ td {
   text-align: start;
   white-space: normal;
   box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
-  pointer-events: none;
+  max-height: min(24rem, calc(100dvh - 1rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
 }
 
 /* =========================

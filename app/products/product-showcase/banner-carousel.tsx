@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { useCallback, useEffect, useMemo, useRef, useState, type TransitionEvent } from "react";
 import Loading from "@/app/design-system/components/loading/loading";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
@@ -125,7 +127,7 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
         onFocus={() => setIsHovered(true)}
         onBlur={() => setIsHovered(false)}
       >
-        <button
+        <CustomActionButton
           type="button"
           ref={bannerDrag.ref}
           className={`flex w-full cursor-grab touch-pan-y select-none items-center justify-center overflow-hidden rounded-xl border border-primary-border bg-primary-media transition-shadow hover:border-primary ${
@@ -163,12 +165,12 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
               />
             ))}
           </div>
-        </button>
+        </CustomActionButton>
       </div>
       {imageCount > 1 ? (
         <div className="flex justify-center gap-2">
           {(imageUrls.length > 1 ? imageUrls : imageUrls.concat(Array(Math.max(0, imageCount - imageUrls.length)).fill(""))).map((imageUrl, index) => (
-            <button
+            <CustomActionButton
               key={`${imageUrl || "dot"}-${index}`}
               type="button"
               data-drag-ignore="true"
@@ -180,7 +182,7 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
               aria-label={`نمایش تصویر بنر ${index + 1}`}
             >
               <span className="sr-only">{index + 1}</span>
-            </button>
+            </CustomActionButton>
           ))}
         </div>
       ) : null}

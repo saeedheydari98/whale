@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomSelectionButton } from "./selection";
+
 import { cx } from "../../variants/shared.variant";
 
 const COLOR_MAP: Record<string, string> = {
@@ -82,12 +84,13 @@ export function ColorStockDots({
         const labelSize = size === "md" ? "min-w-6 text-[13px] leading-5" : "min-w-5 text-[11px] leading-4";
 
         return (
-          <button
+          <CustomSelectionButton
             key={color}
             type="button"
             disabled={!onSelect || disabled}
             aria-label={`رنگ ${color} ${selected ? "انتخاب شده" : available ? "موجود" : "ناموجود"}`}
-            aria-pressed={selected}
+            selected={selected}
+            variant="swatch"
             title={`رنگ ${color} ${available ? "موجود" : "ناموجود"}`}
             onClick={() => onSelect?.(color)}
             className={cx(
@@ -110,7 +113,7 @@ export function ColorStockDots({
                 {label}
               </span>
             ) : null}
-          </button>
+          </CustomSelectionButton>
         );
       })}
     </div>

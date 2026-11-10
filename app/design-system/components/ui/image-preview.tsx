@@ -1,5 +1,7 @@
 "use client";
 
+import { CustomActionButton } from "@/app/design-system/components/ui/action";
+
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { AppImage } from "./app-image";
@@ -30,7 +32,7 @@ export function ImagePreview({ imageUrl, onClose }: ImagePreviewProps) {
   if (!mounted || !imageUrl) return null;
 
   return createPortal(
-    <button
+    <CustomActionButton
       type="button"
       className="fixed inset-0 z-[10000] flex cursor-zoom-out items-center justify-center bg-black/80 p-0 outline-none"
       onClick={onClose}
@@ -44,7 +46,7 @@ export function ImagePreview({ imageUrl, onClose }: ImagePreviewProps) {
         draggable={false}
         className="max-h-[100dvh] max-w-[100vw] object-contain"
       />
-    </button>,
+    </CustomActionButton>,
     document.body
   );
 }

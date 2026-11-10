@@ -1,11 +1,14 @@
 "use client";
 
+import { CustomRange } from "@/app/design-system/components/ui/range";
+
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { FiDollarSign, FiSearch } from "react-icons/fi";
 import { IoOptionsOutline } from "react-icons/io5";
 import Loading from "@/app/design-system/components/loading/loading";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomSelectionButton, CustomSelectionGroup } from "@/app/design-system/components/ui/selection";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { CustomSelect } from "@/app/design-system/components/ui/select";
@@ -147,8 +150,8 @@ function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, 
       >
         <div className="h-1 w-full rounded-full bg-primary-media" />
         <div className="absolute h-1 rounded-full bg-primary" style={{ left: "var(--range-start)", right: "calc(100% - var(--range-end))" }} />
-        <input
-          type="range"
+        <CustomRange
+
           min={0}
           max={rangeMax}
           step={PRICE_RANGE_STEP}
@@ -157,8 +160,8 @@ function PriceRangeSlider({ filters, onChange }: Pick<ProductFilterFieldsProps, 
           className="price-range-input"
           onChange={(event) => commitRange(Number(event.target.value), maxValue)}
         />
-        <input
-          type="range"
+        <CustomRange
+
           min={0}
           max={rangeMax}
           step={PRICE_RANGE_STEP}
@@ -191,39 +194,29 @@ function ProductFilterBar({ filters, onChange }: Pick<ProductFilterFieldsProps, 
 
   return (
     <div className="flex min-w-0 flex-1">
-      <div className="flex min-w-0 flex-1 flex-nowrap gap-1 overflow-x-auto overscroll-x-contain rounded-xl border border-primary-border bg-primary-soft p-1 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <CustomSelectionGroup variant="filter" aria-label="فیلتر محصولات">
         {TOGGLE_FILTERS.map((item) => {
           const active = filters[item.key];
 
           return (
-            <button
+            <CustomSelectionButton
               key={item.key}
-              type="button"
-              aria-pressed={active}
-              className={`flex h-10 shrink-0 items-center justify-center rounded-lg px-3 text-xs font-semibold transition hover:brightness-105 sm:text-sm ${
-                active
-                  ? "bg-primary text-primary-contrast shadow-sm"
-                  : "bg-primary-card text-primary-text hover:bg-primary-bg hover:text-primary"
-              }`}
+              selected={active}
+              variant="filter"
               onClick={() => patchFilters({ [item.key]: !active })}
             >
               <span>{item.label}</span>
-            </button>
+            </CustomSelectionButton>
           );
         })}
-        <button
-          type="button"
-          aria-pressed={filters.minRating === "4"}
-          className={`flex h-10 shrink-0 items-center justify-center rounded-lg px-3 text-xs font-semibold transition hover:brightness-105 sm:text-sm ${
-            filters.minRating === "4"
-              ? "bg-primary text-primary-contrast shadow-sm"
-              : "bg-primary-card text-primary-text hover:bg-primary-bg hover:text-primary"
-          }`}
+        <CustomSelectionButton
+          selected={filters.minRating === "4"}
+          variant="filter"
           onClick={() => patchFilters({ minRating: filters.minRating === "4" ? "" : "4" })}
         >
           <span>محبوب‌ترین‌ها</span>
-        </button>
-      </div>
+        </CustomSelectionButton>
+      </CustomSelectionGroup>
     </div>
   );
 }
@@ -314,16 +307,15 @@ export function ProductListShell({
                   ))}
                 </CustomSelect>
               </label>
-              <CustomButton
-                type="button"
-                size="sm"
-                rounded="full"
-                variant={priceFilterActive ? "primary" : "neutral"}
-                icon={<FiDollarSign />}
+              <CustomSelectionButton
+                selected={priceFilterActive}
+                variant="filter"
+                aria-haspopup="dialog"
                 onClick={() => setPriceModalOpen(true)}
               >
+                <FiDollarSign aria-hidden="true" />
                 <span>قیمت</span>
-              </CustomButton>
+              </CustomSelectionButton>
             </div>
           </div>
           <ProductFilterBar filters={filters} onChange={onFiltersChange} />

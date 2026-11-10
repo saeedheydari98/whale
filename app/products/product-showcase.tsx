@@ -1,5 +1,7 @@
 "use client";
 
+import { compareStorefrontEntries } from "@/lib/storefront-order";
+
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
@@ -291,7 +293,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
             sortOrder: showcase.sortOrder,
           }));
 
-      return [...productBanners, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
+      return [...productBanners, ...showcaseSections].sort(compareStorefrontEntries);
     }
 
     if (tree.sections.length > 0) {
@@ -333,7 +335,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
           sortOrder: showcase.sortOrder,
         }));
 
-    return [...bannerSections, ...showcaseSections].sort((a, b) => a.sortOrder - b.sortOrder);
+    return [...bannerSections, ...showcaseSections].sort(compareStorefrontEntries);
   }, [catalogBanners, mode, showcaseProductsById, sortedProducts, sortedShowcases, tree]);
 
   const openImagePreview = (imageUrl?: string) => {
