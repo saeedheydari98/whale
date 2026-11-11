@@ -506,7 +506,7 @@ function buildStorefrontLayoutPayload(
   };
 }
 
-export function useAdminProductsPanel(activeSection: AdminCatalogSection = "products") {
+export function useAdminProductsPanel(activeSection: AdminCatalogSection = "products", enabled = true) {
   const [products, setProducts] = useState<ProductForm[]>([]);
   const [showcases, setShowcases] = useState<ShowcaseForm[]>([]);
   const [categories, setCategories] = useState<CategoryForm[]>([
@@ -553,6 +553,8 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   const [productsLoaded, setProductsLoaded] = useState(false);
   const [loadedSections, setLoadedSections] = useState<LoadedAdminCatalogSections>(initialLoadedSections);
   const [productFormReferencesLoaded, setProductFormReferencesLoaded] = useState(false);
+  const [productFormReferencesLoading, setProductFormReferencesLoading] = useState(false);
+  const productFormReferencesPending = useRef<Promise<unknown> | null>(null);
   const [saving, setSaving] = useState(false);
   const layoutSavingRef = useRef(false);
   const [status, setStatus] = useState("");
@@ -664,11 +666,28 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
 
   const ensureProductFormReferences = async () => {
     if (productFormReferencesLoaded) return null;
+    if (productFormReferencesPending.current) return productFormReferencesPending.current;
+    setProductFormReferencesLoading(true);
+    const pending = loadProductFormReferences();
+    productFormReferencesPending.current = pending;
+    try {
+      return await pending;
+    } finally {
+      productFormReferencesPending.current = null;
+      setProductFormReferencesLoading(false);
+    }
+  };
 
+  const loadProductFormReferences = async () => {
     try {
       const catalog = await getAdminCatalogSection("product-form");
       const snapshot = normalizeAdminCatalog(catalog, false);
       applyCatalogSectionSnapshot("product-form", catalog);
+      setEditingProduct((current) => {
+        if (!current?.brand) return current;
+        const brand = snapshot.brands.find((item) => item.id === current.brand || item.title === current.brand);
+        return brand ? { ...current, brand: brand.id } : current;
+      });
       return snapshot;
     } catch {
       setStatus("دریافت اطلاعات فرم محصول ممکن نشد.");
@@ -805,6 +824,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   useEffect(() => {
     let cancelled = false;
 
+    if (!enabled) return;
     if (!structure) {
       setLoading(true);
       return () => {
@@ -904,10 +924,10 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
     return () => {
       cancelled = true;
     };
-  }, [activeCapacity, activeSection, activeSectionReady, loadedSectionCount, sectionTotalCount, structure]);
+  }, [activeCapacity, activeSection, activeSectionReady, enabled, loadedSectionCount, sectionTotalCount, structure]);
 
   const loadMoreSection = useCallback(() => {
-    if (loading || loadingMore || !sectionHasMore || activeCapacity <= 0) return;
+    if (!enabled || loading || loadingMore || !sectionHasMore || activeCapacity <= 0) return;
     const offset = loadedSectionCount;
     const take = activeCapacity;
     setLoadingMore(true);
@@ -919,10 +939,10 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
       })
       .finally(() => setLoadingMore(false));
-  }, [activeCapacity, activeSection, loadedSectionCount, loading, loadingMore, sectionHasMore]);
+  }, [activeCapacity, activeSection, enabled, loadedSectionCount, loading, loadingMore, sectionHasMore]);
 
   const loadRemainingSection = useCallback(() => {
-    if (loadingMore || !sectionHasMore || sectionTotalCount === undefined) return;
+    if (!enabled || loadingMore || !sectionHasMore || sectionTotalCount === undefined) return;
     const offset = loadedSectionCount;
     const take = Math.max(1, sectionTotalCount - offset);
     setLoadingMore(true);
@@ -934,7 +954,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
         setStatus("دریافت اطلاعات فروشگاه ممکن نشد.");
       })
       .finally(() => setLoadingMore(false));
-  }, [activeSection, loadedSectionCount, loadingMore, sectionHasMore, sectionTotalCount]);
+  }, [activeSection, enabled, loadedSectionCount, loadingMore, sectionHasMore, sectionTotalCount]);
 
   const persistProducts = async (
     nextProducts: ProductForm[],
@@ -1329,21 +1349,17 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openCreateModal = () => {
-    void (async () => {
-      const references = await ensureProductFormReferences();
-      const referenceCategories = references?.categories ?? sortedCategories;
-      const firstCategory = referenceCategories[0]?.id ?? "general";
-      setRequiredErrors([]);
-      setDraftProduct({
-        ...createProduct(),
-        showcaseId: "",
-        showcaseIds: [],
-        categoryId: firstCategory,
-        categoryIds: [firstCategory],
-        sortOrder: products.length + 1,
-      });
-      setIsCreateOpen(true);
-    })();
+    const firstCategory = productFormReferencesLoaded ? sortedCategories[0]?.id : undefined;
+    setRequiredErrors([]);
+    setDraftProduct({
+      ...createProduct(),
+      showcaseId: "",
+      showcaseIds: [],
+      categoryId: firstCategory ?? "",
+      categoryIds: firstCategory ? [firstCategory] : [],
+      sortOrder: products.length + 1,
+    });
+    setIsCreateOpen(true);
   };
 
   const nextStorefrontOrders = async () => {
@@ -1356,7 +1372,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
   const openShowcaseModal = () => {
     void (async () => {
-      const [, orders] = await Promise.all([ensureProductFormReferences(), nextStorefrontOrders()]);
+      const orders = await nextStorefrontOrders();
       setRequiredErrors([]);
       setDraftShowcase({ ...createShowcase(), sortOrder: orders.products });
       setIsShowcaseOpen(true);
@@ -1420,12 +1436,9 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openEditShowcaseModal = (showcase: ShowcaseForm) => {
-    void (async () => {
-      await ensureProductFormReferences();
-      setRequiredErrors([]);
-      setEditingShowcase(showcase);
-      setIsEditShowcaseOpen(true);
-    })();
+    setRequiredErrors([]);
+    setEditingShowcase(showcase);
+    setIsEditShowcaseOpen(true);
   };
 
   const openEditCategoryModal = (category: CategoryForm) => {
@@ -1448,14 +1461,10 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   const openEditModal = (product: ProductForm) => {
-    void (async () => {
-      const references = await ensureProductFormReferences();
-      const referenceBrands = references?.brands ?? sortedBrands;
-      const selectedBrand = referenceBrands.find((brand) => product.brand === brand.id || product.brand === brand.title);
-      setRequiredErrors([]);
-      setEditingProduct(product.brand ? { ...product, brand: selectedBrand?.id ?? "" } : product);
-      setIsEditOpen(true);
-    })();
+    const selectedBrand = sortedBrands.find((brand) => product.brand === brand.id || product.brand === brand.title);
+    setRequiredErrors([]);
+    setEditingProduct(selectedBrand ? { ...product, brand: selectedBrand.id } : product);
+    setIsEditOpen(true);
   };
 
   const updateDraftProduct = (patch: Partial<ProductForm>) => setDraftProduct((current) => updateProductPatch(current, patch));
@@ -2021,6 +2030,9 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
   };
 
   return {
+    ensureProductFormReferences,
+    productFormReferencesLoaded,
+    productFormReferencesLoading,
     products,
     sortedProducts,
     sortedShowcases,

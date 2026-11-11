@@ -3,7 +3,7 @@ import { cx } from "./shared.variant";
 export const collectionCardSizes = {
   userOrder: "h-40 w-80",
   cartLine: "h-24 w-full",
-  inPersonLine: "h-32 w-full",
+  inPersonLine: "w-full",
   product: "h-36 w-64",
   discount: "h-28 w-52",
   adminProduct: "h-14 w-60",

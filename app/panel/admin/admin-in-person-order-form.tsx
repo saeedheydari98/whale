@@ -20,7 +20,8 @@ import Loading, { DynamicLoadingCollection } from "@/app/design-system/component
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { colorSelectionTotal, serializeColorSelection } from "@/lib/cart-color-selection";
 import { formatAmount, readFormattedPriceNumber } from "@/lib/price-format";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { getAdminPanelStructure } from "@/lib/admin-structure";
 import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
 import { CustomTabs } from "@/app/design-system/components/ui/tabs";
 
@@ -180,24 +181,24 @@ function useInPersonOptions<T>(kind: "products" | "customers", search: string, c
       return payload.data as InPersonOptionsPage<T>;
     },
     getNextPageParam: (lastPage) => lastPage.nextOffset,
-    staleTime: 0,
+    staleTime: 30_000,
     gcTime: 0,
     retry: false,
     refetchOnWindowFocus: false,
   });
-  const items = useMemo(() => empty || pendingSearch ? [] : result.data?.pages.flatMap((page) => page.items) ?? [],
-    [empty, pendingSearch, result.data]);
+  const items = useMemo(() => !enabled || empty || pendingSearch ? [] : result.data?.pages.flatMap((page) => page.items) ?? [],
+    [enabled, empty, pendingSearch, result.data]);
   return {
     items,
     capacity,
-    total: pendingSearch ? undefined : result.data?.pages[0]?.total ?? (query ? undefined : count),
+    total: !enabled ? 0 : pendingSearch ? undefined : result.data?.pages[0]?.total ?? (query ? undefined : count),
     isLoading: enabled && !empty && (pendingSearch || result.isPending || result.isPlaceholderData),
     isLoadingMore: result.isFetchingNextPage,
-    hasMore: !pendingSearch && result.hasNextPage && !result.isError,
+    hasMore: enabled && !pendingSearch && result.hasNextPage && !result.isError,
     error: result.error?.message ?? "",
-    onCapacityChange: count === undefined ? undefined : setCapacity,
+    onCapacityChange: !enabled || count === undefined ? undefined : setCapacity,
     onLoadMore: () => {
-      if (!pendingSearch && result.hasNextPage && !result.isFetching) void result.fetchNextPage();
+      if (enabled && !pendingSearch && result.hasNextPage && !result.isFetching) void result.fetchNextPage();
     },
   };
 }
@@ -206,7 +207,12 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
   const [productQuery, setProductQuery] = useState("");
   const [customerQuery, setCustomerQuery] = useState("");
   const [customer, setCustomer] = useState<AdminInPersonCustomer | null>(null);
-  const [customerMode, setCustomerMode] = useState<"existing" | "new">("existing");
+  const [customerMode, setCustomerMode] = useState<"existing" | "new">("new");
+  const [customerOpen, setCustomerOpen] = useState(true);
+  const [productsOpen, setProductsOpen] = useState(false);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [showAllCustomers, setShowAllCustomers] = useState(false);
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>({ firstName: "", lastName: "", phone: "", email: "", address: "" });
   const [lines, setLines] = useState<InPersonLine[]>([]);
   const [discountCode, setDiscountCode] = useState("");
@@ -219,8 +225,22 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
   const [message, setMessage] = useState("");
   useTransientAppMessage(message);
 
-  const productOptions = useInPersonOptions<AdminInPersonProduct>("products", productQuery, productsCount);
-  const customerOptions = useInPersonOptions<AdminInPersonCustomer>("customers", customerQuery, usersCount, customerMode === "existing" && !customer);
+  const productSearchEnabled = productsOpen && (showAllProducts || productQuery.trim().length > 0);
+  const customerSearchEnabled = customerOpen && customerMode === "existing" && !customer && (showAllCustomers || customerQuery.trim().length > 0);
+  const optionsStructure = useQuery({
+    queryKey: ["admin", "in-person-structure"],
+    queryFn: () => getAdminPanelStructure({ force: true }),
+    enabled: productSearchEnabled || customerSearchEnabled,
+    staleTime: Infinity,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  useTransientAppMessage(optionsStructure.isError ? "دریافت ساختار سفارش حضوری انجام نشد." : "");
+  const optionProductsCount = optionsStructure.isPending ? undefined : optionsStructure.data?.products ?? productsCount;
+  const optionUsersCount = optionsStructure.isPending ? undefined : optionsStructure.data?.users ?? usersCount;
+  const productOptions = useInPersonOptions<AdminInPersonProduct>("products", productQuery, optionProductsCount, productSearchEnabled);
+  const customerOptions = useInPersonOptions<AdminInPersonCustomer>("customers", customerQuery, optionUsersCount, customerSearchEnabled);
   useTransientAppMessage(productOptions.error);
   useTransientAppMessage(customerOptions.error);
 
@@ -346,9 +366,10 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
   }, [customerPayload, discountCode, newCustomerReady, customerMode, payloadLines, quoteInputKey, useWallet]);
 
   useEffect(() => {
+    if (!paymentOpen) return;
     const timer = window.setTimeout(() => void requestQuote(), 400);
     return () => window.clearTimeout(timer);
-  }, [requestQuote]);
+  }, [paymentOpen, requestQuote]);
 
   const submitOrder = async () => {
     if (payloadLines.length === 0) {
@@ -396,7 +417,8 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
         title="مشتری"
         status={customerMode === "new" ? newCustomerReady ? "complete" : "incomplete" : customer ? "complete" : "optional"}
         meta={customerMode === "new" ? "مشتری جدید" : customer ? customerLabel(customer) : "مشتری انتخاب نشده؛ سفارش بدون حساب"}
-        defaultOpen
+        open={customerOpen}
+        onOpenChange={setCustomerOpen}
       >
         <CustomTabs<"existing" | "new">
           variant="tertiary"
@@ -475,6 +497,7 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
           </div>
         ) : (
           <>
+            <CustomSwitch checked={showAllCustomers} onChange={setShowAllCustomers} label="نمایش همه مشتری‌ها" />
             <CustomInput
               type="search"
               name="in-person-customer-search"
@@ -487,7 +510,8 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
               icon={<IoSearchOutline aria-hidden="true" />}
               onChange={(event) => setCustomerQuery(event.target.value)}
             />
-            {!customerOptions.isLoading && customerOptions.items.length === 0 ? (
+            {!customerSearchEnabled ? <span data-text-wrap className="text-xs text-secondary-text">برای یافتن مشتری جست‌وجو کنید یا نمایش همه مشتری‌ها را فعال کنید.</span> : null}
+            {customerSearchEnabled && !customerOptions.isLoading && customerOptions.items.length === 0 ? (
               <CustomEmptyState description="مشتری مطابق جست‌وجو پیدا نشد." size="sm" />
             ) : null}
             <div className={`flex max-h-56 w-full flex-col overflow-y-auto ${customerOptions.total !== 0 && (customerOptions.total ?? Infinity) > customerOptions.capacity ? "h-56" : ""}`}>
@@ -543,8 +567,10 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
         title="محصولات"
         status={lines.length > 0 ? "complete" : "incomplete"}
         meta={lines.length > 0 ? `${lines.length.toLocaleString("fa-IR")} محصول انتخاب شده` : "محصولی انتخاب نشده"}
-        defaultOpen
+        open={productsOpen}
+        onOpenChange={setProductsOpen}
       >
+        <CustomSwitch checked={showAllProducts} onChange={setShowAllProducts} label="نمایش همه محصولات" />
         <CustomInput
           type="search"
           name="in-person-product-search"
@@ -557,7 +583,8 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
           icon={<IoSearchOutline aria-hidden="true" />}
           onChange={(event) => setProductQuery(event.target.value)}
         />
-        {!productOptions.isLoading && productOptions.items.length === 0 ? (
+        {!productSearchEnabled ? <span data-text-wrap className="text-xs text-secondary-text">برای یافتن محصول جست‌وجو کنید یا نمایش همه محصولات را فعال کنید.</span> : null}
+        {productSearchEnabled && !productOptions.isLoading && productOptions.items.length === 0 ? (
           <CustomEmptyState description="محصولی مطابق جست‌وجو پیدا نشد." size="sm" />
         ) : null}
         <div className={`flex max-h-64 w-full flex-col overflow-y-auto ${productOptions.total !== 0 && (productOptions.total ?? Infinity) > productOptions.capacity ? "h-64" : ""}`}>
@@ -624,7 +651,7 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
         title="سبد خرید"
         status={payloadLines.length > 0 && !incompleteColorLine ? "complete" : "incomplete"}
         meta={incompleteColorLine ? "تعداد رنگ‌ها را تکمیل کنید" : payloadLines.length > 0 ? `${lines.reduce((sum, line) => sum + line.quantity, 0).toLocaleString("fa-IR")} عدد کالا` : "سبد خرید خالی است"}
-        defaultOpen
+        defaultOpen={false}
       >
         {lines.length === 0 ? (
           <CustomEmptyState description="هنوز محصولی به سبد خرید اضافه نشده است." size="sm" />
@@ -636,7 +663,7 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
                 <div key={line.key} data-card-family="inPersonLine" className={collectionCardClasses("inPersonLine", "flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-2")}>
                   <div className="flex shrink-0 items-start justify-between gap-2">
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <AppHeading level={4} className="truncate text-sm font-bold text-primary-text">{line.product.title}</AppHeading>
+                      <AppHeading level={3} className="truncate text-sm font-bold text-primary-text">{line.product.title}</AppHeading>
                       <span className="truncate text-xs text-secondary-text">
                         {formatAmount(line.product.discountPrice || line.product.price)} · موجودی: {line.product.stockQuantity}
                       </span>
@@ -647,8 +674,8 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
                   </div>
 
                   {colorEntries.length > 0 ? (
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                      <ColorQuantityPicker colorStock={line.product.colorStock} selection={line.colorCounts} stockQuantity={line.product.stockQuantity}
+                    <div className="flex flex-col">
+                      <ColorQuantityPicker layout="rows" colorStock={line.product.colorStock} selection={line.colorCounts} stockQuantity={line.product.stockQuantity}
                         onChange={(color, count) => setLineColorCount(line.key, color, count)} />
                     </div>
                   ) : (
@@ -690,7 +717,8 @@ export function AdminInPersonOrderForm({ productsCount, usersCount, onCreated, o
         title="پرداخت و تخفیف"
         status={activeQuote && !quoteDataLoading && !incompleteColorLine ? "complete" : "incomplete"}
         meta={discountCode.trim() ? `کد تخفیف: ${discountCode.trim()}` : "بدون کد تخفیف"}
-        defaultOpen
+        open={paymentOpen}
+        onOpenChange={setPaymentOpen}
       >
         <div className="flex flex-wrap items-end gap-2">
           <CustomInput

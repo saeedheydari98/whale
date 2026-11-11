@@ -89,6 +89,9 @@ export const sizeVariants = {
   xxxl: "h-18 px-6 text-xl",
 };
 
+/** Keep nested inline labels out of baseline layout so text centers with icons. */
+export const controlLabelClasses = "inline-flex min-w-0 items-center justify-center";
+
 /**
  * =========================
  * Loading System

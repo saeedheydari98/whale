@@ -61,7 +61,7 @@ try {
       assert.equal(requests, 2);
       reject = false;
       await page.goto(`${origin}/cart`, { waitUntil: "domcontentloaded" });
-      const card = page.locator('[data-card-family="cartLine"]');
+      const card = page.locator('[data-card-family="cartLine"]:not([data-loading-probe] *):not([inert] *)');
       await card.waitFor();
       const before = await card.boundingBox();
       assert.ok(before.height <= 96, 'Cart rows must remain minimal');

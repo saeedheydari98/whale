@@ -22,7 +22,7 @@ import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state"
 import { CustomTag } from "@/app/design-system/components/ui/tag";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { StarRating } from "@/app/design-system/components/ui/star-rating";
-import Loading, { useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
+import Loading, { DynamicLoadingCollection, useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
 import { ProductReviewsSection, type ProductReview } from "./product-reviews-section";
 import { ProductImageGallery } from "./product-image-gallery";
 import { ColorQuantityPicker } from "@/app/design-system/components/ui/color-quantity-picker";
@@ -208,6 +208,9 @@ export default function ProductPage() {
         throw new Error(data?.showMessage || "دیدگاه ثبت نشد.");
       }
       const createdComment = data?.data?.comment;
+      await queryClient.invalidateQueries({ queryKey: ["review-structure", String(numericProductId)] });
+      await queryClient.invalidateQueries({ queryKey: ["admin-list", "/api/products/" + numericProductId + "/comments"] });
+      await queryClient.invalidateQueries({ queryKey: ["catalog", "page-structure", "product", productId] });
       const createdReview = createdComment ? mapReviews([createdComment])[0] : null;
       setText("");
       setRating(undefined);
@@ -290,30 +293,14 @@ export default function ProductPage() {
     ["تاریخ انتشار", formatDate(product.publishedAt)],
   ].filter(([, value]) => String(value ?? "").trim());
   const structureSpecCount = Number(product.specCount);
-  const visibleDetailRows = detailRows.length > 0
-    ? detailRows
-    : catalogLoading && Number.isFinite(structureSpecCount) && structureSpecCount > 0
-      ? Array.from({ length: structureSpecCount }, (_, index) => [`مشخصات ${index + 1}`, "مقدار مشخصات"])
-      : [];
+  const visibleDetailRows = detailRows;
   const showDiscount = discountPercent > 0 || (catalogLoading && product.hasDiscount === true);
   const showBadge = Boolean(String(product.badge ?? "").trim()) || (catalogLoading && product.hasBadge === true);
   const productDescription = String(product.description ?? "").trim();
   const showDescription = Boolean(productDescription) || (catalogLoading && product.hasDescription === true);
-  const displayedReviewCount = catalogLoading
-    ? (Number.isFinite(Number(product.reviewCount)) ? Math.max(0, Math.round(Number(product.reviewCount))) : reviews.length)
-    : reviews.length;
-  const displayedAvgRating = catalogLoading
-    ? Number(product.ratingAverage ?? 0)
-    : avgRating;
-  const loadingReviews = catalogLoading && displayedReviewCount > 0 && reviews.length === 0
-    ? Array.from({ length: displayedReviewCount }, (_, index) => ({
-        id: `loading-review-${index}`,
-        author: "خریدار",
-        text: "متن دیدگاه خریدار برای هم‌اندازه بودن اسکلتون بارگذاری.",
-        rating: 5,
-        createdAt: new Date().toISOString(),
-      }))
-    : reviews;
+  const displayedReviewCount = Number(structureProduct?.reviewCount ?? product.reviewCount ?? product.ratingCount ?? reviews.length);
+  const displayedAvgRating = Number(product.ratingAverage ?? avgRating);
+
   const finalPriceDate = formatDate(product.updatedAt || product.publishedAt || product.createdAt);
   const productGalleryImages = getProductGalleryImages(product);
   const galleryImageCount = Number.isFinite(Number(product.imageCount))
@@ -418,14 +405,10 @@ export default function ProductPage() {
                   <AppHeading level={2} className="text-2xl font-bold text-primary-text">مشخصات محصول</AppHeading>
                 </div>
                 <div className="flex flex-col gap-3">
-                  {visibleDetailRows.length > 0 ? visibleDetailRows.map(([label, value]) => (
-                    <div key={String(label)} className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
-                      <span className="text-xs font-semibold text-secondary-text">{label}</span>
-                      <span className="text-sm font-bold text-primary-text">{String(value)}</span>
-                    </div>
-                  )) : (
-                    <CustomEmptyState description="اطلاعات تکمیلی برای این محصول وجود ندارد." size="sm" />
-                  )}
+                  {!catalogLoading && visibleDetailRows.length === 0 ? <CustomEmptyState size="sm" /> : null}
+                  <DynamicLoadingCollection items={visibleDetailRows} isLoading={catalogLoading} totalCount={catalogLoading && Number.isFinite(structureSpecCount) ? structureSpecCount : visibleDetailRows.length} lazy viewportLimited className="flex flex-col gap-3" getKey={([label], index) => String(label) + index}
+                    renderItem={([label, value]) => <ProductSpecRow label={String(label)} value={String(value)} />}
+                    renderSkeleton={() => <Loading loading="skeleton-structure" isLoading><ProductSpecRow label="..." value="..." /></Loading>} />
                 </div>
                 <div className="flex flex-col gap-3 rounded-md border border-primary-border bg-primary-card p-4">
                   <AppHeading level={3} className="text-sm font-bold text-primary-text">توضیحات محصول</AppHeading>
@@ -444,7 +427,8 @@ export default function ProductPage() {
 
           {activeTab === "reviews" ? (
               <ProductReviewsSection
-                reviews={loadingReviews}
+                productId={productApiId ?? product.id}
+                totalCount={displayedReviewCount}
                 text={text}
                 rating={rating}
                 userRating={userRating}
@@ -479,4 +463,10 @@ export default function ProductPage() {
       </div>
     </main>
   );
+}
+
+function ProductSpecRow({ label, value }: { label: string; value: string }) {
+  return <div className="flex min-w-52 flex-col gap-1 rounded-md border border-primary-border bg-primary-card p-3">
+    <span className="text-xs font-semibold text-secondary-text">{label}</span><span className="text-sm font-bold text-primary-text">{value}</span>
+  </div>;
 }

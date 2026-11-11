@@ -7,6 +7,7 @@ export type UserPanelStructure = {
   orders: number;
   discounts: number;
   unseenDiscounts: number;
+  walletTransactions: number;
 };
 
 function asCount(value: unknown) {
@@ -21,6 +22,7 @@ export function normalizeUserPanelStructure(value: unknown): UserPanelStructure 
     orders: asCount(record.orders),
     discounts: asCount(record.discounts),
     unseenDiscounts: asCount(record.unseenDiscounts),
+    walletTransactions: asCount(record.walletTransactions),
   };
 }
 

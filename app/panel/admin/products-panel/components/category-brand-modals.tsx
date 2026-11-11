@@ -195,7 +195,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(requiredErrorKey) && !hasTitle}
             meta="عنوان و نامک"
-            defaultOpen={!hasTitle}
+            defaultOpen
           >
             <CustomInput
               value={item.title}
@@ -210,7 +210,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
             title="تصویر"
             status={hasImage ? "complete" : "incomplete"}
             meta="تصویر WebP و پیش‌نمایش"
-            defaultOpen={!hasImage}
+            defaultOpen={false}
           >
             <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
             <CustomInput value={item.imageUrl} placeholder={imagePlaceholder} onChange={(event) => onPatch({ imageUrl: event.target.value } as Partial<TItem>)} />
@@ -222,7 +222,7 @@ function TaxonomyModal<TItem extends TaxonomyItem>({
             title="جایگاه و وضعیت"
             status={hasGroup ? "complete" : "optional"}
             meta={item.active ? "فعال" : "مخفی"}
-            defaultOpen={!hasGroup}
+            defaultOpen={false}
           >
             <CustomSelect value={item.groupId} aria-label={groupAriaLabel} onChange={(event) => onPatch({ groupId: event.target.value } as Partial<TItem>)}>
               {groups.map((group) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   IoAlbumsOutline,
   IoColorPaletteOutline,
@@ -25,7 +26,7 @@ import { AdminDiscountsPanel } from "@/app/panel/admin/admin-discounts-panel";
 import { AdminOrdersPanel } from "@/app/panel/admin/admin-orders-panel";
 import { AppHeading } from "@/app/design-system/components/ui/text";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
-import { getAdminPanelStructure, type AdminPanelStructure } from "@/lib/admin-structure";
+import { getAdminPanelStructure } from "@/lib/admin-structure";
 import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
 import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
@@ -46,30 +47,15 @@ export default function AdminPanelPage() {
   );
   const [authUser, setAuthUser] = useState<AdminPanelUser | null>(() => appUser);
   const [activeTab, setActiveTab] = useState<AdminPanelTab>("theme");
-  const [structure, setStructure] = useState<AdminPanelStructure | null>(null);
-  const [structureReady, setStructureReady] = useState(false);
-  const [structureError, setStructureError] = useState("");
-  useTransientAppMessage(structureError);
-
-  useEffect(() => {
-    if (hasAdminAccess !== true) return;
-    let cancelled = false;
-    setStructureError("");
-    void getAdminPanelStructure()
-      .then((next) => {
-        if (cancelled) return;
-        setStructure(next);
-        setStructureReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setStructureError("دریافت ساختار پنل مدیریت انجام نشد.");
-        setStructureReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hasAdminAccess]);
+  const structureQuery = useQuery({
+    queryKey: ["admin-structure", appUser?.id, authUser?.role],
+    queryFn: () => getAdminPanelStructure({ force: true }),
+    enabled: hasAdminAccess === true,
+    staleTime: 30_000, refetchOnWindowFocus: false, retry: false,
+  });
+  const structure = structureQuery.data;
+  const structureReady = !structureQuery.isPending;
+  useTransientAppMessage(structureQuery.error?.message ?? "");
 
   useStructureRouteLoading(hasAdminAccess === null || (hasAdminAccess === true && !structureReady));
 
@@ -139,10 +125,10 @@ export default function AdminPanelPage() {
   ];
 
   return (
-    <main className="min-h-full bg-primary-base p-6 text-primary-text">
+    <main className="min-h-full bg-primary-base p-3 text-primary-text sm:p-4">
       {hasAdminAccess === null ? (
         <Loading loading="skeleton-structure" isLoading>
-          <div className="flex w-full flex-col gap-6">
+          <div className="flex w-full flex-col gap-3">
             <section className="flex flex-col gap-4">
               <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
               <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
@@ -150,14 +136,14 @@ export default function AdminPanelPage() {
           </div>
         </Loading>
       ) : hasAdminAccess ? (
-        <div className="flex w-full flex-col gap-6">
+        <div className="flex w-full flex-col gap-3">
           <section className="flex flex-col gap-4">
             <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
             <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
           </section>
 
           {activeTab === "theme" ? <AdminThemePanel /> : null}
-          {activeTab === "security" && isSuperadmin ? <AdminSecurityPanel /> : null}
+          {activeTab === "security" && isSuperadmin ? <AdminSecurityPanel counts={structure?.accessRequests} usersCount={structure?.users} /> : null}
           {activeTab === "orders" ? (
             <AdminOrdersPanel
               totalCount={structure?.orders}
@@ -167,9 +153,9 @@ export default function AdminPanelPage() {
             />
           ) : null}
           {activeTab === "users" ? <AdminUsersPanel totalCount={structure?.users} /> : null}
-          {activeTab === "discounts" ? <AdminDiscountsPanel totalUsersCount={structure?.users} /> : null}
+          {activeTab === "discounts" ? <AdminDiscountsPanel totalUsersCount={structure?.users} rulesCount={structure?.discountRules} /> : null}
           {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" ? (
-            <AdminProductsPanel section={activeTab} />
+            <AdminProductsPanel key={activeTab} section={activeTab} storefrontCounts={structure?.storefront} />
           ) : null}
         </div>
       ) : (

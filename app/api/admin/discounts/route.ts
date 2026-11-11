@@ -3,6 +3,9 @@ import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/auth";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { readWithRetry } from "@/lib/api/read-retry";
+import { adminListQuerySchema } from "@/lib/api/schemas";
+import { validationError } from "@/lib/api/validation";
+import { pageMetadata } from "@/lib/api/admin-list-pages";
 import { DISCOUNT_AUDIENCES, issueDiscountCode, runDiscountRules } from "@/lib/api/discount-service";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +43,21 @@ export async function GET(request: Request) {
   const auth = await guard(request);
   if (!auth.ok) return auth.response;
   try {
+    const params = new URL(request.url).searchParams;
+    const parsed = adminListQuerySchema.safeParse({ limit: "20", ...Object.fromEntries(params) });
+    if (!parsed.success) return validationError(parsed.error);
+    if (parsed.data.scope === "settings") {
+      const settings = await readWithRetry(() => prisma.commerceSetting.findUnique({ where: { id: 1 } }));
+      return apiOk({ settings: settings ?? { cashbackPercent: 0, postalShippingFee: 30000 } });
+    }
+    if (params.has("limit") || parsed.data.scope === "rules") {
+      const { limit, offset } = parsed.data;
+      const [rules, total] = await Promise.all([
+        readWithRetry(() => prisma.discountRule.findMany({ take: limit, skip: offset, orderBy: [{ createdAt: "desc" }, { id: "desc" }], include: { _count: { select: { discountCodes: true } } } })),
+        readWithRetry(() => prisma.discountRule.count()),
+      ]);
+      return apiOk({ rules, ...pageMetadata(total, offset, rules.length) });
+    }
     const [settings, rules] = await Promise.all([
       readWithRetry(() => prisma.commerceSetting.findUnique({ where: { id: 1 } })),
       readWithRetry(() => prisma.discountRule.findMany({ orderBy: { createdAt: "desc" }, include: { _count: { select: { discountCodes: true } } } })),

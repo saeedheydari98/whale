@@ -3,6 +3,7 @@
 import { CustomTabs } from "@/app/design-system/components/ui/tabs";
 
 import { useEffect, useState } from "react";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
@@ -25,6 +26,12 @@ type StorefrontSectionProps = {
   isLoading?: boolean;
   totalCount?: number;
   isSaving?: boolean;
+  listOpen?: boolean;
+  onListOpenChange?: (open: boolean) => void;
+  onCapacityChange?: (capacity: number) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
 };
 
 const loadingStorefrontEntry: StorefrontDisplayEntry = {
@@ -132,6 +139,12 @@ export function StorefrontSection({
   isLoading = false,
   totalCount,
   isSaving = false,
+  listOpen,
+  onListOpenChange,
+  onCapacityChange,
+  hasMore,
+  onLoadMore,
+  isLoadingMore,
 }: StorefrontSectionProps) {
   const visibleDisplaySections = displaySections;
   const showEmpty = totalCount === 0 || (!isLoading && visibleDisplaySections.length === 0);
@@ -140,6 +153,7 @@ export function StorefrontSection({
     <div className="flex flex-col gap-4">
       <CustomTabs items={STOREFRONT_TABS} value={tab} onChange={setTab} disabled={isSaving} variant="secondary" ariaLabel="صفحه‌ی چیدمان" />
 
+      <CustomAccordion title="فهرست چیدمان" open={listOpen} onOpenChange={onListOpenChange} defaultOpen={false} showStatusLabel={false}>
       {showEmpty ? (
         <CustomEmptyState description="هنوز بخشی برای این صفحه چیده نشده است." size="sm" />
       ) : null}
@@ -148,6 +162,10 @@ export function StorefrontSection({
         items={visibleDisplaySections}
         isLoading={isLoading && !showEmpty}
         totalCount={totalCount}
+        onCapacityChange={onCapacityChange}
+        hasMore={hasMore}
+        onLoadMore={onLoadMore}
+        isLoadingMore={isLoadingMore}
         structure={Number.isFinite(Number(totalCount)) ? { count: Number(totalCount) } : undefined}
         className="flex flex-col gap-4"
         getKey={(entry) => storefrontKey(entry)}
@@ -184,6 +202,7 @@ export function StorefrontSection({
         )}
       />
 
+      </CustomAccordion>
       <span className="text-xs font-semibold text-secondary-text">تغییرات چیدمان به‌صورت خودکار ذخیره می‌شوند.</span>
     </div>
   );

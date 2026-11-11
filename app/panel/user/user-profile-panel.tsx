@@ -179,8 +179,8 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
         <AppHeading level={2} className="text-base font-bold text-primary-text">تکمیل پروفایل</AppHeading>
         <div className="text-sm text-secondary-text">پس از ورود، اطلاعات موردنیاز ارسال سفارش را تکمیل کنید.</div>
       </div>
-      <div ref={formRef} className="grid gap-3 md:grid-cols-2">
-        <div className="flex flex-col gap-1">
+      <div ref={formRef} className="flex flex-wrap gap-3">
+        <div className="flex min-w-0 basis-52 flex-1 flex-col gap-1">
           <CustomInput
             value={profileDraft.firstName}
             label="نام"
@@ -193,7 +193,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             onChange={(event) => updateProfileDraft({ firstName: event.target.value })}
           />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 basis-52 flex-1 flex-col gap-1">
           <CustomInput
             value={profileDraft.lastName}
             label="نام خانوادگی"
@@ -206,7 +206,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             onChange={(event) => updateProfileDraft({ lastName: event.target.value })}
           />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 basis-52 flex-1 flex-col gap-1">
           <CustomInput
             value={profileDraft.phone}
             label="شماره موبایل"
@@ -216,7 +216,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             disabled
           />
         </div>
-        <div className="flex flex-col gap-1">
+        <div className="flex min-w-0 basis-52 flex-1 flex-col gap-1">
           <CustomInput
             value={profileDraft.email}
             type="email"
@@ -227,7 +227,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
             disabled
           />
         </div>
-        <div className="flex flex-col gap-2 md:col-span-2">
+        <div className="flex min-w-0 basis-full flex-col gap-2">
           <CustomInput
             value={profileDraft.address}
             label="آدرس کامل"
@@ -241,7 +241,7 @@ export function UserProfilePanel({ onCompleted }: UserProfilePanelProps = {}) {
           />
         </div>
       </div>
-      <CustomButton fullWidth icon={<IoSaveOutline />} isLoading={isSavingProfile} onClick={() => void saveProfile()}>
+      <CustomButton className="self-start" icon={<IoSaveOutline />} isLoading={isSavingProfile} onClick={() => void saveProfile()}>
         <span>ذخیره و تکمیل پروفایل</span>
       </CustomButton>
       </section>

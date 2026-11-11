@@ -1315,7 +1315,7 @@ export async function getProductDetailPageStructure(identifier: string, searchPa
     const product = await findProductByIdentifier(normalizedIdentifier, includeInactive);
 
     return pageStructure("product", {
-      products: product ? [toProductDetailStructure(product)] : [],
+      products: product ? [{ ...toProductDetailStructure(product), reviewCount: await prisma.comment.count({ where: { productId: product.id, active: true } }) }] : [],
     });
   });
 }
@@ -1381,15 +1381,16 @@ export async function getProductSeoFields(identifier: string) {
 
 export async function getProductDetail(identifier: string, searchParams: URLSearchParams) {
   const includeInactive = getIncludeInactive(searchParams);
+  const includeComments = searchParams.get("includeComments") !== "0";
 
-  return withCatalogCache("product-detail", [identifier, includeInactive ? "all" : "active"], getTtl(searchParams, DETAILS_TTL_SECONDS), async () => {
+  return withCatalogCache("product-detail", [identifier, includeInactive ? "all" : "active", includeComments ? "comments" : "summary"], getTtl(searchParams, DETAILS_TTL_SECONDS), async () => {
     const product = await findProductByIdentifier(identifier, includeInactive);
     if (!product) return null;
 
-    const commentsPromise = prisma.comment.findMany({
+    const commentsPromise = includeComments ? prisma.comment.findMany({
       where: { productId: product.id, active: true },
       orderBy: { createdAt: "desc" },
-    });
+    }) : Promise.resolve([]);
     const recommendationsPromise = getRecommendationProducts(product, new URLSearchParams({ limit: String(searchParams.get("recommendationsLimit") ?? 8) }));
     const [comments, recommendations] = await Promise.all([commentsPromise, recommendationsPromise]);
 

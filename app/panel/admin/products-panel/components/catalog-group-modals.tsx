@@ -146,7 +146,7 @@ function CatalogGroupModal({
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(errorKey) && !hasTitle}
             meta="نام و ترتیب نمایش"
-            defaultOpen={!hasTitle}
+            defaultOpen
           >
             <CustomInput
               value={item.title}
@@ -166,7 +166,7 @@ function CatalogGroupModal({
             title="لینک‌های داخل بخش"
             status={hasLinks ? "complete" : "incomplete"}
             meta={`${selectedIds.length} انتخاب`}
-            defaultOpen={!hasLinks}
+            defaultOpen={false}
           >
             <div className="flex flex-wrap gap-3 rounded-md border border-primary-border p-2">
               {linkOptions.length === 0 ? (

@@ -1,4 +1,29 @@
 import { z } from "zod";
+
+export const positiveIdSchema = z.coerce.number().int().positive();
+
+export const adminListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100),
+  offset: z.coerce.number().int().min(0).max(10_000_000).default(0),
+  q: z.string().trim().max(200).default(""),
+  sort: z.enum(["name", "role", "createdAt", "orderCount", "orderTotal", "walletBalance", "lastOrderAt", "id", "customer", "status", "items", "total"]).default("createdAt"),
+  direction: z.enum(["asc", "desc"]).default("desc"),
+  view: z.enum(["online", "in_person"]).optional(),
+  status: z.enum(["pending", "approved", "archived"]).optional(),
+  from: z.coerce.number().finite().min(0).max(8_640_000_000_000_000).optional(),
+  to: z.coerce.number().finite().min(0).max(8_640_000_000_000_000).optional(),
+  scope: z.enum(["settings", "rules"]).optional(),
+  tab: z.enum(["home", "categories", "products"]).optional(),
+});
+
+export const adminCollectionStructureSchema = adminListQuerySchema.extend({
+  limit: z.coerce.number().int().min(1).max(100).default(1),
+  collection: z.enum(["users", "orders"]),
+});
+
+export const userWalletQuerySchema = adminListQuerySchema.omit({ scope: true }).extend({
+  scope: z.enum(["summary", "discounts", "transactions"]),
+});
 import { isAllowedWebpImageValue, WEBP_ONLY_ERROR } from "@/lib/image-upload";
 import {
   EMAIL_PATTERN,
@@ -139,7 +164,8 @@ export const productSchema = z.object({
 });
 
 export const productSearchSchema = z.object({
-  q: z.string().trim().optional(),
+  q: z.string().trim().max(200).optional(),
+  offset: z.coerce.number().int().min(0).max(10_000_000).optional(),
   minPrice: z.coerce.number().optional(),
   maxPrice: z.coerce.number().optional(),
   hasDiscount: z.coerce.boolean().optional(),

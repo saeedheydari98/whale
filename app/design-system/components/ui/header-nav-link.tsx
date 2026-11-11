@@ -5,7 +5,7 @@ import { headerNavigationClasses, headerNavigationStyle, isNavigationActive } fr
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
-import { cx } from "../../variants/shared.variant";
+import { controlLabelClasses, cx } from "../../variants/shared.variant";
 
 type HeaderNavLinkProps = {
   href: string;
@@ -28,7 +28,7 @@ export function HeaderNavLink({ href, children, icon, className, onClick }: Head
       style={headerNavigationStyle(active)}
     >
       {icon ? <span className="text-lg">{icon}</span> : null}
-      <span>{children}</span>
+      <span className={controlLabelClasses}>{children}</span>
     </Link>
   );
 }

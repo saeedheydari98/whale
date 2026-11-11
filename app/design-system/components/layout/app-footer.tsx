@@ -67,7 +67,7 @@ export function AppFooter() {
   const accountActive = pathname === "/panel/user" || pathname.startsWith("/panel/user/");
 
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-40 flex h-14 w-full shrink-0 items-center justify-center border-t border-primary-border bg-primary-panel font-bold text-primary-text shadow-lg backdrop-blur md:static md:h-auto md:min-h-40 md:p-4">
+    <footer className="fixed inset-x-0 bottom-0 z-40 flex h-14 w-full shrink-0 items-center justify-center border-t border-primary-border bg-primary-panel font-bold text-primary-text shadow-lg backdrop-blur md:static md:h-auto md:p-4">
       {isMobile ? (
         <nav className="flex h-full w-full items-center justify-around gap-1 px-2 py-1.5">
           {visibleNavItems.map((item) => {
@@ -151,7 +151,7 @@ export function AppFooter() {
               درباره وال
             </Link>
           </div>
-          <span className="max-w-4xl text-center text-sm font-normal leading-7 text-secondary-text">
+          <span data-text-wrap className="max-w-4xl text-center text-sm font-normal leading-7 text-secondary-text">
             وال یک پروژه آزمایشی برای ساخت فروشگاهی کاملاً پویاست؛ فروشگاهی که مدیر آن می‌تواند ظاهر و شیوه عملکرد بخش‌های مختلف را بدون تغییر کد مدیریت کند. هدف این پروژه، دستیابی به بالاترین سطح انعطاف‌پذیری در مدیریت فروشگاه است.
           </span>
         </div>

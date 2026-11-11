@@ -2,7 +2,7 @@
 
 import Link, { type LinkProps } from "next/link";
 import React from "react";
-import { cx, motionVariants, radiusVariants, sizeVariants } from "../../variants/shared.variant";
+import { controlLabelClasses, cx, motionVariants, radiusVariants, sizeVariants } from "../../variants/shared.variant";
 
 type CustomLinkProps = LinkProps & {
   children: React.ReactNode;
@@ -39,7 +39,7 @@ export function CustomLink({
   const content = (
     <>
       {icon}
-      <span>{children}</span>
+      <span className={controlLabelClasses}>{children}</span>
       {iconAfter}
     </>
   );

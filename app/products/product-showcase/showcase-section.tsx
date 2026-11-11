@@ -193,6 +193,7 @@ export function ShowcaseSection({
       </div>
 
       <DynamicLoadingCollection
+        lazy
         items={products}
         getKey={(product, index) => product.id ?? index}
         isLoading={isLoading}

@@ -5,12 +5,14 @@ import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { parseJsonBody, validationError } from "@/lib/api/validation";
 import { requireAdmin } from "@/lib/api/auth";
-import { bannerSchema, productSchema, showcaseSchema } from "@/lib/api/schemas";
+import { adminListQuerySchema, bannerSchema, productSchema, showcaseSchema } from "@/lib/api/schemas";
+import { pageMetadata, readAdminOrderPageIds } from "@/lib/api/admin-list-pages";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 import { readWithRetry } from "@/lib/api/read-retry";
 import { normalizeProductData, normalizeProductPatchData } from "@/lib/api/catalog-service";
 import { readImageMetaRecord as readImageMeta, readStoredImageUrls } from "@/lib/catalog-utils";
 import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUSES } from "@/lib/order-status";
+import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,8 +30,9 @@ function images(data: any) {
   return data.images ?? null;
 }
 
-async function readAdminOrders() {
+async function readAdminOrders(ids?: string[]) {
   const orders = await prisma.order.findMany({
+    where: ids ? { id: { in: ids } } : undefined,
     orderBy: { createdAt: "desc" },
     include: {
       user: {
@@ -478,7 +481,7 @@ async function readShowcaseProducts(showcases: AdminShowcaseRecord[], productRef
   });
 }
 
-async function readAdminCatalogStructure() {
+async function readAdminCatalogStructure(includeAccess = false) {
   const [
     products,
     banners,
@@ -492,6 +495,8 @@ async function readAdminCatalogStructure() {
     ungroupedBrands,
     productRefs,
     storefrontLayout,
+    discountRules,
+    accessCounts,
   ] = await Promise.all([
     readWithRetry(() => prisma.product.count()),
     readWithRetry(() => prisma.banner.count()),
@@ -520,6 +525,8 @@ async function readAdminCatalogStructure() {
     readWithRetry(() => prisma.brand.count({ where: { groupId: null } })),
     readWithRetry(() => readAdminProductRefs()),
     readWithRetry(() => readAdminStorefrontLayout()),
+    readWithRetry(() => prisma.discountRule.count()),
+    includeAccess ? readWithRetry(() => prisma.adminAccessRequest.groupBy({ by: ["status"], _count: { _all: true } })) : Promise.resolve([]),
   ]);
 
   const categoryItems = categoryGroups.map((group) => ({
@@ -544,6 +551,12 @@ async function readAdminCatalogStructure() {
     inPersonOrders,
     users,
     banners,
+    discountRules,
+    accessRequests: {
+      pending: accessCounts.find((entry) => entry.status === "pending")?._count._all ?? 0,
+      approved: accessCounts.find((entry) => entry.status === "approved")?._count._all ?? 0,
+      archived: accessCounts.filter((entry) => entry.status !== "pending" && entry.status !== "approved").reduce((total, entry) => total + entry._count._all, 0),
+    },
     showcases: showcases.map((showcase) => ({
       id: showcase.id,
       count: countShowcaseProducts(showcase, productRefs),
@@ -844,11 +857,20 @@ export async function GET(request: Request, context: Context) {
 
   try {
     if (path[0] === "catalog" && path[1] === "storefront") {
-      return apiOk({ storefront: toStorefrontLayoutResponse(await readAdminStorefrontLayout()) });
+      const params = new URL(request.url).searchParams;
+      const parsed = params.has("limit") ? adminListQuerySchema.safeParse(Object.fromEntries(params)) : null;
+      if (parsed && !parsed.success) return validationError(parsed.error);
+      const layout = await readAdminStorefrontLayout();
+      if (parsed?.success) {
+        const { limit, offset, tab = "home" } = parsed.data;
+        const entries = layout[tab].slice(offset, offset + limit);
+        return apiOk({ entries, ...pageMetadata(layout[tab].length, offset, entries.length) });
+      }
+      return apiOk({ storefront: toStorefrontLayoutResponse(layout) });
     }
 
     if (path[0] === "catalog" && path[1] === "structure") {
-      return apiOk({ structure: await readAdminCatalogStructure() });
+      return apiOk({ structure: await readAdminCatalogStructure(auth.user.role === "superadmin" && auth.user.username === SUPERADMIN_PHONE) });
     }
 
     if (path[0] === "catalog" && path[1]) {
@@ -869,6 +891,15 @@ export async function GET(request: Request, context: Context) {
     }
 
     if (path[0] === "orders") {
+      const params = new URL(request.url).searchParams;
+      if (params.has("limit")) {
+        const parsed = adminListQuerySchema.safeParse(Object.fromEntries(params));
+        if (!parsed.success) return validationError(parsed.error);
+        const { ids, ...metadata } = await readAdminOrderPageIds(parsed.data);
+        const orders = await readAdminOrders(ids);
+        const byId = new Map(orders.map((order) => [order.id, order]));
+        return apiOk({ orders: ids.map((id) => byId.get(id)), ...metadata });
+      }
       return apiOk({ orders: await readAdminOrders() });
     }
 
@@ -1052,7 +1083,7 @@ async function updateEntity(request: Request, context: Context, partial: boolean
         }
       });
 
-      const orders = await readAdminOrders();
+      const orders = await readAdminOrders([path[1]]);
       const order = orders.find((item: { id: string }) => item.id === path[1]) ?? null;
       return apiOk({ order });
     }

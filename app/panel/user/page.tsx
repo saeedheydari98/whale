@@ -4,6 +4,8 @@ import { CustomActionButton } from "@/app/design-system/components/ui/action";
 import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
 
 import { useEffect, useState } from "react";
+import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline, IoTicketOutline, IoWalletOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
@@ -14,7 +16,7 @@ import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { OrderStatusTag, OrderStatusTimeline } from "@/app/design-system/components/ui/order-status";
 import { CustomTabs, type CustomTabItem } from "@/app/design-system/components/ui/tabs";
-import { AUTH_USER_UPDATED_EVENT, clearCachedAuthUser } from "@/lib/auth-client";
+import { clearCachedAuthUser } from "@/lib/auth-client";
 import { clearCachedAppUser } from "@/lib/app-user-client";
 import { useAppUser } from "@/lib/app-user-context";
 import { clearLocalCartSnapshot } from "@/lib/cart-client";
@@ -58,12 +60,6 @@ type UserOrder = {
   items: OrderItem[];
 };
 
-let cachedUserOrders: UserOrder[] | null = null;
-let cachedUserOrdersAt = 0;
-let pendingUserOrders: Promise<UserOrder[]> | null = null;
-let userOrdersCacheVersion = 0;
-const USER_ORDERS_CACHE_TTL_MS = 30_000;
-
 const loadingUserOrder: UserOrder = {
   id: "loading-order",
   createdAt: new Date(0).toISOString(),
@@ -73,82 +69,12 @@ const loadingUserOrder: UserOrder = {
   items: [{ id: "loading-item", productId: 1, title: "محصول", price: "0", quantity: 1 }],
 };
 
-function readOrders(data: unknown) {
-  const orders = (data as { data?: { orders?: unknown } } | null)?.data?.orders;
-  return Array.isArray(orders) ? orders as UserOrder[] : [];
-}
-
-function clearUserOrdersCache() {
-  cachedUserOrders = null;
-  cachedUserOrdersAt = 0;
-  pendingUserOrders = null;
-  userOrdersCacheVersion += 1;
-}
-
-function fetchUserOrdersOnce() {
-  if (cachedUserOrders !== null && Date.now() - cachedUserOrdersAt < USER_ORDERS_CACHE_TTL_MS) {
-    return Promise.resolve(cachedUserOrders);
-  }
-  if (pendingUserOrders) return pendingUserOrders;
-
-  const cacheVersion = userOrdersCacheVersion;
-  pendingUserOrders = fetch("/api/user/orders", { cache: "no-store" })
-    .then((res) => (res.ok ? res.json() : null))
-    .then((data) => {
-      const orders = readOrders(data);
-      if (cacheVersion === userOrdersCacheVersion) {
-        cachedUserOrders = orders;
-        cachedUserOrdersAt = Date.now();
-      }
-      return orders;
-    })
-    .finally(() => {
-      if (cacheVersion === userOrdersCacheVersion) {
-        pendingUserOrders = null;
-      }
-    });
-
-  return pendingUserOrders;
-}
-
 function UserOrdersPanel({ totalCount }: { totalCount?: number }) {
-  const [orders, setOrders] = useState<UserOrder[]>(() => cachedUserOrders ?? []);
-  const [loading, setLoading] = useState(cachedUserOrders === null);
+  const page = useStructurePagedCollection<UserOrder>({ endpoint: "/api/user/orders", itemKey: "orders", totalCount });
+  const { items: orders, loading } = page;
+  useTransientAppMessage(page.error);
   const [previewImage, setPreviewImage] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<UserOrder | null>(null);
-  const [, setCapacity] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    let requestId = 0;
-    const loadOrders = () => {
-      const nextRequestId = requestId + 1;
-      requestId = nextRequestId;
-      setLoading(true);
-      void fetchUserOrdersOnce()
-        .then((nextOrders) => {
-          if (!cancelled && nextRequestId === requestId) setOrders(nextOrders);
-        })
-        .catch(() => {
-          if (!cancelled && nextRequestId === requestId) setOrders([]);
-        })
-        .finally(() => {
-          if (!cancelled && nextRequestId === requestId) setLoading(false);
-        });
-    };
-    const reloadOrders = () => {
-      clearUserOrdersCache();
-      loadOrders();
-    };
-
-    loadOrders();
-    window.addEventListener(AUTH_USER_UPDATED_EVENT, reloadOrders);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(AUTH_USER_UPDATED_EVENT, reloadOrders);
-    };
-  }, []);
 
   return (
     <section className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
@@ -168,8 +94,7 @@ function UserOrdersPanel({ totalCount }: { totalCount?: number }) {
       <DynamicLoadingCollection
         items={orders}
         isLoading={loading}
-        totalCount={totalCount}
-        onCapacityChange={totalCount === undefined ? undefined : setCapacity}
+        {...page.collectionProps}
         className="flex flex-wrap items-start gap-3"
         getKey={(order) => order.id}
         lazy
@@ -264,42 +189,22 @@ function UserOrderCard({ order, onSelect, onPreview }: {
 
 export default function UserPanelPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: appUserData } = useAppUser();
   const [activeTab, setActiveTab] = useState<"profile" | "orders" | "discounts" | "wallet">("profile");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
-  const [structureError, setStructureError] = useState("");
-  const [structure, setStructure] = useState<UserPanelStructure | null>(null);
-  const [structureReady, setStructureReady] = useState(false);
   const isLoggedIn = Boolean(appUserData?.user);
+  const structureQuery = useQuery({
+    queryKey: ["user-structure", appUserData?.user?.id],
+    queryFn: () => getUserPanelStructure({ force: true }),
+    enabled: isLoggedIn,
+    staleTime: 30_000, refetchOnWindowFocus: false, retry: false,
+  });
+  const structure = structureQuery.data;
+  const structureReady = !structureQuery.isPending;
   useTransientAppMessage(logoutError);
-  useTransientAppMessage(structureError);
-
-  useEffect(() => {
-    if (!isLoggedIn) {
-      setStructure(null);
-      setStructureReady(true);
-      return;
-    }
-
-    let cancelled = false;
-    setStructureReady(false);
-    setStructureError("");
-    void getUserPanelStructure()
-      .then((next) => {
-        if (cancelled) return;
-        setStructure(next);
-        setStructureReady(true);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setStructureError("دریافت ساختار پنل کاربری انجام نشد.");
-        setStructureReady(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoggedIn]);
+  useTransientAppMessage(structureQuery.error?.message ?? "");
 
   useStructureRouteLoading(isLoggedIn && !structureReady);
 
@@ -308,13 +213,13 @@ export default function UserPanelPage() {
     let cancelled = false;
     void markUserDiscountsSeen()
       .then((next) => {
-        if (!cancelled && next) setStructure(next);
+        if (!cancelled && next) queryClient.setQueryData(["user-structure", appUserData?.user?.id], next);
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [activeTab, structure?.unseenDiscounts]);
+  }, [activeTab, appUserData?.user?.id, queryClient, structure?.unseenDiscounts]);
 
   const tabs: Array<CustomTabItem<typeof activeTab>> = [
     { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
@@ -343,7 +248,6 @@ export default function UserPanelPage() {
       clearLocalCartSnapshot(currentUser);
       clearLocalCartSnapshot(null);
       clearUserProfile(currentUser);
-      clearUserOrdersCache();
       invalidateFetchCache(USER_STRUCTURE_URL);
       clearCachedAppUser();
       clearCachedAuthUser();
@@ -357,7 +261,7 @@ export default function UserPanelPage() {
   };
 
   return (
-    <main className="min-h-full bg-primary-base p-6 text-primary-text">
+    <main className="min-h-full bg-primary-base p-3 text-primary-text sm:p-4">
       <div className="flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <AppHeading level={1} className="text-2xl text-primary-text font-bold">حساب کاربری</AppHeading>
@@ -376,9 +280,9 @@ export default function UserPanelPage() {
         </div>
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل کاربری" />
         {activeTab === "profile" ? <UserProfilePanel onCompleted={handleProfileCompleted} /> : null}
-        {activeTab === "orders" ? <UserOrdersPanel totalCount={structure?.orders} /> : null}
-        {activeTab === "discounts" ? <UserDiscountsPanel totalCount={structure?.discounts} /> : null}
-        {activeTab === "wallet" ? <UserWalletPanel /> : null}
+        {activeTab === "orders" ? <UserOrdersPanel totalCount={isLoggedIn ? structure?.orders : 0} /> : null}
+        {activeTab === "discounts" ? <UserDiscountsPanel totalCount={isLoggedIn ? structure?.discounts : 0} /> : null}
+        {activeTab === "wallet" ? <UserWalletPanel totalCount={isLoggedIn ? structure?.walletTransactions : 0} /> : null}
       </div>
     </main>
   );

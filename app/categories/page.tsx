@@ -97,6 +97,7 @@ function CategoriesGroupSection({
           </div>
         </div>
         <DynamicLoadingCollection
+          lazy
           items={categories}
           isLoading={dataLoading}
           totalCount={totalCount}

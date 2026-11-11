@@ -1,13 +1,16 @@
 "use client";
 
+import { useAdminPagedCollection } from "@/hooks/use-admin-paged-collection";
+
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
 import { CustomTable, CustomTableRow, CustomSortHeader as OrderSortHeaderButton } from "@/app/design-system/components/ui/table";
 
 import { CustomTabs } from "@/app/design-system/components/ui/tabs";
 
-import { useEffect, useMemo, useState } from "react";
-import { IoAddOutline, IoCheckmarkCircleOutline, IoReloadOutline, IoSearchOutline } from "react-icons/io5";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { IoAddOutline, IoCheckmarkCircleOutline, IoSearchOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
@@ -19,13 +22,12 @@ import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { OrderStatusTag, OrderStatusTimeline } from "@/app/design-system/components/ui/order-status";
 import { formatPersianDate } from "@/lib/date-format";
-import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
+import { invalidateFetchCache } from "@/lib/fetch-json";
 import { nextOrderStatus, normalizeOrderStatus, ORDER_STATUS_LABELS, type OrderStatusEventRecord } from "@/lib/order-status";
 import { formatAmount, toLatinDigits } from "@/lib/price-format";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { AppHeading } from "@/app/design-system/components/ui/text";
 import { AdminInPersonOrderForm } from "@/app/panel/admin/admin-in-person-order-form";
-import { getAdminPanelStructure } from "@/lib/admin-structure";
 
 type AdminOrderItem = {
   id: string;
@@ -95,46 +97,6 @@ function customerName(order: AdminOrder) {
   return profileName || order.user?.name || order.user?.username || "کاربر بدون نام";
 }
 
-function orderSearchText(order: AdminOrder) {
-  return [
-    order.id, order.fulfillmentStatus, order.trackingCode, order.total, order.createdAt,
-    order.orderType === "in_person" ? "حضوری" : "آنلاین",
-    order.user?.username, order.user?.email, order.user?.name,
-    order.profile?.firstName, order.profile?.lastName, order.profile?.phone, order.profile?.email, order.profile?.address,
-    ...order.items.flatMap((item) => [item.id, item.productId, item.title, item.selectedColor]),
-  ].filter(Boolean).join(" ").toLowerCase();
-}
-
-function compareOrders(
-  first: AdminOrder,
-  second: AdminOrder,
-  key: AdminOrderSortKey,
-  direction: AdminOrderSortDirection
-) {
-  const factor = direction === "asc" ? 1 : -1;
-
-  if (key === "customer") {
-    return factor * customerName(first).localeCompare(customerName(second), "fa");
-  }
-  if (key === "status") {
-    const firstStatus = ORDER_STATUS_LABELS[normalizeOrderStatus(first.fulfillmentStatus)];
-    const secondStatus = ORDER_STATUS_LABELS[normalizeOrderStatus(second.fulfillmentStatus)];
-    return factor * firstStatus.localeCompare(secondStatus, "fa");
-  }
-  if (key === "createdAt") {
-    return factor * (new Date(first.createdAt).getTime() - new Date(second.createdAt).getTime());
-  }
-  if (key === "items") {
-    const firstQuantity = first.items.reduce((count, item) => count + item.quantity, 0);
-    const secondQuantity = second.items.reduce((count, item) => count + item.quantity, 0);
-    return factor * (firstQuantity - secondQuantity);
-  }
-  if (key === "total") {
-    return factor * (Number(first.total) - Number(second.total));
-  }
-  return factor * first.id.localeCompare(second.id, "fa");
-}
-
 function jalaliToGregorian(jalaliYear: number, jalaliMonth: number, jalaliDay: number) {
   const jy = jalaliYear + 1595;
   let days = -355668 + (365 * jy) + Math.floor(jy / 33) * 8 + Math.floor(((jy % 33) + 3) / 4) + jalaliDay;
@@ -181,17 +143,16 @@ type AdminOrdersPanelProps = {
 };
 
 export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, usersCount }: AdminOrdersPanelProps) {
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const queryClient = useQueryClient();
+  const [tableOpen, setTableOpen] = useState(false);
+  const [orderUpdates, setOrderUpdates] = useState<Record<string, AdminOrder>>({});
   const [trackingDrafts, setTrackingDrafts] = useState<Record<string, string>>({});
   const [previewImage, setPreviewImage] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
-  const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState("");
   const [message, setMessage] = useState("");
-  const [loadError, setLoadError] = useState("");
   const [createdInPersonCount, setCreatedInPersonCount] = useState(0);
   useTransientAppMessage(message);
-  useTransientAppMessage(loadError);
   const [searchQuery, setSearchQuery] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -199,29 +160,6 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
   const [sortKey, setSortKey] = useState<AdminOrderSortKey>("createdAt");
   const [sortDirection, setSortDirection] = useState<AdminOrderSortDirection>("desc");
   const [inPersonModalOpen, setInPersonModalOpen] = useState(false);
-  const [inPersonOptionCounts, setInPersonOptionCounts] = useState<{ products?: number; users?: number } | null>(null);
-
-  const scopedOrders = useMemo(
-    () => orders.filter((order) => isInPersonOrder(order) === (view === "in_person")),
-    [orders, view]
-  );
-
-  const filteredOrders = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const fromTime = getDateBound(dateFrom);
-    const toTime = getDateBound(dateTo, true);
-    return scopedOrders.filter((order) => {
-      const orderTime = new Date(order.createdAt).getTime();
-      if (fromTime !== null && orderTime < fromTime) return false;
-      if (toTime !== null && orderTime > toTime) return false;
-      return !query || orderSearchText(order).includes(query);
-    });
-  }, [dateFrom, dateTo, scopedOrders, searchQuery]);
-
-  const visibleOrders = useMemo(
-    () => [...filteredOrders].sort((first, second) => compareOrders(first, second, sortKey, sortDirection)),
-    [filteredOrders, sortDirection, sortKey]
-  );
 
   const toggleSort = (key: AdminOrderSortKey) => {
     if (sortKey === key) {
@@ -239,34 +177,19 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
     : totalCount !== undefined && inPersonCount !== undefined
       ? Math.max(0, Number(totalCount) - Number(inPersonCount))
       : totalCount;
-  const scopedTotalCount = viewTotalCount ?? scopedOrders.length;
-  const collectionTotalCount = hasFilters
-    ? loading ? undefined : visibleOrders.length
-    : viewTotalCount;
-
-  const loadOrders = async (force = false) => {
-    setLoading(true);
-    setLoadError("");
-    setMessage("");
-    try {
-      const response = await fetchJsonDeduped<AdminOrdersResponse>(ADMIN_ORDERS_URL, { force });
-      if (response?.ok === false) throw new Error(response.showMessage || "دریافت سفارش‌ها انجام نشد.");
-      const nextOrders = Array.isArray(response?.data?.orders) ? response.data.orders : [];
-      setOrders(nextOrders);
-      setTrackingDrafts(Object.fromEntries(nextOrders.map((order) => [order.id, order.trackingCode ?? ""])));
-    } catch (error) {
-      console.error("Admin orders load error:", error);
-      setOrders([]);
-      setLoadError("دریافت سفارش‌ها ممکن نشد.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  const params = new URLSearchParams({ view, q: searchQuery.trim(), sort: sortKey, direction: sortDirection });
+  const from = getDateBound(dateFrom);
+  const to = getDateBound(dateTo, true);
+  if (from !== null) params.set("from", String(from));
+  if (to !== null) params.set("to", String(to));
+  const page = useAdminPagedCollection<AdminOrder>({ endpoint: ADMIN_ORDERS_URL, itemKey: "orders", params: params.toString(), totalCount: hasFilters ? undefined : viewTotalCount, structureEndpoint: "/api/admin/collections/structure?collection=orders", enabled: tableOpen });
+  const { loading, error: loadError } = page;
+  useTransientAppMessage(loadError);
+  const visibleOrders = page.items.map((order) => orderUpdates[order.id] ?? order);
+  const scopedTotalCount = page.total ?? viewTotalCount ?? 0;
   useEffect(() => {
-    const timer = window.setTimeout(() => void loadOrders(), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    setTrackingDrafts((current) => ({ ...Object.fromEntries(page.items.map((order) => [order.id, order.trackingCode ?? ""])), ...current }));
+  }, [page.items]);
 
   const advanceOrder = async (order: AdminOrder) => {
     const nextStatus = nextOrderStatus(order.fulfillmentStatus);
@@ -288,7 +211,8 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
       if (!response.ok || data?.ok === false || !data?.data?.order) throw new Error(data?.showMessage || "ثبت وضعیت سفارش ممکن نشد.");
       const updatedOrder = data.data.order;
       invalidateFetchCache(ADMIN_ORDERS_URL);
-      setOrders((current) => current.map((item) => item.id === updatedOrder.id ? updatedOrder : item));
+      setOrderUpdates((current) => ({ ...current, [updatedOrder.id]: updatedOrder }));
+      void queryClient.invalidateQueries({ queryKey: ["admin-list", ADMIN_ORDERS_URL] });
       setSelectedOrder(updatedOrder);
       setTrackingDrafts((current) => ({ ...current, [updatedOrder.id]: updatedOrder.trackingCode ?? "" }));
       setMessage(`وضعیت سفارش به «${ORDER_STATUS_LABELS[normalizeOrderStatus(updatedOrder.fulfillmentStatus)]}» تغییر کرد.`);
@@ -299,24 +223,15 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
     }
   };
 
-  const openInPersonOrder = async () => {
-    setInPersonOptionCounts(null);
+  const openInPersonOrder = () => {
     setInPersonModalOpen(true);
-    try {
-      // Counts can change while other admin tabs create products or customers.
-      const current = await getAdminPanelStructure({ force: true });
-      setInPersonOptionCounts({ products: current.products, users: current.users });
-    } catch {
-      setInPersonOptionCounts({ products: productsCount, users: usersCount });
-      setMessage("دریافت ساختار سفارش حضوری انجام نشد.");
-    }
   };
 
   const handleInPersonOrderCreated = () => {
     invalidateFetchCache(ADMIN_ORDERS_URL);
     setCreatedInPersonCount((count) => count + 1);
     setInPersonModalOpen(false);
-    void loadOrders(true);
+    void queryClient.invalidateQueries({ queryKey: ["admin-list", ADMIN_ORDERS_URL] });
     setMessage("سفارش حضوری با موفقیت ثبت شد.");
   };
 
@@ -325,7 +240,7 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
       <CustomTabs items={([
           { id: "online", label: "سفارش‌های آنلاین" },
           { id: "in_person", label: "سفارش‌های حضوری" },
-        ] as const)} value={view} onChange={setView} variant="secondary" />
+        ] as const)} value={view} onChange={(next) => { setView(next); setTableOpen(false); }} variant="secondary" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
@@ -334,7 +249,6 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
           </AppHeading>
           <span className="text-xs font-semibold text-secondary-text">{scopedTotalCount} سفارش</span>
         </div>
-        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void loadOrders(true)} disabled={loading}><span>به‌روزرسانی</span></CustomButton>
       </div>
 
       <div className="flex flex-col gap-3 border-t border-primary-border pt-3">
@@ -348,6 +262,7 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
         </div>
       </div>
 
+      <CustomAccordion title="فهرست سفارش‌ها" open={tableOpen} onOpenChange={setTableOpen} showStatusLabel={false}>
       {!loading && !loadError && visibleOrders.length === 0 ? (
         <CustomEmptyState description={hasFilters ? "نتیجه‌ای با این فیلترها پیدا نشد." : view === "in_person" ? "هنوز سفارش حضوری ثبت نشده است." : "هنوز سفارشی ثبت نشده است."} />
       ) : null}
@@ -381,7 +296,7 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
         <DynamicLoadingCollection
           items={visibleOrders}
           isLoading={loading}
-          totalCount={collectionTotalCount}
+          {...page.collectionProps}
           className="flex w-full flex-col gap-1.5"
           getKey={(order) => order.id}
           lazy
@@ -396,6 +311,7 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
         />
 
       </CustomTable>
+      </CustomAccordion>
       <CustomModal open={Boolean(selectedOrder)} onClose={() => setSelectedOrder(null)} title="جزئیات سفارش" size="lg" closeOnBackdrop>
         {selectedOrder ? (
           <AdminOrderDetailsModalContent
@@ -412,8 +328,8 @@ export function AdminOrdersPanel({ totalCount, inPersonCount, productsCount, use
       <CustomModal open={inPersonModalOpen} onClose={() => setInPersonModalOpen(false)} title="ثبت سفارش حضوری" size="lg" closeOnBackdrop>
         {inPersonModalOpen ? (
           <AdminInPersonOrderForm
-            productsCount={inPersonOptionCounts?.products}
-            usersCount={inPersonOptionCounts?.users}
+            productsCount={productsCount}
+            usersCount={usersCount}
             onCreated={handleInPersonOrderCreated}
             onClose={() => setInPersonModalOpen(false)}
           />

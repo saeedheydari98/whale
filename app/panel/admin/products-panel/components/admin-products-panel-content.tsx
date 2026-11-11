@@ -6,6 +6,7 @@ import { AdminBannerList } from "./admin-banner-list";
 import { AdminShowcaseList } from "./admin-showcase-list";
 import { SECTION_COUNT_LABELS, SECTION_TITLES } from "../constants";
 import { AppHeading } from "@/app/design-system/components/ui/text";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import type { AdminCatalogSection, BannerForm } from "../types";
 import type { AdminProductsPanelState } from "../hooks/use-admin-products-panel";
 import { BannerModals } from "./banner-modals";
@@ -22,6 +23,8 @@ import { StorefrontSection } from "./storefront-section";
 type AdminProductsPanelContentProps = {
   section: AdminCatalogSection;
   panel: AdminProductsPanelState;
+  listOpen: boolean;
+  onListOpenChange: (open: boolean) => void;
 };
 
 const loadingBanner: BannerForm = {
@@ -43,10 +46,10 @@ const loadingBanner: BannerForm = {
   sortOrder: 0,
 };
 
-export function AdminProductsPanelContent({ section, panel }: AdminProductsPanelContentProps) {
+export function AdminProductsPanelContent({ section, panel, listOpen, onListOpenChange }: AdminProductsPanelContentProps) {
   useTransientAppMessage(panel.status);
   const sectionCount = getSectionCount(section, panel);
-  const canPage = Boolean(panel.structure) && section !== "storefront";
+  const canPage = listOpen && Boolean(panel.structure) && section !== "storefront";
   const collectionPaging = {
     totalCount: panel.sectionTotalCount,
     hasMore: canPage && panel.sectionHasMore,
@@ -57,10 +60,10 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
   return (
     <section className="flex w-full max-w-none flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex items-center justify-between gap-3">
-        <Loading loading="skeleton-item" isLoading={panel.loading && section !== "storefront"}>
+        <Loading loading="skeleton-item" isLoading={listOpen && panel.loading && section !== "storefront"}>
           <AppHeading level={2} className="text-base font-bold text-primary-text">{SECTION_TITLES[section]}</AppHeading>
         </Loading>
-        <Loading loading="skeleton-item" isLoading={panel.loading && section !== "storefront"}>
+        <Loading loading="skeleton-item" isLoading={listOpen && panel.loading && section !== "storefront"}>
           <span className="text-xs font-semibold text-primary-text">
             {sectionCount} {SECTION_COUNT_LABELS[section]}
           </span>
@@ -70,6 +73,8 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
 
       {section === "products" ? (
         <ProductsSection
+          listOpen={listOpen}
+          onListOpenChange={onListOpenChange}
           products={panel.sortedProducts}
           brands={panel.sortedBrands}
           draggingProductId={panel.draggingProductId}
@@ -84,6 +89,7 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
         />
       ) : null}
 
+      {section !== "products" ? <CustomAccordion title={`فهرست ${SECTION_TITLES[section]}`} open={listOpen} onOpenChange={onListOpenChange} showStatusLabel={false}>
       {section === "banners" ? (
         <DynamicLoadingCollection
           items={panel.sortedBanners}
@@ -177,6 +183,8 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
           totalCount={panel.sectionTotalCount}
         />
       ) : null}
+
+      </CustomAccordion> : null}
 
       <FloatingActions
           section={section}
@@ -290,6 +298,8 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
       />
 
       <ShowcaseModals
+        onLoadReferences={() => { void panel.ensureProductFormReferences(); }}
+        referencesLoading={panel.productFormReferencesLoading}
         products={panel.sortedProducts}
         categories={panel.sortedCategories}
         draftShowcase={panel.draftShowcase}
@@ -310,6 +320,8 @@ export function AdminProductsPanelContent({ section, panel }: AdminProductsPanel
       />
 
       <ProductModals
+        onLoadReferences={() => { void panel.ensureProductFormReferences(); }}
+        referencesLoading={panel.productFormReferencesLoading}
         showcases={panel.sortedShowcases}
         categories={panel.sortedCategories}
         brands={panel.sortedBrands}

@@ -5,6 +5,7 @@ import { CustomFileUpload } from "@/app/design-system/components/ui/file-upload"
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
 import { useEffect, useState } from "react";
+import Loading from "@/app/design-system/components/loading/loading";
 import { IoAdd, IoSaveOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
@@ -17,6 +18,8 @@ import { CustomModalSection } from "@/app/design-system/components/ui/modal-sect
 import { InventoryControls, ProductAdvancedFields, ProductPlacementFields } from "./product-form-fields";
 
 type ProductModalsProps = {
+  onLoadReferences: () => void;
+  referencesLoading: boolean;
   showcases: ShowcaseForm[];
   categories: CategoryForm[];
   brands: BrandForm[];
@@ -48,6 +51,8 @@ export function ProductModals(props: ProductModalsProps) {
   return (
     <>
       <ProductModal
+        onLoadReferences={props.onLoadReferences}
+        referencesLoading={props.referencesLoading}
         open={props.isCreateOpen}
         onClose={props.onCloseCreate}
         title="ثبت محصول"
@@ -71,6 +76,8 @@ export function ProductModals(props: ProductModalsProps) {
         submitLabel="ثبت محصول"
       />
       <ProductModal
+        onLoadReferences={props.onLoadReferences}
+        referencesLoading={props.referencesLoading}
         open={props.isEditOpen}
         onClose={props.onCloseEdit}
         title={props.editingProduct?.title || "ویرایش محصول"}
@@ -99,6 +106,8 @@ export function ProductModals(props: ProductModalsProps) {
 }
 
 type ProductModalProps = {
+  onLoadReferences: () => void;
+  referencesLoading: boolean;
   open: boolean;
   onClose: () => void;
   title: string;
@@ -124,6 +133,8 @@ type ProductModalProps = {
 };
 
 function ProductModal({
+  onLoadReferences,
+  referencesLoading,
   open,
   onClose,
   title,
@@ -175,7 +186,7 @@ function ProductModal({
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(titleErrorKey) && !hasTitle}
             meta="نام، اسلاگ، برچسب و لینک دکمه"
-            defaultOpen={!hasTitle}
+            defaultOpen
           >
             <CustomInput value={product.title} placeholder="نام" invalid={hasRequiredError(titleErrorKey) && !product.title.trim()} onChange={(event) => onPatch({ title: event.target.value })} />
             <CustomInput value={product.slug} placeholder="اسلاگ" onChange={(event) => onPatch({ slug: event.target.value })} />
@@ -188,7 +199,7 @@ function ProductModal({
             status={hasPrice ? "complete" : "incomplete"}
             invalid={hasRequiredError(priceErrorKey) && !hasPrice}
             meta="قیمت قبل از تخفیف و قیمت فروش"
-            defaultOpen={!hasPrice}
+            defaultOpen={false}
           >
             <CustomInput
               value={formatAmount(product.originalPrice)}
@@ -215,8 +226,10 @@ function ProductModal({
             status={hasPlacement ? "complete" : "incomplete"}
             invalid={hasRequiredError(categoryErrorKey) && !hasPlacement}
             meta="دسته‌بندی، ویترین، برند و ترتیب"
-            defaultOpen={!hasPlacement}
+            defaultOpen={false}
+            onOpenChange={(expanded) => { if (expanded) onLoadReferences(); }}
           >
+            <Loading loading="skeleton-structure" isLoading={referencesLoading}>
             <ProductPlacementFields
               product={product}
               showcases={showcases}
@@ -226,6 +239,7 @@ function ProductModal({
               hasRequiredError={hasRequiredError}
               categoryErrorKey={categoryErrorKey}
             />
+            </Loading>
             <CustomInput type="number" value={product.sortOrder} placeholder="ترتیب نمایش" onChange={(event) => onPatch({ sortOrder: Number(event.target.value) })} />
           </CustomModalSection>
 
@@ -234,7 +248,7 @@ function ProductModal({
             status={inventoryComplete ? "complete" : "incomplete"}
             invalid={hasRequiredError(inventoryErrorKey) && !inventoryComplete}
             meta="موجودی کل و سهم رنگ‌ها"
-            defaultOpen={!inventoryComplete}
+            defaultOpen={false}
           >
             <InventoryControls product={product} onChange={onPatch} />
           </CustomModalSection>
@@ -260,7 +274,7 @@ function ProductModal({
             title="تصاویر محصول"
             status={hasImages ? "complete" : "incomplete"}
             meta="گالری محصول و تصویر اصلی کارت"
-            defaultOpen={!hasImages}
+            defaultOpen={false}
           >
             <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است. اولین تصویر روی کارت محصول نمایش داده می‌شود.</div>
             <div className="flex gap-2">

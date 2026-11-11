@@ -23,6 +23,8 @@ export type AdminPanelStructure = {
   categoryGroups: AdminCountItem[];
   brandGroups: AdminCountItem[];
   storefront: AdminStorefrontStructure;
+  discountRules: number;
+  accessRequests: { pending: number; approved: number; archived: number };
 };
 
 function asCount(value: unknown) {
@@ -75,6 +77,12 @@ export function normalizeAdminPanelStructure(value: unknown): AdminPanelStructur
     categoryGroups: asCountItems(record.categoryGroups),
     brandGroups: asCountItems(record.brandGroups),
     storefront: asStorefrontStructure(record.storefront ?? nested.storefront),
+    discountRules: asCount(nested.discountRules),
+    accessRequests: {
+      pending: asCount((record.accessRequests as Record<string, unknown> | undefined)?.pending),
+      approved: asCount((record.accessRequests as Record<string, unknown> | undefined)?.approved),
+      archived: asCount((record.accessRequests as Record<string, unknown> | undefined)?.archived),
+    },
   };
 }
 

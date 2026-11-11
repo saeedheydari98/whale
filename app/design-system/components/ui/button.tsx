@@ -8,7 +8,7 @@ import React from "react";
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
 import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cursorVariants, cx, glassSurfaceClasses, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, controlLabelClasses, cursorVariants, cx, glassSurfaceClasses, GradientDirection, interactionStates, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";
 
 
@@ -111,7 +111,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     <>
       {isLoading && <Loading loading={loading} size={size} />}
       {!isLoading && icon}
-      <span>{isLoading ? loadingText ?? children : children}</span>
+      <span className={controlLabelClasses}>{isLoading ? loadingText ?? children : children}</span>
       {!isLoading && iconAfter}
     </>
   );

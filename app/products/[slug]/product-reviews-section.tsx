@@ -2,7 +2,10 @@
 
 import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
 
-import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
+import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
+import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { IoCheckmarkCircle, IoChatbubbleEllipsesOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
@@ -19,7 +22,8 @@ export type ProductReview = {
 };
 
 type ProductReviewsSectionProps = {
-  reviews: ProductReview[];
+  productId?: string | number;
+  totalCount?: number;
   text: string;
   rating?: number;
   userRating?: number;
@@ -42,24 +46,9 @@ function formatReviewDate(value: string) {
   }
 }
 
-function buildDistribution(reviews: ProductReview[]) {
-  const counts = [0, 0, 0, 0, 0];
-
-  for (const review of reviews) {
-    const stars = Number(review.rating);
-    if (Number.isFinite(stars) && stars >= 1 && stars <= 5) {
-      counts[stars - 1] += 1;
-    }
-  }
-
-  return [5, 4, 3, 2, 1].map((stars) => ({
-    stars,
-    count: counts[stars - 1],
-  }));
-}
-
 export function ProductReviewsSection({
-  reviews,
+  productId,
+  totalCount,
   text,
   rating,
   userRating,
@@ -69,18 +58,23 @@ export function ProductReviewsSection({
   onRatingChange,
   onSubmit,
 }: ProductReviewsSectionProps) {
-  const ratedReviews = useMemo(
-    () => reviews.filter((review) => Number(review.rating) > 0),
-    [reviews]
-  );
-
-  const avgRating = useMemo(() => {
-    if (ratedReviews.length === 0) return 0;
-    const total = ratedReviews.reduce((sum, review) => sum + Number(review.rating), 0);
-    return Math.round((total / ratedReviews.length) * 10) / 10;
-  }, [ratedReviews]);
-
-  const distribution = useMemo(() => buildDistribution(reviews), [reviews]);
+  const endpoint = "/api/products/" + encodeURIComponent(String(productId)) + "/comments";
+  const hasProduct = Number.isInteger(Number(productId)) && Number(productId) > 0;
+  const summary = useQuery({
+    enabled: hasProduct,
+    queryKey: ["review-structure", String(productId)],
+    queryFn: async ({ signal }) => {
+      const response = await fetch(endpoint + "/structure", { cache: "no-store", signal });
+      const payload = await response.json();
+      if (!response.ok || payload?.ok === false) throw new Error(payload?.showMessage || "دریافت ساختار دیدگاه‌ها انجام نشد.");
+      return payload.data.structure as { count: number; ratings: Array<{ stars: number; count: number }> };
+    }, staleTime: 30_000, refetchOnWindowFocus: false, retry: false,
+  });
+  const page = useStructurePagedCollection<{ id: string; author?: string; content: string; rating?: number | null; createdAt: string }>({ endpoint, itemKey: "comments", totalCount: summary.data?.count ?? totalCount, enabled: hasProduct });
+  useTransientAppMessage(summary.error?.message || page.error);
+  const distribution = [5, 4, 3, 2, 1].map((stars) => ({ stars, count: summary.data?.ratings.find((group) => group.stars === stars)?.count ?? 0 }));
+  const ratedCount = distribution.reduce((total, group) => total + group.count, 0);
+  const avgRating = ratedCount ? Math.round(distribution.reduce((total, group) => total + group.stars * group.count, 0) / ratedCount * 10) / 10 : 0;
   const maxCount = Math.max(1, ...distribution.map((item) => item.count));
   const canRate = isPurchased && !hasRated;
   const displayRating = rating ?? userRating ?? 0;
@@ -88,29 +82,30 @@ export function ProductReviewsSection({
   return (
     <section
       id="product-reviews"
-      className="flex w-full flex-col gap-8 rounded-2xl border border-primary-border bg-primary-soft p-6 shadow-sm"
+      className="flex w-full flex-col gap-4 rounded-2xl border border-primary-border bg-primary-soft p-3 shadow-sm sm:p-4"
     >
-      <div className="flex flex-col gap-2 border-b border-primary-border pb-6">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-primary-border pb-3">
         <AppHeading level={2} className="text-2xl font-bold text-primary-text">دیدگاه‌های خریداران</AppHeading>
         <div className="text-sm text-secondary-text">
           نظر خریداران و امتیازها را ببینید.
         </div>
       </div>
 
-      <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-12">
-        <aside className="flex w-full flex-col gap-5 lg:max-w-xs lg:shrink-0">
-            <div data-card-family="review" className={collectionCardClasses("review", "flex flex-col gap-2 rounded-xl border border-primary-border bg-primary-card p-2")}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <aside className="flex w-full flex-col gap-3 lg:max-w-xs lg:shrink-0">
+          <Loading loading="skeleton-structure" isLoading={summary.isPending}>
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary-border bg-primary-card p-2">
             <div className="text-4xl font-bold leading-none text-primary-text">
               {avgRating > 0 ? avgRating.toFixed(1) : "—"}
             </div>
             <StarRating value={avgRating} size="lg" ariaLabel={`میانگین امتیاز ${avgRating} از ۵`} />
             <div className="text-sm text-secondary-text">
-              {ratedReviews.length > 0
-                ? `${ratedReviews.length} دیدگاه امتیازدار`
+              {ratedCount > 0
+                ? `${ratedCount} دیدگاه امتیازدار`
                 : "هنوز امتیازی ثبت نشده است"}
             </div>
             <div className="text-xs text-secondary-text">
-              مجموع {reviews.length} دیدگاه
+              مجموع {page.total ?? totalCount ?? 0} دیدگاه
             </div>
           </div>
 
@@ -132,10 +127,11 @@ export function ProductReviewsSection({
               );
             })}
           </div>
+          </Loading>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-8">
-          <div className="flex flex-col gap-4 rounded-xl border border-primary-border bg-primary-card p-5">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-card p-3">
             <div className="text-lg font-bold text-primary-text">ثبت دیدگاه</div>
 
             <div className="flex flex-col gap-2">
@@ -197,23 +193,26 @@ export function ProductReviewsSection({
             </div>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-3">
               <div className="text-lg font-bold text-primary-text">همه دیدگاه‌ها</div>
               <div className="text-xs text-secondary-text">جدیدترین‌ها</div>
             </div>
 
-            {reviews.length === 0 ? (
-              <CustomEmptyState
-                description="اولین دیدگاه این محصول را ثبت کنید."
-                icon={<IoChatbubbleEllipsesOutline />}
-                className="border-dashed py-12 text-center"
-              />
-            ) : (
-              <div className="flex flex-col gap-4">
-                {reviews.map((review) => (
+            {!page.loading && page.items.length === 0 ? <CustomEmptyState size="sm" icon={<IoChatbubbleEllipsesOutline />} /> : null}
+            <DynamicLoadingCollection items={page.items} isLoading={page.loading} {...page.collectionProps} lazy className="flex flex-col gap-2" getKey={(review) => review.id}
+              renderItem={(review) => <ReviewCard review={{ ...review, text: review.content, rating: review.rating ?? undefined }} />}
+              renderSkeleton={() => <Loading loading="skeleton-structure" isLoading><ReviewCard review={{ id: "loading", text: "...", author: "...", rating: 5, createdAt: new Date(0).toISOString() }} /></Loading>} />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ReviewCard({ review }: { review: ProductReview }) {
+  return (
                   <article
-                    key={review.id}
                     data-card-family="review" className={collectionCardClasses("review", "flex flex-col gap-2 rounded-xl border border-primary-border bg-primary-card p-2")}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -234,12 +233,5 @@ export function ProductReviewsSection({
                     </div>
                     <div className="min-h-0 line-clamp-2 text-xs leading-5 text-primary-text whitespace-pre-wrap">{review.text}</div>
                   </article>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </section>
   );
 }

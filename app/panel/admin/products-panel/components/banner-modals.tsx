@@ -146,7 +146,7 @@ function BannerModal({
             title="اطلاعات بنر"
             status={hasTitle ? "complete" : "optional"}
             meta="عنوان و ترتیب اصلی"
-            defaultOpen={!hasTitle}
+            defaultOpen
           >
             <CustomInput value={banner.title} placeholder="عنوان بنر" onChange={(event) => onPatch({ title: event.target.value })} />
             <CustomInput
@@ -161,7 +161,7 @@ function BannerModal({
             title="محل نمایش بنر"
             status={hasTarget ? "complete" : "incomplete"}
             meta="خانه، دسته‌بندی یا ویترین"
-            defaultOpen={!hasTarget}
+            defaultOpen={false}
           >
             <div className="flex flex-wrap gap-2">
               <BannerTargetCheckbox label="خانه" checked={banner.showOnHome} onChange={(showOnHome) => onPatch({ showOnHome })} />
@@ -204,7 +204,7 @@ function BannerModal({
             title="زمان‌بندی و اندازه"
             status={timingComplete ? "complete" : "incomplete"}
             meta="تغییر خودکار و ارتفاع بنر"
-            defaultOpen={!timingComplete}
+            defaultOpen={false}
           >
             <div className="flex flex-col gap-2 sm:flex-row">
             <CustomInput name={`${errorKey}-interval-seconds`} type="number" min={1} max={60} step={1} value={banner.intervalSeconds} placeholder="زمان تغییر خودکار" onChange={(event) => onPatch({ intervalSeconds: Number(event.target.value) })} />
@@ -217,7 +217,7 @@ function BannerModal({
             status={hasImages ? "complete" : "incomplete"}
             invalid={hasRequiredError(errorKey) && !hasImages}
             meta="گالری WebP بنر"
-            defaultOpen={!hasImages}
+            defaultOpen={false}
           >
             <div className="text-xs font-semibold text-secondary-text">فقط فرمت WebP مجاز است.</div>
             <div className="flex gap-2">

@@ -1268,7 +1268,7 @@ export async function getProductDetail(
 ): Promise<ProductDetailResult> {
   try {
     const json = await fetchJsonDeduped<{ data?: any }>(
-      `/api/products/${encodeCatalogSegment(id)}`,
+      `/api/products/${encodeCatalogSegment(id)}?includeComments=0`,
       { force: options?.force }
     );
     const product = json?.data?.product

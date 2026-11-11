@@ -3,6 +3,9 @@ import { apiOk, apiServerError } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/auth";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { readWithRetry } from "@/lib/api/read-retry";
+import { adminListQuerySchema } from "@/lib/api/schemas";
+import { validationError } from "@/lib/api/validation";
+import { readAdminUserPage } from "@/lib/api/admin-list-pages";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,6 +34,12 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   try {
+    const params = new URL(request.url).searchParams;
+    if (params.has("limit")) {
+      const parsed = adminListQuerySchema.safeParse(Object.fromEntries(params));
+      if (!parsed.success) return validationError(parsed.error);
+      return apiOk(await readWithRetry(() => readAdminUserPage(parsed.data)));
+    }
     const [users, orderStats] = await Promise.all([
       readWithRetry(() => prisma.user.findMany({
         orderBy: { createdAt: "desc" },

@@ -20,12 +20,18 @@ try {
     let release;
     const gate = new Promise((resolve) => { release = resolve; });
     await context.route("**/api/**", async (route) => {
-      const pathname = new URL(route.request().url()).pathname;
+      const url = new URL(route.request().url());
+      const pathname = url.pathname;
       let data = {};
       if (pathname === "/api/theme") data = { theme: { primary: "blue", style: "light" } };
       if (pathname === "/api/app/user") data = { user: { id: 1, role: "user", username: "09121234567", themeMode: "light", profile: null }, cart: { count: 0 } };
       if (pathname === "/api/user/structure") data = { structure: { orders: 4, discounts: 0, unseenDiscounts: 0 } };
-      if (pathname === "/api/user/orders") { await gate; data = { orders }; }
+      if (pathname === "/api/user/orders") {
+        await gate;
+        const offset = Number(url.searchParams.get("offset")), limit = Number(url.searchParams.get("limit"));
+        const items = orders.slice(offset, offset + limit);
+        data = { orders: items, total: orders.length, nextOffset: offset + items.length < orders.length ? offset + items.length : null };
+      }
       if (pathname === "/api/catalog/sync") return route.fulfill({ contentType: "text/event-stream", body: ": fixture\n\n" });
       return route.fulfill({ json: { ok: true, data } });
     });

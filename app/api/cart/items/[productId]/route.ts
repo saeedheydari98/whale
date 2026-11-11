@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { requireUser } from "@/lib/api/auth";
 import { parseJsonBody } from "@/lib/api/validation";
 import { quantitySchema } from "@/lib/api/schemas";
-import { getOrCreateActiveCart, cartItemDto } from "@/lib/api/catalog-service";
+import { getOrCreateActiveCartTarget, cartItemDto } from "@/lib/api/catalog-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +25,7 @@ export async function PUT(request: Request, context: Context) {
 
   try {
     const { productId } = await context.params;
-    const cart = await getOrCreateActiveCart(auth.user.id);
+    const cart = await getOrCreateActiveCartTarget(auth.user.id);
     const item = await prisma.cartItem.update({
       where: { cartId_productId: { cartId: cart.id, productId: Number(productId) } },
       data: { quantity: parsed.data.quantity },
@@ -44,7 +44,7 @@ export async function DELETE(request: Request, context: Context) {
 
   try {
     const { productId } = await context.params;
-    const cart = await getOrCreateActiveCart(auth.user.id);
+    const cart = await getOrCreateActiveCartTarget(auth.user.id);
     await prisma.cartItem.delete({ where: { cartId_productId: { cartId: cart.id, productId: Number(productId) } } });
     return apiOk({ deleted: true });
   } catch (error: any) {

@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { requireUser } from "@/lib/api/auth";
 import { parseJsonBody } from "@/lib/api/validation";
 import { cartItemSchema } from "@/lib/api/schemas";
-import { cartItemDto, getOrCreateActiveCart } from "@/lib/api/catalog-service";
+import { cartItemDto, getOrCreateActiveCart, getOrCreateActiveCartTarget } from "@/lib/api/catalog-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   try {
     const [cart, product] = await Promise.all([
-      getOrCreateActiveCart(auth.user.id),
+      getOrCreateActiveCartTarget(auth.user.id),
       prisma.product.findUnique({ where: { id: parsed.data.productId } }),
     ]);
     if (!product) return apiServerError("محصول پیدا نشد.");

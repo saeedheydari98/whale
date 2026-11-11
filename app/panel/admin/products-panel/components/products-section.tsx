@@ -11,10 +11,13 @@ import { CustomButton } from "@/app/design-system/components/ui/button";
 import { AppImage } from "@/app/design-system/components/ui/app-image";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import type { BrandForm, ProductForm } from "../types";
 import { formatPrice } from "../utils";
 
 type ProductsSectionProps = {
+  listOpen: boolean;
+  onListOpenChange: (open: boolean) => void;
   products: ProductForm[];
   brands: BrandForm[];
   draggingProductId: number | string | null;
@@ -41,7 +44,7 @@ const loadingProduct: ProductForm = {
   metaDescription: "", metaKeywords: "", placement: "", publishedAt: "", deletedAt: "", colorStock: {}, sortOrder: 0,
 };
 
-export function ProductsSection({ products, brands, draggingProductId, setDraggingProductId, onEditProduct, onPreview, onReorderProducts, isLoading = false, isLoadingMore = false, totalCount, hasMore = false, onCapacityChange, onLoadMore, onNeedAllItems }: ProductsSectionProps) {
+export function ProductsSection({ listOpen, onListOpenChange, products, brands, draggingProductId, setDraggingProductId, onEditProduct, onPreview, onReorderProducts, isLoading = false, isLoadingMore = false, totalCount, hasMore = false, onCapacityChange, onLoadMore, onNeedAllItems }: ProductsSectionProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const brandTitleById = useMemo(() => new Map(brands.flatMap((brand): Array<[string, string]> => [[brand.id, brand.title], [brand.title, brand.title]])), [brands]);
   const visibleProducts = useMemo(() => {
@@ -66,9 +69,10 @@ export function ProductsSection({ products, brands, draggingProductId, setDraggi
       <div className="flex flex-wrap items-center gap-2">
         <CustomInput value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="جستجو..." aria-label="جستجو در محصولات" showLabel={false} fullWidth={false} size="sm" rounded="full" icon={<IoSearchOutline />} className="min-w-56" />
         {searchQuery.trim() ? <CustomButton size="sm" rounded="full" variant="neutral" onClick={() => setSearchQuery("")}><span>پاک کردن</span></CustomButton> : null}
-        <span className="text-xs font-semibold text-secondary-text">{visibleProducts.length} محصول</span>
+        <span className="text-xs font-semibold text-secondary-text">{listOpen ? visibleProducts.length : totalCount ?? 0} محصول</span>
       </div>
 
+      <CustomAccordion title="فهرست محصولات" open={listOpen} onOpenChange={onListOpenChange} showStatusLabel={false}>
       {!isLoading && visibleProducts.length === 0 ? <CustomEmptyState description={searchQuery.trim() ? "نتیجه‌ای با این جست‌وجو پیدا نشد." : "هنوز محصولی ثبت نشده است."} /> : null}
 
       <DynamicLoadingCollection
@@ -89,6 +93,7 @@ export function ProductsSection({ products, brands, draggingProductId, setDraggi
           </Loading>
         )}
       />
+      </CustomAccordion>
     </div>
   );
 }

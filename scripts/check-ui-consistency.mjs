@@ -77,3 +77,5 @@ if (failures.length) {
 } else {
   console.log(`PASS: ${scanned} UI files use shared controls, selection state, and semantic text primitives.`);
 }
+
+await import("./check-loading-contract.mjs");

@@ -2,7 +2,7 @@
 
 import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
 
-import { useEffect, useState } from "react";
+import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
 import { IoCopyOutline } from "react-icons/io5";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
@@ -23,37 +23,10 @@ const loadingCode: WalletCode = {
 };
 
 export function UserDiscountsPanel({ totalCount }: { totalCount?: number }) {
-  const [codes, setCodes] = useState<WalletCode[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  const [, setCapacity] = useState(0);
-  const [loadedAt, setLoadedAt] = useState(() => Date.now());
+  const page = useStructurePagedCollection<WalletCode>({ endpoint: "/api/user/wallet", params: "scope=discounts", itemKey: "codes", totalCount });
+  const { items: activeCodes, loading } = page;
   const notification = useAppNotification();
-  useTransientAppMessage(message);
-
-  const load = async () => {
-    setLoading(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/user/wallet", { cache: "no-store" });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "دریافت کدهای تخفیف انجام نشد.");
-      const nextCodes = Array.isArray(data?.data?.wallet?.discountCodes) ? data.data.wallet.discountCodes as WalletCode[] : [];
-      setCodes(nextCodes);
-      setLoadedAt(Date.now());
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "دریافت کدهای تخفیف انجام نشد.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  const activeCodes = codes.filter((code) => !code.usedAt && new Date(code.expiresAt).getTime() > loadedAt);
+  useTransientAppMessage(page.error);
 
   const copyCode = async (code: string) => {
     try {
@@ -78,8 +51,7 @@ export function UserDiscountsPanel({ totalCount }: { totalCount?: number }) {
       <DynamicLoadingCollection
         items={activeCodes}
         isLoading={loading}
-        totalCount={totalCount}
-        onCapacityChange={totalCount === undefined ? undefined : setCapacity}
+        {...page.collectionProps}
         className="flex flex-wrap gap-2"
         getKey={(code) => code.id}
         lazy

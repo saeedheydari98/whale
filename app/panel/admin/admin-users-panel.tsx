@@ -2,15 +2,16 @@
 
 import { CustomTable, CustomTableRow, CustomSortHeader as SortHeaderButton } from "@/app/design-system/components/ui/table";
 
-import { useEffect, useMemo, useState } from "react";
-import { IoReloadOutline, IoSearchOutline } from "react-icons/io5";
+import { useState } from "react";
+import { useAdminPagedCollection } from "@/hooks/use-admin-paged-collection";
+import { IoSearchOutline } from "react-icons/io5";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { CustomInput } from "@/app/design-system/components/ui/input";
 import { CustomTag } from "@/app/design-system/components/ui/tag";
 import {
-  adminUserMatchesSearch,
   getAdminUserContact,
   getAdminUserTitle,
 } from "@/app/panel/admin/admin-user-compact-row";
@@ -62,30 +63,18 @@ function roleVariant(role: string) {
   return "neutral" as const;
 }
 
-function compareUsers(a: AdminUser, b: AdminUser, key: SortKey, direction: SortDirection) {
-  const factor = direction === "asc" ? 1 : -1;
-  if (key === "name") {
-    return factor * getAdminUserTitle(a).localeCompare(getAdminUserTitle(b), "fa");
-  }
-  if (key === "role") {
-    return factor * roleLabel(a.role).localeCompare(roleLabel(b.role), "fa");
-  }
-  if (key === "createdAt" || key === "lastOrderAt") {
-    const left = new Date(a[key] || 0).getTime();
-    const right = new Date(b[key] || 0).getTime();
-    return factor * (left - right);
-  }
-  return factor * ((a[key] as number) - (b[key] as number));
-}
-
 function UserTableRow({
   user,
   onSelectUser,
   isLoading = false,
+  selectionLabel = "انتخاب",
+  canSelectUser,
 }: {
   user: AdminUser;
   onSelectUser?: (user: AdminUser) => void;
   isLoading?: boolean;
+  selectionLabel?: string;
+  canSelectUser?: (user: AdminUser) => boolean;
 }) {
   return (
     <CustomTableRow>
@@ -117,8 +106,8 @@ function UserTableRow({
       </span>
       {onSelectUser ? (
         <div className="w-24 shrink-0">
-          <CustomButton size="sm" variant="neutral" disabled={isLoading} onClick={() => onSelectUser(user)}>
-            <span>انتخاب</span>
+          <CustomButton size="sm" variant="neutral" disabled={isLoading || (canSelectUser ? !canSelectUser(user) : false)} onClick={() => onSelectUser(user)}>
+            <span>{selectionLabel}</span>
           </CustomButton>
         </div>
       ) : null}
@@ -129,64 +118,21 @@ function UserTableRow({
 type AdminUsersPanelProps = {
   totalCount?: number;
   onSelectUser?: (user: AdminUser) => void;
+  selectionLabel?: string;
+  canSelectUser?: (user: AdminUser) => boolean;
 };
 
-export function AdminUsersPanel({ totalCount, onSelectUser }: AdminUsersPanelProps) {
-  const [users, setUsers] = useState<AdminUser[]>([]);
+export function AdminUsersPanel({ totalCount, onSelectUser, selectionLabel, canSelectUser }: AdminUsersPanelProps) {
+  const [tableOpen, setTableOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [displayLimit, setDisplayLimit] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState("");
-  useTransientAppMessage(message);
-
-  const filteredUsers = useMemo(
-    () => users.filter((user) => adminUserMatchesSearch(user, searchQuery)),
-    [searchQuery, users]
-  );
-
-  const sortedUsers = useMemo(
-    () => [...filteredUsers].sort((a, b) =>
-      compareUsers(a, b, sortKey ?? "createdAt", sortDirection)
-    ),
-    [filteredUsers, sortDirection, sortKey]
-  );
-  const displayLimitNumber = Number(displayLimit);
-  const visibleUsers = displayLimit === "" || !Number.isFinite(displayLimitNumber)
-    ? sortedUsers
-    : sortedUsers.slice(0, Math.max(0, Math.floor(displayLimitNumber)));
-  const hasSearch = Boolean(searchQuery.trim());
-  const collectionTotalCount = loading ? totalCount : visibleUsers.length;
-  const matchingUserCount = hasSearch
-    ? filteredUsers.length
-    : Math.max(users.length, Number(totalCount) || 0);
-
-  const load = async () => {
-    setLoading(true);
-    setMessage("");
-    try {
-      const response = await fetch("/api/admin/users", { cache: "no-store" });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "دریافت کاربران انجام نشد.");
-      const nextUsers = Array.isArray(data?.data?.users) ? data.data.users as AdminUser[] : [];
-      setUsers(nextUsers.map((user) => ({
-        ...user,
-        orderCount: Number(user.orderCount) || 0,
-        orderTotal: Number(user.orderTotal) || 0,
-        walletBalance: Number(user.walletBalance) || 0,
-      })));
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "دریافت کاربران انجام نشد.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const params = new URLSearchParams({ q: searchQuery.trim(), sort: sortKey ?? "createdAt", direction: sortDirection });
+  const page = useAdminPagedCollection<AdminUser>({ endpoint: "/api/admin/users", itemKey: "users", params: params.toString(), totalCount: searchQuery.trim() ? undefined : totalCount, structureEndpoint: "/api/admin/collections/structure?collection=users", enabled: tableOpen });
+  const { items: users, loading } = page;
+  const visibleUsers = users;
+  const matchingUserCount = page.total ?? users.length;
+  useTransientAppMessage(page.error);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -199,20 +145,14 @@ export function AdminUsersPanel({ totalCount, onSelectUser }: AdminUsersPanelPro
 
   return (
     <section className="flex w-full flex-col gap-4 rounded-lg border border-primary-border bg-primary-soft p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-baseline gap-2">
           <AppHeading level={2} className="text-base font-bold text-primary-text">کاربران</AppHeading>
           <span className="text-xs text-secondary-text">
             {visibleUsers.length.toLocaleString("fa-IR")} از {matchingUserCount.toLocaleString("fa-IR")} حساب کاربری
           </span>
         </div>
-        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline />} onClick={() => void load()} disabled={loading}>
-          <span>به‌روزرسانی</span>
-        </CustomButton>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="min-w-52 flex-1">
+        <div className="min-w-0 basis-60 flex-1">
           <CustomInput
             type="search"
             name="admin-user-search"
@@ -226,20 +166,10 @@ export function AdminUsersPanel({ totalCount, onSelectUser }: AdminUsersPanelPro
             onChange={(event) => setSearchQuery(event.target.value)}
           />
         </div>
-        <div className="min-w-56 flex-1">
-          <CustomInput
-            type="number"
-            min={1}
-            step={1}
-            label="تعداد کاربران قابل نمایش"
-            placeholder="تعداد کاربران قابل نمایش…  "
-            value={displayLimit}
-            aria-label="تعداد کاربران قابل نمایش"
-            onChange={(event) => setDisplayLimit(event.target.value)}
-          />
-        </div>
+
       </div>
 
+      <CustomAccordion title="فهرست کاربران" open={tableOpen} onOpenChange={setTableOpen} showStatusLabel={false}>
       {!loading && users.length === 0 ? <CustomEmptyState description="کاربری پیدا نشد." /> : null}
       {!loading && users.length > 0 && visibleUsers.length === 0 ? (
         <CustomEmptyState description="کاربری مطابق جست‌وجو یا فیلتر پیدا نشد." size="sm" />
@@ -310,13 +240,12 @@ export function AdminUsersPanel({ totalCount, onSelectUser }: AdminUsersPanelPro
         <DynamicLoadingCollection
           items={visibleUsers}
           isLoading={loading}
-          totalCount={collectionTotalCount}
-          viewportLimited
+          {...page.collectionProps}
           className="flex w-full flex-col gap-1.5"
           containerProps={{ "aria-live": "polite" }}
           getKey={(user) => user.id}
           lazy
-          renderItem={(user) => <UserTableRow user={user} onSelectUser={onSelectUser} />}
+          renderItem={(user) => <UserTableRow user={user} onSelectUser={onSelectUser} selectionLabel={selectionLabel} canSelectUser={canSelectUser} />}
           renderSkeleton={() => (
             <Loading loading="skeleton-structure" isLoading>
               <UserTableRow user={loadingUser} onSelectUser={onSelectUser} isLoading />
@@ -325,6 +254,7 @@ export function AdminUsersPanel({ totalCount, onSelectUser }: AdminUsersPanelPro
         />
 
       </CustomTable>
+      </CustomAccordion>
     </section>
   );
 }

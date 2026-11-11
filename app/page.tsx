@@ -92,6 +92,7 @@ function HomeBrandSection({
         </div>
         {!dataLoading && brands.length === 0 ? <CustomEmptyState size="sm" /> : null}
         <DynamicLoadingCollection
+          lazy
           items={brands}
           isLoading={dataLoading}
           totalCount={totalCount}

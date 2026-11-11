@@ -1,6 +1,7 @@
 "use client";
 
 import { IoSaveOutline, IoTrashOutline } from "react-icons/io5";
+import Loading from "@/app/design-system/components/loading/loading";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomSelectionButton } from "@/app/design-system/components/ui/selection";
 import { CustomInput } from "@/app/design-system/components/ui/input";
@@ -13,6 +14,8 @@ import { toggleProductId } from "../utils";
 import { CustomModalSection } from "@/app/design-system/components/ui/modal-section";
 
 type ShowcaseModalsProps = {
+  onLoadReferences: () => void;
+  referencesLoading: boolean;
   products: ProductForm[];
   categories: CategoryForm[];
   draftShowcase: ShowcaseForm;
@@ -33,6 +36,8 @@ export function ShowcaseModals(props: ShowcaseModalsProps) {
   return (
     <>
       <ShowcaseModal
+        onLoadReferences={props.onLoadReferences}
+        referencesLoading={props.referencesLoading}
         open={props.isShowcaseOpen}
         onClose={props.onCloseShowcase}
         title="ثبت ویترین"
@@ -46,6 +51,8 @@ export function ShowcaseModals(props: ShowcaseModalsProps) {
         submitLabel="ثبت ویترین"
       />
       <ShowcaseModal
+        onLoadReferences={props.onLoadReferences}
+        referencesLoading={props.referencesLoading}
         open={props.isEditShowcaseOpen}
         onClose={props.onCloseEditShowcase}
         title={props.editingShowcase?.title || "ویرایش ویترین"}
@@ -64,6 +71,8 @@ export function ShowcaseModals(props: ShowcaseModalsProps) {
 }
 
 type ShowcaseModalProps = {
+  onLoadReferences: () => void;
+  referencesLoading: boolean;
   open: boolean;
   onClose: () => void;
   title: string;
@@ -79,6 +88,8 @@ type ShowcaseModalProps = {
 };
 
 function ShowcaseModal({
+  onLoadReferences,
+  referencesLoading,
   open,
   onClose,
   title,
@@ -106,7 +117,7 @@ function ShowcaseModal({
             status={hasTitle ? "complete" : "incomplete"}
             invalid={hasRequiredError(requiredErrorKey) && !hasTitle}
             meta="عنوان و ترتیب نمایش"
-            defaultOpen={!hasTitle}
+            defaultOpen
           >
             <CustomInput
               value={showcase.title}
@@ -121,17 +132,20 @@ function ShowcaseModal({
             title="حالت و محصولات"
             status={ruleComplete ? "complete" : "incomplete"}
             meta={showcase.mode === "auto" ? "قانون خودکار" : "انتخاب دستی محصول"}
-            defaultOpen={!ruleComplete}
+            defaultOpen={false}
+            onOpenChange={(expanded) => { if (expanded) onLoadReferences(); }}
           >
             <CustomSelect value={showcase.mode} aria-label="حالت ویترین" onChange={(event) => onPatch({ mode: event.target.value === "auto" ? "auto" : "manual" })}>
               <option value="manual">انتخاب دستی محصول</option>
               <option value="auto">خودکار بر اساس قانون</option>
             </CustomSelect>
+            <Loading loading="skeleton-structure" isLoading={referencesLoading}>
             {showcase.mode === "auto" ? (
               <AutoShowcaseFields showcase={showcase} categories={categories} onPatch={onPatch} />
             ) : (
               <ManualShowcaseProducts showcase={showcase} products={products} onPatch={onPatch} />
             )}
+            </Loading>
           </CustomModalSection>
 
           <CustomModalSection title="وضعیت" status="optional" meta={showcase.active ? "فعال" : "مخفی"}>

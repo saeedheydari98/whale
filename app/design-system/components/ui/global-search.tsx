@@ -9,10 +9,10 @@ import { IoClose } from "react-icons/io5";
 import { CustomEmptyState } from "./empty-state";
 import { AppImage } from "./app-image";
 import { CustomInput } from "./input";
-import Loading, { startRouteLoading } from "../loading/loading";
+import Loading, { DynamicLoadingCollection, startRouteLoading } from "../loading/loading";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { APP_USER_UPDATED_EVENT } from "@/lib/app-user-client";
-import { fetchJsonDeduped } from "@/lib/fetch-json";
+import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
 import { formatAmount, toLatinDigits } from "@/lib/price-format";
 import { productSlug, type ProductRecord } from "@/lib/products-client";
 import {
@@ -20,15 +20,6 @@ import {
   NON_ASCII_DIGIT_PATTERN,
   PHONE_PATTERN,
 } from "@/lib/validation-patterns";
-
-type SearchPayload = {
-  ok?: boolean;
-  data?: {
-    products?: {
-      items?: ProductRecord[];
-    };
-  };
-};
 
 const INPUT_ID = "global-search-input";
 
@@ -45,19 +36,15 @@ export function GlobalSearch() {
   const [inputResetKey, setInputResetKey] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [focused, setFocused] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<ProductRecord[]>([]);
-  const [hasSearched, setHasSearched] = useState(false);
   const closeTimerRef = useRef<number | null>(null);
   const isOpen = !isMobile || expanded;
   const query = value.trim();
-  const showPanel = isOpen && focused && (query.length > 0 || loading || hasSearched);
+  const showPanel = isOpen && focused && query.length > 0;
+  const page = useStructurePagedCollection<ProductRecord>({ endpoint: "/api/products/search", params: new URLSearchParams({ q: query }).toString(), itemKey: "items", structureEndpoint: "/api/products/search/structure", enabled: showPanel });
+  const { items: results, loading } = page;
 
   const clearSearch = useCallback(() => {
     setValue("");
-    setResults([]);
-    setHasSearched(false);
-    setLoading(false);
   }, []);
 
   const clearInjectedPhone = useCallback(() => {
@@ -69,42 +56,6 @@ export function GlobalSearch() {
     clearSearch();
     setInputResetKey((current) => current + 1);
   }, [clearSearch, focused, value]);
-
-  useEffect(() => {
-    if (!query) {
-      const resetTimer = window.setTimeout(() => {
-        setResults([]);
-        setLoading(false);
-        setHasSearched(false);
-      }, 0);
-      return () => window.clearTimeout(resetTimer);
-    }
-
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      setLoading(true);
-      void fetchJsonDeduped<SearchPayload>(`/api/products/search?q=${encodeURIComponent(query)}&limit=8`)
-        .then((payload) => {
-          if (cancelled) return;
-          const items = payload?.data?.products?.items;
-          setResults(Array.isArray(items) ? items : []);
-          setHasSearched(true);
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setResults([]);
-          setHasSearched(true);
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false);
-        });
-    }, 220);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [query]);
 
   useEffect(() => {
     const timer = window.setTimeout(clearInjectedPhone, 80);
@@ -255,29 +206,27 @@ export function GlobalSearch() {
 
       {showPanel ? (
         <div className="absolute top-full z-40 mt-2 flex w-full min-w-72 flex-col overflow-hidden rounded-lg border border-primary-border bg-primary-card shadow-lg md:w-72">
-          {loading ? (
-            <Loading loading="skeleton-structure" isLoading>
-              <div className="flex max-h-80 flex-col overflow-y-auto">
-                <CustomActionButton type="button" className="flex items-center gap-3 border-b border-primary-border bg-transparent px-3 py-2 text-right">
-                  <span data-loading-leaf className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
-                    <span className="text-xs font-bold text-secondary-text">تصویر</span>
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="line-clamp-1 text-sm font-bold text-primary-text">نتیجه جست‌وجوی محصول</span>
-                    <span className="line-clamp-1 text-xs font-semibold text-secondary-text">قیمت محصول</span>
-                  </span>
-                </CustomActionButton>
-              </div>
-            </Loading>
-          ) : results.length > 0 ? (
-            <div className="flex max-h-80 flex-col overflow-y-auto">
-              {results.map((product) => (
+          {!loading && results.length === 0 ? <CustomEmptyState size="sm" className="border-0" /> : null}
+          <div className="flex max-h-80 flex-col overflow-y-auto">
+            <DynamicLoadingCollection items={results} isLoading={loading} {...page.collectionProps} lazy className="flex flex-col" getKey={(product) => String(product.id ?? product.slug ?? product.title)}
+              renderItem={(product) => <SearchResultRow product={product} onSelect={() => goToProduct(product)} />}
+              renderSkeleton={() => <Loading loading="skeleton-structure" isLoading><SearchResultRow product={{ id: 0, title: "...", description: "", price: "0", active: true, sortOrder: 0 }} onSelect={() => undefined} /></Loading>} />
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export default GlobalSearch;
+
+function SearchResultRow({ product, onSelect }: { product: ProductRecord; onSelect: () => void }) {
+  return (
                 <CustomActionButton
-                  key={product.id}
                   type="button"
                   className="flex items-center gap-3 border-b border-primary-border bg-transparent px-3 py-2 text-right transition hover:bg-primary-bg"
                   onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => goToProduct(product)}
+                  onClick={onSelect}
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-primary-media">
                     {product.imageUrl ? (
@@ -291,15 +240,5 @@ export function GlobalSearch() {
                     <span className="line-clamp-1 text-xs font-semibold text-secondary-text">{formatAmount(product.discountPrice || product.price) || product.discountPrice || product.price}</span>
                   </span>
                 </CustomActionButton>
-              ))}
-            </div>
-          ) : (
-            <CustomEmptyState size="sm" className="border-0" />
-          )}
-        </div>
-      ) : null}
-    </div>
   );
 }
-
-export default GlobalSearch;

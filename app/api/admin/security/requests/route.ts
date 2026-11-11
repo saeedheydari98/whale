@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { parseJsonBody } from "@/lib/api/validation";
+import { parseJsonBody, validationError } from "@/lib/api/validation";
+import { adminListQuerySchema } from "@/lib/api/schemas";
+import { pageMetadata } from "@/lib/api/admin-list-pages";
 import { requireUser } from "@/lib/api/auth";
 import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
 import { prisma } from "@/lib/prisma";
@@ -100,8 +102,19 @@ export async function GET(request: Request) {
   if (!auth.ok) return auth.response;
 
   try {
+    const params = new URL(request.url).searchParams;
+    const parsed = params.has("limit") ? adminListQuerySchema.safeParse(Object.fromEntries(params)) : null;
+    if (parsed && !parsed.success) return validationError(parsed.error);
+    const page = parsed?.success ? parsed.data : null;
+    const where: Prisma.AdminAccessRequestWhereInput = page?.status === "archived"
+      ? { status: { notIn: ["pending", "approved"] } }
+      : page?.status ? { status: page.status } : {};
+    const total = page ? await prisma.adminAccessRequest.count({ where }) : 0;
     const requests = await prisma.adminAccessRequest.findMany({
-      orderBy: { updatedAt: "desc" },
+      where,
+      take: page?.limit,
+      skip: page?.offset,
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       include: {
         user: {
           select: {
@@ -124,7 +137,7 @@ export async function GET(request: Request) {
         },
       },
     });
-    return apiOk({ requests: requests.map(toPublicRequest) });
+    return apiOk({ requests: requests.map(toPublicRequest), ...(page ? pageMetadata(total, page.offset, requests.length) : {}) });
   } catch (error) {
     console.error("Admin access requests GET error:", error);
     return apiServerError();

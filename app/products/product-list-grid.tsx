@@ -36,6 +36,7 @@ export function ProductListGrid({
 }: ProductListGridProps) {
   return (
     <DynamicLoadingCollection
+      lazy
       items={products}
       getKey={(product, index) => product.id ?? index}
       isLoading={loading}

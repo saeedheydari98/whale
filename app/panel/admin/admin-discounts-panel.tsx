@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { IoCreateOutline, IoFlashOutline, IoGiftOutline, IoPeopleOutline, IoReloadOutline, IoSaveOutline, IoTrashOutline, IoWalletOutline } from "react-icons/io5";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAdminPagedCollection } from "@/hooks/use-admin-paged-collection";
+import { IoCreateOutline, IoGiftOutline, IoSaveOutline, IoTrashOutline, IoWalletOutline } from "react-icons/io5";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
 import { CustomButton } from "@/app/design-system/components/ui/button";
@@ -15,7 +17,7 @@ import { AdminUsersPanel, type AdminUser } from "@/app/panel/admin/admin-users-p
 import { formatPersianDate } from "@/lib/date-format";
 import { formatAmount, readFormattedPriceNumber } from "@/lib/price-format";
 import { AppHeading } from "@/app/design-system/components/ui/text";
-import Loading from "@/app/design-system/components/loading/loading";
+import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 
 type AudienceType = "new_users" | "purchase_count" | "purchase_amount";
 type DiscountType = "percentage" | "free_shipping";
@@ -107,7 +109,11 @@ function DiscountRuleFields({ namePrefix, value, nameInvalid, onChange }: Discou
   );
 }
 
-export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: number }) {
+export function AdminDiscountsPanel({ totalUsersCount, rulesCount }: { totalUsersCount?: number; rulesCount?: number }) {
+  const queryClient = useQueryClient();
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const rulesPage = useAdminPagedCollection<DiscountRule>({ endpoint: "/api/admin/discounts", itemKey: "rules", params: "scope=rules", enabled: rulesOpen, totalCount: rulesCount });
+  useTransientAppMessage(rulesPage.error);
   const [rules, setRules] = useState<DiscountRule[]>([]);
   const [cashbackPercent, setCashbackPercent] = useState(0);
   const [ruleDraft, setRuleDraft] = useState<DiscountRuleDraft>(DEFAULT_DISCOUNT_RULE);
@@ -121,7 +127,7 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
   const [manualType, setManualType] = useState<DiscountType>("percentage");
   const [manualPercent, setManualPercent] = useState(10);
   const [manualValidDays, setManualValidDays] = useState(30);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   useTransientAppMessage(message);
@@ -129,10 +135,9 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
     setLoading(true);
     setMessage("");
     try {
-      const response = await fetch("/api/admin/discounts", { cache: "no-store" });
+      const response = await fetch("/api/admin/discounts?scope=settings", { cache: "no-store" });
       const data = await response.json().catch(() => null);
       if (!response.ok || data?.ok === false) throw new Error(data?.showMessage || "دریافت تخفیف‌ها انجام نشد.");
-      setRules(Array.isArray(data?.data?.rules) ? data.data.rules : []);
       setCashbackPercent(Number(data?.data?.settings?.cashbackPercent) || 0);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "دریافت تخفیف‌ها انجام نشد.");
@@ -142,9 +147,8 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
   };
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    setRules(rulesPage.items);
+  }, [rulesPage.items]);
 
   const request = async (method: string, body: Record<string, unknown>) => {
     const response = await fetch("/api/admin/discounts", {
@@ -181,10 +185,11 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
     setMessage("");
     try {
       await request("POST", ruleDraft);
+      await queryClient.invalidateQueries({ queryKey: ["admin-structure"] });
       setRuleDraft(DEFAULT_DISCOUNT_RULE);
       setNameInvalid(false);
       setMessage("کد تخفیف خودکار ساخته شد.");
-      await load();
+      await queryClient.invalidateQueries({ queryKey: ["admin-list", "/api/admin/discounts"] });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "ساخت کد تخفیف انجام نشد.");
     } finally {
@@ -217,6 +222,7 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
     try {
       const data = await request("PATCH", { action: "update_rule", id: editingRule.id, ...editDraft });
       setRules((current) => current.map((rule) => rule.id === editingRule.id ? data.data.rule : rule));
+      await queryClient.invalidateQueries({ queryKey: ["admin-list", "/api/admin/discounts"] });
       setEditingRule(null);
       setEditDraft(null);
       setEditNameInvalid(false);
@@ -233,6 +239,7 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
     try {
       await request("PATCH", { id: rule.id, active });
       setRules((current) => current.map((item) => item.id === rule.id ? { ...item, active } : item));
+      await queryClient.invalidateQueries({ queryKey: ["admin-list", "/api/admin/discounts"] });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "ویرایش کد تخفیف انجام نشد.");
     } finally {
@@ -245,7 +252,9 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
     setSaving(true);
     try {
       await request("DELETE", { id: rule.id });
+      await queryClient.invalidateQueries({ queryKey: ["admin-structure"] });
       setRules((current) => current.filter((item) => item.id !== rule.id));
+      await queryClient.invalidateQueries({ queryKey: ["admin-list", "/api/admin/discounts"] });
       setMessage("کد تخفیف حذف شد؛ کدهای صادرشده کاربران حفظ شدند.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "حذف کد تخفیف انجام نشد.");
@@ -276,39 +285,31 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
   };
 
   return (
-    <Loading loading="skeleton-structure" isLoading={loading && rules.length === 0}>
     <section className="flex w-full flex-col gap-3 rounded-lg border border-primary-border bg-primary-soft p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
           <AppHeading level={2} className="text-base font-bold">تخفیف‌ها</AppHeading>
           <span className="text-xs text-secondary-text">تنظیم بازگشت وجه، کدهای خودکار و کدهای اختصاصی</span>
         </div>
-        <CustomButton size="sm" variant="neutral" icon={<IoReloadOutline aria-hidden="true" />} onClick={() => void load()} isLoading={loading}>
-          <span>به‌روزرسانی</span>
-        </CustomButton>
       </div>
       <CustomAccordion
         title="بازگشت وجه کیف پول"
         leading={<IoWalletOutline aria-hidden="true" />}
         meta={`${cashbackPercent}٪ از هر خرید`}
         defaultOpen={false}
+        onOpenChange={(open) => { if (open) void load(); }}
         showStatusLabel={false}
         contentClassName="p-2"
       >
+        <Loading loading="skeleton-structure" isLoading={loading}>
         <div className="flex flex-wrap items-end gap-2">
           <CustomInput name="cashback-percent" type="number" min={0} max={100} value={cashbackPercent} label="درصد بازگشت وجه" fullWidth={false} className="w-44" onChange={(event) => setCashbackPercent(Number(event.target.value))} />
           <CustomButton icon={<IoSaveOutline aria-hidden="true" />} isLoading={saving} onClick={() => void saveCashback()}><span>ذخیره درصد</span></CustomButton>
         </div>
+        </Loading>
       </CustomAccordion>
 
-      <CustomAccordion
-        title="کدهای تخفیف خودکار"
-        leading={<IoFlashOutline aria-hidden="true" />}
-        meta={`${rules.length} کد تخفیف`}
-        defaultOpen={false}
-        showStatusLabel={false}
-        contentClassName="gap-3 p-2"
-      >
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-2 rounded-md border border-primary-border bg-primary-card p-2.5">
           <span className="text-xs font-bold">ساخت کد تخفیف خودکار</span>
           <DiscountRuleFields
@@ -326,39 +327,23 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
         <CustomAccordion
           title="کدهای تخفیف ایجادشده"
           leading={<IoGiftOutline aria-hidden="true" />}
-          meta={`${rules.length} کد تخفیف`}
-          defaultOpen={false}
+          meta={rulesPage.total === undefined ? undefined : `${rulesPage.total} کد تخفیف`}
+          open={rulesOpen}
+          onOpenChange={setRulesOpen}
           showStatusLabel={false}
           contentClassName="gap-1.5 p-1"
         >
-          {rules.length === 0 && !loading ? <CustomEmptyState description="هنوز کد تخفیف خودکاری ساخته نشده است." size="sm" /> : null}
-          <div className="flex w-full flex-col gap-1.5">
-            {rules.map((rule) => (
-              <div key={rule.id} className="flex w-full flex-wrap items-center gap-2 rounded-md border border-primary-border bg-primary-card px-2.5 py-2">
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="truncate text-xs font-bold">{rule.name}</span>
-                  <span className="truncate text-[11px] text-secondary-text">{audienceLabel(rule)} · {rule.discountType === "free_shipping" ? "ارسال رایگان" : `${rule.percent ?? 0}٪ تخفیف`} · اعتبار {rule.validDays} روز</span>
-                  <span className="truncate text-[10px] text-secondary-text">{rule._count.discountCodes} کد صادرشده{rule.lastRunAt ? ` · آخرین اجرا ${formatPersianDate(rule.lastRunAt)}` : ""}</span>
-                </span>
-                <CustomSwitch checked={rule.active} onChange={(active) => void toggleRule(rule, active)} disabled={saving} />
-                <CustomButton size="sm" variant="neutral" icon={<IoCreateOutline aria-hidden="true" />} disabled={saving} onClick={() => openRuleEditor(rule)}><span>ویرایش</span></CustomButton>
-                <CustomButton size="sm" variant="danger" icon={<IoTrashOutline aria-hidden="true" />} disabled={saving} onClick={() => void deleteRule(rule)}><span>حذف</span></CustomButton>
-              </div>
-            ))}
-          </div>
+          {rules.length === 0 && !rulesPage.loading ? <CustomEmptyState description="هنوز کد تخفیف خودکاری ساخته نشده است." size="sm" /> : null}
+          <DynamicLoadingCollection items={rules} isLoading={rulesPage.loading} {...rulesPage.collectionProps} lazy className="flex w-full flex-col gap-1.5" getKey={(rule) => rule.id}
+            renderItem={(rule) => <DiscountRuleRow rule={rule} disabled={saving} onToggle={(active) => void toggleRule(rule, active)} onEdit={() => openRuleEditor(rule)} onDelete={() => void deleteRule(rule)} />}
+            renderSkeleton={() => <Loading loading="skeleton-structure" isLoading><DiscountRuleRow rule={{ id: "loading", name: "کد تخفیف", audienceType: "new_users", minimumValue: 1, lookbackDays: 30, discountType: "percentage", percent: 10, validDays: 30, active: true, _count: { discountCodes: 0 } }} disabled onToggle={() => undefined} onEdit={() => undefined} onDelete={() => undefined} /></Loading>} />
         </CustomAccordion>
-      </CustomAccordion>
+      </div>
 
-      <CustomAccordion
-        title="صدور دستی کد"
-        leading={<IoPeopleOutline aria-hidden="true" />}
-        meta="انتخاب کاربر برای صدور کد"
-        defaultOpen={false}
-        showStatusLabel={false}
-        contentClassName="gap-2 p-2"
-      >
+      <div className="flex flex-col gap-2">
+        <AppHeading level={3} className="text-sm font-bold text-primary-text">صدور دستی کد</AppHeading>
         <AdminUsersPanel totalCount={totalUsersCount} onSelectUser={setSelectedUser} />
-      </CustomAccordion>
+      </div>
 
       <CustomModal open={Boolean(editingRule && editDraft)} onClose={closeRuleEditor} title="ویرایش کد تخفیف" isLoading={saving} closeOnBackdrop={!saving}>
         {editDraft ? (
@@ -388,6 +373,20 @@ export function AdminDiscountsPanel({ totalUsersCount }: { totalUsersCount?: num
         </div>
       </CustomModal>
     </section>
-    </Loading>
   );
+}
+
+function DiscountRuleRow({ rule, disabled, onToggle, onEdit, onDelete }: {
+  rule: DiscountRule; disabled: boolean; onToggle: (active: boolean) => void; onEdit: () => void; onDelete: () => void;
+}) {
+  return <div className="flex w-full flex-wrap items-center gap-2 rounded-md border border-primary-border bg-primary-card px-2.5 py-2">
+    <span className="flex min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-1 lg:basis-0 lg:flex-1">
+      <span className="min-w-0 break-words text-xs font-bold">{rule.name}</span>
+      <span className="min-w-0 break-words text-[11px] text-secondary-text">{audienceLabel(rule)} · {rule.discountType === "free_shipping" ? "ارسال رایگان" : `${rule.percent ?? 0}٪ تخفیف`} · اعتبار {rule.validDays} روز</span>
+      <span className="text-[10px] text-secondary-text">{rule._count.discountCodes} کد صادرشده{rule.lastRunAt ? ` · آخرین اجرا ${formatPersianDate(rule.lastRunAt)}` : ""}</span>
+    </span>
+    <CustomSwitch checked={rule.active} onChange={onToggle} disabled={disabled} />
+    <CustomButton size="sm" variant="neutral" icon={<IoCreateOutline aria-hidden="true" />} disabled={disabled} onClick={onEdit}><span>ویرایش</span></CustomButton>
+    <CustomButton size="sm" variant="danger" icon={<IoTrashOutline aria-hidden="true" />} disabled={disabled} onClick={onDelete}><span>حذف</span></CustomButton>
+  </div>;
 }

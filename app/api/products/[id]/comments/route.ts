@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { parseJsonBody } from "@/lib/api/validation";
-import { commentSchema } from "@/lib/api/schemas";
+import { parseJsonBody, validationError } from "@/lib/api/validation";
+import { adminListQuerySchema, commentSchema } from "@/lib/api/schemas";
+import { pageMetadata } from "@/lib/api/admin-list-pages";
 import { getAuthUser } from "@/lib/api/auth";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
 
@@ -29,6 +30,18 @@ export async function GET(request: Request, context: Context) {
   try {
     const { id } = await context.params;
     const productId = Number(id);
+    if (!Number.isInteger(productId) || productId <= 0) return apiFail("محصول نامعتبر است.", 400);
+    const params = new URL(request.url).searchParams;
+    if (params.has("limit")) {
+      const parsed = adminListQuerySchema.safeParse(Object.fromEntries(params));
+      if (!parsed.success) return validationError(parsed.error);
+      const where = { productId, active: true };
+      const [comments, total] = await Promise.all([
+        prisma.comment.findMany({ where, take: parsed.data.limit, skip: parsed.data.offset, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, author: true, content: true, rating: true, createdAt: true } }),
+        prisma.comment.count({ where }),
+      ]);
+      return apiOk({ comments, ...pageMetadata(total, parsed.data.offset, comments.length) });
+    }
     const authUser = await getAuthUser(request);
     const comments = await prisma.comment.findMany({
       where: { productId, active: true },

@@ -77,7 +77,7 @@ export function CustomAccordion({
   onOpenChange,
 }: CustomAccordionProps) {
   const contentId = useId();
-  const [localOpen, setLocalOpen] = useState(defaultOpen ?? status !== "complete");
+  const [localOpen, setLocalOpen] = useState(defaultOpen ?? false);
   const resolvedOpen = open ?? localOpen;
   const label = statusLabel(status, invalid);
   const icon = statusIcon(status, invalid);

@@ -287,8 +287,7 @@ function productOrderBy(searchParams: URLSearchParams): Prisma.ProductOrderByWit
   return [{ sortOrder: "asc" }, { createdAt: "desc" }];
 }
 
-export async function searchProducts(searchParams: URLSearchParams, extra: Record<string, unknown> = {}) {
-  const { page, limit } = pagination(searchParams);
+async function filteredSearchProducts(searchParams: URLSearchParams, extra: Record<string, unknown> = {}) {
   const where = productWhere(searchParams, extra);
   const q = String(searchParams.get("q") ?? "").trim();
   const rawItems = await prisma.product.findMany({
@@ -307,13 +306,28 @@ export async function searchProducts(searchParams: URLSearchParams, extra: Recor
     if (Number.isFinite(maxPrice) && price > maxPrice) return false;
     return true;
   });
-  const start = (page - 1) * limit;
-  const paged = filtered.slice(start, start + limit);
-
-  return pageResult(paged, page, limit, filtered.length);
+  return filtered;
 }
 
-export async function getOrCreateActiveCart(userId: number) {
+export async function countSearchProducts(searchParams: URLSearchParams) {
+  return (await filteredSearchProducts(searchParams)).length;
+}
+
+export async function searchProducts(searchParams: URLSearchParams, extra: Record<string, unknown> = {}) {
+  const { page, limit } = pagination(searchParams);
+  const filtered = await filteredSearchProducts(searchParams, extra);
+  const start = (page - 1) * limit;
+  return pageResult(filtered.slice(start, start + limit), page, limit, filtered.length);
+}
+
+/** Mutations only need the cart target; do not load items they will replace. */
+export async function getOrCreateActiveCartTarget(userId: number) {
+  const existing = await prisma.cart.findFirst({
+    where: { status: "active", profile: { userId } },
+    select: { id: true, profile: true },
+  });
+  if (existing) return existing;
+
   let profile = await prisma.customerProfile.findFirst({ where: { userId } });
   if (!profile) {
     profile = await prisma.customerProfile.create({
@@ -326,12 +340,19 @@ export async function getOrCreateActiveCart(userId: number) {
     });
   }
 
-  return prisma.cart.upsert({
+  const cart = await prisma.cart.upsert({
     where: { profileId_status: { profileId: profile.id, status: "active" } },
     update: {},
     create: { profileId: profile.id, status: "active" },
-    include: { items: { orderBy: { createdAt: "asc" } }, profile: true },
+    select: { id: true },
   });
+  return { id: cart.id, profile };
+}
+
+export async function getOrCreateActiveCart(userId: number) {
+  const cart = await getOrCreateActiveCartTarget(userId);
+  const items = await prisma.cartItem.findMany({ where: { cartId: cart.id }, orderBy: { createdAt: "asc" } });
+  return { ...cart, items };
 }
 
 export function cartItemDto(item: any) {

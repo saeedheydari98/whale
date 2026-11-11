@@ -1,11 +1,11 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, type CustomerProfile } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getAuthUser } from "@/lib/api/auth";
 import { parseJsonBody } from "@/lib/api/validation";
 import { cartSnapshotSchema } from "@/lib/api/schemas";
-import { cartItemDto, getOrCreateActiveCart } from "@/lib/api/catalog-service";
+import { cartItemDto, getOrCreateActiveCart, getOrCreateActiveCartTarget } from "@/lib/api/catalog-service";
 import { CheckoutError, completeCheckout, normalizeShippingMethod } from "@/lib/api/checkout-service";
 import {
   colorSelectionTotal,
@@ -143,13 +143,13 @@ async function findLegacyProfile(request: Request, bodyProfile?: ProfilePayload)
   });
 }
 
-async function upsertLegacyProfile(authUser: Awaited<ReturnType<typeof getAuthUser>>, profile: ReturnType<typeof normalizeProfile>) {
-  const existing = authUser
+async function upsertLegacyProfile(authUser: Awaited<ReturnType<typeof getAuthUser>>, profile: ReturnType<typeof normalizeProfile>, currentProfile?: CustomerProfile) {
+  const existing = currentProfile ?? (authUser
     ? await prisma.customerProfile.findFirst({ where: { userId: authUser.id } })
     : await prisma.customerProfile.findFirst({
       where: { phone: profile.phone, userId: null },
       orderBy: { updatedAt: "desc" },
-    });
+    }));
   const profileData = {
     ...(authUser ? { userId: authUser.id } : {}),
     firstName: profile.firstName,
@@ -181,13 +181,12 @@ async function upsertLegacyProfile(authUser: Awaited<ReturnType<typeof getAuthUs
     });
 }
 
-async function activeCartForProfile(profileId: string) {
-  return prisma.cart.upsert({
-    where: { profileId_status: { profileId, status: "active" } },
-    update: {},
-    create: { profileId, status: "active" },
-    include: { profile: true, items: { orderBy: { createdAt: "asc" } } },
+async function activeCartForProfile(profile: CustomerProfile) {
+  const cart = await prisma.cart.findUnique({
+    where: { profileId_status: { profileId: profile.id, status: "active" } },
+    select: { items: { orderBy: { createdAt: "asc" } } },
   });
+  return { profile, items: cart?.items ?? [] };
 }
 
 export async function GET(request: Request) {
@@ -199,7 +198,7 @@ export async function GET(request: Request) {
     const cart = authUser
       ? await getOrCreateActiveCart(authUser.id)
       : await findLegacyProfile(request).then((profile) =>
-          profile ? activeCartForProfile(profile.id) : null
+          profile ? activeCartForProfile(profile) : null
         );
 
     return apiOk({
@@ -296,33 +295,38 @@ export async function POST(request: Request) {
       return apiFail(`موجودی ${rejectedItemTitle} تغییر کرده است؛ لطفاً دوباره انتخاب کنید.`, 409);
     }
 
-    const cart = hasCompleteProfile
-      ? await upsertLegacyProfile(authUser, profile).then((savedProfile) => activeCartForProfile(savedProfile.id))
-      : await getOrCreateActiveCart(authUser!.id);
-    const savedItems = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
-      if (safeItems.length > 0) {
-        await tx.cartItem.createMany({
-          data: safeItems.map((item) => ({
-            cartId: cart.id,
-            productId: item.productId,
-            title: item.title,
-            description: item.description,
-            price: item.price,
-            originalPrice: item.originalPrice,
-            discountPrice: item.discountPrice,
-            discountPercent: item.discountPercent,
-            imageUrl: item.imageUrl,
-            selectedColor: item.selectedColor,
-            quantity: item.quantity,
-          })),
-        });
-      }
-      return tx.cartItem.findMany({ where: { cartId: cart.id }, orderBy: { createdAt: "asc" } });
+    const accountCart = authUser ? await getOrCreateActiveCartTarget(authUser.id) : null;
+    const savedProfile = hasCompleteProfile ? await upsertLegacyProfile(authUser, profile, accountCart?.profile) : accountCart!.profile;
+    const cart = accountCart ?? await prisma.cart.upsert({
+      where: { profileId_status: { profileId: savedProfile.id, status: "active" } },
+      update: {}, create: { profileId: savedProfile.id, status: "active" }, select: { id: true },
     });
+    // A batch transaction avoids interactive transaction round trips. RETURNING
+    // supplies the inserted rows without querying the complete cart again.
+    const [, savedItems] = await prisma.$transaction([
+      prisma.cartItem.deleteMany({ where: { cartId: cart.id } }),
+      prisma.cartItem.createManyAndReturn({
+        data: safeItems.map((item) => ({
+          cartId: cart.id,
+          productId: item.productId,
+          title: item.title,
+          description: item.description,
+          price: item.price,
+          originalPrice: item.originalPrice,
+          discountPrice: item.discountPrice,
+          discountPercent: item.discountPercent,
+          imageUrl: item.imageUrl,
+          selectedColor: item.selectedColor,
+          quantity: item.quantity,
+        })),
+      }),
+    ]);
+    // INSERT ... RETURNING does not guarantee input order.
+    const itemOrder = new Map(safeItems.map((item, index) => [serverCartItemKey(item), index]));
+    savedItems.sort((a, b) => (itemOrder.get(serverCartItemKey(normalizeCartItem(a))) ?? 0) - (itemOrder.get(serverCartItemKey(normalizeCartItem(b))) ?? 0));
 
     return apiOk({
-      user: { profile: cart.profile },
+      user: { profile: savedProfile },
       cart: { items: savedItems.map(cartItemDto) },
     }, {
       message: "CART_UPDATED",
@@ -376,8 +380,7 @@ export async function DELETE(request: Request) {
   });
 
   try {
-    const cart = await activeCartForProfile(profile.id);
-    await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+    await prisma.cartItem.deleteMany({ where: { cart: { profileId: profile.id, status: "active" } } });
     return apiOk({ user: { profile }, cart: { items: [] } }, {
       message: "CART_CLEARED",
       showMessage: "سبد خرید خالی شد.",

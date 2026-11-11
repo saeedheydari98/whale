@@ -20,7 +20,8 @@ async function check(viewport, count) {
   }));
   await context.route("**/icon?**", (route) => route.fulfill({ status: 204, body: "" }));
   await context.route("**/api/**", async (route) => {
-    const pathname = new URL(route.request().url()).pathname;
+    const url = new URL(route.request().url());
+    const pathname = url.pathname;
     let data = {};
     if (pathname === "/api/theme") data = { theme: { primary: "blue", style: "light" } };
     if (pathname === "/api/app/user") data = { user, cart: { count: 0 } };
@@ -29,7 +30,11 @@ async function check(viewport, count) {
     } };
     if (pathname === "/api/admin/users") {
       await gate;
-      data = { users };
+      const offset = Number(url.searchParams.get("offset"));
+      const limit = Number(url.searchParams.get("limit"));
+      assert.ok(limit > 0 && limit <= 100);
+      const items = users.slice(offset, offset + limit);
+      data = { users: items, total: users.length, nextOffset: offset + items.length < users.length ? offset + items.length : null };
     }
     if (pathname === "/api/catalog/sync") return route.fulfill({ status: 200, contentType: "text/event-stream", body: ": fixture\n\n" });
     return route.fulfill({ json: { ok: true, data } });
@@ -37,6 +42,7 @@ async function check(viewport, count) {
   try {
     await page.goto(`${origin}/panel/admin`, { waitUntil: "domcontentloaded" });
     await page.getByRole("button", { name: "کاربران", exact: true }).click();
+    await page.getByRole("button", { name: "فهرست کاربران", exact: true }).click();
     const section = page.locator("section").filter({ has: page.getByRole("heading", { name: "کاربران", exact: true }) });
     const collection = section.locator("[data-loading-probe]").locator("..");
     const geometry = () => collection.evaluate((element) => {
@@ -67,16 +73,9 @@ async function check(viewport, count) {
         assert.ok(Math.abs(before.bounds[index][key] - after.bounds[index][key]) < 1, `Row ${index} ${key} shifted between skeleton and content`);
       }
     }
-    if (count) {
-      gate = new Promise((resolve) => { releaseUsers = resolve; });
-      await section.getByRole("button", { name: "به‌روزرسانی", exact: true }).click();
-      await pause(200);
-      const refreshing = await geometry();
-      assert.equal(refreshing.count, Math.min(count, refreshing.fit), "Refresh must also use the measured skeleton capacity");
-      releaseUsers();
-    }
+    assert.equal(await section.getByRole("button", { name: "به‌روزرسانی", exact: true }).count(), 0);
     assert.deepEqual(failures, []);
-    console.log(`PASS ${viewport.width}x${viewport.height}, total=${count}: ${before.count} measured skeletons, matching row geometry, refresh`);
+    console.log(`PASS ${viewport.width}x${viewport.height}, total=${count}: ${before.count} measured skeletons, matching row geometry, no manual refresh`);
   } finally {
     releaseUsers();
     await context.close();

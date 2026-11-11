@@ -3,8 +3,8 @@
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
 
-import { useEffect, useMemo, useState } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { IoBagHandleOutline, IoCardOutline, IoTrashOutline } from "react-icons/io5";
 import { CustomButton } from "../design-system/components/ui/button";
@@ -16,7 +16,7 @@ import { ImagePreview } from "../design-system/components/ui/image-preview";
 import { AppImage } from "../design-system/components/ui/app-image";
 import { AppHeading } from "../design-system/components/ui/text";
 import { CustomModal } from "../design-system/components/ui/modal";
-import { startRouteLoading } from "../design-system/components/loading/loading";
+import Loading, { DynamicLoadingCollection, startRouteLoading, useStructureRouteLoading } from "../design-system/components/loading/loading";
 import {
   CART_UPDATED_EVENT,
   clearCart as clearCartData,
@@ -49,7 +49,7 @@ import {
   getFinalPriceValue as getFinalPrice,
   readFormattedPriceNumber as readPriceNumber,
 } from "@/lib/price-format";
-import { getProductDetail } from "@/lib/products-client";
+import { getProductDetail, type ProductRecord } from "@/lib/products-client";
 import { normalizeStockEntries } from "../design-system/components/ui/color-stock-dots";
 import { ColorQuantityPicker } from "../design-system/components/ui/color-quantity-picker";
 import { colorSelectionTotal } from "@/lib/cart-color-selection";
@@ -78,22 +78,17 @@ export default function CartPage() {
     ].join("|"),
     [appUser?.id, appUser?.role, appUser?.username]
   );
-  const productQueries = useQueries({
-    queries: items.map((item) => {
-      const productId = item.productId ?? item.id;
-      return {
-        queryKey: ["catalog", "product", productId],
-        queryFn: () => getProductDetail(productId ?? ""),
-        enabled: Boolean(productId),
-      };
-    }),
-  });
-  const products = useMemo(
-    () => productQueries
-      .map((query) => query.data?.product)
-      .filter((product): product is NonNullable<typeof product> => Boolean(product)),
-    [productQueries]
-  );
+  const [products, setProducts] = useState<ProductRecord[]>([]);
+  const [failedProducts, setFailedProducts] = useState<string[]>([]);
+  const onProductError = useCallback((id: string) => setFailedProducts((current) => current.includes(id) ? current : [...current, id]), []);
+  const [cartReady, setCartReady] = useState(false);
+  useStructureRouteLoading(!cartReady);
+  const onProductLoaded = useCallback((product: ProductRecord) => {
+    setProducts((current) => {
+      const previous = current.find((entry) => String(entry.id) === String(product.id));
+      return previous === product ? current : [...current.filter((entry) => String(entry.id) !== String(product.id)), product];
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,7 +105,7 @@ export default function CartPage() {
       setItems(snapshot.items);
       setProfile(savedProfile);
       setAuthUser(user);
-    })();
+    })().catch((error) => { if (!cancelled) setCheckoutMessage(error instanceof Error ? error.message : "دریافت سبد خرید انجام نشد."); }).finally(() => { if (!cancelled) setCartReady(true); });
 
     return () => {
       cancelled = true;
@@ -290,50 +285,7 @@ export default function CartPage() {
     await prepareCheckout(accountCart.items, checkoutProfile);
   };
 
-  return (
-    <main className="min-h-full bg-primary-base text-primary-text">
-      <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
-        <div className="flex items-center justify-between gap-3 border-b border-primary-border pb-4">
-          <div>
-            <AppHeading level={1} className="text-3xl font-bold">سبد خرید</AppHeading>
-            <div className="text-sm text-secondary-text">{totalItems} کالا در سبد خرید</div>
-            {items.length > 0 && (
-              <div className="mt-1 text-base font-bold text-primary">
-                مجموع: {formatPrice(cartTotal)}
-              </div>
-            )}
-          </div>
-          {items.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2">
-              <CustomButton
-                size="sm"
-                variant="info"
-                icon={<IoCardOutline />}
-                isLoading={isCheckoutLoading}
-                loadingText="در حال پرداخت"
-                disabled={isCheckoutLoading || hasIncompleteColorSelection}
-                onClick={() => void continueCheckout()}
-              >
-                پرداخت
-              </CustomButton>
-              <CustomButton variant="danger" size="sm" disabled={isCheckoutLoading} onClick={clearCart}>
-                خالی کردن سبد
-              </CustomButton>
-              {hasIncompleteColorSelection ? (
-                <span className="text-xs font-semibold text-danger-text-nomode">
-                  برای پرداخت، رنگ هر محصول را انتخاب کنید.
-                </span>
-              ) : null}
-            </div>
-          )}
-        </div>
-
-
-        {items.length === 0 ? (
-          <CustomEmptyState description="سبد خرید شما خالی است." />
-        ) : (
-          <div className="grid w-full max-w-5xl self-center grid-cols-1 gap-3 lg:grid-cols-2">
-            {items.map((item, index) => {
+  const renderCartItem = (item: CartItemRecord, index: number, probe = false) => {
               const product = products.find((entry) => String(entry.id) === String(item.productId ?? item.id));
               const stockValue = product?.stockQuantity ?? item.stockQuantity;
               const stockLimit = Number(stockValue);
@@ -357,6 +309,8 @@ export default function CartPage() {
                 && isAvailable
                 && item.quantity < normalizedStockLimit;
               return (
+                <>
+                {!probe && (item.productId ?? item.id) ? <CartProductLoader productId={String(item.productId ?? item.id)} onLoaded={onProductLoaded} onError={onProductError} /> : null}
                 <article
                   data-card-family="cartLine"
                   key={String(item.productId ?? item.id ?? `${item.title}-${index}`)}
@@ -422,9 +376,56 @@ export default function CartPage() {
                     </CustomActionButton>
                   </div>
                 </article>
+                </>
               );
-            })}
+  };
+
+  return (
+    <main className="min-h-full bg-primary-base text-primary-text">
+      <section className="mx-auto flex w-full flex-col gap-6 px-4 py-8">
+        <div className="flex items-center justify-between gap-3 border-b border-primary-border pb-4">
+          <div>
+            <AppHeading level={1} className="text-3xl font-bold">سبد خرید</AppHeading>
+            <div className="text-sm text-secondary-text">{totalItems} کالا در سبد خرید</div>
+            {items.length > 0 && (
+              <div className="mt-1 text-base font-bold text-primary">
+                مجموع: {formatPrice(cartTotal)}
+              </div>
+            )}
           </div>
+          {items.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <CustomButton
+                size="sm"
+                variant="info"
+                icon={<IoCardOutline />}
+                isLoading={isCheckoutLoading}
+                loadingText="در حال پرداخت"
+                disabled={isCheckoutLoading || hasIncompleteColorSelection}
+                onClick={() => void continueCheckout()}
+              >
+                پرداخت
+              </CustomButton>
+              <CustomButton variant="danger" size="sm" disabled={isCheckoutLoading} onClick={clearCart}>
+                خالی کردن سبد
+              </CustomButton>
+              {hasIncompleteColorSelection ? (
+                <span className="text-xs font-semibold text-danger-text-nomode">
+                  برای پرداخت، رنگ هر محصول را انتخاب کنید.
+                </span>
+              ) : null}
+            </div>
+          )}
+        </div>
+
+
+        {items.length === 0 ? (
+          <CustomEmptyState description="سبد خرید شما خالی است." />
+        ) : (
+          <DynamicLoadingCollection items={items} totalCount={items.length} isLoading={false} lazy
+            className="grid w-full max-w-5xl self-center grid-cols-1 gap-3 lg:grid-cols-2" getKey={(item, index) => String(item.productId ?? item.id ?? index)}
+            renderItem={(item, index) => <Loading loading="skeleton-structure" isLoading={!failedProducts.includes(String(item.productId ?? item.id)) && !products.some((product) => String(product.id) === String(item.productId ?? item.id))}>{renderCartItem(item, index)}</Loading>}
+            renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{renderCartItem(items[0], 0, true)}</Loading>} />
         )}
 
         <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />
@@ -518,4 +519,12 @@ export default function CartPage() {
       </section>
     </main>
   );
+}
+
+function CartProductLoader({ productId, onLoaded, onError }: { productId: string; onLoaded: (product: ProductRecord) => void; onError: (id: string) => void }) {
+  const query = useQuery({ queryKey: ["catalog", "product", productId], queryFn: () => getProductDetail(productId) });
+  useEffect(() => { if (query.data?.product) onLoaded(query.data.product); }, [onLoaded, query.data]);
+  useEffect(() => { if (query.isError || (query.isSuccess && !query.data?.product)) onError(productId); }, [onError, productId, query.data, query.isError, query.isSuccess]);
+  useTransientAppMessage(query.error?.message ?? "");
+  return null;
 }

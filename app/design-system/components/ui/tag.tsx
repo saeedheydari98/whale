@@ -5,7 +5,7 @@ import React from "react";
 import { useTheme } from "../../theme/provider";
 import { resolveDynamicColor } from "../../theme/theme";
 import { resolveTokenTextColor, resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
-import { borderVariants, cx, glassSurfaceClasses, GradientDirection, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
+import { borderVariants, controlLabelClasses, cx, glassSurfaceClasses, GradientDirection, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 
 type BaseProps = React.HTMLAttributes<HTMLSpanElement>;
 
@@ -94,7 +94,7 @@ export const CustomTag: React.FC<CustomTagProps> = ({
       )}
     >
       {icon}
-      <span>{children}</span>
+      <span className={controlLabelClasses}>{children}</span>
       {iconAfter}
     </span>
   );
