@@ -70,7 +70,9 @@ counters that remain visible for selected colors.
 
 Terminal text gets ellipsis centrally; explicit `whitespace-normal`,
 `whitespace-pre-wrap`, `line-clamp-*`, or `data-text-wrap` keep multiline copy.
-The application tooltip is shown only when the rendered text is actually clipped.
+The application tooltip is shown only when a text box actually overflows with
+ellipsis or a line clamp. Layout/icon overflow and wrapped text do not qualify.
+Control activation dismisses the tooltip before an action or navigation starts.
 
 Run `npm run check:ui` to check the shared-control boundary. Also run
 `npx tsc --noEmit` and the required Next.js build after UI changes.

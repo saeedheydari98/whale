@@ -4,16 +4,25 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type TooltipState = { target: HTMLElement; text: string; bounds: DOMRect };
-const excluded = "input, textarea, select, pre, code, [data-loading-probe], [aria-hidden=true], [inert], .sr-only, [data-overflow-tooltip=off]";
+const excluded = "input, textarea, select, pre, code, [data-loading-probe], [data-loading-overlay], [aria-busy=true], [aria-hidden=true], [inert], .sr-only, [data-overflow-tooltip=off], .app-overflow-tooltip";
+const controls = "button, a, input, textarea, select, [role=button], [role=link], [role=menuitem], [role=tab]";
 
 function isClippedText(element: HTMLElement) {
-  if (element.closest(excluded)) return false;
+  if (!element.isConnected || element.closest(excluded)) return false;
   const style = getComputedStyle(element);
   const clamped = Number(style.webkitLineClamp) > 0;
-  const ellipsis = style.textOverflow === "ellipsis";
+  const clipsHorizontally = style.overflowX === "hidden" || style.overflowX === "clip";
+  const ellipsis = style.textOverflow === "ellipsis" && clipsHorizontally
+    && (style.whiteSpace === "nowrap" || style.whiteSpace === "pre");
   if ((!clamped && !ellipsis) || style.visibility !== "visible" || element.clientWidth === 0 || !element.textContent?.trim()) return false;
-  return (clamped && element.scrollHeight > element.clientHeight)
-    || (ellipsis && (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight));
+  // Overflowing flex layouts/icons are not ellipsized text. Only measure a
+  // text box, allowing inline formatting inside it but no nested layout boxes.
+  if (style.display.includes("flex") || style.display.includes("grid")
+    || Array.from(element.querySelectorAll("*")).some(child =>
+      !(child instanceof HTMLElement) || getComputedStyle(child).display !== "inline")) return false;
+  return (clamped && (style.overflowY === "hidden" || style.overflowY === "clip")
+      && element.scrollHeight > element.clientHeight)
+    || (ellipsis && element.scrollWidth > element.clientWidth);
 }
 
 function getOverflowTarget(target: EventTarget | null, includeChildren = false) {
@@ -85,20 +94,27 @@ export function AppOverflowTooltip() {
     const click = (event: MouseEvent) => {
       if (inTooltip(event.target)) return;
       // Touch users can reveal clipped static text without stealing control actions.
-      if (event.target instanceof Element && event.target.closest("button,a,input,textarea,select")) return;
+      if (event.target instanceof Element && event.target.closest(controls)) { hide(); return; }
       const target = getOverflowTarget(event.target);
       if (target && target !== active) show(target);
       else hide();
     };
     const focus = (event: FocusEvent) => show(getOverflowTarget(event.target, true));
-    const keyDown = (event: KeyboardEvent) => { if (event.key === "Escape") hide(); };
     const scroll = (event: Event) => { if (!inTooltip(event.target)) hide(); };
+    // Capture activation before a control starts loading or changes the route.
+    const pointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest(controls)) hide();
+    };
+    const activationKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" || event.key === "Enter" || event.key === " ") hide();
+    };
     window.addEventListener("pointerover", pointerOver);
     window.addEventListener("pointerout", pointerOut);
-    window.addEventListener("click", click);
+    window.addEventListener("pointerdown", pointerDown, true);
+    window.addEventListener("click", click, true);
     window.addEventListener("focusin", focus);
     window.addEventListener("focusout", hide);
-    window.addEventListener("keydown", keyDown);
+    window.addEventListener("keydown", activationKey, true);
     window.addEventListener("resize", hide);
     window.addEventListener("scroll", scroll, true);
     window.addEventListener("blur", hide);
@@ -106,10 +122,11 @@ export function AppOverflowTooltip() {
       hide();
       window.removeEventListener("pointerover", pointerOver);
       window.removeEventListener("pointerout", pointerOut);
-      window.removeEventListener("click", click);
+      window.removeEventListener("pointerdown", pointerDown, true);
+      window.removeEventListener("click", click, true);
       window.removeEventListener("focusin", focus);
       window.removeEventListener("focusout", hide);
-      window.removeEventListener("keydown", keyDown);
+      window.removeEventListener("keydown", activationKey, true);
       window.removeEventListener("resize", hide);
       window.removeEventListener("scroll", scroll, true);
       window.removeEventListener("blur", hide);
