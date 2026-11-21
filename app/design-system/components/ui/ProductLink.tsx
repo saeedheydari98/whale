@@ -67,6 +67,7 @@ export default function ProductLink({
   return (
     <CustomButton
       href={isExternal ? String(externalHref) : internalHref}
+      aria-label={`مشاهده ${productTitle || "جزئیات محصول"}`}
       variant={variant}
       size={size}
       rounded={rounded}

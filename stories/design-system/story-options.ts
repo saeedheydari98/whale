@@ -53,4 +53,7 @@ export const loadingOptions = [
   "bars",
   "skeleton",
   "skeleton-block",
+  "skeleton-card",
+  "skeleton-item",
+  "skeleton-structure",
 ] as const;

@@ -3,6 +3,8 @@ import { securityHeaderList } from "./lib/security-headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Emit dynamic metadata in the initial head for every visitor and crawler.
+  htmlLimitedBots: /.*/,
   serverExternalPackages: ["nodemailer", "ws"],
   outputFileTracingIncludes: {
     "/*": ["./node_modules/.prisma/client/**", "./node_modules/@prisma/client/**"],

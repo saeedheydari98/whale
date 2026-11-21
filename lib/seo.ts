@@ -14,15 +14,17 @@ export function parseSlugParam(value: unknown) {
 }
 
 export function seoDescription(value: string, fallback: string) {
-  const text = String(value || fallback).replace(/\s+/g, " ").trim();
+  let text = String(value || fallback).replace(/\s+/g, " ").trim();
   if (text.length < 150) {
-    const padded = `${text} ${fallback}`.replace(/\s+/g, " ").trim();
-    return padded.slice(0, 160);
+    text = `${text} ${fallback}`.replace(/\s+/g, " ").trim();
+  }
+  if (text.length < 150) {
+    text = `${text} ${DEFAULT_HOME_DESCRIPTION}`.trim();
   }
   if (text.length <= 160) return text;
   const sliced = text.slice(0, 160);
   const lastSpace = sliced.lastIndexOf(" ");
-  return (lastSpace > 120 ? sliced.slice(0, lastSpace) : sliced).trim();
+  return (lastSpace >= 150 ? sliced.slice(0, lastSpace) : sliced).trim();
 }
 
 export function seoKeywords(value?: string | string[] | null) {
@@ -83,7 +85,7 @@ export function pageMetadata({
 }
 
 export const DEFAULT_HOME_DESCRIPTION =
-  "فروشگاه وال برای خرید آنلاین محصولات، مشاهده ویترین و دسته‌بندی‌ها، مقایسه قیمت و ثبت سفارش با ارسال منظم در ایران.";
+  "فروشگاه وال برای خرید آنلاین محصولات، مشاهده ویترین و دسته‌بندی‌ها، بررسی مشخصات و مقایسه قیمت؛ کالای مورد نظر را انتخاب کنید و سفارش خود را ثبت و پیگیری کنید.";
 
 export function jsonLdScript(data: unknown) {
   return JSON.stringify(data).replace(/</g, "\\u003c");

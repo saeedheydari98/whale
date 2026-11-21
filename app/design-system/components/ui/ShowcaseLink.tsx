@@ -26,6 +26,7 @@ type Props = {
 
 export default function ShowcaseLink({
   showcaseId,
+  showcaseTitle,
   children,
   variant = "primary",
   size = "sm",
@@ -41,6 +42,7 @@ export default function ShowcaseLink({
   return (
     <CustomButton
       href={href}
+      aria-label={`مشاهده محصولات ${showcaseTitle || "ویترین"}`}
       variant={variant}
       size={size}
       rounded={rounded}

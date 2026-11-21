@@ -92,6 +92,25 @@ const paginationParams = [
   queryParam("limit", "Page size.", { type: "integer", minimum: 1, maximum: 500 }),
 ];
 
+const offsetParams = [
+  queryParam("limit", "Measured page capacity (1–100).", { type: "integer", minimum: 1, maximum: 100 }),
+  queryParam("offset", "Number of records already loaded.", { type: "integer", minimum: 0, default: 0 }),
+];
+const adminFilterParams = [
+  queryParam("q", "Search text.", { type: "string", maxLength: 200 }),
+  queryParam("view", "Order channel.", { type: "string", enum: ["online", "in_person"] }),
+  queryParam("from", "Inclusive start timestamp in milliseconds.", { type: "number", minimum: 0 }),
+  queryParam("to", "Inclusive end timestamp in milliseconds.", { type: "number", minimum: 0 }),
+];
+const adminSortParams = [
+  queryParam("sort", "Sort field supported by the collection.", { type: "string", enum: ["name", "role", "createdAt", "orderCount", "orderTotal", "walletBalance", "lastOrderAt", "id", "customer", "status", "items", "total"], default: "createdAt" }),
+  queryParam("direction", "Sort direction.", { type: "string", enum: ["asc", "desc"], default: "desc" }),
+];
+const countSchema = { type: "integer", minimum: 0 };
+const countData = { type: "object", properties: { structure: { type: "object", properties: { count: countSchema }, required: ["count"] } }, required: ["structure"] };
+const pageFields = { total: countSchema, nextOffset: { type: "integer", minimum: 0, nullable: true } };
+const pagedData = (name: string, schema: OpenApiObject) => ({ type: "object", properties: { [name]: { type: "array", items: schema }, ...pageFields }, required: [name, "total", "nextOffset"] });
+
 const productFilterParams = [
   queryParam("q", "Search text."),
   queryParam("search", "Alternative search text."),
@@ -244,8 +263,8 @@ export const openApiDocument = {
   openapi: "3.0.3",
   info: {
     title: "Whale Store API",
-    version: "0.2.0",
-    description: "API فروشگاه وال شامل ورود با کد ایمیلی، پروفایل کاربر، سبد خرید و پرداخت.",
+    version: "0.3.0",
+    description: "API فروشگاه وال: کاتالوگ و ساختار صفحه، احراز هویت، سفارش آنلاین و حضوری، کیف پول، تخفیف‌ها و مدیریت فروشگاه. برای فهرست‌های پویا ابتدا تعداد را از مسیر structure دریافت کنید، سپس limit اندازه‌گیری‌شده و offset را به مسیر داده بفرستید.",
   },
   servers: [
     {
@@ -262,6 +281,7 @@ export const openApiDocument = {
     { name: "Showcases", description: "Showcase and showcase-product endpoints." },
     { name: "Banners", description: "Banner endpoints." },
     { name: "Cart", description: "Cart and checkout endpoints." },
+    { name: "Commerce", description: "Wallet, discounts, cashback, and in-person sales." },
     { name: "Profile", description: "User profile endpoints." },
     { name: "Admin", description: "Admin dashboard and content management endpoints." },
     { name: "Admin Security", description: "Admin access request endpoints." },
@@ -281,6 +301,110 @@ export const openApiDocument = {
       },
     },
     schemas: {
+      CheckoutInput: {
+        type: "object",
+        properties: {
+          shippingMethod: { type: "string", enum: ["post", "pickup"], default: "pickup" },
+          discountCode: { type: "string", description: "Optional personal discount code." },
+        },
+      },
+      OrderQuote: {
+        type: "object",
+        properties: {
+          subtotal: { type: "number" }, discountAmount: { type: "number" }, walletAmount: { type: "number" },
+          shippingAmount: { type: "number" }, total: { type: "number" }, cashbackEarned: { type: "number" },
+          cashbackPercent: { type: "number" }, walletBalance: { type: "number" },
+          shippingMethod: { type: "string", enum: ["post", "pickup"], description: "Present on online checkout quotes." },
+          discountCode: { type: "string", nullable: true },
+          discountType: { type: "string", enum: ["percentage", "free_shipping"], nullable: true },
+          discountPercent: { type: "number", nullable: true },
+        },
+        required: ["subtotal", "discountAmount", "walletAmount", "shippingAmount", "total", "cashbackEarned", "cashbackPercent", "walletBalance", "discountCode", "discountType", "discountPercent"],
+      },
+      InPersonCustomer: {
+        type: "object",
+        properties: {
+          firstName: { type: "string", pattern: PERSIAN_NAME_PATTERN.source },
+          lastName: { type: "string", pattern: PERSIAN_NAME_PATTERN.source },
+          phone: { type: "string", pattern: PHONE_PATTERN.source },
+          email: { type: "string", pattern: EMAIL_PATTERN.source },
+          address: { type: "string", minLength: 5, maxLength: 200 },
+        },
+        required: ["firstName", "lastName", "phone", "email", "address"],
+      },
+      InPersonOrderInput: {
+        type: "object",
+        description: "Each productId may appear only once. Omit customerUserId and newCustomer for a walk-in sale. Product prices and stock are checked on the server.",
+        properties: {
+          customerUserId: { type: "integer", minimum: 1, nullable: true },
+          newCustomer: nullableRef("InPersonCustomer"),
+          discountCode: { type: "string" }, useWallet: { type: "boolean", default: false },
+          lines: {
+            type: "array", minItems: 1,
+            items: {
+              type: "object",
+              properties: {
+                productId: { type: "integer", minimum: 1 }, title: { type: "string", minLength: 1 },
+                description: { type: "string", default: "" }, price: { type: "string", minLength: 1 },
+                originalPrice: { type: "string", nullable: true }, discountPrice: { type: "string", nullable: true },
+                discountPercent: { type: "integer", minimum: 0, nullable: true }, imageUrl: { type: "string", nullable: true },
+                selectedColor: { type: "string", nullable: true }, quantity: { type: "integer", minimum: 1 },
+              },
+              required: ["productId", "title", "price", "quantity"],
+            },
+          },
+        },
+        required: ["lines"],
+      },
+      CommerceSettings: {
+        type: "object", properties: { cashbackPercent: { type: "integer", minimum: 0, maximum: 100 }, postalShippingFee: { type: "integer" } },
+        required: ["cashbackPercent", "postalShippingFee"],
+      },
+      CashbackInput: {
+        type: "object", properties: { cashbackPercent: { type: "integer", minimum: 0, maximum: 100 } }, required: ["cashbackPercent"],
+      },
+      DiscountCode: {
+        type: "object",
+        properties: {
+          id: { type: "string" }, name: { type: "string" }, code: { type: "string" },
+          type: { type: "string", enum: ["percentage", "free_shipping"] }, percent: { type: "integer", nullable: true },
+          expiresAt: { type: "string", format: "date-time" }, usedAt: { type: "string", format: "date-time", nullable: true },
+        },
+        required: ["id", "name", "code", "type", "percent", "expiresAt", "usedAt"],
+      },
+      DiscountRuleInput: {
+        type: "object",
+        description: "percent is required for percentage discounts; minimumValue must be positive except for new_users.",
+        properties: {
+          name: { type: "string", minLength: 1 }, audienceType: { type: "string", enum: ["new_users", "purchase_count", "purchase_amount"] },
+          minimumValue: { type: "integer", minimum: 1 }, lookbackDays: { type: "integer", minimum: 1, maximum: 3650 },
+          discountType: { type: "string", enum: ["percentage", "free_shipping"], default: "percentage" },
+          percent: { type: "integer", minimum: 1, maximum: 100, nullable: true }, validDays: { type: "integer", minimum: 1, maximum: 3650 },
+        },
+        required: ["name", "audienceType", "lookbackDays", "validDays"],
+      },
+      DiscountRule: {
+        allOf: [ref("DiscountRuleInput"), { type: "object", properties: { id: { type: "string" }, active: { type: "boolean" }, createdAt: { type: "string", format: "date-time" }, _count: { type: "object", properties: { discountCodes: countSchema } } } }],
+      },
+      ManualDiscountInput: {
+        type: "object",
+        description: "percent is required for percentage discounts.",
+        properties: { name: { type: "string", minLength: 1 }, type: { type: "string", enum: ["percentage", "free_shipping"], default: "percentage" }, percent: { type: "integer", minimum: 1, maximum: 100 }, durationDays: { type: "integer", minimum: 1, maximum: 3650 } },
+        required: ["name", "durationDays"],
+      },
+      WalletTransaction: {
+        type: "object",
+        properties: { id: { type: "string" }, userId: { type: "integer" }, orderId: { type: "string", nullable: true }, type: { type: "string" }, amount: { type: "integer" }, createdAt: { type: "string", format: "date-time" } },
+      },
+      AdminUser: {
+        type: "object",
+        properties: {
+          id: { type: "integer" }, name: { type: "string", nullable: true }, username: { type: "string", nullable: true }, email: { type: "string", nullable: true }, role: { type: "string" },
+          walletBalance: { type: "integer" }, createdAt: { type: "string", format: "date-time" },
+          profiles: { type: "array", items: { type: "object", properties: { firstName: { type: "string" }, lastName: { type: "string" }, phone: { type: "string" }, email: { type: "string", nullable: true } } } },
+          orderCount: countSchema, orderTotal: { type: "number" }, lastOrderAt: { type: "string", format: "date-time", nullable: true },
+        },
+      },
       ApiSuccess: {
         type: "object",
         properties: {
@@ -563,8 +687,10 @@ export const openApiDocument = {
         type: "object",
         properties: {
           products: ref("ProductPage"),
+          items: { type: "array", items: ref("Product") },
+          ...pageFields,
         },
-        required: ["products"],
+        required: ["products", "items", "total", "nextOffset"],
       },
       ProductDetailData: {
         type: "object",
@@ -853,15 +979,27 @@ export const openApiDocument = {
       CheckoutData: {
         type: "object",
         properties: {
-          checkedOut: { type: "boolean" },
+          checkout: ref("OrderCreated"),
         },
-        required: ["checkedOut"],
+        required: ["checkout"],
+      },
+      OrderCreated: {
+        type: "object",
+        properties: { orderId: { type: "string" }, quote: ref("OrderQuote"), customerId: { type: "integer", nullable: true, description: "Present on in-person sale results." } },
+        required: ["orderId", "quote"],
       },
       Order: {
         type: "object",
         additionalProperties: true,
         properties: {
           id: { type: "string" },
+          orderType: { type: "string", enum: ["online", "in_person"] },
+          shippingMethod: { type: "string", enum: ["post", "pickup"] },
+          subtotal: { type: "string" },
+          discountAmount: { type: "string" },
+          walletAmount: { type: "string" },
+          shippingAmount: { type: "string" },
+          cashbackEarned: { type: "integer" },
           status: { type: "string" },
           fulfillmentStatus: { type: "string", enum: ["pending_approval", "processing", "shipped", "delivered"] },
           trackingCode: { type: "string", nullable: true },
@@ -896,8 +1034,9 @@ export const openApiDocument = {
           orders: { type: "integer" },
           discounts: { type: "integer" },
           unseenDiscounts: { type: "integer" },
+          walletTransactions: countSchema,
         },
-        required: ["orders", "discounts", "unseenDiscounts"],
+        required: ["orders", "discounts", "unseenDiscounts", "walletTransactions"],
       },
       AdminPanelStructure: {
         type: "object",
@@ -905,6 +1044,8 @@ export const openApiDocument = {
           products: { type: "integer" },
           orders: { type: "integer" },
           inPersonOrders: { type: "integer" },
+          discountRules: countSchema,
+          accessRequests: { type: "object", properties: { pending: countSchema, approved: countSchema, archived: countSchema }, required: ["pending", "approved", "archived"] },
           users: { type: "integer" },
           banners: { type: "integer" },
           showcases: {
@@ -950,7 +1091,7 @@ export const openApiDocument = {
             required: ["home", "categories", "products"],
           },
         },
-        required: ["products", "orders", "inPersonOrders", "users", "banners", "showcases", "categoryGroups", "brandGroups", "storefront"],
+        required: ["products", "orders", "inPersonOrders", "users", "banners", "showcases", "categoryGroups", "brandGroups", "storefront", "discountRules", "accessRequests"],
       },
       AdminDashboard: {
         type: "object",
@@ -1052,6 +1193,68 @@ export const openApiDocument = {
     },
   },
   paths: {
+    "/api/cart/quote": {
+      post: operation({ tags: ["Cart"], summary: "Preview checkout totals", operationId: "quoteCart", body: ref("CheckoutInput"), data: singleData("quote", "OrderQuote"), security: authSecurity, extraResponses: { "409": errorResponse("Discount already used or insufficient stock/balance"), "410": errorResponse("Discount expired") } }),
+    },
+    "/api/admin/commerce": {
+      get: operation({ tags: ["Commerce", "Admin"], summary: "Read cashback and shipping settings", operationId: "getCommerceSettings", data: singleData("settings", "CommerceSettings"), security: authSecurity }),
+      patch: operation({ tags: ["Commerce", "Admin"], summary: "Update cashback percentage", operationId: "updateCommerceSettings", body: ref("CashbackInput"), data: singleData("settings", "CommerceSettings"), security: authSecurity }),
+    },
+    "/api/admin/users": {
+      get: operation({ tags: ["Admin"], summary: "List customers and order statistics", operationId: "listAdminUsers", description: "Supply limit for paginated results. Without limit the legacy response contains only users. Fetch the filtered collections/structure count first.", parameters: [...offsetParams, adminFilterParams[0], ...adminSortParams], data: { anyOf: [pagedData("users", ref("AdminUser")), listData("users", "AdminUser")] }, security: authSecurity }),
+    },
+    "/api/admin/users/{id}/discount": {
+      post: operation({ tags: ["Commerce", "Admin"], summary: "Issue a personal discount code", operationId: "issueUserDiscount", parameters: [pathParam("id", "Customer user ID.", true)], body: ref("ManualDiscountInput"), data: singleData("discountCode", "DiscountCode"), security: authSecurity }),
+    },
+    "/api/admin/discounts": {
+      get: operation({
+        tags: ["Commerce", "Admin"], summary: "Read discount rules or settings", operationId: "getAdminDiscounts", security: authSecurity,
+        description: "scope=settings returns settings only. scope=rules or an explicit limit returns a rules page (default limit 20). With neither, returns settings and all rules.",
+        parameters: [...offsetParams, queryParam("scope", "Requested data.", { type: "string", enum: ["settings", "rules"] })],
+        data: { anyOf: [singleData("settings", "CommerceSettings"), pagedData("rules", ref("DiscountRule")), { type: "object", properties: { settings: ref("CommerceSettings"), rules: { type: "array", items: ref("DiscountRule") } }, required: ["settings", "rules"] }] },
+      }),
+      post: operation({
+        tags: ["Commerce", "Admin"], summary: "Create a rule, issue a code, or run rules", operationId: "createAdminDiscount", security: authSecurity,
+        description: "Omit action to create a rule; issue_manual uses discountType and validDays. run_rules evaluates active rules for eligible users.",
+        body: { oneOf: [ref("DiscountRuleInput"), { type: "object", properties: { action: { type: "string", enum: ["run_rules"] } }, required: ["action"] }, { type: "object", properties: { action: { type: "string", enum: ["issue_manual"] }, userId: { type: "integer", minimum: 1 }, name: { type: "string", minLength: 1 }, discountType: { type: "string", enum: ["percentage", "free_shipping"] }, percent: { type: "integer", minimum: 1, maximum: 100 }, validDays: { type: "integer", minimum: 1, maximum: 3650 } }, required: ["action", "userId", "name", "validDays"] }] },
+        data: { anyOf: [singleData("rule", "DiscountRule"), { type: "object", properties: { discountCode: ref("DiscountCode"), created: { type: "boolean" } }, required: ["discountCode", "created"] }, { type: "object", properties: { result: { type: "object", additionalProperties: true } }, required: ["result"] }] },
+      }),
+      patch: operation({
+        tags: ["Commerce", "Admin"], summary: "Edit a rule, toggle it, or update cashback", operationId: "updateAdminDiscount", security: authSecurity,
+        body: { oneOf: [{ allOf: [ref("CashbackInput"), { type: "object", properties: { action: { type: "string", enum: ["settings"] } }, required: ["action"] }] }, { allOf: [ref("DiscountRuleInput"), { type: "object", properties: { id: { type: "string" }, action: { type: "string", enum: ["update_rule"] } }, required: ["id", "action"] }] }, { type: "object", properties: { id: { type: "string" }, active: { type: "boolean" } }, required: ["id", "active"] }] },
+        data: { oneOf: [singleData("settings", "CommerceSettings"), singleData("rule", "DiscountRule")] },
+      }),
+      delete: operation({ tags: ["Commerce", "Admin"], summary: "Delete a discount rule", operationId: "deleteAdminDiscount", security: authSecurity, body: { type: "object", properties: { id: { type: "string" } }, required: ["id"] }, data: deletedData }),
+    },
+    "/api/user/wallet": {
+      get: operation({
+        tags: ["Commerce"], summary: "Read wallet balance, active discounts, or transactions", operationId: "getUserWallet", security: authSecurity,
+        description: "scope=summary returns balance. scope=discounts returns active unused codes. scope=transactions returns transaction records. Scoped lists use offset/limit (default limit 1); obtain counts from user/structure first. Without scope the legacy wallet includes all codes and up to 30 transactions.",
+        parameters: [...offsetParams, queryParam("scope", "Requested wallet section.", { type: "string", enum: ["summary", "discounts", "transactions"] })],
+        data: { anyOf: [{ type: "object", properties: { wallet: { type: "object", properties: { balance: { type: "integer" }, discountCodes: { type: "array", items: ref("DiscountCode") }, transactions: { type: "array", items: ref("WalletTransaction") } }, required: ["balance"] } }, required: ["wallet"] }, pagedData("codes", ref("DiscountCode")), pagedData("transactions", ref("WalletTransaction"))] },
+      }),
+    },
+    "/api/admin/orders/in-person": {
+      post: operation({ tags: ["Commerce", "Admin"], summary: "Create an in-person sale", operationId: "createInPersonOrder", security: authSecurity, body: ref("InPersonOrderInput"), data: singleData("order", "OrderCreated"), successStatus: "201", extraResponses: { "409": errorResponse("Stock, wallet, or discount conflict"), "410": errorResponse("Discount expired") } }),
+    },
+    "/api/admin/orders/in-person/quote": {
+      post: operation({ tags: ["Commerce", "Admin"], summary: "Preview an in-person sale", operationId: "quoteInPersonOrder", security: authSecurity, body: ref("InPersonOrderInput"), data: singleData("quote", "OrderQuote"), extraResponses: { "409": errorResponse("Stock, wallet, or discount conflict"), "410": errorResponse("Discount expired") } }),
+    },
+    "/api/admin/orders/in-person/options": {
+      get: operation({ tags: ["Commerce", "Admin"], summary: "Search products or customers for a sale", operationId: "getInPersonOrderOptions", security: authSecurity, parameters: [{ ...queryParam("kind", "Option collection.", { type: "string", enum: ["products", "customers"] }), required: true }, { ...offsetParams[0], required: true }, offsetParams[1], adminFilterParams[0]], data: pagedData("items", { type: "object", description: "Product: id, title, description, prices, imageUrl, stockQuantity, colorStock, active/isActive/isAvailable. Customer: id, name, username, email, role, walletBalance, profiles.", additionalProperties: true }) }),
+    },
+    "/api/admin/collections/structure": {
+      get: operation({ tags: ["Admin"], summary: "Count filtered users or orders before requesting a page", operationId: "getAdminCollectionStructure", security: authSecurity, parameters: [{ ...queryParam("collection", "Collection to count.", { type: "string", enum: ["users", "orders"] }), required: true }, ...adminFilterParams], data: countData }),
+    },
+    "/api/products/search/structure": {
+      get: operation({ tags: ["Products"], summary: "Count products matching search before loading results", operationId: "getProductSearchStructure", parameters: productFilterParams, data: countData }),
+    },
+    "/api/products/{id}/comments/structure": {
+      get: operation({ tags: ["Products"], summary: "Count active comments and rating groups", operationId: "getProductCommentStructure", parameters: [pathParam("id", "Product ID.", true)], description: "count includes unrated text comments; ratings includes only numeric ratings across all active comments, not just the current page.", data: { type: "object", properties: { structure: { type: "object", properties: { count: countSchema, ratings: { type: "array", items: { type: "object", properties: { stars: { type: "integer", minimum: 1, maximum: 5 }, count: countSchema }, required: ["stars", "count"] } } }, required: ["count", "ratings"] } }, required: ["structure"] } }),
+    },
+    "/api/catalog/section": {
+      get: operation({ tags: ["Catalog"], summary: "Load data for a storefront section", operationId: "getCatalogSection", parameters: [{ ...queryParam("type", "Section type.", { type: "string", enum: ["banner", "brands", "categories"] }), required: true }, { ...queryParam("id", "Section identifier."), required: true }, includeInactiveParam], data: { type: "object", properties: { type: { type: "string" }, banner: nullableRef("Banner"), brands: { type: "array", items: ref("Brand") }, categories: { type: "array", items: ref("Category") } }, required: ["type", "banner", "brands", "categories"] } }),
+    },
     "/api/openapi": {
       get: operation({
         tags: ["Documentation"],
@@ -1408,7 +1611,7 @@ export const openApiDocument = {
         tags: ["Products"],
         summary: "Search products",
         operationId: "searchProducts",
-        parameters: productFilterParams,
+        parameters: [...productFilterParams.filter((parameter) => parameter.name !== "limit"), ...offsetParams],
         data: ref("ProductSearchData"),
       }),
     },
@@ -1489,8 +1692,9 @@ export const openApiDocument = {
         tags: ["Products"],
         summary: "List product comments",
         operationId: "listProductComments",
-        parameters: [pathParam("id", "Product id.", true)],
-        data: ref("ProductCommentsData"),
+        parameters: [pathParam("id", "Product id.", true), ...offsetParams],
+        description: "With limit, returns a page and total/nextOffset; without limit, returns the legacy comments and viewer rating metadata.",
+        data: { anyOf: [pagedData("comments", ref("Comment")), ref("ProductCommentsData")] },
       }),
       post: operation({
         tags: ["Products"],
@@ -1677,6 +1881,7 @@ export const openApiDocument = {
         summary: "پرداخت جایگزین سبد احراز هویت‌شده",
         description: "مسیر جایگزین پرداخت برای کلاینت‌هایی که مستقیماً با سبد حساب کاربری کار می‌کنند.",
         operationId: "checkoutCart",
+        body: ref("CheckoutInput"),
         data: ref("CheckoutData"),
         security: authSecurity,
       }),
@@ -1806,8 +2011,9 @@ export const openApiDocument = {
         tags: ["Profile"],
         summary: "List current user's orders",
         operationId: "listUserOrders",
-        data: listData("orders", "Order"),
-        security: authSecurity,
+        parameters: offsetParams,
+        description: "Guests receive an empty page. Authenticated requests return their orders; supply limit to page results.",
+        data: pagedData("orders", ref("Order")),
       }),
     },
     "/api/admin/catalog/structure": {
@@ -1860,7 +2066,9 @@ export const openApiDocument = {
         tags: ["Admin"],
         summary: "List all orders for admin",
         operationId: "listAdminOrders",
-        data: listData("orders", "Order"),
+        parameters: [...offsetParams, ...adminFilterParams, ...adminSortParams],
+        description: "Supply limit for pagination; use the same view, q, from, and to filters when requesting collections/structure. Without limit the legacy response returns all orders.",
+        data: { anyOf: [pagedData("orders", ref("Order")), listData("orders", "Order")] },
         security: authSecurity,
       }),
     },
@@ -2267,6 +2475,15 @@ export const openApiDocument = {
         tags: ["Theme"],
         summary: "Save theme compatibility route",
         operationId: "saveThemeAdmin",
+        body: ref("ThemeInput"),
+        data: singleData("theme", "ThemeConfig"),
+        security: authSecurity,
+        deprecated: true,
+      }),
+      put: operation({
+        tags: ["Theme"],
+        summary: "Update theme compatibility route",
+        operationId: "putThemeAdmin",
         body: ref("ThemeInput"),
         data: singleData("theme", "ThemeConfig"),
         security: authSecurity,

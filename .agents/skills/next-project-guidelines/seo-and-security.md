@@ -4,6 +4,19 @@ Use this file with the project skill. Keep body copy and chrome in `div`/`span`.
 
 ## SEO
 
+### SEO regression gate (required)
+
+Require Lighthouse/PageSpeed's **SEO category at 100/100** on mobile and desktop for public, indexable routes. This is a code-quality gate, not a guarantee of search rankings or the other Lighthouse categories.
+
+- Build the current code with `npm run build`, then run `npm run check:seo`. The checker starts that production build, tests the static public pages and one real URL per dynamic sitemap route family, and writes JSON and HTML reports under `artifacts/seo/`. It also checks the cart's intentional noindex policy separately.
+- Add affected paths with `npm run check:seo -- /products/example`. Before release, `npm run verify:seo` builds and checks **all** sitemap URLs. Use a populated test database and a healthy theme API; an empty catalog does not verify product/category templates.
+- Reproduce deployed reports with `npm run check:seo -- https://your-deployed-origin.example /affected-path`. Compare the exact URL and device. A local report proves only the tested build and URLs; hosting, production configuration, and external availability still need deployed verification.
+- Keep intentionally private/transactional routes noindex and out of the sitemap. Their raw Lighthouse score can be below 100 solely because of `is-crawlable`; retain that audit and report the real score, while requiring all other scored SEO audits to pass. Never silently index private pages to raise a score. Keep `/cart` crawlable in robots.txt so crawlers can read its noindex metadata; a crawl block is not a substitute for noindex (https://developers.google.com/search/docs/crawling-indexing/block-indexing). Include public about and category-group routes and canonical catalog URLs in the sitemap.
+- Fix the reported cause and rerun affected checks. Do not skip scored audits, lower the public threshold, return crawler-only content, mock APIs during scoring, or reveal content before its theme/loading contract permits it. Report blocked or incomplete audits honestly.
+- Keep dynamic metadata in the initial HTML head for all visitors (`htmlLimitedBots: /.*/` in next.config.ts). Lighthouse reads `head meta`; streamed metadata left in body causes the meta-description audit to fail. Do not special-case Lighthouse user agents. Blocking metadata waits for its data before the initial response, so keep catalog metadata reads efficient.
+- Run Lighthouse audits sequentially on a machine; concurrent browser audits compete for resources and can make collection unreliable. Retain failed reports and investigate unexpected variability instead of automatically retrying until a passing result appears.
+- Preserve the pinned Lighthouse dependency and lockfile for comparable runs. Rebaseline explicitly when upgrading Lighthouse; do not silently accept a lower score.
+
 ### Architecture
 
 - Pages that only display content should be Server Components. Keep `"use client"` on interactive islands (tabs, cart, galleries, loaders).
@@ -52,7 +65,7 @@ Helpers: `pageMetadata`, `lib/site.ts`, `lib/seo-catalog.ts`. Use product `metaT
 ### Required files
 
 - `app/sitemap.ts` — static catalog routes plus active products/categories/brands/showcases
-- `app/robots.ts` — allow public pages; disallow `/panel/`, `/api/`, `/cart`, `/swagger`
+- `app/robots.ts` — allow public pages; disallow `/panel/`, `/api/`, `/swagger`; allow crawling `/cart` so its noindex directive can be read
 - `app/manifest.ts` — PWA name for فروشگاه وال
 - `app/not-found.tsx` and `app/error.tsx` — user-facing copy only, no stack traces
 

@@ -7,7 +7,8 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/panel/", "/api/", "/cart", "/swagger"],
+        // Crawlers must be able to read the cart's noindex metadata.
+        disallow: ["/panel/", "/api/", "/swagger"],
       },
     ],
     sitemap: sitePath("/sitemap.xml"),

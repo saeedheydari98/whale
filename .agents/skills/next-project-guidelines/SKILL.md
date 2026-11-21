@@ -36,6 +36,8 @@ description: Project-specific rules for this Next.js 16 app. Use when editing, r
 
 Follow [seo-and-security.md](seo-and-security.md) whenever adding pages, metadata, JSON-LD, images, headers, env, or API validation.
 
+- Preserve Lighthouse/PageSpeed **SEO 100/100** on mobile and desktop for public, indexable pages. Treat code-caused regressions as release blockers. After public-page, shared UI, metadata, routing, robots, or sitemap changes, build the current code and run `npm run check:seo` plus affected paths; before release use `npm run verify:seo`. Do not claim 100 without fresh reports. Keep intentionally non-indexable pages separate: record their actual score and require every audit other than the expected indexing restriction to pass. Never disable audits, fake content, or bypass theme/loading to raise the score. See the SEO regression gate in [seo-and-security.md](seo-and-security.md).
+
 - Public pages need `metadata` / `generateMetadata` (`title`, `description` 150–160 chars, `robots`, `alternates.canonical`, Open Graph, Twitter). Put it on Server layouts; do not export metadata from `"use client"` pages.
 - Root layout owns `Organization` + `WebSite` JSON-LD. Product/category/brand/showcase layouts add `BreadcrumbList` and `Product` where relevant. Serialize with `jsonLdScript` (escape `<` as `\u003c`).
 - Visible outline: one `AppHeading level={1}` per page, `level={2}` sections, `level={3}` item titles. Do not heading-ize prices or chrome. Keep `div`/`span` for body copy. Still no `p`. Document title and JSON-LD stay required alongside headings.

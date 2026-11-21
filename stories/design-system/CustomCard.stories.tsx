@@ -30,8 +30,7 @@ const meta = {
     shadow: "sm",
     hover: "none",
     isLoading: false,
-    loading: "spinner",
-    loadingText: "Loading card...",
+    loading: "skeleton-structure",
     children: "This is a custom card component.",
   },
 } satisfies Meta<typeof CustomCard>;
@@ -40,3 +39,5 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Playground = {} as Story;
+
+export const LoadingContent: Story = { args: { isLoading: true, loading: "skeleton-structure" } };

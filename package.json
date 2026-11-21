@@ -12,6 +12,8 @@
     "start": "next start",
     "lint": "eslint",
     "check:ui": "node scripts/check-ui-consistency.mjs",
+    "check:seo": "node scripts/check-seo.mjs",
+    "verify:seo": "npm run build && npm run check:seo -- --all",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -51,6 +53,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "eslint-plugin-storybook": "^10.3.6",
+    "lighthouse": "13.6.0",
     "playwright": "^1.59.1",
     "postcss": "^8.5.13",
     "storybook": "^10.3.6",

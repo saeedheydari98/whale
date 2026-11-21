@@ -1,4 +1,6 @@
 import { createServer } from "node:http";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 const preferredPort = Number(process.env.PORT || process.env.SWAGGER_PORT || 3001);
 const maxPort = preferredPort + 20;
@@ -60,21 +62,46 @@ function swaggerHtml() {
 </html>`;
 }
 
-async function proxyOpenApi(response) {
+async function proxyApi(request, response, url) {
   try {
-    const upstream = await fetch(openApiUrl);
-    const body = await upstream.text();
-
-    response.writeHead(upstream.status, {
-      "Content-Type": upstream.headers.get("content-type") || "application/json; charset=utf-8",
-      "Cache-Control": "no-cache",
+    // Keep browser requests and auth cookies on the Swagger origin. The upstream
+    // host is fixed by configuration; paths cannot select another destination.
+    const target = new URL(nextOrigin);
+    target.pathname = url.pathname;
+    target.search = url.search;
+    const headers = new Headers();
+    for (const name of ["accept", "authorization", "content-type", "cookie"]) {
+      const value = request.headers[name];
+      if (typeof value === "string") headers.set(name, value);
+    }
+    const hasBody = request.method !== "GET" && request.method !== "HEAD";
+    const upstream = await fetch(target, {
+      method: request.method,
+      headers,
+      ...(hasBody ? { body: request, duplex: "half" } : {}),
+      redirect: "manual",
     });
-    response.end(body);
-  } catch (error) {
+    response.statusCode = upstream.status;
+    for (const name of ["content-type", "cache-control", "location", "retry-after"]) {
+      const value = upstream.headers.get(name);
+      if (value) response.setHeader(name, value);
+    }
+    const cookies = upstream.headers.getSetCookie();
+    if (cookies.length) response.setHeader("set-cookie", cookies);
+    if (upstream.body && request.method !== "HEAD") {
+      await pipeline(Readable.fromWeb(upstream.body), response);
+    } else {
+      response.end();
+    }
+  } catch {
+    if (response.headersSent || response.destroyed) {
+      response.destroy();
+      return;
+    }
     response.writeHead(502, { "Content-Type": "application/json; charset=utf-8" });
     response.end(JSON.stringify({
       ok: false,
-      message: `Could not load OpenAPI document from ${openApiUrl}`,
+      message: `Could not reach the Next.js API at ${nextOrigin}. Start it with npm run dev.`,
     }));
   }
 }
@@ -82,8 +109,8 @@ async function proxyOpenApi(response) {
 const server = createServer(async (request, response) => {
   const url = new URL(request.url || "/", `http://${request.headers.host}`);
 
-  if (url.pathname === "/api/openapi") {
-    await proxyOpenApi(response);
+  if (url.pathname.startsWith("/api/")) {
+    await proxyApi(request, response, url);
     return;
   }
 
