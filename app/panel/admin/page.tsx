@@ -1,4 +1,5 @@
 "use client";
+import { NotificationsPanel } from "@/app/panel/notifications-panel";
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -37,7 +38,7 @@ type AdminPanelUser = {
   role?: string | null;
 };
 
-type AdminPanelTab = "theme" | "security" | "orders" | "users" | "discounts" | AdminCatalogSection;
+type AdminPanelTab = "theme" | "security" | "orders" | "users" | "discounts" | "notifications" | AdminCatalogSection;
 
 export default function AdminPanelPage() {
   const { data: appUserData, refresh: refreshAppUser } = useAppUser();
@@ -116,6 +117,7 @@ export default function AdminPanelPage() {
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
     { id: "users", label: "کاربران", icon: <IoPeopleOutline /> },
+    { id: "notifications", label: "اعلان‌ها" },
     { id: "discounts", label: "تخفیف‌ها", icon: <IoTicketOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
     { id: "showcases", label: "ویترین‌ها", icon: <IoAlbumsOutline /> },
@@ -153,8 +155,9 @@ export default function AdminPanelPage() {
             />
           ) : null}
           {activeTab === "users" ? <AdminUsersPanel totalCount={structure?.users} /> : null}
+          {activeTab === "notifications" ? <NotificationsPanel admin usersCount={structure?.users} /> : null}
           {activeTab === "discounts" ? <AdminDiscountsPanel totalUsersCount={structure?.users} rulesCount={structure?.discountRules} /> : null}
-          {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" ? (
+          {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" && activeTab !== "notifications" ? (
             <AdminProductsPanel key={activeTab} section={activeTab} storefrontCounts={structure?.storefront} />
           ) : null}
         </div>

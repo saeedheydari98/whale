@@ -36,6 +36,7 @@ const db = {
       return { count: 1 };
     },
   },
+  pushSubscription: { deleteMany: async () => ({ count: 0 }) },
   customerProfile: { findFirst: async () => null, findMany: async () => [] },
   authOtp: {
     findFirst: async () => otp,

@@ -5,7 +5,7 @@ import { Pool, neonConfig } from "@neondatabase/serverless";
 import WebSocket from "ws";
 import { runtimeEnv } from "@/lib/env";
 
-const PRISMA_SCHEMA_VERSION = "neon-fetch-rhel-engine-v1";
+const PRISMA_SCHEMA_VERSION = "neon-fetch-rhel-engine-notifications-v2";
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   prismaSchemaVersion?: string;

@@ -185,7 +185,12 @@ export async function revokeAuthSession(request: Request) {
     ? { id: Number(refresh.sub), refreshTokenHash: hashToken(refreshToken) }
     : access ? { id: Number(access.sub), refreshTokenHash: access.sid } : null;
   // A delayed logout cannot revoke a newer login/refresh session.
-  if (session) await prisma.user.updateMany({ where: session, data: { refreshTokenHash: null } });
+  if (session) {
+    await prisma.$transaction(async tx => {
+      const revoked = await tx.user.updateMany({ where: session, data: { refreshTokenHash: null } });
+      if (revoked.count) await tx.pushSubscription.deleteMany({ where: { userId: session.id } });
+    });
+  }
   await clearAuthCookies();
 }
 

@@ -12,7 +12,7 @@ function asCount(value: unknown) {
 }
 
 async function readUserPanelStructure(userId: number) {
-  const [orders, discountStats, walletTransactions] = await Promise.all([
+  const [orders, discountStats, walletTransactions, unreadNotifications] = await Promise.all([
     prisma.order.count({ where: { userId } }),
     prisma.$queryRaw<Array<{ discounts: unknown; unseen: unknown }>>`
       SELECT
@@ -24,6 +24,7 @@ async function readUserPanelStructure(userId: number) {
         AND "expiresAt" > NOW()
     `,
     prisma.walletTransaction.count({ where: { userId } }),
+    prisma.notification.count({ where: { userId, readAt: null } }),
   ]);
   const stats = discountStats[0];
   return {
@@ -31,6 +32,7 @@ async function readUserPanelStructure(userId: number) {
     discounts: asCount(stats?.discounts),
     unseenDiscounts: asCount(stats?.unseen),
     walletTransactions,
+    unreadNotifications,
   };
 }
 

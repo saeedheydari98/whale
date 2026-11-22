@@ -4,6 +4,7 @@ import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
 export const USER_STRUCTURE_URL = "/api/user/structure";
 
 export type UserPanelStructure = {
+  unreadNotifications: number;
   orders: number;
   discounts: number;
   unseenDiscounts: number;
@@ -19,6 +20,7 @@ export function normalizeUserPanelStructure(value: unknown): UserPanelStructure 
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   return {
+    unreadNotifications: asCount(record.unreadNotifications),
     orders: asCount(record.orders),
     discounts: asCount(record.discounts),
     unseenDiscounts: asCount(record.unseenDiscounts),

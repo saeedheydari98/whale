@@ -1,4 +1,5 @@
 "use client";
+import { NotificationsPanel } from "@/app/panel/notifications-panel";
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 import { collectionCardClasses } from "@/app/design-system/variants/collection-card.variant";
@@ -191,7 +192,7 @@ export default function UserPanelPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: appUserData } = useAppUser();
-  const [activeTab, setActiveTab] = useState<"profile" | "orders" | "discounts" | "wallet">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "orders" | "discounts" | "wallet" | "notifications">("profile");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [logoutError, setLogoutError] = useState("");
   const isLoggedIn = Boolean(appUserData?.user);
@@ -224,6 +225,7 @@ export default function UserPanelPage() {
   const tabs: Array<CustomTabItem<typeof activeTab>> = [
     { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
+    { id: "notifications", label: "اعلان‌ها", badge: structure?.unreadNotifications },
     { id: "discounts", label: "تخفیف‌ها", icon: <IoTicketOutline />, badge: structure?.unseenDiscounts },
     { id: "wallet", label: "کیف پول", icon: <IoWalletOutline /> },
   ];
@@ -281,6 +283,7 @@ export default function UserPanelPage() {
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل کاربری" />
         {activeTab === "profile" ? <UserProfilePanel onCompleted={handleProfileCompleted} /> : null}
         {activeTab === "orders" ? <UserOrdersPanel totalCount={isLoggedIn ? structure?.orders : 0} /> : null}
+        {activeTab === "notifications" ? <NotificationsPanel /> : null}
         {activeTab === "discounts" ? <UserDiscountsPanel totalCount={isLoggedIn ? structure?.discounts : 0} /> : null}
         {activeTab === "wallet" ? <UserWalletPanel totalCount={isLoggedIn ? structure?.walletTransactions : 0} /> : null}
       </div>

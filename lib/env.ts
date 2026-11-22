@@ -42,3 +42,15 @@ export function authSecret() {
   }
   return secret || "development-jwt-secret-change-me";
 }
+
+export function pushConfiguration() {
+  return z.object({
+    publicKey: z.string().regex(/^[A-Za-z0-9_-]{87}$/).optional(),
+    privateKey: z.string().regex(/^[A-Za-z0-9_-]{43}$/).optional(),
+    subject: z.string().regex(/^(mailto:|https:\/\/)/).optional(),
+  }).parse({
+    publicKey: runtimeEnv("VAPID_PUBLIC_KEY"),
+    privateKey: runtimeEnv("VAPID_PRIVATE_KEY"),
+    subject: runtimeEnv("VAPID_SUBJECT"),
+  });
+}

@@ -27,8 +27,68 @@ model User {
   adminRequests      AdminAccessRequest[]
   discountCodes      DiscountCode[]
   walletTransactions WalletTransaction[]
+  notifications      Notification[]
+  pushSubscriptions  PushSubscription[]
 
   @@map("users")
+}
+
+model NotificationRule {
+  id String @id @default(cuid())
+  name String
+  title String
+  body String
+  url String @default("/panel/user")
+  audienceType String
+  minimumValue Int @default(1)
+  lookbackDays Int @default(30)
+  userIds Int[] @default([])
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  notifications Notification[]
+}
+
+model Notification {
+  id String @id @default(cuid())
+  userId Int
+  ruleId String
+  title String
+  body String
+  url String
+  readAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rule NotificationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  deliveries PushDelivery[]
+  @@unique([ruleId, userId])
+  @@index([userId, createdAt])
+}
+
+model PushSubscription {
+  id String @id @default(cuid())
+  userId Int
+  endpoint String @unique
+  p256dh String
+  auth String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries PushDelivery[]
+  @@index([userId])
+}
+
+model PushDelivery {
+  id String @id @default(cuid())
+  notificationId String
+  subscriptionId String
+  status String @default("pending")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  leaseUntil DateTime?
+  lastError String?
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscription PushSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  @@unique([notificationId, subscriptionId])
+  @@index([status, nextAttemptAt])
 }
 
 model CommerceSetting {
