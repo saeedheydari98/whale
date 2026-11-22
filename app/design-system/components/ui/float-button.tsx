@@ -52,7 +52,7 @@ export function FloatButton({
 }: FloatButtonProps) {
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const positionClass =
-    position === "bottom-left" ? "left-4 bottom-20 md:left-6 md:bottom-6" : "right-4 bottom-20 md:right-6 md:bottom-6";
+    position === "bottom-left" ? "left-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] md:left-6 md:bottom-6" : "right-4 bottom-[calc(7rem+env(safe-area-inset-bottom))] md:right-6 md:bottom-6";
 
   useEffect(() => {
     setPortalTarget(document.body);

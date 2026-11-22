@@ -1,7 +1,5 @@
 import type { AdminCatalogSection, StorefrontLayoutTab } from "./types";
 
-export const MIN_LOADING_MS = 350;
-
 export const PRODUCT_COLOR_OPTIONS = [
   "black",
   "white",

@@ -237,6 +237,9 @@ export async function POST(request: Request) {
     ]);
     if (!authUser && !hasCompleteProfile) return apiFail("برای ادامه باید پروفایل را کامل کنید.", 400);
     const productsById = new Map(products.map((product) => [product.id, product]));
+    if (body.guestMergeUserId !== undefined && authUser?.id !== body.guestMergeUserId) {
+      return apiFail("حساب کاربری تغییر کرده است؛ سبد مهمان حفظ شد.", 409);
+    }
     let rejectedItemTitle = "";
     const safeItems = mergeCartItems(
       items
@@ -267,12 +270,17 @@ export async function POST(request: Request) {
             return { ...item, selectedColors: {}, selectedColor: null, quantity: Math.min(item.quantity, productStock) };
           }
 
+          let remainingStock = productStock;
           const selectedColors = Object.fromEntries(
             Object.entries(item.selectedColors)
-              .map(([color, count]) => [
-                color,
-                Math.min(Math.max(0, Math.round(Number(count) || 0)), colorStock[color] ?? 0),
-              ] as const)
+              .map(([color, count]) => {
+                const quantity = Math.min(
+                  Math.max(0, Math.round(Number(count) || 0)), colorStock[color] ?? 0,
+                  body.guestMergeUserId !== undefined ? remainingStock : Number.POSITIVE_INFINITY
+                );
+                remainingStock -= quantity;
+                return [color, quantity] as const;
+              })
               .filter(([, count]) => count > 0)
           );
           const selectedTotal = colorSelectionTotal(selectedColors);

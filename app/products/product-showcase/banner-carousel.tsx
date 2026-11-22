@@ -130,7 +130,7 @@ export function BannerCarousel({ banner, onPreview, isLoading = false }: BannerC
         <CustomActionButton
           type="button"
           ref={bannerDrag.ref}
-          className={`flex w-full cursor-grab touch-pan-y select-none items-center justify-center overflow-hidden rounded-xl border border-primary-border bg-primary-media transition-shadow hover:border-primary ${
+          className={`flex w-full cursor-grab touch-pan-y! select-none items-center justify-center overflow-hidden rounded-xl border border-primary-border bg-primary-media transition-shadow hover:border-primary ${
             bannerDrag.isDragging ? "cursor-grabbing" : ""
           }`}
           style={{ height: bannerHeight }}

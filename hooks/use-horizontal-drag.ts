@@ -57,16 +57,18 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
   const [isDragging, setIsDragging] = useState(false);
   const [dragDelta, setDragDelta] = useState(0);
 
-  const stopDrag = useCallback((event?: PointerEvent<T>) => {
+  const stopDrag = useCallback((event?: PointerEvent<T>, cancelled = false) => {
     const state = stateRef.current;
-    if (!state.active) return;
+    if (!state.active || (event && event.pointerId !== state.pointerId)) return;
 
     const deltaX = event ? event.clientX - state.startX : state.lastDeltaX;
+    // Releasing capture can dispatch another termination event.
+    state.active = false;
     if (event && state.pointerId !== null && event.currentTarget.hasPointerCapture(state.pointerId)) {
       event.currentTarget.releasePointerCapture(state.pointerId);
     }
 
-    const passedThreshold = state.hasDragged && Math.abs(deltaX) >= threshold;
+    const passedThreshold = !cancelled && state.hasDragged && Math.abs(deltaX) >= threshold;
     const direction = passedThreshold ? (deltaX < 0 ? "next" : "previous") : null;
 
     if (mode === "swipe") {
@@ -83,9 +85,6 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     }
 
     suppressClickRef.current = state.hasDragged;
-    window.setTimeout(() => {
-      suppressClickRef.current = false;
-    }, 0);
 
     stateRef.current = {
       active: false,
@@ -101,12 +100,20 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     setDragDelta(0);
   }, [mode, onDragEnd, onSwipe, threshold]);
 
+  const cancelDrag = useCallback((event: PointerEvent<T>) => {
+    stopDrag(event, true);
+  }, [stopDrag]);
+
   const onPointerDown = useCallback((event: PointerEvent<T>) => {
-    if (disabled || event.button !== 0) return;
+    if (disabled || event.button !== 0 || !event.isPrimary || stateRef.current.active) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest(ignoreSelector)) return;
-    if (event.pointerType !== "mouse") return;
-    event.preventDefault();
+    // Scroll rails use native touch scrolling; swipe carousels handle horizontal
+    // touch gestures with touch-pan-y, leaving vertical page scrolling native.
+    if (mode === "scroll" && event.pointerType !== "mouse") return;
+    if (event.pointerType === "mouse") event.preventDefault();
+    // Keep a drag's synthetic click suppressed until the next deliberate tap.
+    suppressClickRef.current = false;
 
     stateRef.current = {
       active: true,
@@ -119,11 +126,11 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     };
     setIsPointerActive(true);
     event.currentTarget.setPointerCapture(event.pointerId);
-  }, [disabled, ignoreSelector]);
+  }, [disabled, ignoreSelector, mode]);
 
   const onPointerMove = useCallback((event: PointerEvent<T>) => {
     const state = stateRef.current;
-    if (!state.active) return;
+    if (!state.active || event.pointerId !== state.pointerId) return;
     if (event.pointerType === "mouse" && event.buttons === 0) {
       stopDrag(event);
       return;
@@ -132,6 +139,10 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
     const deltaX = event.clientX - state.startX;
     const deltaY = event.clientY - state.startY;
     state.lastDeltaX = deltaX;
+    if (!state.hasDragged && event.pointerType !== "mouse" && Math.abs(deltaY) > dragStartThreshold && Math.abs(deltaY) > Math.abs(deltaX)) {
+      cancelDrag(event);
+      return;
+    }
     const passedDragStartThreshold = Math.abs(deltaX) > dragStartThreshold && Math.abs(deltaX) > Math.abs(deltaY);
     if (passedDragStartThreshold) {
       state.hasDragged = true;
@@ -148,7 +159,7 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
 
     const dragLimit = event.currentTarget.clientWidth;
     setDragDelta(Math.max(-dragLimit, Math.min(dragLimit, deltaX)));
-  }, [dragStartThreshold, mode, stopDrag]);
+  }, [cancelDrag, dragStartThreshold, mode, stopDrag]);
 
   const shouldSuppressClick = useCallback(() => {
     if (!suppressClickRef.current) return false;
@@ -166,8 +177,8 @@ export function useHorizontalDrag<T extends HTMLElement = HTMLElement>({
       onPointerDown,
       onPointerMove,
       onPointerUp: stopDrag,
-      onPointerCancel: stopDrag,
-      onLostPointerCapture: stopDrag,
+      onPointerCancel: cancelDrag,
+      onLostPointerCapture: cancelDrag,
     },
   };
 }

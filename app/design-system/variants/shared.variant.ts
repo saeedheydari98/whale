@@ -94,18 +94,6 @@ export const controlLabelClasses = "inline-flex min-w-0 items-center justify-cen
 
 /**
  * =========================
- * Loading System
- * =========================
- */
-
-export const loadingVariants = {
-  spinner: "relative pointer-events-none",
-  overlay:
-    "before:absolute before:inset-0 before:bg-white/50 before:content-['']",
-};
-
-/**
- * =========================
  * Animation / Motion
  * =========================
  */

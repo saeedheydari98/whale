@@ -425,7 +425,7 @@ export default function CartPage() {
           <DynamicLoadingCollection items={items} totalCount={items.length} isLoading={false} lazy
             className="grid w-full max-w-5xl self-center grid-cols-1 gap-3 lg:grid-cols-2" getKey={(item, index) => String(item.productId ?? item.id ?? index)}
             renderItem={(item, index) => <Loading loading="skeleton-structure" isLoading={!failedProducts.includes(String(item.productId ?? item.id)) && !products.some((product) => String(product.id) === String(item.productId ?? item.id))}>{renderCartItem(item, index)}</Loading>}
-            renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{renderCartItem(items[0], 0, true)}</Loading>} />
+            renderSkeleton={(index) => <Loading loading="skeleton-structure" isLoading>{renderCartItem(items[index] ?? items[0], index, true)}</Loading>} />
         )}
 
         <ImagePreview imageUrl={previewImage} onClose={() => setPreviewImage("")} />

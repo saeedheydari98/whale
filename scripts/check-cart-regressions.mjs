@@ -39,10 +39,10 @@ const db = {
   cart: { upsert: async () => { cartReads++; return cart(); } },
   cartItem: {
     deleteMany: async () => { deletes++; saved = []; },
-    createMany: async ({ data }) => { batchWrites++; saved = data.map((item, index) => ({ ...item, id: `line-${index}` })); return { count: data.length }; },
+    createManyAndReturn: async ({ data }) => { batchWrites++; saved = data.map((item, index) => ({ ...item, id: `line-${index}` })); return saved; },
     findMany: async () => saved,
   },
-  $transaction: async (run) => run(db),
+  $transaction: async (operations) => Promise.all(operations),
 };
 const load = loader({
   "@/lib/prisma": { prisma: db },
@@ -50,6 +50,7 @@ const load = loader({
   "@/lib/api/rate-limit": { rateLimit: () => null },
   "@/lib/api/catalog-service": {
     getOrCreateActiveCart: async () => { cartReads++; return cart(); },
+    getOrCreateActiveCartTarget: async () => { cartReads++; return cart(); },
     cartItemDto: (item) => item,
   },
   "@/lib/api/checkout-service": { CheckoutError: class extends Error {} },

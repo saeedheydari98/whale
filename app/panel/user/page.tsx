@@ -30,7 +30,7 @@ import { UserProfilePanel } from "./user-profile-panel";
 import { UserDiscountsPanel } from "./user-discounts-panel";
 import { UserWalletPanel } from "./user-wallet-panel";
 import Loading, { DynamicLoadingCollection, startRouteLoading, useStructureRouteLoading } from "@/app/design-system/components/loading/loading";
-import { getUserPanelStructure, markUserDiscountsSeen, USER_STRUCTURE_URL, type UserPanelStructure } from "@/lib/user-structure";
+import { getUserPanelStructure, markUserDiscountsSeen, USER_STRUCTURE_URL } from "@/lib/user-structure";
 import { invalidateFetchCache } from "@/lib/fetch-json";
 
 type OrderItem = {

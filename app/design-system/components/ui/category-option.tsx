@@ -2,7 +2,6 @@
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
-import React from "react";
 import { GiSpermWhale } from "react-icons/gi";
 import { cx } from "../../variants/shared.variant";
 import { collectionCardSizes } from "../../variants/collection-card.variant";

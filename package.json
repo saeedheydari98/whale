@@ -12,6 +12,8 @@
     "start": "next start",
     "lint": "eslint",
     "check:ui": "node scripts/check-ui-consistency.mjs",
+    "check:auth": "node scripts/check-auth-security.mjs",
+    "check:cart-merge": "node scripts/check-cart-merge.mjs",
     "check:seo": "node scripts/check-seo.mjs",
     "verify:seo": "npm run build && npm run check:seo -- --all",
     "storybook": "storybook dev -p 6006",

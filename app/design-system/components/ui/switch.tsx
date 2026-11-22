@@ -2,7 +2,6 @@
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
-import React from "react";
 import { resolveVariantCssVars, strengthenBorderColor, UICommonVariant } from "../../variants/ui.variant";
 import { borderVariants, cx, glassSurfaceClasses, GradientDirection, motionVariants, radiusVariants, resolveGlassBackground, resolveGradientStyle, shadowVariants, sizeVariants } from "../../variants/shared.variant";
 import Loading, { LoadingVariant } from "../loading/loading";

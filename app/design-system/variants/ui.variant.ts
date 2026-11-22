@@ -58,14 +58,6 @@ export function strengthenBorderColor(color: string): string {
   return `#${darken(match[1])}${darken(match[2])}${darken(match[3])}`;
 }
 
-function createVariantStyle(backgroundColor: string, color: string): VariantColorStyle {
-  return {
-    backgroundColor,
-    color,
-    borderColor: strengthenBorderColor(backgroundColor),
-  };
-}
-
 function getAdminThemeTextSource(theme: Theme) {
   return {
     color: theme.admin?.primary ?? "gray",
@@ -106,43 +98,4 @@ export function resolveTokenTextColor(
   return token.includes("-admin-")
     ? resolveThemeTextColor(theme, tone)
     : resolveSemanticTextColor(theme, semanticThemeMap.neutral, tone);
-}
-
-export function resolveVariantColors(
-  variant: UICommonVariant,
-  theme: Theme
-): VariantColorStyle {
-  if (variant === "neutral") {
-    const darkMode = theme.state.mode === "dark";
-
-    return {
-      backgroundColor: resolveColor("gray", darkMode ? "dark" : "light", darkMode ? 800 : 100),
-      color: resolveColor("gray", darkMode ? "dark" : "light", darkMode ? 50 : 950),
-      borderColor: resolveColor("gray", darkMode ? "dark" : "light", darkMode ? 600 : 300),
-    };
-  }
-
-  const colorVariantMap: Partial<Record<UICommonVariant, ThemeColorKey>> = {
-    secondary: "gray",
-    success: "green",
-    danger: "red",
-    warning: "yellow",
-    info: "blue",
-    edit: "orange",
-    accent: "purple",
-  };
-  const staticColor = colorVariantMap[variant];
-
-  if (staticColor) {
-    return createVariantStyle(
-      theme.tokens.colors.ui[variant],
-      resolveSemanticTextColor(theme, staticColor, staticColor === "yellow" ? 950 : 50)
-    );
-  }
-
-  switch (variant) {
-    case "primary":
-    default:
-      return createVariantStyle(theme.tokens.colors.ui.primary, resolveThemeTextColor(theme, 50));
-  }
 }

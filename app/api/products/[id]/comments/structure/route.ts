@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
+import { apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { positiveIdSchema } from "@/lib/api/schemas";
 import { validationError } from "@/lib/api/validation";

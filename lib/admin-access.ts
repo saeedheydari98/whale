@@ -1,7 +1,6 @@
 "use client";
 
 import { clearAppUserCache } from "@/lib/app-user-client";
-import { fetchCurrentUser, hasAdminRole, readCachedAuthUser } from "@/lib/auth-client";
 
 export const ADMIN_ACCESS_UPDATED_EVENT = "admin-access-updated";
 
@@ -28,24 +27,11 @@ export type AdminAccessRequestRecord = {
     } | null;
   } | null;
 };
-
-const ADMIN_REQUESTS_CACHE_MS = 5000;
 const ADMIN_REQUESTS_ENDPOINT = "/api/admin/security/requests";
-let cachedAdminRequests: { value: AdminAccessRequestRecord[]; expiresAt: number } | null = null;
-let pendingAdminRequests: Promise<AdminAccessRequestRecord[]> | null = null;
 
 function emitAdminAccessUpdated() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new Event(ADMIN_ACCESS_UPDATED_EVENT));
-}
-
-function now() {
-  return Date.now();
-}
-
-function invalidateAdminRequestsCache() {
-  cachedAdminRequests = null;
-  pendingAdminRequests = null;
 }
 
 async function readApiJson(response: Response, fallbackMessage: string) {
@@ -56,53 +42,14 @@ async function readApiJson(response: Response, fallbackMessage: string) {
   return data;
 }
 
-export function isAdminAccessUnlocked() {
-  return hasAdminRole(readCachedAuthUser());
-}
-
-export async function fetchAdminAccess(options?: { force?: boolean }) {
-  return hasAdminRole(await fetchCurrentUser(options));
-}
-
 export async function requestAdminAccess() {
   const response = await fetch(ADMIN_REQUESTS_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
   const data = await readApiJson(response, "ثبت درخواست ناموفق بود.");
-  invalidateAdminRequestsCache();
   emitAdminAccessUpdated();
   return data?.data?.request as AdminAccessRequestRecord | null;
-}
-
-export async function fetchAdminAccessRequests(options?: { force?: boolean }) {
-  if (!options?.force && cachedAdminRequests && cachedAdminRequests.expiresAt > now()) {
-    return cachedAdminRequests.value;
-  }
-
-  if (!options?.force && pendingAdminRequests) {
-    return pendingAdminRequests;
-  }
-
-  if (options?.force) invalidateAdminRequestsCache();
-
-  pendingAdminRequests = fetch(ADMIN_REQUESTS_ENDPOINT, { cache: "no-store" })
-    .then(async (response) => {
-      const data = await readApiJson(response, "بارگذاری درخواست‌ها ناموفق بود.");
-      const requests = Array.isArray(data?.data?.requests)
-        ? data.data.requests as AdminAccessRequestRecord[]
-        : [];
-      cachedAdminRequests = {
-        value: requests,
-        expiresAt: now() + ADMIN_REQUESTS_CACHE_MS,
-      };
-      return requests;
-    })
-    .finally(() => {
-      pendingAdminRequests = null;
-    });
-
-  return pendingAdminRequests;
 }
 
 export async function reviewAdminAccessRequest(
@@ -115,7 +62,6 @@ export async function reviewAdminAccessRequest(
     body: JSON.stringify({ id, action }),
   });
   const data = await readApiJson(response, "به‌روزرسانی درخواست ناموفق بود.");
-  invalidateAdminRequestsCache();
   clearAppUserCache();
   emitAdminAccessUpdated();
   return data?.data?.request as AdminAccessRequestRecord | null;
@@ -128,7 +74,6 @@ export async function grantAdminAccessToUser(userId: number) {
     body: JSON.stringify({ userId, action: "grant" }),
   });
   const data = await readApiJson(response, "اعطای دسترسی مدیریت ناموفق بود.");
-  invalidateAdminRequestsCache();
   clearAppUserCache();
   emitAdminAccessUpdated();
   return data?.data?.request as AdminAccessRequestRecord | null;

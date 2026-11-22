@@ -1,6 +1,5 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { matchesSearchQuery } from "@/lib/product-search";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { normalizeProductData } from "@/lib/api/catalog-service";
 import { invalidateCatalogCache } from "@/lib/api/catalog-cache";
@@ -631,7 +630,6 @@ function buildCatalogTree(
     : banners.filter((banner) => banner.active !== false);
 
   const allBannerSections = visibleBanners.map(toClientBanner);
-  const bannerSections = allBannerSections.filter((banner) => banner.showOnHome !== false);
   const visibleCategories = categories.filter((category) => includeInactive || category.active !== false);
   const visibleBrands = brands.filter((brand) => includeInactive || brand.active !== false);
   const visibleCategoryGroups = categoryGroups.filter((group) => includeInactive || group.active !== false);
@@ -771,32 +769,6 @@ function splitTreePayload(tree: CatalogTreePayload | null) {
   return {
     showcases: Array.isArray(tree?.showcases) ? tree.showcases : showcaseChildren,
     banners: Array.isArray(tree?.banners) ? tree.banners : bannerChildren,
-  };
-}
-
-function buildShowcaseProductsNode(
-  showcase: {
-    id: string;
-    title: string | null;
-    description: string | null;
-    imageUrl: string | null;
-    active: boolean;
-    sortOrder: number;
-  } | null,
-  showcaseId: string,
-  products: ProductPayload[]
-) {
-  return {
-    type: "showcase" as const,
-    id: showcase?.id ?? showcaseId,
-    title: showcase?.title ?? "",
-    description: showcase?.description ?? "",
-    imageUrl: showcase?.imageUrl ?? "",
-    active: showcase?.active ?? true,
-    placement: showcase?.sortOrder ?? 0,
-    products: products
-      .map(toClientProduct)
-      .sort((a, b) => Number(a.placement ?? 0) - Number(b.placement ?? 0)),
   };
 }
 

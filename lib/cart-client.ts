@@ -31,6 +31,7 @@ export const CART_UPDATED_EVENT = "product-cart-updated";
 
 const SILENT_NOTIFICATION_HEADERS = { [NOTIFICATION_SILENT_HEADER]: "true" };
 const GUEST_CART_STORAGE_KEY = `${CART_STORAGE_KEY}:guest`;
+const GUEST_CART_OWNER_KEY = `${GUEST_CART_STORAGE_KEY}:merge-owner`;
 
 export type CartItemRecord = {
   id?: number | string;
@@ -60,6 +61,7 @@ let pendingCartLoadKey = "";
 let cartMutationVersion = 0;
 let cartApiMutationQueue: Promise<void> = Promise.resolve();
 const pendingLocalCartKeys = new Set<string>();
+const pendingGuestClaims = new Map<string, Promise<CartItemRecord[] | null>>();
 
 function clearPendingCartLoad() {
   pendingCartLoad = null;
@@ -252,13 +254,16 @@ function dedupeCartItems(items: CartItemRecord[]) {
         mergedSelection[color] = (mergedSelection[color] ?? 0) + count;
       }
       const selectionTotal = colorSelectionTotal(mergedSelection);
+      // Keep draft quantities instead of silently losing units without a chosen color.
+      const hasDraftQuantity = Object.keys(getCartItemColorSelection(existing)).length === 0
+        || Object.keys(getCartItemColorSelection(item)).length === 0;
 
       byKey.set(key, {
         ...existing,
         ...item,
-        selectedColors: mergedSelection,
-        selectedColor: serializeColorSelection(mergedSelection) || existing.selectedColor || item.selectedColor || "",
-        quantity: selectionTotal > 0 ? selectionTotal : existing.quantity + item.quantity,
+        selectedColors: hasDraftQuantity ? {} : mergedSelection,
+        selectedColor: hasDraftQuantity ? "" : serializeColorSelection(mergedSelection),
+        quantity: hasDraftQuantity ? existing.quantity + item.quantity : selectionTotal,
       });
       continue;
     }
@@ -301,20 +306,102 @@ export function writeLocalCart(items: CartItemRecord[], user: AuthClientUser | n
   emitCartUpdated();
 }
 
-export function claimGuestCartForUser(user: AuthClientUser | null | undefined) {
-  if (typeof window === "undefined" || !canUseAccountCart(user)) return null;
-  if (localStorage.getItem(GUEST_CART_STORAGE_KEY) === null) return null;
+type PendingGuestClaim = { guestSnapshot: string; items: CartItemRecord[] };
 
-  const guestItems = readLocalCart(null);
-  localStorage.removeItem(GUEST_CART_STORAGE_KEY);
-  if (guestItems.length === 0) return null;
+function hasGuestCartToClaim(user: AuthClientUser | null | undefined) {
+  if (typeof window === "undefined" || !user?.id) return false;
+  const userKey = getCartStorageKey(user);
+  return pendingGuestClaims.has(userKey)
+    || localStorage.getItem(GUEST_CART_STORAGE_KEY) !== null
+    || localStorage.getItem(CART_STORAGE_KEY) !== null
+    || localStorage.getItem(`${userKey}:guest-merge`) !== null;
+}
 
-  const accountItems = readLocalCart(user);
-  const mergedItems = dedupeCartItems([...accountItems, ...guestItems]);
-  beginCartMutation(user);
-  localStorage.setItem(getCartStorageKey(user), JSON.stringify(mergedItems));
-  localStorage.removeItem(CART_STORAGE_KEY);
-  return mergedItems;
+function consumeClaimedGuestCart(snapshot: string) {
+  if (localStorage.getItem(GUEST_CART_STORAGE_KEY) === snapshot) {
+    localStorage.removeItem(GUEST_CART_STORAGE_KEY);
+    return;
+  }
+  const claimed = new Map(dedupeCartItems(JSON.parse(snapshot).map(normalizeCartItem)).map((item) => [getItemKey(item), item]));
+  const remaining = readLocalCart(null).flatMap((item) => {
+    const previous = claimed.get(getItemKey(item));
+    if (!previous) return [item];
+    const selection = getCartItemColorSelection(item);
+    const oldSelection = getCartItemColorSelection(previous);
+    const selectedColors = Object.fromEntries(Object.entries(selection)
+      .map(([color, count]) => [color, Math.max(0, count - (oldSelection[color] ?? 0))])
+      .filter(([, count]) => Number(count) > 0)) as CartColorSelection;
+    const quantity = Object.keys(selection).length > 0
+      ? colorSelectionTotal(selectedColors)
+      : Math.max(0, item.quantity - previous.quantity);
+    return quantity > 0 ? [{ ...item, quantity, selectedColors, selectedColor: serializeColorSelection(selectedColors) }] : [];
+  });
+  if (remaining.length) localStorage.setItem(GUEST_CART_STORAGE_KEY, JSON.stringify(remaining));
+  else localStorage.removeItem(GUEST_CART_STORAGE_KEY);
+}
+
+export async function claimGuestCartForUser(user: AuthClientUser | null | undefined): Promise<CartItemRecord[] | null> {
+  if (typeof window === "undefined" || !user?.id) return null;
+  const userKey = getCartStorageKey(user);
+  const pending = pendingGuestClaims.get(userKey);
+  if (pending) return pending;
+  migrateLegacyGuestCart(GUEST_CART_STORAGE_KEY);
+  const transferKey = `${userKey}:guest-merge`;
+  if (!localStorage.getItem(GUEST_CART_STORAGE_KEY) && !localStorage.getItem(transferKey)) return null;
+
+  const merge = async () => {
+    if (getCartStorageKey(readCachedAuthUser()) !== userKey) throw new Error("حساب کاربری تغییر کرده است؛ سبد مهمان حفظ شد.");
+    const owner = localStorage.getItem(GUEST_CART_OWNER_KEY);
+    if (owner && owner !== userKey) return null;
+    let transfer: PendingGuestClaim | null = null;
+    const storedTransfer = localStorage.getItem(transferKey);
+    if (storedTransfer) {
+      try {
+        const parsed = JSON.parse(storedTransfer) as PendingGuestClaim;
+        if (typeof parsed.guestSnapshot === "string" && Array.isArray(parsed.items)) transfer = parsed;
+      } catch { /* Keep the guest cart if a saved transfer is unreadable. */ }
+    }
+    if (!transfer) {
+      const guestSnapshot = localStorage.getItem(GUEST_CART_STORAGE_KEY);
+      const guestItems = readLocalCart(null);
+      if (!guestSnapshot || guestItems.length === 0) return null;
+      const accountCart = await loadCartFromApi({ silent: true });
+      if (getCartStorageKey(readCachedAuthUser()) !== userKey) throw new Error("حساب کاربری تغییر کرده است؛ سبد مهمان حفظ شد.");
+      transfer = { guestSnapshot, items: dedupeCartItems([...accountCart.items, ...guestItems]) };
+      // Persist the exact replacement before sending it. A lost response/reload must
+      // retry the same quantities, never add the guest quantities a second time.
+      localStorage.setItem(transferKey, JSON.stringify(transfer));
+      localStorage.setItem(GUEST_CART_OWNER_KEY, userKey);
+    }
+    const mutationVersion = beginCartMutation(user);
+    try {
+      const savedItems = await saveCartToApi(transfer.items, null, { silent: true, guestMergeUserId: Number(user.id) });
+      consumeClaimedGuestCart(transfer.guestSnapshot);
+      localStorage.removeItem(transferKey);
+      localStorage.removeItem(GUEST_CART_OWNER_KEY);
+      if (mutationVersion === cartMutationVersion) {
+        markCartSynchronized(user);
+        writeLocalCart(savedItems, user);
+      }
+      return savedItems;
+    } catch (error) {
+      // A confirmed rejection did not write the snapshot. Re-read the server on retry.
+      if (error instanceof CartApiError && error.status >= 400 && error.status < 500) {
+        localStorage.removeItem(transferKey);
+        localStorage.removeItem(GUEST_CART_OWNER_KEY);
+      }
+      markCartSynchronized(user);
+      throw error;
+    }
+  };
+  const request = enqueueCartApiMutation(async () => {
+    // Web Locks serialize claims across tabs; the promise map covers callers in this tab.
+    return typeof navigator !== "undefined" && navigator.locks
+      ? navigator.locks.request("whale:guest-cart-merge", merge)
+      : merge();
+  }).finally(() => { pendingGuestClaims.delete(userKey); });
+  pendingGuestClaims.set(userKey, request);
+  return request;
 }
 
 export function clearLocalCartSnapshot(user: AuthClientUser | null | undefined = readCachedAuthUser()) {
@@ -343,14 +430,17 @@ async function loadCartFromApi(options?: { silent?: boolean }) {
   };
 }
 
-async function saveCartToApi(items: CartItemRecord[], profile?: UserProfile | null, options?: { silent?: boolean }) {
+async function saveCartToApi(items: CartItemRecord[], profile?: UserProfile | null, options?: { silent?: boolean; guestMergeUserId?: number }) {
   const res = await fetch("/api/cart", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(options?.silent ? SILENT_NOTIFICATION_HEADERS : {}),
     },
-    body: JSON.stringify(canSyncCartToApi(profile) ? { profile, items } : { items }),
+    body: JSON.stringify({
+      ...(canSyncCartToApi(profile) ? { profile } : {}), items,
+      ...(options?.guestMergeUserId ? { guestMergeUserId: options.guestMergeUserId } : {}),
+    }),
   });
   const data = await res.json();
   if (!res.ok || data?.ok === false) {
@@ -382,6 +472,12 @@ export async function getCart(user: AuthClientUser | null | undefined = readCach
   const profile = readUserProfile();
 
   if (canUseAccountCart(user)) {
+    try {
+      const mergedItems = await claimGuestCartForUser(user);
+      if (mergedItems) return { items: mergedItems, profile };
+    } catch {
+      notifyCartError("ادغام سبد خرید انجام نشد؛ کالاهای مهمان محفوظ هستند. دوباره تلاش کنید.");
+    }
     const loadKey = getCartStorageKey(user);
     if (pendingLocalCartKeys.has(loadKey)) return { items: readLocalCart(user), profile };
     if (pendingCartLoad && pendingCartLoadKey === loadKey) return pendingCartLoad;
@@ -478,7 +574,7 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
   }
 
   const cartUser = readCachedAuthUser() ?? await fetchCurrentUser({ allowStaleOnError: true });
-  claimGuestCartForUser(cartUser);
+  await claimGuestCartForUser(cartUser);
   const currentCart = readLocalCart(cartUser);
   const existing = currentCart.find((item) => getItemKey(item) === key);
   const existingSelection = existing ? getCartItemColorSelection(existing) : {};
@@ -551,6 +647,8 @@ export async function addProductToCart(product: ProductRecord, quantity = 1, sel
 }
 
 export async function updateCartQuantity(target: CartItemRecord, quantity: number, options?: { notify?: boolean }) {
+  const user = readCachedAuthUser();
+  if (hasGuestCartToClaim(user)) await claimGuestCartForUser(user);
   const key = getItemKey(target);
   const currentCart = readLocalCart();
   const nextQuantity = clampCartQuantity(target, quantity);
@@ -577,6 +675,8 @@ export async function updateCartColorQuantity(
   quantity: number,
   options?: { notify?: boolean }
 ) {
+  const user = readCachedAuthUser();
+  if (hasGuestCartToClaim(user)) await claimGuestCartForUser(user);
   const key = getItemKey(target);
   const currentCart = readLocalCart();
   const colorName = String(color ?? "").trim();
@@ -616,46 +716,9 @@ export async function removeCartItem(target: CartItemRecord) {
   return updateCartQuantity(target, 0);
 }
 
-type SelectCartItemColorOptions = {
-  items?: CartItemRecord[];
-  user?: AuthClientUser | null;
-};
-
-export function selectCartItemColor(
-  target: CartItemRecord,
-  color: string,
-  options?: SelectCartItemColorOptions
-) {
-  const user = options && "user" in options ? options.user : readCachedAuthUser();
-  const key = getItemKey(target);
-  const colorName = String(color ?? "").trim();
-  const currentCart = options?.items ?? readLocalCart(user);
-  if (!colorName) return currentCart;
-
-  const nextCart = currentCart.map((item) => {
-    if (getItemKey(item) !== key) return item;
-
-    const targetColorStock = normalizeCartColorStock(target.colorStock);
-    const colorStock = Object.keys(targetColorStock).length > 0
-      ? targetColorStock
-      : normalizeCartColorStock(item.colorStock);
-    if ((colorStock[colorName] ?? 0) < item.quantity) return item;
-
-    const selectedColors = { [colorName]: item.quantity };
-    return {
-      ...item,
-      selectedColors,
-      selectedColor: serializeColorSelection(selectedColors),
-    };
-  });
-
-  beginCartMutation(user);
-  writeLocalCart(nextCart, user);
-  return nextCart;
-}
-
 export async function clearCart() {
   const user = readCachedAuthUser();
+  if (hasGuestCartToClaim(user)) await claimGuestCartForUser(user);
   const apiNotifies = canUseApiCart(readUserProfile(), user);
   const savedItems = await persistCart([]);
   if (!apiNotifies) notifyCartSuccess("سبد خرید خالی شد.");

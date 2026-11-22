@@ -9,6 +9,8 @@ import { IoClose } from "react-icons/io5";
 import { CustomEmptyState } from "./empty-state";
 import { AppImage } from "./app-image";
 import { CustomInput } from "./input";
+import { useTheme } from "../../theme/provider";
+import { resolveGlassBackground, resolveGradientStyle } from "../../variants/shared.variant";
 import Loading, { DynamicLoadingCollection, startRouteLoading } from "../loading/loading";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { APP_USER_UPDATED_EVENT } from "@/lib/app-user-client";
@@ -22,6 +24,11 @@ import {
 } from "@/lib/validation-patterns";
 
 const INPUT_ID = "global-search-input";
+const darkSearchBackground = resolveGlassBackground("color-mix(in srgb, var(--primary-card) 50%, var(--bg-surface))", 74);
+const darkSearchStyle = {
+  backgroundColor: darkSearchBackground,
+  ...resolveGradientStyle(darkSearchBackground, undefined, "var(--border-default)"),
+};
 
 function isLikelyPhoneAutofill(value: string) {
   const digits = toLatinDigits(value).replace(NON_ASCII_DIGIT_PATTERN, "");
@@ -29,6 +36,7 @@ function isLikelyPhoneAutofill(value: string) {
 }
 
 export function GlobalSearch() {
+  const { mode } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const isMobile = useIsMobile();
@@ -124,7 +132,7 @@ export function GlobalSearch() {
   };
 
   return (
-    <div className="relative min-w-0 flex-1 md:flex-none">
+    <div className="relative min-w-0 flex-1 md:max-w-72">
       <form
         className="flex min-w-0 items-center"
         role="search"
@@ -135,7 +143,7 @@ export function GlobalSearch() {
         }}
       >
         <div
-          className={`relative flex items-center transition-all duration-200 ease-out md:static md:h-auto md:w-72 ${
+          className={`relative flex items-center transition-all duration-200 ease-out md:static md:h-auto md:w-full ${
             expanded ? "h-10 w-full min-w-0" : "h-6 w-10 min-w-10 shrink-0 justify-center"
           }`}
         >
@@ -160,6 +168,7 @@ export function GlobalSearch() {
             fullWidth={isOpen}
             rounded="full"
             border="none"
+            style={mode === "dark" ? darkSearchStyle : undefined}
             className={
               isOpen
                 ? "h-10 px-7 text-sm"

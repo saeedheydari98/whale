@@ -37,11 +37,6 @@ const webpImageValueSchema = z
   .trim()
   .refine(isAllowedWebpImageValue, { message: WEBP_ONLY_ERROR });
 
-const optionalWebpImageValueSchema = z.union([
-  z.literal(""),
-  webpImageValueSchema,
-]);
-
 const optionalNullableWebpImageValueSchema = z
   .string()
   .trim()
@@ -64,10 +59,6 @@ const customerProfileSchema = z.object({
     .min(1, "آدرس کامل را وارد کنید.")
     .min(5, "آدرس باید حداقل ۵ حرف باشد.")
     .max(200, "آدرس نباید بیشتر از ۲۰۰ حرف باشد."),
-});
-
-export const idParamSchema = z.object({
-  id: z.string().min(1),
 });
 
 export const authOtpRequestSchema = z.object({
@@ -202,6 +193,7 @@ export const cartItemSchema = z.object({
 });
 
 export const cartSnapshotSchema = z.object({
+  guestMergeUserId: z.number().int().positive().optional(),
   profile: z.object({
     firstName: z.string().nullable().optional(),
     lastName: z.string().nullable().optional(),
@@ -228,13 +220,6 @@ export const cartSnapshotSchema = z.object({
 
 export const quantitySchema = z.object({
   quantity: z.coerce.number().int().min(1),
-});
-
-export const adminCodeSchema = z.object({
-  code: z.string().min(4),
-  confirmCode: z.string().optional(),
-  currentCode: z.string().optional(),
-  username: z.string().trim().toLowerCase().optional(),
 });
 
 export const inPersonOrderLineSchema = z.object({

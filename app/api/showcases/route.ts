@@ -5,37 +5,8 @@ import { apiFail, apiOk } from "@/lib/api/response";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type ProductPayload = {
-  id?: number | string;
-  showcaseId?: string;
-  title: string;
-  description: string;
-  price: string;
-  originalPrice?: string;
-  discountPrice?: string;
-  discountPercent?: number | string;
-  imageUrl?: string;
-  badge?: string;
-  ctaLabel?: string;
-  ctaHref?: string;
-  active: boolean;
-  sortOrder: number;
-};
-
 const hasShowcaseModel =
   prisma.showcase && typeof prisma.showcase.findMany === "function";
-
-function dedupeProducts(products: ProductPayload[]) {
-  const seen = new Set<string>();
-  return products.filter((product) => {
-    const key = [String(product.showcaseId ?? "").trim().toLowerCase(), product.title, product.description, product.price]
-      .map((v) => String(v ?? "").trim().toLowerCase())
-      .join("|");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
 
 export async function GET(request: Request) {
   const limited = rateLimit(request);

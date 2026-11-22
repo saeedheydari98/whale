@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { matchesSearchQuery } from "@/lib/product-search";
 import { pageResult, pagination, parseMoney } from "@/lib/api/catalog-service";
 import { withCatalogCache } from "@/lib/api/catalog-cache";
-import { getBannerImageData, getPlacement } from "@/lib/catalog-utils";
+import { getBannerImageData } from "@/lib/catalog-utils";
 import { normalizeColorStock } from "@/lib/color-counts";
 
 const STRUCTURE_TTL_SECONDS = 60;
@@ -385,19 +385,6 @@ function toProductDetail(product: ProductRecord) {
     deletedAt: product.deletedAt,
     colorStock: normalizeColorStock(product.colorStock),
   };
-}
-
-function countUniqueProductImages(product: Partial<ProductRecord>) {
-  const values = [
-    product.imageUrl,
-    ...(Array.isArray(product.images) ? product.images : []),
-  ];
-  const seen = new Set<string>();
-  for (const value of values) {
-    const imageUrl = String(value ?? "").trim();
-    if (imageUrl) seen.add(imageUrl);
-  }
-  return seen.size;
 }
 
 function countProductSpecFields(product: Partial<ProductRecord>) {

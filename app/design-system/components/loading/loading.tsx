@@ -227,12 +227,15 @@ function observeUntilVisible(node: Element, onVisible: () => void, rootMargin = 
 
 function collectionItemShellClass(className?: string) {
   const classes = className ?? "";
+  // Grid rows take their width from the track, not from changing child controls.
+  if (/(?:^|\s)grid(?:\s|$)/.test(classes)) return "self-start w-full min-w-0 shrink-0";
   if (/\bflex-col\b/.test(classes)) return "w-full min-w-0 shrink-0";
   if (/\boverflow-x-/.test(classes)) return "shrink-0 w-max";
   return "self-start w-max max-w-full shrink-0";
 }
 
 function collectionProbeInnerClass(className?: string) {
+  if (/(?:^|\s)grid(?:\s|$)/.test(className ?? "")) return cx("invisible", className);
   return /\bflex-col\b/.test(className ?? "") ? "invisible w-full" : "invisible w-max";
 }
 

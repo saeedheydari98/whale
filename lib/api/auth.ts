@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { apiFail } from "@/lib/api/response";
@@ -29,45 +29,74 @@ function base64Url(input: Buffer | string) {
   return Buffer.from(input).toString("base64url");
 }
 
-function signPayload(data: Record<string, unknown>, ttlSeconds: number) {
+type TokenType = "access" | "refresh";
+type TokenPayload = {
+  sub: string;
+  type: TokenType;
+  iss: string;
+  aud: string;
+  iat: number;
+  exp: number;
+  sid?: string;
+  jti?: string;
+};
+const TOKEN_ISSUER = "whale";
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+function signPayload(userId: number, type: TokenType, claims: { sid: string } | { jti: string }) {
   const now = Math.floor(Date.now() / 1000);
+  const ttl = type === "access" ? ACCESS_TTL_SECONDS : REFRESH_TTL_SECONDS;
   const header = base64Url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const payload = base64Url(JSON.stringify({ ...data, iat: now, exp: now + ttlSeconds }));
+  const payload = base64Url(JSON.stringify({
+    sub: String(userId), type, iss: TOKEN_ISSUER, aud: `whale:${type}`,
+    ...claims, iat: now, exp: now + ttl,
+  }));
   const signature = createHmac("sha256", secret()).update(`${header}.${payload}`).digest("base64url");
   return `${header}.${payload}.${signature}`;
 }
 
-export function createAccessToken(user: Pick<AuthUser, "id" | "email" | "role">) {
-  return signPayload({ sub: String(user.id), email: user.email, role: user.role }, ACCESS_TTL_SECONDS);
+export function createAccessToken(user: Pick<AuthUser, "id">, sessionHash: string) {
+  return signPayload(user.id, "access", { sid: sessionHash });
 }
 
-export function createRefreshToken(user: Pick<AuthUser, "id" | "email" | "role">) {
-  return signPayload({ sub: String(user.id), email: user.email, role: user.role, type: "refresh" }, REFRESH_TTL_SECONDS);
+export function createRefreshToken(user: Pick<AuthUser, "id">) {
+  return signPayload(user.id, "refresh", { jti: randomBytes(32).toString("base64url") });
 }
 
-export function verifyToken(token: string | undefined | null) {
-  if (!token) return null;
-  const [header, payload, signature] = token.split(".");
-  if (!header || !payload || !signature) return null;
-
+function verifyToken(token: string | undefined | null, type: TokenType): TokenPayload | null {
+  if (!token || token.length > 4096) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3 || parts.some((part) => !/^[A-Za-z0-9_-]+$/.test(part))) return null;
+  const [header, payload, signature] = parts;
   const expected = createHmac("sha256", secret()).update(`${header}.${payload}`).digest("base64url");
   const given = Buffer.from(signature);
   const wanted = Buffer.from(expected);
   if (given.length !== wanted.length || !timingSafeEqual(given, wanted)) return null;
 
   try {
-    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
-      sub?: string;
-      email?: string;
-      role?: string;
-      exp?: number;
-      type?: string;
-    };
-    if (!parsed.exp || parsed.exp < Math.floor(Date.now() / 1000)) return null;
-    return parsed;
+    const metadata = JSON.parse(Buffer.from(header, "base64url").toString("utf8"));
+    const parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    const now = Math.floor(Date.now() / 1000);
+    const ttl = type === "access" ? ACCESS_TTL_SECONDS : REFRESH_TTL_SECONDS;
+    if (!metadata || metadata.alg !== "HS256" || metadata.typ !== "JWT" || metadata.crit !== undefined) return null;
+    if (!parsed || parsed.type !== type || parsed.iss !== TOKEN_ISSUER || parsed.aud !== `whale:${type}`) return null;
+    if (typeof parsed.sub !== "string" || !/^[1-9]\d*$/.test(parsed.sub) || !Number.isSafeInteger(Number(parsed.sub))) return null;
+    if (!Number.isSafeInteger(parsed.iat) || !Number.isSafeInteger(parsed.exp)
+      || parsed.iat > now || parsed.exp <= now || parsed.exp <= parsed.iat || parsed.exp - parsed.iat > ttl) return null;
+    const sessionId = type === "access" ? parsed.sid : parsed.jti;
+    if (typeof sessionId !== "string" || !SESSION_ID_PATTERN.test(sessionId)) return null;
+    return parsed as TokenPayload;
   } catch {
     return null;
   }
+}
+
+export function verifyAccessToken(token: string | undefined | null) {
+  return verifyToken(token, "access") as (TokenPayload & { sid: string }) | null;
+}
+
+export function verifyRefreshToken(token: string | undefined | null) {
+  return verifyToken(token, "refresh") as (TokenPayload & { jti: string }) | null;
 }
 
 export function hashToken(token: string) {
@@ -105,9 +134,9 @@ async function normalizeRole(user: AuthUser) {
   return user;
 }
 
-async function findPublicUser(id: number) {
-  const users = await prisma.$queryRaw<AuthUser[]>`
-    SELECT "id", "email", "username", "name", "role", "avatarUrl", "themeMode"
+async function findSessionUser(id: number) {
+  const users = await prisma.$queryRaw<Array<AuthUser & { refreshTokenHash: string | null }>>`
+    SELECT "id", "email", "username", "name", "role", "avatarUrl", "themeMode", "refreshTokenHash"
     FROM "users"
     WHERE "id" = ${id}
     LIMIT 1
@@ -115,7 +144,7 @@ async function findPublicUser(id: number) {
   const user = users[0];
   if (!user) return null;
 
-  return normalizeRole(user);
+  return user;
 }
 
 function bearerToken(request: Request) {
@@ -126,49 +155,38 @@ function bearerToken(request: Request) {
 }
 
 export async function getAuthUser(request: Request): Promise<AuthUser | null> {
-  try {
-    const store = await cookies();
-    const token = bearerToken(request) || store.get(ACCESS_COOKIE)?.value;
-    const payload = verifyToken(token);
-    const id = Number(payload?.sub);
-
-    if (Number.isInteger(id) && id > 0) {
-      return findPublicUser(id);
-    }
-
-    const refreshToken = store.get(REFRESH_COOKIE)?.value;
-    const refreshPayload = verifyToken(refreshToken);
-    const refreshUserId = Number(refreshPayload?.sub);
-    if (!refreshToken || refreshPayload?.type !== "refresh" || !Number.isInteger(refreshUserId) || refreshUserId <= 0) {
-      return null;
-    }
-
-    const users = await prisma.$queryRaw<Array<AuthUser & { refreshTokenHash: string | null }>>`
-      SELECT "id", "email", "username", "name", "role", "refreshTokenHash", "avatarUrl", "themeMode"
-      FROM "users"
-      WHERE "id" = ${refreshUserId}
-      LIMIT 1
-    `;
-    const user = users[0];
-    if (!user || user.refreshTokenHash !== hashToken(refreshToken)) return null;
-
-    const normalizedUser = await normalizeRole(user);
-    const accessToken = createAccessToken(normalizedUser);
-    await setAccessCookie(accessToken);
-
-    return {
-      id: normalizedUser.id,
-      email: normalizedUser.email,
-      username: normalizedUser.username,
-      name: normalizedUser.name,
-      role: normalizedUser.role,
-      avatarUrl: normalizedUser.avatarUrl,
-      themeMode: normalizedUser.themeMode,
-    };
-  } catch (error) {
-    console.error("Auth user load error:", error);
-    throw error;
+  const store = await cookies();
+  const bearer = bearerToken(request);
+  const payload = verifyAccessToken(request.headers.has("authorization") ? bearer : store.get(ACCESS_COOKIE)?.value);
+  if (payload) {
+    const user = await findSessionUser(Number(payload.sub));
+    if (user?.refreshTokenHash === payload.sid) return normalizeRole(publicUser(user));
   }
+  // An explicitly supplied credential must never fall back to another account's cookies.
+  if (request.headers.has("authorization")) return null;
+
+  const refreshToken = store.get(REFRESH_COOKIE)?.value;
+  const refreshPayload = verifyRefreshToken(refreshToken);
+  if (!refreshToken || !refreshPayload) return null;
+  const user = await findSessionUser(Number(refreshPayload.sub));
+  if (!user || !verifyHashedToken(refreshToken, user.refreshTokenHash)) return null;
+  const normalizedUser = await normalizeRole(publicUser(user));
+  await setAccessCookie(createAccessToken(normalizedUser, hashToken(refreshToken)));
+  return normalizedUser;
+}
+
+export async function revokeAuthSession(request: Request) {
+  const store = await cookies();
+  const bearer = bearerToken(request);
+  const access = verifyAccessToken(request.headers.has("authorization") ? bearer : store.get(ACCESS_COOKIE)?.value);
+  const refreshToken = request.headers.has("authorization") ? undefined : store.get(REFRESH_COOKIE)?.value;
+  const refresh = verifyRefreshToken(refreshToken);
+  const session = refresh && refreshToken
+    ? { id: Number(refresh.sub), refreshTokenHash: hashToken(refreshToken) }
+    : access ? { id: Number(access.sub), refreshTokenHash: access.sid } : null;
+  // A delayed logout cannot revoke a newer login/refresh session.
+  if (session) await prisma.user.updateMany({ where: session, data: { refreshTokenHash: null } });
+  await clearAuthCookies();
 }
 
 export async function requireUser(request: Request) {
@@ -222,5 +240,7 @@ export async function clearAuthCookies() {
 }
 
 export async function getRefreshTokenFromRequest(request: Request) {
-  return bearerToken(request) || (await cookies()).get(REFRESH_COOKIE)?.value;
+  return request.headers.has("authorization")
+    ? bearerToken(request)
+    : (await cookies()).get(REFRESH_COOKIE)?.value;
 }

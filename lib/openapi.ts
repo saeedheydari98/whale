@@ -252,11 +252,9 @@ const authResultData = {
   type: "object",
   properties: {
     user: ref("PublicUser"),
-    accessToken: { type: "string" },
-    refreshToken: { type: "string" },
     profileComplete: { type: "boolean" },
   },
-  required: ["user", "accessToken", "refreshToken", "profileComplete"],
+  required: ["user", "profileComplete"],
 };
 
 export const openApiDocument = {
@@ -298,6 +296,11 @@ export const openApiDocument = {
         type: "apiKey",
         in: "cookie",
         name: "accessToken",
+      },
+      refreshTokenCookie: {
+        type: "apiKey",
+        in: "cookie",
+        name: "refreshToken",
       },
     },
     schemas: {
@@ -956,6 +959,11 @@ export const openApiDocument = {
       CartSaveInput: {
         type: "object",
         properties: {
+          guestMergeUserId: {
+            type: "integer",
+            minimum: 1,
+            description: "For a prepared guest/account merge snapshot: must match the signed-in user. Selected colors are capped to current product stock.",
+          },
           profile: ref("CustomerProfileInput"),
           items: {
             type: "array",
@@ -1342,7 +1350,7 @@ export const openApiDocument = {
             sent: { type: "boolean" },
             retryAfterSeconds: { type: "integer" },
             expiresInSeconds: { type: "integer" },
-            developmentCode: { type: "string", pattern: OTP_CODE_PATTERN.source, description: "فقط وقتی AUTH_OTP_EXPOSE_CODE فعال باشد." },
+            developmentCode: { type: "string", pattern: OTP_CODE_PATTERN.source, description: "فقط خارج از production و وقتی AUTH_OTP_EXPOSE_CODE فعال باشد." },
           },
           required: ["sent"],
         },
@@ -1375,9 +1383,10 @@ export const openApiDocument = {
       post: operation({
         tags: ["Auth"],
         summary: "Refresh access and refresh tokens",
+        description: "Rotates HttpOnly session cookies. Tokens are never included in the JSON response.",
         operationId: "refreshToken",
-        data: authResultData,
-        security: authSecurity,
+        data: singleData("user", "PublicUser"),
+        security: [{ refreshTokenCookie: [] }, { bearerAuth: [] }],
       }),
     },
     "/api/catalog/structure": {

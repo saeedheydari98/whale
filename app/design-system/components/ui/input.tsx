@@ -160,6 +160,7 @@ export function CustomInput({
     !isDisabled && interactionStates.hover.none,
     isDisabled && interactionStates.disabled.base,
     fullWidth && "w-full",
+    visibleLabel && "scroll-mt-2",
     icon !== undefined && "pr-10",
     resolvedIconAfter !== null && "pl-10",
     multiline && "resize-y py-3 leading-6",
@@ -237,7 +238,7 @@ export function CustomInput({
         <label
           htmlFor={resolvedId}
           className={cx(
-            "pointer-events-none absolute top-0 z-20 flex -translate-y-1/2 items-center px-1.5 text-[11px] font-bold leading-none text-primary transition-colors",
+            "pointer-events-none absolute top-0 z-20 flex -translate-y-1/2 items-center px-1.5 text-[11px] font-bold leading-4 text-primary transition-colors",
             labelOffsetClass
           )}
         >
@@ -261,7 +262,9 @@ export function CustomInput({
 
   if (!visibleLabel) return control;
 
-  return <div className={cx("flex flex-col", fullWidth && "w-full")}>{control}</div>;
+  // Reserve half the label's line height even while it is hidden. The label
+  // stays inside this field's box in scroll containers, without shifting on focus.
+  return <div className={cx("flex flex-col pt-2", fullWidth && "w-full")}>{control}</div>;
 }
 
 function hasInputValue(value: unknown) {

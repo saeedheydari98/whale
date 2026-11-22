@@ -97,7 +97,6 @@ type PaletteSectionProps = {
   children: ReactNode;
   open: boolean;
   preview: ReactNode;
-  scopeClasses: (typeof paletteScopeClasses)[PaletteScope];
   title: string;
   value: string;
   valueClassName: string;
@@ -108,7 +107,6 @@ function PaletteSection({
   children,
   open,
   preview,
-  scopeClasses,
   title,
   value,
   valueClassName,
@@ -177,7 +175,6 @@ export function ThemePalettePicker({
       >
         <PaletteSection
           open={openSections.colors}
-          scopeClasses={scopeClasses}
           title="رنگ‌ها"
           value={colorLabels[selectedColor]}
           valueClassName={selectionClassName}
@@ -222,7 +219,6 @@ export function ThemePalettePicker({
 
         <PaletteSection
           open={openSections.styles}
-          scopeClasses={scopeClasses}
           title="سبک‌ها"
           value={styleLabels[selectedStyle]}
           valueClassName={selectionClassName}

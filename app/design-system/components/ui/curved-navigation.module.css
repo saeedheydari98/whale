@@ -1,0 +1,41 @@
+.surface {
+  /* Subtract a smooth, shoulder-shaped notch from the theme-colored surface. */
+  mask-image: linear-gradient(#000, #000), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 36' preserveAspectRatio='none'%3E%3Cpath d='M0 0C12 0 12 7 18 17C24 29 34 36 48 36S72 29 78 17C84 7 84 0 96 0Z'/%3E%3C/svg%3E");
+  mask-size: 100% 100%, var(--nav-notch-width) var(--nav-notch-height);
+  mask-position: 0 0, var(--nav-notch-position) 0;
+  mask-repeat: no-repeat;
+  mask-composite: exclude;
+  transition: mask-position 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.headerSurface {
+  /* Flip only the cutout; the original panel gradient keeps its direction. */
+  mask-image: linear-gradient(#000, #000), url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 36' preserveAspectRatio='none'%3E%3Cpath transform='translate(0 36) scale(1 -1)' d='M0 0C12 0 12 7 18 17C24 29 34 36 48 36S72 29 78 17C84 7 84 0 96 0Z'/%3E%3C/svg%3E");
+  mask-position: 0 0, var(--nav-notch-position) 100%;
+}
+
+.surface[data-active="false"] {
+  mask-image: linear-gradient(#000, #000);
+}
+
+.footerOutline {
+  /* Clear the entire straight edge beneath the notch, including its shallow
+     shoulders, so the curved stroke never overlaps a partially masked border. */
+  mask-image: linear-gradient(#000, #000), linear-gradient(#000, #000);
+  mask-size: 100% 100%, var(--nav-notch-width) 1px;
+  mask-position: 0 0, var(--nav-notch-position) 0;
+  mask-repeat: no-repeat;
+  mask-composite: exclude;
+  transition: mask-position 480ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.footerOutline[data-active="false"] {
+  mask-image: linear-gradient(#000, #000);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface,
+  .footerOutline {
+    transition: none;
+  }
+}

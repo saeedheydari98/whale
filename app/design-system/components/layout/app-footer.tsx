@@ -1,6 +1,6 @@
 "use client";
 
-import { footerNavigationClasses, footerNavigationIconClasses, footerNavigationIndicatorClasses, isNavigationActive } from "@/app/design-system/variants/navigation.variant";
+import { footerNavigationClasses, footerNavigationIconClasses, isNavigationActive } from "@/app/design-system/variants/navigation.variant";
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import { getCart } from "@/lib/cart-client";
 import { readUserProfile, USER_PROFILE_UPDATED_EVENT, type UserProfile } from "@/lib/user-profile";
 import { EmailOtpAuthForm } from "../ui/email-otp-auth-form";
 import { CustomModal } from "../ui/modal";
+import { CurvedNavigation } from "../ui/curved-navigation";
 import { startRouteLoading } from "../loading/loading";
 import {
   AccountButton,
@@ -38,7 +39,6 @@ export function AppFooter() {
   const [authUser, setAuthUser] = useState<AccountUser | null>(null);
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
-  const [language, setLanguage] = useState<"fa" | "en">("fa");
   const visibleNavItems = mobileNavItems;
   const isActiveLink = (href: string) => isNavigationActive(pathname, href);
 
@@ -65,11 +65,12 @@ export function AppFooter() {
   };
 
   const accountActive = pathname === "/panel/user" || pathname.startsWith("/panel/user/");
+  const activeNavIndex = accountActive ? visibleNavItems.length : visibleNavItems.findIndex((item) => isActiveLink(item.href));
 
   return (
-    <footer className="fixed inset-x-0 bottom-0 z-40 flex h-14 w-full shrink-0 items-center justify-center border-t border-primary-border bg-primary-panel font-bold text-primary-text shadow-lg backdrop-blur md:static md:h-auto md:p-4">
+    <footer className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex w-full shrink-0 items-center justify-center px-4 pt-7 pb-[calc(0.75rem+env(safe-area-inset-bottom))] bg-primary-panel font-bold text-primary-text max-md:bg-transparent! max-md:bg-none! max-md:backdrop-filter-none! md:pointer-events-auto md:static md:h-auto md:border-t md:border-border-default md:p-4 md:shadow-lg md:backdrop-blur">
       {isMobile ? (
-        <nav className="flex h-full w-full items-center justify-around gap-1 px-2 py-1.5">
+        <CurvedNavigation activeIndex={activeNavIndex} itemCount={visibleNavItems.length + 1} className="pointer-events-auto max-w-lg">
           {visibleNavItems.map((item) => {
             const active = isActiveLink(item.href);
             return (
@@ -79,11 +80,10 @@ export function AppFooter() {
                 aria-current={active ? "page" : undefined}
                 className={footerNavigationClasses(active)}
               >
-                <span className={footerNavigationIconClasses(active)}>
+                <span aria-hidden="true" className={footerNavigationIconClasses(active)}>
                   {item.icon}
                 </span>
-                <span className="max-w-full truncate leading-none">{item.label}</span>
-                <span className={footerNavigationIndicatorClasses(active)} aria-hidden="true" />
+                <span className="max-w-full truncate leading-4">{item.label}</span>
               </Link>
             );
           })}
@@ -94,7 +94,7 @@ export function AppFooter() {
             variant="footer"
             onOpen={openAccount}
           />
-        </nav>
+        </CurvedNavigation>
       ) : (
         <div className="flex w-full max-w-7xl flex-col items-center gap-4">
           <div className="flex items-center gap-2 text-xl font-bold">

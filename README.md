@@ -102,7 +102,20 @@ prisma/
 npm run dev
 npm run build
 npm run storybook
+npm run check:auth
+npm run check:cart-merge
 ```
+
+Authentication returns user data in JSON and sends tokens only through HttpOnly
+cookies. Access tokens last 15 minutes; refresh tokens last 30 days. Each access
+token is bound to the user's stored refresh-token hash, so logout and refresh
+rotation invalidate the previous session. The existing single-session-per-user
+storage model is retained; no database migration is needed.
+
+Deploying the stricter token format requires existing users to log in again.
+`AUTH_OTP_EXPOSE_CODE` is ignored in production. `check:auth` exercises login,
+token validation, revocation, and concurrent refresh using isolated database and
+email doubles; it does not modify real accounts or send email.
 
 ## API documentation and component previews
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { headerNavigationClasses, headerNavigationStyle, footerNavigationClasses, footerNavigationIconClasses, footerNavigationIndicatorClasses } from "@/app/design-system/variants/navigation.variant";
+import { headerNavigationClasses, headerNavigationIconClasses, footerNavigationClasses, footerNavigationIconClasses } from "@/app/design-system/variants/navigation.variant";
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
@@ -21,15 +21,6 @@ export type AccountUser = {
   name?: string | null;
   role?: string | null;
   profile?: unknown;
-};
-
-type AccountProfile = {
-  firstName?: string | null;
-  lastName?: string | null;
-  phone?: string | null;
-  email?: string | null;
-  address?: string | null;
-  isAdminUnlocked?: boolean | null;
 };
 
 export function readAccountProfileFromUser(user: AccountUser | null | undefined) {
@@ -73,21 +64,12 @@ export function AccountButton({
       className={className}
       aria-label="حساب کاربری"
       aria-current={active ? "page" : undefined}
-      style={!isFooter ? headerNavigationStyle(active) : undefined}
       onClick={onOpen}
     >
-      <span className={isFooter
-        ? footerNavigationIconClasses(active)
-        : showsInitial
-          ? "flex h-7 w-7 items-center justify-center rounded-full border border-primary-border bg-primary-bg text-xs font-bold"
-          : "flex items-center justify-center text-lg"
-      }>
+      <span aria-hidden="true" className={isFooter ? footerNavigationIconClasses(active) : headerNavigationIconClasses(active)}>
         {showsInitial ? <span>{initial}</span> : <IoPersonCircleOutline />}
       </span>
-      <span className={isFooter ? "max-w-full truncate leading-none" : undefined}>حساب کاربری</span>
-      {isFooter ? (
-        <span className={footerNavigationIndicatorClasses(active)} aria-hidden="true" />
-      ) : null}
+      <span className="max-w-full truncate leading-4">حساب کاربری</span>
     </CustomActionButton>
   );
 }

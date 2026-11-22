@@ -2,7 +2,7 @@
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { IoStar, IoStarHalf, IoStarOutline } from "react-icons/io5";
 import { cx } from "../../variants/shared.variant";
 

@@ -74,6 +74,14 @@ failInsert = true;
 const originalError = console.error; console.error = () => {};
 try { result = await submit({ items: [item] }); } finally { console.error = originalError; }
 assert.equal(result.status, 500); assert.deepEqual(rows, before, 'Failed insertion must roll back deletion'); failInsert = false;
+const beforeWrongAccount = structuredClone(rows);
+result = await submit({ guestMergeUserId: 2, items: [item] });
+assert.equal(result.status, 409);
+assert.deepEqual(rows, beforeWrongAccount, 'A guest transfer must never write another account');
+result = await submit({ guestMergeUserId: 1, items: [{ ...item, selectedColors: { red: 9, blue: 8 }, quantity: 17 }] });
+assert.equal(result.status, 200);
+assert.equal(result.body.data.cart.items[0].quantity, 5);
+assert.deepEqual(result.body.data.cart.items[0].selectedColors, { red: 3, blue: 2 }, 'Merged colors respect real stock limits');
 result = await submit({ items: [] }); assert.equal(result.status, 200); assert.deepEqual(result.body.data.cart.items, []);
 calls.length = 0;
 await service.getOrCreateActiveCart(1);

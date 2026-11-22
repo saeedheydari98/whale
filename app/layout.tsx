@@ -174,7 +174,7 @@ export default function RootLayout({
                   <div data-app-shell className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-primary-base text-primary-text">
                     <div data-app-scroll-container className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
                       <AppHeader />
-                      <main data-app-content className="flex grow shrink-0 flex-col pb-14 md:pb-0">
+                      <main data-app-content className="flex grow shrink-0 flex-col pb-[calc(7rem+env(safe-area-inset-bottom))] md:pb-0">
                         {children}
                       </main>
                       <AppFooter />

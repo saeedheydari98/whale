@@ -16,6 +16,8 @@ import { BiCategoryAlt } from "react-icons/bi";
 import { EmailOtpAuthForm } from "../ui/email-otp-auth-form";
 import { CustomModal } from "../ui/modal";
 import HeaderNavLink from "../ui/header-nav-link";
+import { CurvedNavigation } from "../ui/curved-navigation";
+import { isNavigationActive } from "../../variants/navigation.variant";
 import {
   CART_UPDATED_EVENT,
   getCart,
@@ -84,7 +86,9 @@ export function AppHeader() {
   const [accountProfile, setAccountProfile] = useState<UserProfile | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const router = useRouter();
-  const showMobileBack = isMobile && pathname !== "/";
+  const showMobileBack = isMobile
+    && pathname.split("/").filter(Boolean).length > 1
+    && pathname !== "/panel/user";
 
   useEffect(() => {
     if (!appUserData) return;
@@ -139,6 +143,8 @@ export function AppHeader() {
   }, [refreshAppUser]);
 
   const visibleNavItems = navItems;
+  const accountActive = isNavigationActive(pathname, "/panel/user");
+  const activeNavIndex = accountActive ? visibleNavItems.length : visibleNavItems.findIndex((item) => isNavigationActive(pathname, item.href));
   const openAccount = () => {
     if (authUser ?? readCachedAuthUser()) {
       startRouteLoading();
@@ -152,14 +158,14 @@ export function AppHeader() {
     <header
       ref={headerRef}
       className={`
-        sticky top-0 z-30 h-20 shrink-0 border-b border-primary-border
-        bg-primary-panel backdrop-blur flex justify-center items-center 
+        sticky top-0 z-30 h-15 shrink-0 border-b border-border-default md:h-20
+        bg-primary-panel backdrop-blur flex justify-center items-center md:items-start md:border-0 md:bg-transparent! md:bg-none! md:backdrop-filter-none!
         w-full will-change-transform
       `}
     >
-      <div className="relative flex justify-between items-center w-full gap-3 px-4">
+      <div className="relative flex justify-between items-center w-full gap-3 px-4 md:h-15 md:items-stretch md:gap-0 md:px-0">
         {/* Left: logo, theme toggle, global search */}
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3 bg-primary-panel max-md:bg-transparent! max-md:bg-none! max-md:backdrop-filter-none! md:border-b md:border-border-default md:px-4">
           {showMobileBack ? (
             <CustomActionButton
               type="button"
@@ -183,7 +189,7 @@ export function AppHeader() {
 
         {/* Center: desktop nav */}
         {!isMobile && (
-          <nav className="flex flex-1 justify-end items-stretch gap-1 self-stretch">
+          <CurvedNavigation placement="header" activeIndex={activeNavIndex} itemCount={visibleNavItems.length + 1} className="hidden min-w-80 max-w-md flex-1 md:flex">
             {visibleNavItems.map((item) => (
               <HeaderNavLink key={item.href} href={item.href} icon={item.icon}>
                 {item.label}
@@ -192,14 +198,14 @@ export function AppHeader() {
             <AccountButton
               user={authUser}
               profile={accountProfile}
-              active={pathname === "/panel/user" || pathname.startsWith("/panel/user/")}
+              active={accountActive}
               onOpen={openAccount}
             />
-          </nav>
+          </CurvedNavigation>
         )}
 
         {/* Right: cart */}
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 bg-primary-panel max-md:bg-transparent! max-md:bg-none! max-md:backdrop-filter-none! md:border-b md:border-border-default md:px-4">
           <CartLink count={cartCount} />
         </div>
       </div>

@@ -9,7 +9,6 @@ import {
   claimGuestCartForUser,
   getCartCount,
   hasLocalCartSnapshot,
-  persistCart,
   readLocalCart,
 } from "@/lib/cart-client";
 import { fetchJsonDeduped, invalidateFetchCache } from "@/lib/fetch-json";
@@ -196,10 +195,7 @@ function writeUserCache(data: AppUserData) {
   memoryCache = cached;
   setCachedAuthUser(data.user, { emit: false });
 
-  const claimedCart = claimGuestCartForUser(data.user);
-  if (claimedCart) {
-    void persistCart(claimedCart, undefined, { notify: false }).catch(() => undefined);
-  }
+  void claimGuestCartForUser(data.user).catch(() => undefined);
 
   if (typeof window === "undefined") return;
   try {

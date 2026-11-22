@@ -10,17 +10,8 @@ export type ShippingMethod = (typeof SHIPPING_METHODS)[number];
 export const ORDER_TYPES = ["online", "in_person"] as const;
 export type OrderType = (typeof ORDER_TYPES)[number];
 
-export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
-  online: "سفارش آنلاین",
-  in_person: "سفارش حضوری",
-};
-
 export function normalizeShippingMethod(value: unknown): ShippingMethod {
   return value === "post" ? "post" : "pickup";
-}
-
-export function normalizeOrderType(value: unknown): OrderType {
-  return value === "in_person" ? "in_person" : "online";
 }
 
 export function normalizeDiscountCode(value: unknown) {

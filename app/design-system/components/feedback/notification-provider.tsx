@@ -2,7 +2,7 @@
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
-import React, {
+import {
   createContext,
   useCallback,
   useContext,

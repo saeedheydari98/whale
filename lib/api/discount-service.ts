@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 
 export const DISCOUNT_AUDIENCES = ["new_users", "purchase_count", "purchase_amount"] as const;
 export const DISCOUNT_TYPES = ["percentage", "free_shipping"] as const;
-export type DiscountAudience = (typeof DISCOUNT_AUDIENCES)[number];
 export type DiscountType = (typeof DISCOUNT_TYPES)[number];
 
 type IssueDiscountInput = {

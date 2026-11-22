@@ -29,32 +29,6 @@ export function getAdminUserContact(user: CompactAdminUser) {
   return profile?.phone || profile?.email || user.username || user.email || `شناسه ${user.id}`;
 }
 
-function normalizeSearchValue(value: string) {
-  return value
-    .toLocaleLowerCase("fa")
-    .replaceAll("ي", "ی")
-    .replaceAll("ك", "ک")
-    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)))
-    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
-    .trim();
-}
-
-export function adminUserMatchesSearch(user: CompactAdminUser, query: string) {
-  const normalizedQuery = normalizeSearchValue(query);
-  if (!normalizedQuery) return true;
-
-  const profile = user.profiles[0];
-  return [
-    getAdminUserTitle(user),
-    profile?.phone,
-    profile?.email,
-    user.email,
-    user.username,
-    user.role,
-    String(user.id),
-  ].some((value) => normalizeSearchValue(String(value ?? "")).includes(normalizedQuery));
-}
-
 type AdminUserCompactRowProps = {
   user: CompactAdminUser;
   meta?: ReactNode;

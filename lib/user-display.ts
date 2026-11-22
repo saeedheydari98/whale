@@ -23,10 +23,6 @@ export function getProfilePhone(profile: unknown) {
   return String(readProfile(profile)?.phone || "").trim();
 }
 
-export function getProfileMarketingEmail(profile: unknown) {
-  return String(readProfile(profile)?.email || "").trim();
-}
-
 export function getUserPhone(user: UserLike, preferredProfile?: unknown, options?: { fallbackToUsername?: boolean }) {
   const phone = getProfilePhone(preferredProfile ?? user?.profile);
   if (phone) return phone;

@@ -7,16 +7,16 @@ import { parseJsonBody } from "@/lib/api/validation";
 import { authOtpRequestSchema, authOtpVerifySchema } from "@/lib/api/schemas";
 import { isLocalAccountEmail, SUPERADMIN_PHONE } from "@/lib/auth-constants";
 import {
-  clearAuthCookies,
   createAccessToken,
   createRefreshToken,
   getAuthUser,
   getRefreshTokenFromRequest,
   hashToken,
   publicUser,
+  revokeAuthSession,
   setAuthCookies,
   verifyHashedToken,
-  verifyToken,
+  verifyRefreshToken,
 } from "@/lib/api/auth";
 import { MissingAuthSecretError, runtimeEnv } from "@/lib/env";
 import { sendAuthOtpEmail } from "@/lib/gmail";
@@ -40,15 +40,21 @@ function createOtpCode() {
   return String(randomInt(100_000, 1_000_000));
 }
 
-async function authTokens(user: { id: number; email: string; role: string }) {
-  const accessToken = createAccessToken(user);
+async function setAuthSession(user: { id: number; email: string; role: string }, previousHash?: string) {
   const refreshToken = createRefreshToken(user);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { refreshTokenHash: hashToken(refreshToken) },
-  });
+  const refreshTokenHash = hashToken(refreshToken);
+  const accessToken = createAccessToken(user, refreshTokenHash);
+  if (previousHash !== undefined) {
+    const rotated = await prisma.user.updateMany({
+      where: { id: user.id, refreshTokenHash: previousHash },
+      data: { refreshTokenHash },
+    });
+    if (rotated.count !== 1) return false;
+  } else {
+    await prisma.user.update({ where: { id: user.id }, data: { refreshTokenHash } });
+  }
   await setAuthCookies(accessToken, refreshToken);
-  return { accessToken, refreshToken };
+  return true;
 }
 
 async function normalizeRole<T extends { id: number; username: string | null; role: string }>(user: T) {
@@ -228,14 +234,15 @@ export async function POST(request: Request, context: Context) {
         },
         data: { consumedAt: new Date() },
       });
+      const exposeCode = process.env.NODE_ENV !== "production" && runtimeEnv("AUTH_OTP_EXPOSE_CODE") === "true";
       return apiOk({
         sent: true,
         retryAfterSeconds: OTP_COOLDOWN_SECONDS,
         expiresInSeconds: OTP_EXPIRES_MINUTES * 60,
-        developmentCode: runtimeEnv("AUTH_OTP_EXPOSE_CODE") === "true" ? code : undefined,
+        developmentCode: exposeCode ? code : undefined,
       }, {
         message: "OTP_SENT",
-        showMessage: runtimeEnv("AUTH_OTP_EXPOSE_CODE") === "true"
+        showMessage: exposeCode
           ? `کد ورود برای ${identity.email} ارسال شد. کد توسعه: ${code}`
           : `کد ورود به ${identity.email} ارسال شد.`,
       });
@@ -278,24 +285,22 @@ export async function POST(request: Request, context: Context) {
       if (consumed.count !== 1) return apiFail("این کد قبلاً استفاده شده است.", 401);
 
       const user = await normalizeRole(await findOrCreateVerifiedUser(identity));
-      const [tokens, profileComplete] = await Promise.all([
-        authTokens(user),
+      const [, profileComplete] = await Promise.all([
+        setAuthSession(user),
         isProfileComplete(user.id),
         runDiscountRules({ userIds: [user.id] }).catch((error) => {
           console.error("Login discount rule evaluation error:", error);
           return null;
         }),
       ]);
-      return apiOk({ user: publicUser(user), profileComplete, ...tokens }, {
+      return apiOk({ user: publicUser(user), profileComplete }, {
         message: "AUTHENTICATION_SUCCEEDED",
         showMessage: "ورود با موفقیت انجام شد.",
       });
     }
 
     if (action === "logout") {
-      const user = await getAuthUser(request);
-      if (user) await prisma.user.update({ where: { id: user.id }, data: { refreshTokenHash: null } });
-      await clearAuthCookies();
+      await revokeAuthSession(request);
       return apiOk({ loggedOut: true }, {
         message: "LOGOUT_SUCCEEDED",
         showMessage: "خروج با موفقیت انجام شد.",
@@ -304,18 +309,20 @@ export async function POST(request: Request, context: Context) {
 
     if (action === "refresh-token") {
       const refreshToken = await getRefreshTokenFromRequest(request);
-      const payload = verifyToken(refreshToken);
+      const payload = verifyRefreshToken(refreshToken);
       const userId = Number(payload?.sub);
-      if (!refreshToken || payload?.type !== "refresh" || !Number.isInteger(userId)) {
+      if (!refreshToken || !payload) {
         return apiFail("برای ادامه باید وارد حساب شوید.", 401);
       }
       const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user || user.refreshTokenHash !== hashToken(refreshToken)) {
+      if (!user || !verifyHashedToken(refreshToken, user.refreshTokenHash)) {
         return apiFail("برای ادامه باید وارد حساب شوید.", 401);
       }
       await normalizeRole(user);
-      const tokens = await authTokens(user);
-      return apiOk({ user: publicUser(user), ...tokens });
+      if (!await setAuthSession(user, hashToken(refreshToken))) {
+        return apiFail("برای ادامه باید وارد حساب شوید.", 401);
+      }
+      return apiOk({ user: publicUser(user) });
     }
 
     return apiFail("مسیر پیدا نشد.", 404);

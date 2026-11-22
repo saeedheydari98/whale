@@ -7,7 +7,6 @@ import { normalizeColorStock } from "@/lib/color-counts";
 export { normalizeColorStock };
 
 const CATALOG_URL_ACTIVE = "/api/products";
-const CATALOG_URL_ALL = "/api/products?all=1";
 const CATALOG_STRUCTURE_URL_ACTIVE = "/api/catalog/structure";
 const CATALOG_STRUCTURE_URL_ALL = "/api/catalog/structure?all=1";
 const HOME_PAGE_STRUCTURE_URL = "/api/home/structure";
@@ -300,13 +299,6 @@ export function showcaseSlug(showcase: Partial<ShowcaseRecord>) {
 
 export function isProductAvailable(product: Partial<ProductRecord>) {
   return product.isAvailable !== false && Number(product.stockQuantity ?? 0) > 0;
-}
-
-export function getStockStatusLabel(value?: string | null) {
-  const status = String(value ?? "").trim();
-  if (status === "in_stock") return "موجود";
-  if (status === "out_of_stock") return "ناموجود";
-  return status;
 }
 
 export type GetProductsOptions = {
@@ -1300,24 +1292,6 @@ export async function getProductDetail(
       comments: [],
       recommendations: [],
     };
-  }
-}
-
-export async function getRecommendations(
-  params?: Record<string, string | number | boolean | null | undefined>,
-  options?: Pick<GetProductsOptions, "force">
-) {
-  try {
-    const json = await fetchJsonDeduped<{ data?: { products?: ProductRecord[] } }>(
-      withQuery("/api/products/recommendations", params),
-      { force: options?.force }
-    );
-
-    return Array.isArray(json?.data?.products)
-      ? json.data.products.map(normalizeProductRecord)
-      : [];
-  } catch {
-    return [];
   }
 }
 

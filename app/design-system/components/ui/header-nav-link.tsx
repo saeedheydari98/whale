@@ -1,11 +1,11 @@
 "use client";
 
-import { headerNavigationClasses, headerNavigationStyle, isNavigationActive } from "@/app/design-system/variants/navigation.variant";
+import { headerNavigationClasses, headerNavigationIconClasses, isNavigationActive } from "@/app/design-system/variants/navigation.variant";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React from "react";
-import { controlLabelClasses, cx } from "../../variants/shared.variant";
+import { cx } from "../../variants/shared.variant";
 
 type HeaderNavLinkProps = {
   href: string;
@@ -25,10 +25,9 @@ export function HeaderNavLink({ href, children, icon, className, onClick }: Head
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cx(headerNavigationClasses(active), className)}
-      style={headerNavigationStyle(active)}
     >
-      {icon ? <span className="text-lg">{icon}</span> : null}
-      <span className={controlLabelClasses}>{children}</span>
+      {icon ? <span aria-hidden="true" className={headerNavigationIconClasses(active)}>{icon}</span> : null}
+      <span className="max-w-full truncate leading-4">{children}</span>
     </Link>
   );
 }
