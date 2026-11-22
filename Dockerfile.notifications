@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 COPY prisma ./prisma
 RUN npm ci --omit=dev && npx prisma generate
 COPY scripts/notification-worker.mjs ./scripts/notification-worker.mjs
+COPY lib/notifications ./lib/notifications
 USER node
 CMD ["node", "scripts/notification-worker.mjs"]
 

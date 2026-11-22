@@ -1,3 +1,6 @@
+import { after } from "next/server";
+import { dispatchNotifications } from "@/lib/notifications/dispatch.mjs";
+export const maxDuration = 300;
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser } from "@/lib/api/auth";
 import { rateLimit } from "@/lib/api/rate-limit";
@@ -30,7 +33,7 @@ export async function PATCH(request: Request) {
  const parsed = await parseJsonBody(request, actionSchema); if (!parsed.ok) return parsed.response;
  try {
  const { id, action, active } = parsed.data;
- if (action === "run") return apiOk(await runNotificationRule(id));
+ if (action === "run") { const result = await runNotificationRule(id); after(async () => { try { await dispatchNotifications(prisma, 40000); } catch { console.error("Notification dispatch failed; retained for retry."); } }); return apiOk(result); }
  return apiOk({ rule: await prisma.notificationRule.update({ where: { id }, data: { active: active ?? false } }) });
  } catch { return apiServerError("اجرای قانون اعلان انجام نشد."); }
 }
