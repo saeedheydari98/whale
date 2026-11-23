@@ -9,7 +9,7 @@ export const ruleSchema = z.object({
   .refine(v => new TextEncoder().encode(JSON.stringify({ title: v.title, body: v.body, url: v.url })).length <= 3500, { message: "حجم متن و آدرس اعلان بیش از حد مجاز پوش است." });
 export const actionSchema = z.object({ id: z.string().min(1), action: z.enum(["run", "toggle"]), active: z.boolean().optional() });
 export const pageSchema = z.object({ limit: z.coerce.number().int().min(1).max(100).default(20), offset: z.coerce.number().int().min(0).default(0) });
-export const readSchema = z.object({ id: z.string().min(1).optional() });
+export const readSchema = z.object({ id: z.string().min(1).optional(), ids: z.array(z.string().min(1)).min(1).max(100).optional() });
 export const endpointSchema = z.string().url().max(2048).refine(value => {
  const u = new URL(value);
  return u.protocol === "https:" && !u.username && !u.password && !u.port &&

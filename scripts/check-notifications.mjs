@@ -10,7 +10,10 @@ function load(file, mocks = {}) {
  vm.runInNewContext(code, { exports: module.exports, module, require: name => mocks[name] ?? require(name), URL, Date, TextEncoder });
  return module.exports;
 }
-const { ruleSchema, endpointSchema } = load("lib/notification-schemas.ts");
+const { ruleSchema, endpointSchema, readSchema } = load("lib/notification-schemas.ts");
+assert.equal(readSchema.safeParse({ids:[]}).success,false);
+assert.equal(readSchema.safeParse({ids:["n1","n2"]}).success,true);
+assert.equal(readSchema.safeParse({ids:Array(101).fill("n1")}).success,false);
 const draft = { name: "rule", title: "hello", body: "body", audienceType: "all" };
 for (const url of ["//evil.example","/\\evil.example","https://evil.example","/\nevil"]) assert.equal(ruleSchema.safeParse({ ...draft,url }).success,false);
 assert.equal(ruleSchema.safeParse({ ...draft,url: "/panel/user" }).success,true);
@@ -45,11 +48,19 @@ rule.active=false;assert.equal((await runNotificationRule("rule")).created,0);
 console.log("PASS: all six audiences, minimum amount after discount, disabled rules, idempotent replay and per-device jobs");
 const handlers={},shown=[],opened=[];
 const self={ location:{origin:"https://shop.example"}, addEventListener:(name,fn)=>handlers[name]=fn, registration:{showNotification:async(...args)=>shown.push(args)},clients:{matchAll:async()=>[],openWindow:async u=>opened.push(u)} };
-vm.runInNewContext(fs.readFileSync("public/notification-worker.js","utf8"),{self,URL});
+const readRequests=[];
+vm.runInNewContext(fs.readFileSync("public/notification-worker.js","utf8"),{self,URL,fetch:async(url,options)=>{readRequests.push({url,...options});return {ok:true};}});
 let pending;
 handlers.push({ data:{json:()=>({title:"hello",body:"world",id:"n1"})},waitUntil:p=>pending=p });await pending;
 assert.equal(shown[0][1].tag,"n1");
+assert.equal(shown[0][1].dir,"rtl");
+assert.equal(shown[0][1].data.id,"n1");
 handlers.notificationclick({ notification:{close(){},data:{url:"https://evil.example"}},waitUntil:p=>pending=p });await pending;
 assert.equal(opened[0],"https://shop.example/panel/user");
+assert.equal(readRequests.length,0,"Legacy pushes must not mark the entire inbox read");
+handlers.notificationclick({notification:{close(){},data:{id:"n1",url:"/products"}},waitUntil:p=>pending=p});await pending;
+assert.deepEqual(JSON.parse(readRequests[0].body),{id:"n1"});
+assert.equal(readRequests[0].method,"PATCH");
+assert.equal(opened[1],"https://shop.example/products");
 console.log("PASS: push rendering, deduplication tag and same-origin click destination");
 

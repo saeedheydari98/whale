@@ -30,6 +30,32 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  const [message, setMessage] = useState("");
  const [busy, setBusy] = useState(false);
  const [confirmId, setConfirmId] = useState<string | null>(null);
+ const unreadIds = JSON.stringify(admin ? [] : page.items.filter(item => !item.readAt).slice(0, 100).map(item => item.id));
+ useEffect(() => {
+   if (admin || unreadIds === "[]") return;
+   let stopped = false;
+   let pending = false;
+   const markRead = async () => {
+     if (stopped || pending || document.hidden) return;
+     pending = true;
+     try {
+       await request(endpoint, "PATCH", { ids: JSON.parse(unreadIds) });
+       if (stopped) return;
+       invalidateFetchCache(USER_STRUCTURE_URL);
+       await Promise.all([
+         queryClient.invalidateQueries({ queryKey: ["user-structure"] }),
+         queryClient.invalidateQueries({ queryKey: ["collection-structure", endpoint + "?structure=1"] }),
+         queryClient.invalidateQueries({ queryKey: ["admin-list", endpoint] }),
+       ]);
+     } catch {
+       // Keep unread state and retry while the inbox is visible.
+     } finally { pending = false; }
+   };
+   void markRead();
+   const timer = window.setInterval(() => void markRead(), 30000);
+   document.addEventListener("visibilitychange", markRead);
+   return () => { stopped = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", markRead); };
+ }, [admin, endpoint, queryClient, unreadIds]);
  useEffect(() => {
    if (admin) return;
    const refreshInbox = () => {
@@ -41,7 +67,9 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
    };
    const timer = window.setInterval(refreshInbox, 30000);
    window.addEventListener("focus", refreshInbox);
-   return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshInbox); };
+   const onPush = (event: MessageEvent) => { if (event.data?.type === "notification-received") refreshInbox(); };
+   navigator.serviceWorker?.addEventListener("message", onPush);
+   return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshInbox); navigator.serviceWorker?.removeEventListener("message", onPush); };
  }, [admin, endpoint, queryClient]);
  const [draft, setDraft] = useState({ name: "", title: "", body: "", url: "/panel/user", audienceType: "all", minimumValue: 1, lookbackDays: 30 });
  const [view, setView] = useState<"individual" | "create">("individual");
@@ -72,8 +100,6 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  <CustomSwitch checked={!!item.active} disabled={busy} label="فعال بودن اعلان" onChange={active => void mutate("PATCH", { id: item.id, action: "toggle", active })} />
  </div> : <div className="flex flex-wrap gap-2">
  <span>{item.readAt ? "خوانده‌شده" : "خوانده‌نشده"}</span>
- <CustomButton href={item.url} variant="neutral">مشاهده مقصد</CustomButton>
- {!item.readAt ? <CustomButton disabled={busy} onClick={() => void mutate("PATCH", { id: item.id })}>خواندم</CustomButton> : null}
  </div>}
  </div>;
  return <section className="flex flex-col gap-4">
@@ -94,15 +120,15 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  <AdminUsersPanel totalCount={usersCount} onSelectUser={u => { if (!busy) setSelected(current => current.some(s => s.id === u.id) ? current : [...current,u]); }} canSelectUser={u => !busy && !selected.some(s => s.id === u.id)} />
  <div className="text-sm text-secondary-text">{selected.length === 0 ? "حداقل یک گیرنده انتخاب کنید." : `${selected.length.toLocaleString("fa-IR")} گیرنده انتخاب شده است.`}</div>
  </div> : <>
- <CustomInput label="نام اعلان" value={draft.name} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, name: e.target.value })} />
- {draft.audienceType !== "all" ? <CustomInput label="بازه بررسی (روز)" type="number" min={1} max={3650} value={draft.lookbackDays} disabled={busy} onChange={e => setDraft({ ...draft, lookbackDays: Number(e.target.value) })} /> : null}
- {draft.audienceType.startsWith("purchase_") ? <CustomInput label={draft.audienceType === "purchase_count" ? "حداقل تعداد خرید" : "حداقل مبلغ خرید (تومان)"} type="number" min={1} value={draft.minimumValue} disabled={busy} onChange={e => setDraft({ ...draft, minimumValue: Number(e.target.value) })} /> : null}
+ <CustomInput label="نام اعلان" placeholder="مثلاً پیشنهاد ویژه کاربران جدید" value={draft.name} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, name: e.target.value })} />
+ {draft.audienceType !== "all" ? <CustomInput label="بازه بررسی (روز)" placeholder="مثلاً ۳۰" type="number" min={1} max={3650} value={draft.lookbackDays} disabled={busy} onChange={e => setDraft({ ...draft, lookbackDays: Number(e.target.value) })} /> : null}
+ {draft.audienceType.startsWith("purchase_") ? <CustomInput label={draft.audienceType === "purchase_count" ? "حداقل تعداد خرید" : "حداقل مبلغ خرید (تومان)"} placeholder={draft.audienceType === "purchase_count" ? "مثلاً ۳" : "مثلاً ۵۰۰۰۰۰"} type="number" min={1} value={draft.minimumValue} disabled={busy} onChange={e => setDraft({ ...draft, minimumValue: Number(e.target.value) })} /> : null}
  </>}
- <CustomInput label="مسیر مقصد داخل سایت" value={draft.url} required maxLength={500} disabled={busy} onChange={e => setDraft({ ...draft, url: e.target.value })} />
- <CustomInput label="عنوان اعلان" value={draft.title} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, title: e.target.value })} />
- <CustomInput label="متن اعلان" multiline value={draft.body} required maxLength={1000} disabled={busy} onChange={e => setDraft({ ...draft, body: e.target.value })} />
+ <CustomInput label="مسیر مقصد داخل سایت" placeholder="مثلاً /products" value={draft.url} required maxLength={500} disabled={busy} onChange={e => setDraft({ ...draft, url: e.target.value })} />
+ <CustomInput label="عنوان اعلان" placeholder="عنوانی کوتاه برای اعلان بنویسید" value={draft.title} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, title: e.target.value })} />
+ <CustomInput label="متن اعلان" placeholder="متن پیام برای کاربران را اینجا بنویسید" multiline value={draft.body} required maxLength={1000} disabled={busy} onChange={e => setDraft({ ...draft, body: e.target.value })} />
  <CustomButton type="submit" disabled={busy || (view === "individual" && selected.length === 0)} isLoading={busy}>{view === "individual" ? "ارسال اعلان" : "ساخت و ارسال اعلان"}</CustomButton>
- </form> : <><PushSettings /><CustomButton disabled={busy} variant="neutral" onClick={() => void mutate("PATCH", {})}>خواندن همه اعلان‌ها</CustomButton></>}
+ </form> : <PushSettings />}
  {message || page.error ? <div role="status" className="text-sm text-primary-text">{message || page.error}</div> : null}
  {!page.loading && page.total === 0 ? <div className="text-secondary-text">هنوز موردی ثبت نشده است.</div> : null}
  <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} getKey={item => item.id} lazy className="flex flex-col gap-3" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />

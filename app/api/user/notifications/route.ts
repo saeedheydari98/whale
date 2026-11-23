@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
  const auth = await guard(request); if (!auth.ok) return auth.response;
  const parsed = await parseJsonBody(request, readSchema); if (!parsed.ok) return parsed.response;
- try { await prisma.notification.updateMany({ where: { userId: auth.user.id, readAt: null, ...(parsed.data.id ? { id: parsed.data.id } : {}) }, data: { readAt: new Date() } }); return apiOk({}); }
+ try { await prisma.notification.updateMany({ where: { userId: auth.user.id, readAt: null, ...(parsed.data.id ? { id: parsed.data.id } : parsed.data.ids ? { id: { in: parsed.data.ids } } : {}) }, data: { readAt: new Date() } }); return apiOk({}); }
  catch { return apiServerError("ثبت خواندن اعلان انجام نشد."); }
 }
 
