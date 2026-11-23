@@ -38,7 +38,7 @@ model NotificationRule {
   name String
   title String
   body String
-  url String @default("/panel/user")
+  url String @default("/")
   audienceType String
   minimumValue Int @default(1)
   lookbackDays Int @default(30)

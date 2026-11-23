@@ -33,7 +33,25 @@ export async function PATCH(request: Request) {
  const parsed = await parseJsonBody(request, actionSchema); if (!parsed.ok) return parsed.response;
  try {
  const { id, action, active } = parsed.data;
- if (action === "run") { const result = await runNotificationRule(id); after(async () => { try { await dispatchNotifications(prisma, 40000); } catch { console.error("Notification dispatch failed; retained for retry."); } }); return apiOk(result); }
+ if (action === "run") {
+   const result = await runNotificationRule(id);
+   let pushWarning = "";
+   try {
+     // Attempt delivery before returning; background work alone can leave jobs untouched.
+     await dispatchNotifications(prisma, 10000);
+     const [subscriptions, outstanding] = await Promise.all([
+       prisma.pushDelivery.count({ where: { notification: { ruleId: id } } }),
+       prisma.pushDelivery.count({ where: { notification: { ruleId: id }, status: { not: "accepted" } } }),
+     ]);
+     if (!subscriptions) pushWarning = "مرورگر فعالی برای دریافت پوش این اعلان ثبت نشده است.";
+     else if (outstanding) pushWarning = "ارسال پوش به برخی مرورگرها هنوز تکمیل نشده است.";
+   } catch {
+     pushWarning = "اعلان در صندوق ثبت شد، اما ارسال پوش انجام نشد؛ اتصال و تنظیمات سرویس ارسال باید بررسی شود.";
+     console.error("Notification dispatch failed; retained for retry.");
+   }
+   after(async () => { try { await dispatchNotifications(prisma, 40000); } catch { console.error("Notification dispatch retry failed."); } });
+   return apiOk({ ...result, pushWarning });
+ }
  return apiOk({ rule: await prisma.notificationRule.update({ where: { id }, data: { active: active ?? false } }) });
  } catch { return apiServerError("اجرای قانون اعلان انجام نشد."); }
 }

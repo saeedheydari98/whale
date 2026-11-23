@@ -5,7 +5,6 @@ import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collect
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { CustomTabs } from "@/app/design-system/components/ui/tabs";
-import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { invalidateFetchCache } from "@/lib/fetch-json";
 import { USER_STRUCTURE_URL } from "@/lib/user-structure";
 import { CustomInput } from "@/app/design-system/components/ui/input";
@@ -14,7 +13,7 @@ import Loading, { DynamicLoadingCollection } from "@/app/design-system/component
 import { AdminUsersPanel, type AdminUser } from "@/app/panel/admin/admin-users-panel";
 
 type Entry = { id: string; name?: string; title: string; body: string; url: string; active?: boolean; readAt?: string | null; createdAt?: string; _count?: { notifications: number } };
-const empty: Entry = { id: "", title: "عنوان اعلان", body: "متن پیام", url: "/panel/user" };
+const empty: Entry = { id: "", title: "عنوان اعلان", body: "متن پیام", url: "/" };
 const audiences = [["all","همه کاربران"],["new_users","کاربران جدید"],["purchase_count","حداقل تعداد خرید"],["purchase_amount","حداقل مبلغ خرید"],["no_purchase","بدون خرید در بازه"]] as const;
 async function request(url: string, method = "GET", body?: unknown) {
  const response = await fetch(url, { method, headers: { "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
@@ -29,7 +28,7 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  const queryClient = useQueryClient();
  const [message, setMessage] = useState("");
  const [busy, setBusy] = useState(false);
- const [confirmId, setConfirmId] = useState<string | null>(null);
+ const [pendingSend, setPendingSend] = useState<{ id: string; body: string } | null>(null);
  const unreadIds = JSON.stringify(admin ? [] : page.items.filter(item => !item.readAt).slice(0, 100).map(item => item.id));
  useEffect(() => {
    if (admin || unreadIds === "[]") return;
@@ -71,22 +70,23 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
    navigator.serviceWorker?.addEventListener("message", onPush);
    return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshInbox); navigator.serviceWorker?.removeEventListener("message", onPush); };
  }, [admin, endpoint, queryClient]);
- const [draft, setDraft] = useState({ name: "", title: "", body: "", url: "/panel/user", audienceType: "all", minimumValue: 1, lookbackDays: 30 });
+ const [draft, setDraft] = useState({ name: "", title: "", body: "", url: "/", audienceType: "all", minimumValue: 1, lookbackDays: 30 });
  const [view, setView] = useState<"individual" | "create">("individual");
  const [selected, setSelected] = useState<AdminUser[]>([]);
  const refresh = async () => { invalidateFetchCache(USER_STRUCTURE_URL); await queryClient.invalidateQueries({ queryKey: ["user-structure"] }); await queryClient.invalidateQueries({ queryKey: ["admin-list", endpoint] }); await page.refresh(); };
  const mutate = async (method: string, body: unknown, send = false) => {
  setBusy(true); setMessage("");
- try { let result = await request(endpoint, method, body);
+ try { let result = pendingSend && send && pendingSend.body === JSON.stringify(body) ? { rule: { id: pendingSend.id } } : await request(endpoint, method, body);
  if (send) {
-   try { result = await request(endpoint, "PATCH", { id: result.rule.id, action: "run" }); }
+   setPendingSend({ id: result.rule.id, body: JSON.stringify(body) });
+   try { result = await request(endpoint, "PATCH", { id: result.rule.id, action: "run" }); setPendingSend(null); }
    catch (error) {
-     setMessage(`اعلان ذخیره شد اما ارسال کامل نشد. از دکمه ارسال اعلان در فهرست پایین دوباره تلاش کنید. ${error instanceof Error ? error.message : ""}`);
+     setMessage(`اعلان ذخیره شد اما ارسال کامل نشد. برای تلاش دوباره، دکمه ارسال همین فرم را بزنید. ${error instanceof Error ? error.message : ""}`);
      await refresh();
      return;
    }
  }
- setMessage(result.created !== undefined ? `${result.created} اعلان جدید در صندوق کاربران ثبت شد.` : "ذخیره شد."); await refresh(); }
+ setMessage(result.created !== undefined ? `${result.created} اعلان جدید در صندوق کاربران ثبت شد.${result.pushWarning ? ` ${result.pushWarning}` : ""}` : "ذخیره شد."); await refresh(); }
  catch (e) { setMessage(e instanceof Error ? e.message : "عملیات انجام نشد."); }
  finally { setBusy(false); }
  };
@@ -96,8 +96,6 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  <div className="whitespace-pre-wrap break-words text-sm">{item.body}</div>
  {admin ? <div className="flex flex-wrap gap-2">
  <span>{item._count?.notifications ?? 0} گیرنده · {item.active ? "فعال" : "متوقف"}</span>
- <CustomButton disabled={busy || !item.active} onClick={() => setConfirmId(item.id)}>ارسال اعلان</CustomButton>
- <CustomSwitch checked={!!item.active} disabled={busy} label="فعال بودن اعلان" onChange={active => void mutate("PATCH", { id: item.id, action: "toggle", active })} />
  </div> : <div className="flex flex-wrap gap-2">
  <span>{item.readAt ? "خوانده‌شده" : "خوانده‌نشده"}</span>
  </div>}
@@ -120,22 +118,18 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  <AdminUsersPanel totalCount={usersCount} onSelectUser={u => { if (!busy) setSelected(current => current.some(s => s.id === u.id) ? current : [...current,u]); }} canSelectUser={u => !busy && !selected.some(s => s.id === u.id)} />
  <div className="text-sm text-secondary-text">{selected.length === 0 ? "حداقل یک گیرنده انتخاب کنید." : `${selected.length.toLocaleString("fa-IR")} گیرنده انتخاب شده است.`}</div>
  </div> : <>
- <CustomInput label="نام اعلان" placeholder="مثلاً پیشنهاد ویژه کاربران جدید" value={draft.name} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, name: e.target.value })} />
- {draft.audienceType !== "all" ? <CustomInput label="بازه بررسی (روز)" placeholder="مثلاً ۳۰" type="number" min={1} max={3650} value={draft.lookbackDays} disabled={busy} onChange={e => setDraft({ ...draft, lookbackDays: Number(e.target.value) })} /> : null}
- {draft.audienceType.startsWith("purchase_") ? <CustomInput label={draft.audienceType === "purchase_count" ? "حداقل تعداد خرید" : "حداقل مبلغ خرید (تومان)"} placeholder={draft.audienceType === "purchase_count" ? "مثلاً ۳" : "مثلاً ۵۰۰۰۰۰"} type="number" min={1} value={draft.minimumValue} disabled={busy} onChange={e => setDraft({ ...draft, minimumValue: Number(e.target.value) })} /> : null}
+ <CustomInput label="نام اعلان" placeholder="نام اعلان" value={draft.name} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, name: e.target.value })} />
+ {draft.audienceType !== "all" ? <CustomInput label="بازه بررسی (روز)" placeholder="بازه بررسی (روز)" type="number" min={1} max={3650} value={draft.lookbackDays} disabled={busy} onChange={e => setDraft({ ...draft, lookbackDays: Number(e.target.value) })} /> : null}
+ {draft.audienceType.startsWith("purchase_") ? <CustomInput label={draft.audienceType === "purchase_count" ? "حداقل تعداد خرید" : "حداقل مبلغ خرید (تومان)"} placeholder={draft.audienceType === "purchase_count" ? "حداقل تعداد خرید" : "حداقل مبلغ خرید (تومان)"} type="number" min={1} value={draft.minimumValue} disabled={busy} onChange={e => setDraft({ ...draft, minimumValue: Number(e.target.value) })} /> : null}
  </>}
- <CustomInput label="مسیر مقصد داخل سایت" placeholder="مثلاً /products" value={draft.url} required maxLength={500} disabled={busy} onChange={e => setDraft({ ...draft, url: e.target.value })} />
- <CustomInput label="عنوان اعلان" placeholder="عنوانی کوتاه برای اعلان بنویسید" value={draft.title} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, title: e.target.value })} />
- <CustomInput label="متن اعلان" placeholder="متن پیام برای کاربران را اینجا بنویسید" multiline value={draft.body} required maxLength={1000} disabled={busy} onChange={e => setDraft({ ...draft, body: e.target.value })} />
+ <CustomInput label="مسیر مقصد داخل سایت" placeholder="مسیر مقصد داخل سایت" value={draft.url} required maxLength={500} disabled={busy} onChange={e => setDraft({ ...draft, url: e.target.value })} />
+ <CustomInput label="عنوان اعلان" placeholder="عنوان اعلان" value={draft.title} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, title: e.target.value })} />
+ <CustomInput label="متن اعلان" placeholder="متن اعلان" multiline value={draft.body} required maxLength={1000} disabled={busy} onChange={e => setDraft({ ...draft, body: e.target.value })} />
  <CustomButton type="submit" disabled={busy || (view === "individual" && selected.length === 0)} isLoading={busy}>{view === "individual" ? "ارسال اعلان" : "ساخت و ارسال اعلان"}</CustomButton>
  </form> : <PushSettings />}
  {message || page.error ? <div role="status" className="text-sm text-primary-text">{message || page.error}</div> : null}
  {!page.loading && page.total === 0 ? <div className="text-secondary-text">هنوز موردی ثبت نشده است.</div> : null}
  <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} getKey={item => item.id} lazy className="flex flex-col gap-3" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />
- <CustomModal open={confirmId !== null} onClose={() => setConfirmId(null)} title="تأیید ارسال اعلان">
- <div className="flex flex-col gap-4"><div>این اعلان برای تمام مخاطبان آن ثبت شود؟ کاربران دریافت‌کننده قبلی دوباره پیام نمی‌گیرند.</div>
- <CustomButton disabled={busy} onClick={() => { const id = confirmId; setConfirmId(null); if (id) void mutate("PATCH", { id, action: "run" }); }}>تأیید و ارسال</CustomButton></div>
- </CustomModal>
  </section>;
 }
 
@@ -177,7 +171,10 @@ function PushSettings() {
  }
  return <Loading loading="skeleton-structure" isLoading={state.loading}><div className="flex flex-col gap-3">
  <div className="text-sm text-secondary-text">صندوق اعلان همیشه در دسترس است. پوش برای همین مرورگر فعال می‌شود. در آیفون ابتدا سایت را به صفحه اصلی اضافه کنید.</div>
- <CustomSwitch checked={state.enabled} disabled={state.loading || busy || !state.supported || !state.configured} isLoading={busy} label="اعلان‌های پوش این مرورگر" onChange={() => void toggle()} />
+ <div className="flex items-center gap-2">
+ <CustomSwitch labelClickable={false} showLabel={false} checked={state.enabled} disabled={state.loading || busy || !state.supported || !state.configured} isLoading={busy} label="اعلان‌های پوش این مرورگر" onChange={() => void toggle()} />
+ <span>اعلان‌های پوش این مرورگر</span>
+ </div>
  {!state.supported ? <div>مرورگر یا اتصال فعلی از پوش پشتیبانی نمی‌کند.</div> : !state.configured ? <div>پوش هنوز توسط مدیر سایت پیکربندی نشده است.</div> : null}
  {error ? <div role="alert">{error}</div> : null}
  </div></Loading>;

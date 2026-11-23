@@ -18,6 +18,8 @@ type CustomSwitchProps = {
   shadow?: keyof typeof shadowVariants;
   customColor?: string;
   label?: string;
+  showLabel?: boolean;
+  labelClickable?: boolean;
   loading?: LoadingVariant;
   isLoading?: boolean;
   loadingText?: string;
@@ -35,6 +37,8 @@ export function CustomSwitch({
   shadow = "none",
   customColor,
   label,
+  showLabel = true,
+  labelClickable = true,
   loading = "spinner",
   isLoading = false,
   loadingText,
@@ -45,9 +49,10 @@ export function CustomSwitch({
   const switchBackgroundColor = resolveGlassBackground(checked ? switchColor : "var(--neutral)", checked ? 86 : 72);
   const borderColor = resolvedCustomColor ? strengthenBorderColor(resolvedCustomColor) : colorStyle.borderColor;
   const isDisabled = disabled || isLoading;
+  const Wrapper = labelClickable ? "label" : "div";
 
   return (
-    <label className="inline-flex items-center gap-2">
+    <Wrapper className="inline-flex items-center gap-2">
       <CustomActionButton
         type="button"
         role="switch"
@@ -57,7 +62,7 @@ export function CustomSwitch({
         onClick={() => onChange(!checked)}
         onMouseDown={(event) => event.preventDefault()}
         className={cx(
-          "relative h-7 w-12 select-none outline-none [-webkit-tap-highlight-color:transparent] focus:outline-none focus-visible:outline-none",
+          "relative h-7 w-12 shrink-0 select-none outline-none [-webkit-tap-highlight-color:transparent] focus:outline-none focus-visible:outline-none",
           radiusVariants[rounded],
           borderVariants[border],
           shadowVariants[shadow],
@@ -72,21 +77,21 @@ export function CustomSwitch({
         }}
       >
         {isLoading ? (
-          <span className="absolute inset-0 flex items-center justify-center">
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <Loading loading={loading} size={size} />
           </span>
         ) : (
           <span
             className={cx(
-              "absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white",
+              "pointer-events-none absolute top-1/2 h-5 w-5 -translate-y-1/2 rounded-full bg-white",
               motionVariants.smooth,
               checked ? "left-6" : "left-0.5"
             )}
           />
         )}
       </CustomActionButton>
-      {label && <span>{label}</span>}
+      {showLabel && label && <span>{label}</span>}
       {isLoading && loadingText && <span className="text-sm text-secondary-text">{loadingText}</span>}
-    </label>
+    </Wrapper>
   );
 }

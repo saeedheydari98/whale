@@ -4,7 +4,7 @@ self.addEventListener("push", event => {
  event.waitUntil((async () => {
  await self.registration.showNotification(data.title || "اعلان جدید", {
  body: data.body || "یک پیام جدید در حساب کاربری دارید.", tag: data.id,
- icon: "/icon", lang: "fa", dir: "rtl", data: { id: data.id, url: data.url || "/panel/user" },
+ icon: "/icon", lang: "fa", dir: "rtl", data: { id: data.id, url: data.url || "/" },
  });
  const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
  for (const client of clients) client.postMessage({ type: "notification-received" });
@@ -12,9 +12,9 @@ self.addEventListener("push", event => {
 });
 self.addEventListener("notificationclick", event => {
  event.notification.close();
- let url = new URL("/panel/user", self.location.origin);
- try { url = new URL(event.notification.data?.url || "/panel/user", self.location.origin); } catch {}
- const target = url.origin === self.location.origin ? url.href : new URL("/panel/user", self.location.origin).href;
+ let url = new URL("/", self.location.origin);
+ try { url = new URL(event.notification.data?.url || "/", self.location.origin); } catch {}
+ const target = url.origin === self.location.origin ? url.href : new URL("/", self.location.origin).href;
  const markRead = typeof event.notification.data?.id === "string" && event.notification.data.id
  ? fetch("/api/user/notifications", { method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: event.notification.data.id }) }).catch(() => undefined)
  : Promise.resolve();

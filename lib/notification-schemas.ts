@@ -1,7 +1,7 @@
 import { z } from "zod";
 export const ruleSchema = z.object({
  name: z.string().trim().min(1).max(100), title: z.string().trim().min(1).max(100), body: z.string().trim().min(1).max(1000),
- url: z.string().max(500).refine(v => v.startsWith("/") && !v.startsWith("//") && !/[\\\r\n]/.test(v)).default("/panel/user"),
+ url: z.string().max(500).refine(v => v.startsWith("/") && !v.startsWith("//") && !/[\\\r\n]/.test(v)).default("/"),
  audienceType: z.enum(["all", "selected", "new_users", "purchase_count", "purchase_amount", "no_purchase"]),
  minimumValue: z.number().int().min(1).max(2000000000).default(1), lookbackDays: z.number().int().min(1).max(3650).default(30),
  userIds: z.array(z.number().int().positive()).max(1000).default([]),
