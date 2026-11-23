@@ -5,6 +5,7 @@ import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collect
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { CustomTabs } from "@/app/design-system/components/ui/tabs";
+import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { invalidateFetchCache } from "@/lib/fetch-json";
 import { USER_STRUCTURE_URL } from "@/lib/user-structure";
 import { CustomInput } from "@/app/design-system/components/ui/input";
@@ -28,6 +29,14 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  const queryClient = useQueryClient();
  const [message, setMessage] = useState("");
  const [busy, setBusy] = useState(false);
+ const [openMessageId, setOpenMessageId] = useState<string | null>(null);
+ const [newMessageIds, setNewMessageIds] = useState<string[]>([]);
+ const arrivingMessageIds = admin ? [] : page.items.filter(item => !item.readAt && !newMessageIds.includes(item.id)).map(item => item.id);
+ if (arrivingMessageIds.length > 0) {
+   // Retain the arrival state after the automatic read acknowledgement refreshes data.
+   setNewMessageIds([...newMessageIds, ...arrivingMessageIds]);
+   if (newMessageIds.length === 0 || arrivingMessageIds.includes(page.items[0]?.id)) setOpenMessageId(arrivingMessageIds[0]);
+ }
  const [pendingSend, setPendingSend] = useState<{ id: string; body: string } | null>(null);
  const unreadIds = JSON.stringify(admin ? [] : page.items.filter(item => !item.readAt).slice(0, 100).map(item => item.id));
  useEffect(() => {
@@ -90,16 +99,24 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  catch (e) { setMessage(e instanceof Error ? e.message : "عملیات انجام نشد."); }
  finally { setBusy(false); }
  };
- const row = (item: Entry) => <div className="flex flex-col gap-3 rounded-xl border border-primary-border bg-primary-card p-4 text-primary-text">
- <AppHeading level={3} className="text-base font-bold">{item.name || item.title}</AppHeading>
- {admin ? <span>{item.title}</span> : null}
- <div className="whitespace-pre-wrap break-words text-sm">{item.body}</div>
- {admin ? <div className="flex flex-wrap gap-2">
- <span>{item._count?.notifications ?? 0} گیرنده · {item.active ? "فعال" : "متوقف"}</span>
- </div> : <div className="flex flex-wrap gap-2">
- <span>{item.readAt ? "خوانده‌شده" : "خوانده‌نشده"}</span>
+ const row = (item: Entry) => <CustomAccordion
+ title={openMessageId === item.id ? "بستن پیام" : "متن پیام"}
+ open={openMessageId === item.id}
+ onOpenChange={open => setOpenMessageId(open ? item.id : null)}
+ showStatusLabel={false}
+ className="text-primary-text"
+ heading={<div className="flex min-w-0 flex-col gap-1 p-2">
+   <div className="flex min-w-0 items-center gap-2">
+     <AppHeading level={3} className="truncate text-sm font-medium">{item.name || item.title}</AppHeading>
+     {!admin && newMessageIds.includes(item.id) ? <span className="shrink-0 rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px] font-medium text-primary">جدید</span> : null}
+   </div>
+   <span className="text-xs text-secondary-text">{admin ? `${(item._count?.notifications ?? 0).toLocaleString("fa-IR")} گیرنده` : item.readAt ? "خوانده‌شده" : "خوانده‌نشده"}</span>
  </div>}
- </div>;
+ contentClassName="p-2"
+ >
+ {admin && item.name && item.name !== item.title ? <div className="text-sm font-medium">{item.title}</div> : null}
+ <div className="whitespace-pre-wrap break-words text-sm leading-7 text-secondary-text">{item.body}</div>
+ </CustomAccordion>;
  return <section className="flex flex-col gap-4">
  {admin ? <CustomTabs items={([
    { id: "individual", label: "ارسال فردی" },
@@ -128,8 +145,9 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  <CustomButton type="submit" disabled={busy || (view === "individual" && selected.length === 0)} isLoading={busy}>{view === "individual" ? "ارسال اعلان" : "ساخت و ارسال اعلان"}</CustomButton>
  </form> : <PushSettings />}
  {message || page.error ? <div role="status" className="text-sm text-primary-text">{message || page.error}</div> : null}
+ <AppHeading level={2} className="text-sm font-semibold text-primary-text">{admin ? "پیام‌های ارسال‌شده" : "پیام‌های دریافتی"}</AppHeading>
  {!page.loading && page.total === 0 ? <div className="text-secondary-text">هنوز موردی ثبت نشده است.</div> : null}
- <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} getKey={item => item.id} lazy className="flex flex-col gap-3" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />
+ <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} onCapacityChange={openMessageId === null ? page.collectionProps.onCapacityChange : undefined} getKey={item => item.id} lazy className="flex flex-col gap-2" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />
  </section>;
 }
 

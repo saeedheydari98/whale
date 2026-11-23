@@ -83,6 +83,14 @@ try {
  const after=await heading.boundingBox();
  assert.ok(before && after,"Loaded notification remains visible after read-state refresh");
  assert.ok(Math.abs(before.y-after.y)<1,"Stable loaded geometry");
+ const messageBody=page.getByText("Notification body",{exact:true});
+ await page.getByText("جدید",{exact:true}).first().waitFor();
+ await messageBody.first().waitFor({state:"visible"});
+ assert.equal(await messageBody.count(),1,"Newest unread message opens automatically and stays open after read acknowledgement");
+ await page.getByRole("button",{name:"بستن پیام",exact:true}).click();
+ assert.equal(await messageBody.count(),0,"Message collapses again");
+ await page.waitForTimeout(300);
+ assert.equal(await messageBody.count(),0,"Manually closed new message stays closed");
  }
  await context.close();
  console.log("PASS: notification inbox",width,count);
