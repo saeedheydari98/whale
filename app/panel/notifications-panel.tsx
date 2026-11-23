@@ -15,7 +15,7 @@ import { AdminUsersPanel, type AdminUser } from "@/app/panel/admin/admin-users-p
 
 type Entry = { id: string; name?: string; title: string; body: string; url: string; active?: boolean; readAt?: string | null; createdAt?: string; _count?: { notifications: number } };
 const empty: Entry = { id: "", title: "عنوان اعلان", body: "متن پیام", url: "/panel/user" };
-const audiences = [["all","همه کاربران"],["selected","افراد انتخابی"],["new_users","کاربران جدید"],["purchase_count","حداقل تعداد خرید"],["purchase_amount","حداقل مبلغ خرید"],["no_purchase","بدون خرید در بازه"]] as const;
+const audiences = [["all","همه کاربران"],["new_users","کاربران جدید"],["purchase_count","حداقل تعداد خرید"],["purchase_amount","حداقل مبلغ خرید"],["no_purchase","بدون خرید در بازه"]] as const;
 async function request(url: string, method = "GET", body?: unknown) {
  const response = await fetch(url, { method, headers: { "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
  const json = await response.json();
@@ -44,11 +44,21 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
    return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshInbox); };
  }, [admin, endpoint, queryClient]);
  const [draft, setDraft] = useState({ name: "", title: "", body: "", url: "/panel/user", audienceType: "all", minimumValue: 1, lookbackDays: 30 });
+ const [view, setView] = useState<"individual" | "create">("individual");
  const [selected, setSelected] = useState<AdminUser[]>([]);
  const refresh = async () => { invalidateFetchCache(USER_STRUCTURE_URL); await queryClient.invalidateQueries({ queryKey: ["user-structure"] }); await queryClient.invalidateQueries({ queryKey: ["admin-list", endpoint] }); await page.refresh(); };
- const mutate = async (method: string, body: unknown) => {
+ const mutate = async (method: string, body: unknown, send = false) => {
  setBusy(true); setMessage("");
- try { const result = await request(endpoint, method, body); setMessage(result.created !== undefined ? `${result.created} اعلان جدید در صندوق کاربران ثبت شد.` : "ذخیره شد."); await refresh(); }
+ try { let result = await request(endpoint, method, body);
+ if (send) {
+   try { result = await request(endpoint, "PATCH", { id: result.rule.id, action: "run" }); }
+   catch (error) {
+     setMessage(`اعلان ذخیره شد اما ارسال کامل نشد. از دکمه ارسال اعلان در فهرست پایین دوباره تلاش کنید. ${error instanceof Error ? error.message : ""}`);
+     await refresh();
+     return;
+   }
+ }
+ setMessage(result.created !== undefined ? `${result.created} اعلان جدید در صندوق کاربران ثبت شد.` : "ذخیره شد."); await refresh(); }
  catch (e) { setMessage(e instanceof Error ? e.message : "عملیات انجام نشد."); }
  finally { setBusy(false); }
  };
@@ -58,8 +68,8 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  <div className="whitespace-pre-wrap break-words text-sm">{item.body}</div>
  {admin ? <div className="flex flex-wrap gap-2">
  <span>{item._count?.notifications ?? 0} گیرنده · {item.active ? "فعال" : "متوقف"}</span>
- <CustomButton disabled={busy || !item.active} onClick={() => setConfirmId(item.id)}>اجرای قانون و ارسال</CustomButton>
- <CustomSwitch checked={!!item.active} disabled={busy} label="فعال بودن قانون اعلان" onChange={active => void mutate("PATCH", { id: item.id, action: "toggle", active })} />
+ <CustomButton disabled={busy || !item.active} onClick={() => setConfirmId(item.id)}>ارسال اعلان</CustomButton>
+ <CustomSwitch checked={!!item.active} disabled={busy} label="فعال بودن اعلان" onChange={active => void mutate("PATCH", { id: item.id, action: "toggle", active })} />
  </div> : <div className="flex flex-wrap gap-2">
  <span>{item.readAt ? "خوانده‌شده" : "خوانده‌نشده"}</span>
  <CustomButton href={item.url} variant="neutral">مشاهده مقصد</CustomButton>
@@ -67,26 +77,37 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  </div>}
  </div>;
  return <section className="flex flex-col gap-4">
- <AppHeading level={2} className="text-lg font-bold text-primary-text">{admin ? "قوانین و ارسال اعلان" : "اعلان‌ها"}</AppHeading>
- {admin ? <form className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); void mutate("POST", { ...draft, userIds: selected.map(u => u.id) }); }}>
- <div className="text-sm text-secondary-text">قانون را ذخیره کنید، سپس با «اجرای قانون و ارسال» ارسال کنید. هر قانون برای هر کاربر فقط یک بار اجرا می‌شود. بازه خرید بر اساس سفارش‌های پرداخت‌شده است.</div>
- <CustomInput label="نام قانون" value={draft.name} required maxLength={100} onChange={e => setDraft({ ...draft, name: e.target.value })} />
- <CustomInput label="عنوان اعلان" value={draft.title} required maxLength={100} onChange={e => setDraft({ ...draft, title: e.target.value })} />
- <CustomInput label="متن اعلان" multiline value={draft.body} required maxLength={1000} onChange={e => setDraft({ ...draft, body: e.target.value })} />
- <CustomInput label="مسیر مقصد داخل سایت" value={draft.url} required onChange={e => setDraft({ ...draft, url: e.target.value })} />
- <CustomTabs items={audiences.map(([id,label]) => ({ id, label }))} value={draft.audienceType} onChange={id => setDraft({ ...draft, audienceType: id })} ariaLabel="مخاطبان اعلان" />
- {!["all","selected"].includes(draft.audienceType) ? <CustomInput label="بازه بررسی (روز)" type="number" min={1} max={3650} value={draft.lookbackDays} onChange={e => setDraft({ ...draft, lookbackDays: Number(e.target.value) })} /> : null}
- {draft.audienceType.startsWith("purchase_") ? <CustomInput label={draft.audienceType === "purchase_count" ? "حداقل تعداد خرید" : "حداقل مبلغ خرید (تومان)"} type="number" min={1} value={draft.minimumValue} onChange={e => setDraft({ ...draft, minimumValue: Number(e.target.value) })} /> : null}
- {draft.audienceType === "selected" ? <div className="flex flex-col gap-3"><div className="flex flex-wrap gap-2">{selected.map(u => <CustomButton key={u.id} type="button" variant="neutral" onClick={() => setSelected(selected.filter(s => s.id !== u.id))}>{u.name || u.username || u.email} ×</CustomButton>)}</div>
- <AdminUsersPanel totalCount={usersCount} onSelectUser={u => setSelected(current => current.some(s => s.id === u.id) ? current : [...current,u])} canSelectUser={u => !selected.some(s => s.id === u.id)} />
- </div> : null}
- <CustomButton type="submit" disabled={busy} isLoading={busy}>ذخیره قانون</CustomButton>
+ {admin ? <CustomTabs items={([
+   { id: "individual", label: "ارسال فردی" },
+   { id: "create", label: "ساخت اعلان" },
+ ] as const)} value={view} onChange={setView} disabled={busy} variant="secondary" ariaLabel="روش ارسال اعلان" /> : null}
+ {admin && view === "create" ? <CustomTabs items={audiences.map(([id,label]) => ({ id, label }))} value={draft.audienceType} onChange={id => setDraft({ ...draft, audienceType: id })} disabled={busy} ariaLabel="مخاطبان اعلان" /> : null}
+ <AppHeading level={2} className="text-lg font-bold text-primary-text">{admin ? view === "individual" ? "ارسال به افراد منتخب" : "ساخت اعلان" : "اعلان‌ها"}</AppHeading>
+ {admin ? <form className="flex flex-col gap-4" onSubmit={e => {
+   e.preventDefault();
+   if (busy || (view === "individual" && selected.length === 0)) return;
+   void mutate("POST", { ...draft, name: view === "individual" ? draft.title : draft.name, audienceType: view === "individual" ? "selected" : draft.audienceType, userIds: view === "individual" ? selected.map(u => u.id) : [] }, true);
+ }}>
+ <div className="text-sm text-secondary-text">{view === "individual" ? "گیرندگان را انتخاب کنید و پس از نوشتن متن، دکمه ارسال اعلان را بزنید." : "مخاطبان را مشخص کنید و پس از نوشتن متن، اعلان را بسازید و ارسال کنید. هر اعلان برای هر کاربر فقط یک بار ارسال می‌شود. بازه خرید بر اساس سفارش‌های پرداخت‌شده است."}</div>
+ {view === "individual" ? <div className="flex flex-col gap-3">
+ <div className="flex flex-wrap gap-2">{selected.map(u => <CustomButton key={u.id} type="button" variant="neutral" disabled={busy} onClick={() => setSelected(current => current.filter(s => s.id !== u.id))}>{u.name || u.username || u.email} ×</CustomButton>)}</div>
+ <AdminUsersPanel totalCount={usersCount} onSelectUser={u => { if (!busy) setSelected(current => current.some(s => s.id === u.id) ? current : [...current,u]); }} canSelectUser={u => !busy && !selected.some(s => s.id === u.id)} />
+ <div className="text-sm text-secondary-text">{selected.length === 0 ? "حداقل یک گیرنده انتخاب کنید." : `${selected.length.toLocaleString("fa-IR")} گیرنده انتخاب شده است.`}</div>
+ </div> : <>
+ <CustomInput label="نام اعلان" value={draft.name} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, name: e.target.value })} />
+ {draft.audienceType !== "all" ? <CustomInput label="بازه بررسی (روز)" type="number" min={1} max={3650} value={draft.lookbackDays} disabled={busy} onChange={e => setDraft({ ...draft, lookbackDays: Number(e.target.value) })} /> : null}
+ {draft.audienceType.startsWith("purchase_") ? <CustomInput label={draft.audienceType === "purchase_count" ? "حداقل تعداد خرید" : "حداقل مبلغ خرید (تومان)"} type="number" min={1} value={draft.minimumValue} disabled={busy} onChange={e => setDraft({ ...draft, minimumValue: Number(e.target.value) })} /> : null}
+ </>}
+ <CustomInput label="مسیر مقصد داخل سایت" value={draft.url} required maxLength={500} disabled={busy} onChange={e => setDraft({ ...draft, url: e.target.value })} />
+ <CustomInput label="عنوان اعلان" value={draft.title} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, title: e.target.value })} />
+ <CustomInput label="متن اعلان" multiline value={draft.body} required maxLength={1000} disabled={busy} onChange={e => setDraft({ ...draft, body: e.target.value })} />
+ <CustomButton type="submit" disabled={busy || (view === "individual" && selected.length === 0)} isLoading={busy}>{view === "individual" ? "ارسال اعلان" : "ساخت و ارسال اعلان"}</CustomButton>
  </form> : <><PushSettings /><CustomButton disabled={busy} variant="neutral" onClick={() => void mutate("PATCH", {})}>خواندن همه اعلان‌ها</CustomButton></>}
  {message || page.error ? <div role="status" className="text-sm text-primary-text">{message || page.error}</div> : null}
  {!page.loading && page.total === 0 ? <div className="text-secondary-text">هنوز موردی ثبت نشده است.</div> : null}
  <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} getKey={item => item.id} lazy className="flex flex-col gap-3" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />
  <CustomModal open={confirmId !== null} onClose={() => setConfirmId(null)} title="تأیید ارسال اعلان">
- <div className="flex flex-col gap-4"><div>این اعلان برای تمام کاربران واجد شرایط این قانون ثبت شود؟ کاربران دریافت‌کننده قبلی دوباره پیام نمی‌گیرند.</div>
+ <div className="flex flex-col gap-4"><div>این اعلان برای تمام مخاطبان آن ثبت شود؟ کاربران دریافت‌کننده قبلی دوباره پیام نمی‌گیرند.</div>
  <CustomButton disabled={busy} onClick={() => { const id = confirmId; setConfirmId(null); if (id) void mutate("PATCH", { id, action: "run" }); }}>تأیید و ارسال</CustomButton></div>
  </CustomModal>
  </section>;
