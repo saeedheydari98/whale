@@ -283,7 +283,7 @@ export default function UserPanelPage() {
         <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل کاربری" />
         {activeTab === "profile" ? <UserProfilePanel onCompleted={handleProfileCompleted} /> : null}
         {activeTab === "orders" ? <UserOrdersPanel totalCount={isLoggedIn ? structure?.orders : 0} /> : null}
-        {activeTab === "notifications" ? <NotificationsPanel /> : null}
+        {activeTab === "notifications" ? <NotificationsPanel unreadCount={structure?.unreadNotifications} /> : null}
         {activeTab === "discounts" ? <UserDiscountsPanel totalCount={isLoggedIn ? structure?.discounts : 0} /> : null}
         {activeTab === "wallet" ? <UserWalletPanel totalCount={isLoggedIn ? structure?.walletTransactions : 0} /> : null}
       </div>

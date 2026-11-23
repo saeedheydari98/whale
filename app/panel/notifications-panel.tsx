@@ -24,7 +24,7 @@ async function request(url: string, method = "GET", body?: unknown) {
  return json.data;
 }
 
-export function NotificationsPanel({ admin = false, usersCount }: { admin?: boolean; usersCount?: number }) {
+export function NotificationsPanel({ admin = false, usersCount, unreadCount = 0 }: { admin?: boolean; usersCount?: number; unreadCount?: number }) {
  const endpoint = admin ? "/api/admin/notifications" : "/api/user/notifications";
  const [messagesOpen, setMessagesOpen] = useState(false);
  const page = useStructurePagedCollection<Entry>({ endpoint, structureEndpoint: endpoint + "?structure=1", itemKey: "items", enabled: messagesOpen });
@@ -141,7 +141,7 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  </form> : <PushSettings />}
  {message || page.error ? <div role="status" className="text-sm text-primary-text">{message || page.error}</div> : null}
  <CustomAccordion title={messagesOpen ? "بستن پیام‌ها" : "نمایش پیام‌ها"} open={messagesOpen} onOpenChange={setMessagesOpen} showStatusLabel={false}
- heading={<AppHeading level={2} className="p-2 text-sm font-semibold text-primary-text">{admin ? "پیام‌های ارسال‌شده" : "پیام‌های دریافتی"}</AppHeading>} contentClassName="p-2">
+ heading={<div className="flex flex-wrap items-center gap-2 p-2"><AppHeading level={2} className="text-sm font-semibold text-primary-text">{admin ? "پیام‌های ارسال‌شده" : "پیام‌های دریافتی"}</AppHeading>{!admin && unreadCount > 0 ? <span role="status" className="rounded-full bg-primary-soft p-1 text-xs font-medium text-primary">{unreadCount.toLocaleString("fa-IR")} پیام جدید</span> : null}</div>} contentClassName="p-2">
  {!page.loading && page.total === 0 ? <div className="text-secondary-text">هنوز موردی ثبت نشده است.</div> : null}
  <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} getKey={item => item.id} lazy className="flex flex-col gap-2" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />
  </CustomAccordion>
@@ -163,17 +163,6 @@ function PushSettings() {
  } catch (e) { setError(e instanceof Error ? e.message : "دریافت تنظیمات انجام نشد."); setState(s => ({ ...s, loading: false })); }
  }
  useEffect(() => { void load(); const visible = () => { if (!document.hidden) void load(); }; window.addEventListener("focus", visible); document.addEventListener("visibilitychange", visible); return () => { window.removeEventListener("focus", visible); document.removeEventListener("visibilitychange", visible); }; }, []);
- async function testPush() {
- setBusy(true); setError(""); setNotice("");
- try {
- const reg = await navigator.serviceWorker.getRegistration("/");
- const sub = await reg?.pushManager.getSubscription();
- if (!sub) throw new Error("ابتدا اعلان‌های این مرورگر را فعال کنید.");
- await request("/api/user/push", "PATCH", { endpoint: sub.endpoint });
- setNotice("سرویس پوش پیام آزمایشی را پذیرفت. اگر روی صفحه ظاهر نشد، مجوز اعلان مرورگر در سیستم‌عامل و حالت مزاحم نشوید را بررسی کنید.");
- } catch (e) { setError(e instanceof Error ? e.message : "آزمایش اعلان انجام نشد."); await load(); }
- finally { setBusy(false); }
- }
  async function toggle() {
  setBusy(true); setError(""); setNotice("");
  try {
@@ -200,7 +189,7 @@ function PushSettings() {
  }
  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
  await request("/api/user/push", "POST", sub.toJSON());
- setNotice("اعلان‌های این مرورگر فعال شد. با «آزمایش اعلان مرورگر» دریافت روی صفحه را بررسی کنید.");
+ setNotice("اعلان‌های این مرورگر فعال شد. پیام‌های مدیر به صورت اعلان مرورگر نمایش داده می‌شوند.");
  }
  await load();
  } catch (e) { setError(e instanceof Error ? e.message : "عملیات انجام نشد."); }
@@ -212,7 +201,6 @@ function PushSettings() {
  <CustomSwitch labelClickable={false} showLabel={false} checked={state.enabled} disabled={state.loading || busy || !state.supported || !state.configured} isLoading={busy} label="اعلان‌های پوش این مرورگر" onChange={() => void toggle()} />
  <span>اعلان‌های پوش این مرورگر</span>
  </div>
- {state.enabled ? <CustomButton type="button" variant="neutral" disabled={busy} isLoading={busy} onClick={() => void testPush()}>آزمایش اعلان مرورگر</CustomButton> : null}
  {!state.supported ? <div>مرورگر یا اتصال فعلی از پوش پشتیبانی نمی‌کند.</div> : !state.configured ? <div>پوش هنوز توسط مدیر سایت پیکربندی نشده است.</div> : null}
  {error ? <div role="alert">{error}</div> : null}
  {notice ? <div role="status" className="text-sm text-secondary-text">{notice}</div> : null}

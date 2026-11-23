@@ -69,7 +69,8 @@ console.log("PASS: push rendering, deduplication tag and same-origin click desti
 let attempted=false, failDispatch=false;
 const adminRoute=load("app/api/admin/notifications/route.ts",{
  "next/server":{after:()=>{}},
- "@/lib/notifications/dispatch.mjs":{dispatchNotifications:async()=>{attempted=true;if(failDispatch)throw new Error("offline");return {processed:1};}},
+ "@/lib/notifications/dispatch.mjs":{dispatchNotifications:async(_db,_budget,options)=>{assert.equal(options.ruleId,"rule");assert.equal(options.config.publicKey,"public");attempted=true;if(failDispatch)throw new Error("offline");return {processed:1};}},
+ "@/lib/env":{pushConfiguration:()=>({publicKey:"public",privateKey:"private",subject:"mailto:test@example.com"})},
  "@/lib/prisma":{prisma:{pushDelivery:{count:async({where})=>where.status?0:1}}},
  "@/lib/api/auth":{requireAdmin:async()=>({ok:true,user:{id:1}})},
  "@/lib/api/rate-limit":{rateLimit:()=>null},
@@ -112,4 +113,30 @@ pushCode=403;
 assert.equal((await pushRoute.PATCH(runRequest)).status,502);
 assert.equal((await pushRoute.PATCH({method:"PATCH",url:"https://shop.example/api/user/push",headers:{get:()=>"https://evil.example"}})).status,403);
 console.log("PASS: browser test delivery, account ownership, expired subscription, VAPID failure and origin restriction");
+
+let liveEnabled = true, liveQueries = 0;
+const liveRoute = load("app/api/user/push/live/route.ts", {
+ "@/lib/prisma": {prisma:{
+   pushSubscription:{findFirst:async({where})=>{assert.equal(where.userId,1);return liveEnabled ? {id:"own-device"} : null;}},
+   pushDelivery:{findMany:async options=>{
+     liveQueries++;
+     assert.equal(options.where.subscriptionId,"own-device");
+     assert.equal(options.where.notification.userId,1);
+     assert.equal(options.take,20);
+     return [{id:"job1",notification:{id:"n1",title:"Native",body:"Message",url:"/"}}];
+   }},
+ }},
+ "@/lib/api/auth":{requireUser:async()=>({ok:true,user:{id:1}})},
+ "@/lib/api/rate-limit":{rateLimit:()=>null},
+ "@/lib/api/response":{apiOk:data=>data,apiServerError:()=>({error:true})},
+ "@/lib/api/validation":{validationError:()=>({invalid:true})},
+ "@/lib/notification-schemas":{endpointSchema},
+});
+const liveRequest={url:"https://shop.example/api/user/push/live?endpoint="+encodeURIComponent("https://fcm.googleapis.com/test")};
+assert.equal((await liveRoute.GET(liveRequest)).items[0].id,"n1");
+liveEnabled=false;
+assert.equal((await liveRoute.GET(liveRequest)).enabled,false);
+assert.equal(liveQueries,1,"Disabled or foreign subscriptions cannot read the live delivery feed");
+assert.equal((await liveRoute.GET({url:"https://shop.example/api/user/push/live?endpoint=https://evil.example"})).invalid,true);
+console.log("PASS: native notification feed is bounded and restricted to the account's enabled browser");
 

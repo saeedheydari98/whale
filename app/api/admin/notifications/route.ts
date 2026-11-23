@@ -1,5 +1,6 @@
 import { after } from "next/server";
 import { dispatchNotifications } from "@/lib/notifications/dispatch.mjs";
+import { pushConfiguration } from "@/lib/env";
 export const maxDuration = 300;
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, requireUser } from "@/lib/api/auth";
@@ -38,7 +39,7 @@ export async function PATCH(request: Request) {
    let pushWarning = "";
    try {
      // Attempt delivery before returning; background work alone can leave jobs untouched.
-     await dispatchNotifications(prisma, 10000);
+     await dispatchNotifications(prisma, 20000, { ruleId: id, config: pushConfiguration() });
      const [subscriptions, outstanding] = await Promise.all([
        prisma.pushDelivery.count({ where: { notification: { ruleId: id } } }),
        prisma.pushDelivery.count({ where: { notification: { ruleId: id }, status: { not: "accepted" } } }),
@@ -49,7 +50,7 @@ export async function PATCH(request: Request) {
      pushWarning = "اعلان در صندوق ثبت شد، اما ارسال پوش انجام نشد؛ اتصال و تنظیمات سرویس ارسال باید بررسی شود.";
      console.error("Notification dispatch failed; retained for retry.");
    }
-   after(async () => { try { await dispatchNotifications(prisma, 40000); } catch { console.error("Notification dispatch retry failed."); } });
+   after(async () => { try { await dispatchNotifications(prisma, 40000, { ruleId: id, config: pushConfiguration() }); } catch { console.error("Notification dispatch retry failed."); } });
    return apiOk({ ...result, pushWarning });
  }
  return apiOk({ rule: await prisma.notificationRule.update({ where: { id }, data: { active: active ?? false } }) });

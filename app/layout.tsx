@@ -11,6 +11,7 @@ import { AppOverflowTooltip } from "./design-system/components/ui/overflow-toolt
 import { ProductsCatalogProvider } from "@/lib/products-catalog-context";
 import { CatalogQueryProvider } from "@/lib/catalog-query-provider";
 import { AppUserProvider } from "@/lib/app-user-context";
+import { BrowserNotificationReceiver } from "@/lib/browser-notification-receiver";
 import { AppThemeProvider } from "@/lib/app-theme-provider";
 import { createTheme, resolveColor } from "./design-system/theme/theme";
 import { generateCSSVariables } from "./design-system/theme/css-vars";
@@ -170,6 +171,7 @@ export default function RootLayout({
           <AppUserProvider>
             <AppNotificationProvider>
               <CatalogQueryProvider>
+                <BrowserNotificationReceiver />
                 <ProductsCatalogProvider>
                   <div data-app-shell className="flex h-[100dvh] min-h-0 flex-col overflow-hidden bg-primary-base text-primary-text">
                     <div data-app-scroll-container className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
