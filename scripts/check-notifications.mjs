@@ -87,3 +87,29 @@ assert.equal(offlineResult.created,1,"A push error must preserve the inbox resul
 assert.ok(offlineResult.pushWarning,"Do not report push failure as unconditional success");
 console.log("PASS: synchronous initial push attempt and visible delivery failure");
 
+let pushOwner = 1, pushCode = 0, testSends = 0, deletedSubscription = false;
+const pushRoute = load("app/api/user/push/route.ts", {
+ "@/lib/prisma": { prisma: { pushSubscription: {
+   findFirst: async ({where}) => where.userId === pushOwner ? {id:"device", endpoint:where.endpoint,p256dh:"key",auth:"auth"} : null,
+   deleteMany: async ({where}) => { assert.equal(where.userId,1); deletedSubscription = true; },
+ } } },
+ "@/lib/api/auth": {requireUser:async()=>({ok:true,user:{id:1}})},
+ "@/lib/api/rate-limit": {rateLimit:()=>null},
+ "@/lib/api/response": {apiOk:data=>data,apiFail:(message,status)=>({message,status}),apiServerError:()=>({status:500})},
+ "@/lib/api/validation": {parseJsonBody:async()=>({ok:true,data:{endpoint:"https://fcm.googleapis.com/test"}})},
+ "@/lib/notification-schemas": {endpointSchema},
+ "@/lib/env": {pushConfiguration:()=>({publicKey:"public",privateKey:"private",subject:"mailto:test@example.com"})},
+ "@/lib/notifications/test-push.mjs": {sendTestPush:async()=>{testSends++;if(pushCode)throw {statusCode:pushCode};}},
+});
+assert.equal((await pushRoute.PATCH(runRequest)).accepted,true);
+pushOwner=2;
+assert.equal((await pushRoute.PATCH(runRequest)).status,404);
+assert.equal(testSends,1,"Cannot send test notifications to another account's browser");
+pushOwner=1;pushCode=410;
+assert.equal((await pushRoute.PATCH(runRequest)).status,410);
+assert.equal(deletedSubscription,true);
+pushCode=403;
+assert.equal((await pushRoute.PATCH(runRequest)).status,502);
+assert.equal((await pushRoute.PATCH({method:"PATCH",url:"https://shop.example/api/user/push",headers:{get:()=>"https://evil.example"}})).status,403);
+console.log("PASS: browser test delivery, account ownership, expired subscription, VAPID failure and origin restriction");
+

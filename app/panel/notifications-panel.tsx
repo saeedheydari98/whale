@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useAppUser } from "@/lib/app-user-context";
 import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomSwitch } from "@/app/design-system/components/ui/switch";
@@ -25,22 +26,23 @@ async function request(url: string, method = "GET", body?: unknown) {
 
 export function NotificationsPanel({ admin = false, usersCount }: { admin?: boolean; usersCount?: number }) {
  const endpoint = admin ? "/api/admin/notifications" : "/api/user/notifications";
- const page = useStructurePagedCollection<Entry>({ endpoint, structureEndpoint: endpoint + "?structure=1", itemKey: "items" });
+ const [messagesOpen, setMessagesOpen] = useState(false);
+ const page = useStructurePagedCollection<Entry>({ endpoint, structureEndpoint: endpoint + "?structure=1", itemKey: "items", enabled: messagesOpen });
  const queryClient = useQueryClient();
+ const { data: appUser } = useAppUser();
+ const accountId = appUser?.user?.id ?? "guest";
  const [message, setMessage] = useState("");
  const [busy, setBusy] = useState(false);
- const [openMessageId, setOpenMessageId] = useState<string | null>(null);
  const [newMessageIds, setNewMessageIds] = useState<string[]>([]);
  const arrivingMessageIds = admin ? [] : page.items.filter(item => !item.readAt && !newMessageIds.includes(item.id)).map(item => item.id);
  if (arrivingMessageIds.length > 0) {
    // Retain the arrival state after the automatic read acknowledgement refreshes data.
    setNewMessageIds([...newMessageIds, ...arrivingMessageIds]);
-   if (newMessageIds.length === 0 || arrivingMessageIds.includes(page.items[0]?.id)) setOpenMessageId(arrivingMessageIds[0]);
  }
  const [pendingSend, setPendingSend] = useState<{ id: string; body: string } | null>(null);
  const unreadIds = JSON.stringify(admin ? [] : page.items.filter(item => !item.readAt).slice(0, 100).map(item => item.id));
  useEffect(() => {
-   if (admin || unreadIds === "[]") return;
+   if (admin || !messagesOpen || unreadIds === "[]") return;
    let stopped = false;
    let pending = false;
    const markRead = async () => {
@@ -49,12 +51,14 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
      try {
        await request(endpoint, "PATCH", { ids: JSON.parse(unreadIds) });
        if (stopped) return;
+       const acknowledged = new Set<string>(JSON.parse(unreadIds));
+       const readAt = new Date().toISOString();
+       queryClient.setQueriesData<InfiniteData<{ items: Entry[]; total: number; nextOffset: number | null }>>(
+         { queryKey: ["admin-list", endpoint], predicate: query => query.queryKey[4] === accountId },
+         current => current ? { ...current, pages: current.pages.map(batch => ({ ...batch, items: batch.items.map(item => acknowledged.has(item.id) ? { ...item, readAt: item.readAt || readAt } : item) })) } : current,
+       );
        invalidateFetchCache(USER_STRUCTURE_URL);
-       await Promise.all([
-         queryClient.invalidateQueries({ queryKey: ["user-structure"] }),
-         queryClient.invalidateQueries({ queryKey: ["collection-structure", endpoint + "?structure=1"] }),
-         queryClient.invalidateQueries({ queryKey: ["admin-list", endpoint] }),
-       ]);
+       await queryClient.invalidateQueries({ queryKey: ["user-structure"] });
      } catch {
        // Keep unread state and retry while the inbox is visible.
      } finally { pending = false; }
@@ -63,9 +67,9 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
    const timer = window.setInterval(() => void markRead(), 30000);
    document.addEventListener("visibilitychange", markRead);
    return () => { stopped = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", markRead); };
- }, [admin, endpoint, queryClient, unreadIds]);
+ }, [accountId, admin, endpoint, messagesOpen, queryClient, unreadIds]);
  useEffect(() => {
-   if (admin) return;
+   if (admin || !messagesOpen) return;
    const refreshInbox = () => {
      if (document.hidden) return;
      invalidateFetchCache(USER_STRUCTURE_URL);
@@ -78,7 +82,7 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
    const onPush = (event: MessageEvent) => { if (event.data?.type === "notification-received") refreshInbox(); };
    navigator.serviceWorker?.addEventListener("message", onPush);
    return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshInbox); navigator.serviceWorker?.removeEventListener("message", onPush); };
- }, [admin, endpoint, queryClient]);
+ }, [admin, endpoint, messagesOpen, queryClient]);
  const [draft, setDraft] = useState({ name: "", title: "", body: "", url: "/", audienceType: "all", minimumValue: 1, lookbackDays: 30 });
  const [view, setView] = useState<"individual" | "create">("individual");
  const [selected, setSelected] = useState<AdminUser[]>([]);
@@ -99,24 +103,15 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  catch (e) { setMessage(e instanceof Error ? e.message : "عملیات انجام نشد."); }
  finally { setBusy(false); }
  };
- const row = (item: Entry) => <CustomAccordion
- title={openMessageId === item.id ? "بستن پیام" : "متن پیام"}
- open={openMessageId === item.id}
- onOpenChange={open => setOpenMessageId(open ? item.id : null)}
- showStatusLabel={false}
- className="text-primary-text"
- heading={<div className="flex min-w-0 flex-col gap-1 p-2">
+ const row = (item: Entry) => <div className="flex min-w-0 flex-col gap-2 border-b border-primary-border p-2 text-primary-text">
    <div className="flex min-w-0 items-center gap-2">
-     <AppHeading level={3} className="truncate text-sm font-medium">{item.name || item.title}</AppHeading>
+     <AppHeading level={3} className="text-sm font-medium">{item.name || item.title}</AppHeading>
      {!admin && newMessageIds.includes(item.id) ? <span className="shrink-0 rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px] font-medium text-primary">جدید</span> : null}
    </div>
    <span className="text-xs text-secondary-text">{admin ? `${(item._count?.notifications ?? 0).toLocaleString("fa-IR")} گیرنده` : item.readAt ? "خوانده‌شده" : "خوانده‌نشده"}</span>
- </div>}
- contentClassName="p-2"
- >
  {admin && item.name && item.name !== item.title ? <div className="text-sm font-medium">{item.title}</div> : null}
  <div className="whitespace-pre-wrap break-words text-sm leading-7 text-secondary-text">{item.body}</div>
- </CustomAccordion>;
+ </div>;
  return <section className="flex flex-col gap-4">
  {admin ? <CustomTabs items={([
    { id: "individual", label: "ارسال فردی" },
@@ -145,15 +140,18 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  <CustomButton type="submit" disabled={busy || (view === "individual" && selected.length === 0)} isLoading={busy}>{view === "individual" ? "ارسال اعلان" : "ساخت و ارسال اعلان"}</CustomButton>
  </form> : <PushSettings />}
  {message || page.error ? <div role="status" className="text-sm text-primary-text">{message || page.error}</div> : null}
- <AppHeading level={2} className="text-sm font-semibold text-primary-text">{admin ? "پیام‌های ارسال‌شده" : "پیام‌های دریافتی"}</AppHeading>
+ <CustomAccordion title={messagesOpen ? "بستن پیام‌ها" : "نمایش پیام‌ها"} open={messagesOpen} onOpenChange={setMessagesOpen} showStatusLabel={false}
+ heading={<AppHeading level={2} className="p-2 text-sm font-semibold text-primary-text">{admin ? "پیام‌های ارسال‌شده" : "پیام‌های دریافتی"}</AppHeading>} contentClassName="p-2">
  {!page.loading && page.total === 0 ? <div className="text-secondary-text">هنوز موردی ثبت نشده است.</div> : null}
- <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} onCapacityChange={openMessageId === null ? page.collectionProps.onCapacityChange : undefined} getKey={item => item.id} lazy className="flex flex-col gap-2" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />
+ <DynamicLoadingCollection items={page.items} isLoading={page.loading && !page.error} {...page.collectionProps} getKey={item => item.id} lazy className="flex flex-col gap-2" renderItem={row} renderSkeleton={() => <Loading loading="skeleton-structure" isLoading>{row(empty)}</Loading>} />
+ </CustomAccordion>
  </section>;
 }
 
 function PushSettings() {
  const [state, setState] = useState({ loading: true, supported: false, enabled: false, configured: false });
  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+ const [notice, setNotice] = useState("");
  const supported = () => window.isSecureContext && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
  async function load() {
  if (!supported()) { setState({ loading: false, supported: false, enabled: false, configured: false }); return; }
@@ -164,24 +162,45 @@ function PushSettings() {
  setState({ loading: false, supported: true, configured: status.configured, enabled: !!subscription && status.enabled && Notification.permission === "granted" });
  } catch (e) { setError(e instanceof Error ? e.message : "دریافت تنظیمات انجام نشد."); setState(s => ({ ...s, loading: false })); }
  }
- useEffect(() => { void load(); const visible = () => { if (!document.hidden) void load(); }; window.addEventListener("focus", visible); return () => window.removeEventListener("focus", visible); }, []);
+ useEffect(() => { void load(); const visible = () => { if (!document.hidden) void load(); }; window.addEventListener("focus", visible); document.addEventListener("visibilitychange", visible); return () => { window.removeEventListener("focus", visible); document.removeEventListener("visibilitychange", visible); }; }, []);
+ async function testPush() {
+ setBusy(true); setError(""); setNotice("");
+ try {
+ const reg = await navigator.serviceWorker.getRegistration("/");
+ const sub = await reg?.pushManager.getSubscription();
+ if (!sub) throw new Error("ابتدا اعلان‌های این مرورگر را فعال کنید.");
+ await request("/api/user/push", "PATCH", { endpoint: sub.endpoint });
+ setNotice("سرویس پوش پیام آزمایشی را پذیرفت. اگر روی صفحه ظاهر نشد، مجوز اعلان مرورگر در سیستم‌عامل و حالت مزاحم نشوید را بررسی کنید.");
+ } catch (e) { setError(e instanceof Error ? e.message : "آزمایش اعلان انجام نشد."); await load(); }
+ finally { setBusy(false); }
+ }
  async function toggle() {
- setBusy(true); setError("");
+ setBusy(true); setError(""); setNotice("");
  try {
  if (state.enabled) {
  const reg = await navigator.serviceWorker.getRegistration("/");
  const subscription = await reg?.pushManager.getSubscription();
  if (subscription) { await request("/api/user/push", "DELETE", { endpoint: subscription.endpoint }); await subscription.unsubscribe(); }
  } else {
- const permission = await Notification.requestPermission();
+ const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
  if (permission !== "granted") throw new Error("مجوز اعلان را از تنظیمات مرورگر فعال کنید.");
  const config = await request("/api/user/push");
  if (!config.configured) throw new Error("پوش هنوز توسط مدیر سایت پیکربندی نشده است.");
  await navigator.serviceWorker.register("/notification-worker.js", { scope: "/" });
- const reg = await Promise.race([navigator.serviceWorker.ready, new Promise<never>((_, reject) => setTimeout(() => reject(new Error("سرویس اعلان آماده نشد.")),15000))]);
+ let timer: ReturnType<typeof setTimeout> | undefined;
+ const reg = await Promise.race([navigator.serviceWorker.ready, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("سرویس اعلان آماده نشد.")),15000); })]).finally(() => clearTimeout(timer));
  let sub = await reg.pushManager.getSubscription();
- if (!sub) { const key = config.publicKey.replace(/-/g,"+").replace(/_/g,"/"); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: Uint8Array.from(atob(key), c => c.charCodeAt(0)) }); }
+ const key = config.publicKey.replace(/-/g,"+").replace(/_/g,"/");
+ const applicationServerKey = Uint8Array.from(atob(key), c => c.charCodeAt(0));
+ const existingKey = sub?.options.applicationServerKey;
+ if (sub && (!existingKey || new Uint8Array(existingKey).length !== applicationServerKey.length || !new Uint8Array(existingKey).every((value, index) => value === applicationServerKey[index]))) {
+   await request("/api/user/push", "DELETE", { endpoint: sub.endpoint });
+   if (!await sub.unsubscribe()) throw new Error("حذف اشتراک قدیمی انجام نشد؛ دوباره تلاش کنید.");
+   sub = null;
+ }
+ if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
  await request("/api/user/push", "POST", sub.toJSON());
+ setNotice("اعلان‌های این مرورگر فعال شد. با «آزمایش اعلان مرورگر» دریافت روی صفحه را بررسی کنید.");
  }
  await load();
  } catch (e) { setError(e instanceof Error ? e.message : "عملیات انجام نشد."); }
@@ -193,8 +212,10 @@ function PushSettings() {
  <CustomSwitch labelClickable={false} showLabel={false} checked={state.enabled} disabled={state.loading || busy || !state.supported || !state.configured} isLoading={busy} label="اعلان‌های پوش این مرورگر" onChange={() => void toggle()} />
  <span>اعلان‌های پوش این مرورگر</span>
  </div>
+ {state.enabled ? <CustomButton type="button" variant="neutral" disabled={busy} isLoading={busy} onClick={() => void testPush()}>آزمایش اعلان مرورگر</CustomButton> : null}
  {!state.supported ? <div>مرورگر یا اتصال فعلی از پوش پشتیبانی نمی‌کند.</div> : !state.configured ? <div>پوش هنوز توسط مدیر سایت پیکربندی نشده است.</div> : null}
  {error ? <div role="alert">{error}</div> : null}
+ {notice ? <div role="status" className="text-sm text-secondary-text">{notice}</div> : null}
  </div></Loading>;
 }
 

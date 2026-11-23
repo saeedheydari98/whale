@@ -4,10 +4,10 @@ const browser = await chromium.launch({channel:"chrome",headless:true});
 try {
  for (const width of [390,1280]) for (const count of [0,1,2,30]) {
  const context=await browser.newContext({viewport:{width,height:850}});
- let pushEnabled=false, pushWrites=0;
+ let pushEnabled=false, pushWrites=0, pushTests=0;
  await context.addInitScript(() => {
    let subscription=null;
-   const fakeSubscription={endpoint:"https://fcm.googleapis.com/test",toJSON:()=>({endpoint:"https://fcm.googleapis.com/test",keys:{}}),unsubscribe:async()=>{subscription=null;return true;}};
+   const fakeSubscription={endpoint:"https://fcm.googleapis.com/test",options:{applicationServerKey:new Uint8Array([1]).buffer},toJSON:()=>({endpoint:"https://fcm.googleapis.com/test",keys:{}}),unsubscribe:async()=>{subscription=null;return true;}};
    const registration={pushManager:{getSubscription:async()=>subscription,subscribe:async()=>{subscription=fakeSubscription;return subscription;}}};
    Object.defineProperty(Notification,"permission",{get:()=>"granted"});
    Notification.requestPermission=async()=>"granted";
@@ -27,6 +27,7 @@ try {
  if(p==="/api/user/structure") return json({structure:{orders:0,discounts:0,unseenDiscounts:0,walletTransactions:0,unreadNotifications:count}});
  if(p==="/api/user/profile") return json({profile:null});
  if(p==="/api/user/push") {
+ if(route.request().method()==="PATCH") {pushTests++;return json({accepted:true});}
  if(route.request().method()==="POST") {pushEnabled=true;pushWrites++;return json({});}
  if(route.request().method()==="DELETE") {pushEnabled=false;pushWrites++;return json({});}
  return json({configured:true,enabled:pushEnabled,publicKey:"AQ"});
@@ -51,11 +52,19 @@ try {
  });
  const page=await context.newPage();page.setDefaultTimeout(10000);page.on("pageerror",e=>console.log("PAGE ERROR",e.message));await page.goto("http://localhost:3100/panel/user");
  await page.getByRole("button",{name:/اعلان/}).first().click();
+ await page.getByRole("button",{name:"نمایش پیام‌ها",exact:true}).waitFor();
+ assert.equal(structureReady,false,"Closed inbox does not fetch structure");
+ assert.equal(measuredLimit,0,"Closed inbox does not fetch records");
+ assert.equal(readIds.size,0,"Closed inbox does not acknowledge messages");
+ await page.getByRole("button",{name:"نمایش پیام‌ها",exact:true}).click();
  if(count===0) {
  const toggle=page.getByRole("switch",{name:"اعلان‌های پوش این مرورگر"});
  await toggle.click();
  await toggle.locator('xpath=self::*[@aria-checked="true"]').waitFor();
  assert.equal(pushWrites,1,"Clicking the switch enables push once");
+ await page.getByRole("button",{name:"آزمایش اعلان مرورگر",exact:true}).click();
+ await page.getByText(/سرویس پوش پیام آزمایشی را پذیرفت/).waitFor();
+ assert.equal(pushTests,1,"Browser test uses server push delivery");
  await page.getByText("اعلان‌های پوش این مرورگر",{exact:true}).click();
  await page.waitForTimeout(300);
  assert.equal(pushWrites,1,"Clicking adjacent text must not send a push mutation");
@@ -86,11 +95,14 @@ try {
  const messageBody=page.getByText("Notification body",{exact:true});
  await page.getByText("جدید",{exact:true}).first().waitFor();
  await messageBody.first().waitFor({state:"visible"});
- assert.equal(await messageBody.count(),1,"Newest unread message opens automatically and stays open after read acknowledgement");
- await page.getByRole("button",{name:"بستن پیام",exact:true}).click();
+ assert.equal(await messageBody.count(),await page.getByRole("heading",{name:/Fixture notification/}).count(),"Every loaded message body is visible in the shared accordion");
+ assert.equal(await page.getByRole("button",{name:"بستن پیام‌ها",exact:true}).count(),1,"One accordion controls all messages");
+ await page.getByRole("button",{name:"بستن پیام‌ها",exact:true}).click();
  assert.equal(await messageBody.count(),0,"Message collapses again");
  await page.waitForTimeout(300);
  assert.equal(await messageBody.count(),0,"Manually closed new message stays closed");
+ await page.getByRole("button",{name:"نمایش پیام‌ها",exact:true}).click();
+ await messageBody.first().waitFor({state:"visible"});
  }
  await context.close();
  console.log("PASS: notification inbox",width,count);
