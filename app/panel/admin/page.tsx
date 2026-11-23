@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   IoAlbumsOutline,
+  IoNotificationsOutline,
   IoColorPaletteOutline,
   IoCubeOutline,
   IoImageOutline,
@@ -117,7 +118,7 @@ export default function AdminPanelPage() {
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
     { id: "users", label: "کاربران", icon: <IoPeopleOutline /> },
-    { id: "notifications", label: "اعلان‌ها" },
+    { id: "notifications", label: "اعلان‌ها", icon: <IoNotificationsOutline /> },
     { id: "discounts", label: "تخفیف‌ها", icon: <IoTicketOutline /> },
     { id: "banners", label: "بنرها", icon: <IoImageOutline /> },
     { id: "showcases", label: "ویترین‌ها", icon: <IoAlbumsOutline /> },

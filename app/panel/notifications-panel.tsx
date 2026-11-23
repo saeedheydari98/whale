@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
 import { CustomButton } from "@/app/design-system/components/ui/button";
+import { CustomSwitch } from "@/app/design-system/components/ui/switch";
 import { CustomTabs } from "@/app/design-system/components/ui/tabs";
 import { CustomModal } from "@/app/design-system/components/ui/modal";
 import { invalidateFetchCache } from "@/lib/fetch-json";
@@ -58,7 +59,7 @@ export function NotificationsPanel({ admin = false, usersCount }: { admin?: bool
  {admin ? <div className="flex flex-wrap gap-2">
  <span>{item._count?.notifications ?? 0} گیرنده · {item.active ? "فعال" : "متوقف"}</span>
  <CustomButton disabled={busy || !item.active} onClick={() => setConfirmId(item.id)}>اجرای قانون و ارسال</CustomButton>
- <CustomButton disabled={busy} variant="neutral" onClick={() => void mutate("PATCH", { id: item.id, action: "toggle", active: !item.active })}>{item.active ? "توقف" : "فعال‌سازی"}</CustomButton>
+ <CustomSwitch checked={!!item.active} disabled={busy} label="فعال بودن قانون اعلان" onChange={active => void mutate("PATCH", { id: item.id, action: "toggle", active })} />
  </div> : <div className="flex flex-wrap gap-2">
  <span>{item.readAt ? "خوانده‌شده" : "خوانده‌نشده"}</span>
  <CustomButton href={item.url} variant="neutral">مشاهده مقصد</CustomButton>
@@ -129,7 +130,7 @@ function PushSettings() {
  }
  return <Loading loading="skeleton-structure" isLoading={state.loading}><div className="flex flex-col gap-3">
  <div className="text-sm text-secondary-text">صندوق اعلان همیشه در دسترس است. پوش برای همین مرورگر فعال می‌شود. در آیفون ابتدا سایت را به صفحه اصلی اضافه کنید.</div>
- <CustomButton disabled={busy || !state.supported || !state.configured} isLoading={busy} onClick={() => void toggle()}>{state.enabled ? "غیرفعال‌سازی پوش این مرورگر" : "فعال‌سازی پوش این مرورگر"}</CustomButton>
+ <CustomSwitch checked={state.enabled} disabled={state.loading || busy || !state.supported || !state.configured} isLoading={busy} label="اعلان‌های پوش این مرورگر" onChange={() => void toggle()} />
  {!state.supported ? <div>مرورگر یا اتصال فعلی از پوش پشتیبانی نمی‌کند.</div> : !state.configured ? <div>پوش هنوز توسط مدیر سایت پیکربندی نشده است.</div> : null}
  {error ? <div role="alert">{error}</div> : null}
  </div></Loading>;

@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { IoLogOutOutline, IoPersonCircleOutline, IoReceiptOutline, IoTicketOutline, IoWalletOutline } from "react-icons/io5";
+import { IoLogOutOutline, IoNotificationsOutline, IoPersonCircleOutline, IoReceiptOutline, IoTicketOutline, IoWalletOutline } from "react-icons/io5";
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import { CustomButton } from "@/app/design-system/components/ui/button";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
@@ -225,7 +225,7 @@ export default function UserPanelPage() {
   const tabs: Array<CustomTabItem<typeof activeTab>> = [
     { id: "profile", label: "پروفایل", icon: <IoPersonCircleOutline /> },
     { id: "orders", label: "سفارش ها", icon: <IoReceiptOutline /> },
-    { id: "notifications", label: "اعلان‌ها", badge: structure?.unreadNotifications },
+    { id: "notifications", label: "اعلان‌ها", icon: <IoNotificationsOutline />, badge: structure?.unreadNotifications },
     { id: "discounts", label: "تخفیف‌ها", icon: <IoTicketOutline />, badge: structure?.unseenDiscounts },
     { id: "wallet", label: "کیف پول", icon: <IoWalletOutline /> },
   ];
