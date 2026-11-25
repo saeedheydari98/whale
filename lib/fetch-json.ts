@@ -12,6 +12,8 @@ type FetchJsonOptions = {
 const DEFAULT_STALE_MS = 60_000;
 const inflight = new Map<string, Promise<unknown>>();
 const cache = new Map<string, CacheEntry>();
+const controllers = new Map<string, AbortController>();
+const versions = new Map<string, number>();
 const revalidating = new Set<string>();
 
 function fetchFresh<T>(url: string, force: boolean): Promise<T> {
@@ -20,7 +22,11 @@ function fetchFresh<T>(url: string, force: boolean): Promise<T> {
 
   if (force) cache.delete(url);
 
+  const controller = new AbortController();
+  controllers.set(url, controller);
+  const version = versions.get(url) ?? 0;
   const task = fetch(url, {
+    signal: controller.signal,
     ...(force ? { cache: "no-store" as const } : {}),
     credentials: "same-origin",
   })
@@ -30,13 +36,13 @@ function fetchFresh<T>(url: string, force: boolean): Promise<T> {
     }))
     .then(({ ok, data }) => {
       const apiOk = !(data && typeof data === "object" && (data as { ok?: unknown }).ok === false);
-      if (ok && apiOk) {
+      if (ok && apiOk && (versions.get(url) ?? 0) === version) {
         cache.set(url, { data, at: Date.now() });
       }
       return data;
     })
     .finally(() => {
-      inflight.delete(url);
+      if (inflight.get(url) === task) { inflight.delete(url); controllers.delete(url); }
     });
 
   inflight.set(url, task);
@@ -83,6 +89,9 @@ export async function fetchJsonDeduped<T>(
 export function invalidateFetchCache(urlPrefix?: string) {
   if (!urlPrefix) {
     cache.clear();
+    for (const key of inflight.keys()) versions.set(key, (versions.get(key) ?? 0) + 1);
+    for (const controller of controllers.values()) controller.abort();
+    controllers.clear();
     inflight.clear();
     revalidating.clear();
     return;
@@ -92,7 +101,7 @@ export function invalidateFetchCache(urlPrefix?: string) {
     if (key.startsWith(urlPrefix)) cache.delete(key);
   }
   for (const key of [...inflight.keys()]) {
-    if (key.startsWith(urlPrefix)) inflight.delete(key);
+    if (key.startsWith(urlPrefix)) versions.set(key, (versions.get(key) ?? 0) + 1);
   }
   for (const key of [...revalidating]) {
     if (key.startsWith(urlPrefix)) revalidating.delete(key);

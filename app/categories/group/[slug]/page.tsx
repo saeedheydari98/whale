@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { catalogPageLimit } from "@/lib/catalog-page-limit";
 import { useParams } from "next/navigation";
 import {
   EMPTY_PRODUCT_FILTERS,
@@ -27,6 +28,7 @@ export default function CategoryGroupProductsPage() {
   const normalizedSearchQuery = deferredSearchQuery.trim();
   const [sort, setSort] = useState("newest");
   const [filters, setFilters] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
+  const queryClient = useQueryClient();
   const [pageSize, setPageSize] = useState(0);
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
@@ -38,10 +40,10 @@ export default function CategoryGroupProductsPage() {
   });
 
   const categoryGroupProductsQuery = useInfiniteQuery({
-    queryKey: ["catalog", "category-group", slug, "products", sort, normalizedSearchQuery, filterParams, pageSize],
-    queryFn: ({ pageParam }) => getCategoryGroupProducts(slug, {
+    queryKey: ["catalog", "category-group", slug, "products", sort, normalizedSearchQuery, filterParams],
+    queryFn: ({ pageParam, queryKey }) => getCategoryGroupProducts(slug, {
       page: Number(pageParam),
-      limit: Math.max(1, pageSize),
+      limit: catalogPageLimit(queryClient, queryKey, pageSize),
       sort,
       q: normalizedSearchQuery,
       ...filterParams,
@@ -64,7 +66,7 @@ export default function CategoryGroupProductsPage() {
   const lastPage = pages[pages.length - 1];
   const categoryGroup = structureQuery.data?.page.categoryGroups[0] ?? firstPage?.section;
   const categoryGroupProductCount = Number(categoryGroup?.productCount);
-  const productLoading = pageSize === 0 || (categoryGroupProductsQuery.isLoading && !categoryGroupProductsQuery.data);
+  const productLoading = (!categoryGroupProductsQuery.data && pageSize === 0) || (categoryGroupProductsQuery.isLoading && !categoryGroupProductsQuery.data);
   const initialPageLoading = structureQuery.isLoading && !categoryGroup && !categoryGroupProductsQuery.data;
   useStructureRouteLoading(structureQuery.isLoading && !structureQuery.data);
 

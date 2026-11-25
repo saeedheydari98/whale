@@ -15,6 +15,7 @@ model User {
   username           String?           @unique
   name               String?
   role               String            @default("user")
+  adminPermissions   Json              @default("{}")
   refreshTokenHash   String?
   avatarUrl          String?
   themeMode          String            @default("light")
@@ -445,4 +446,15 @@ model AuthOtp {
   createdAt  DateTime  @default(now())
 
   @@index([phone, email, purpose, consumedAt, expiresAt])
+}
+
+model AdminPermissionAudit {
+  id Int @id @default(autoincrement())
+  actorId Int
+  userId Int
+  action String
+  before Json
+  after Json
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
 }

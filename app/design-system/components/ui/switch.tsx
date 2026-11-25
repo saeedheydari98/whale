@@ -20,6 +20,8 @@ type CustomSwitchProps = {
   label?: string;
   showLabel?: boolean;
   labelClickable?: boolean;
+  layout?: "horizontal" | "vertical";
+  className?: string;
   loading?: LoadingVariant;
   isLoading?: boolean;
   loadingText?: string;
@@ -39,6 +41,8 @@ export function CustomSwitch({
   label,
   showLabel = true,
   labelClickable = true,
+  layout = "horizontal",
+  className,
   loading = "spinner",
   isLoading = false,
   loadingText,
@@ -46,13 +50,13 @@ export function CustomSwitch({
   const colorStyle = resolveVariantCssVars(variant);
   const resolvedCustomColor = customColor || undefined;
   const switchColor = resolvedCustomColor ?? colorStyle.backgroundColor;
-  const switchBackgroundColor = resolveGlassBackground(checked ? switchColor : "var(--neutral)", checked ? 86 : 72);
+  const switchBackgroundColor = resolveGlassBackground(checked ? switchColor : "var(--neutral)", checked ? 86 : 24);
   const borderColor = resolvedCustomColor ? strengthenBorderColor(resolvedCustomColor) : colorStyle.borderColor;
   const isDisabled = disabled || isLoading;
   const Wrapper = labelClickable ? "label" : "div";
 
   return (
-    <Wrapper className="inline-flex items-center gap-2">
+    <Wrapper className={cx("inline-flex min-w-0 items-center gap-2", layout === "vertical" && "flex-col text-center", className)}>
       <CustomActionButton
         type="button"
         role="switch"
@@ -90,7 +94,7 @@ export function CustomSwitch({
           />
         )}
       </CustomActionButton>
-      {showLabel && label && <span>{label}</span>}
+      {showLabel && label && <span className="min-w-0 break-words">{label}</span>}
       {isLoading && loadingText && <span className="text-sm text-secondary-text">{loadingText}</span>}
     </Wrapper>
   );

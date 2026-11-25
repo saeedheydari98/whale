@@ -12,6 +12,7 @@ export type AuthClientUser = {
   name?: string | null;
   role?: string | null;
   profile?: unknown;
+  adminPermissions?: import("./admin-permissions").AdminPermissions;
 };
 
 let cachedUser: AuthClientUser | null = null;
@@ -24,6 +25,7 @@ function authUserCacheKey(user: AuthClientUser | null | undefined) {
     user?.username ?? "",
     user?.email ?? "",
     user?.role ?? "",
+    JSON.stringify(user?.adminPermissions ?? {}),
   ].join("|");
 }
 
@@ -43,7 +45,7 @@ export function setCachedAuthUser(user: AuthClientUser | null, options?: { emit?
   hasLoadedUser = true;
   pendingUserRequest = null;
   if (previousKey !== nextKey) invalidateFetchCache(USER_PROFILE_API_URL);
-  if (options?.emit !== false) emitAuthUserUpdated();
+  if (options?.emit !== false && previousKey !== nextKey) emitAuthUserUpdated();
 }
 
 export function clearCachedAuthUser(options?: { emit?: boolean }) {

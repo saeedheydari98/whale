@@ -1,3 +1,4 @@
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import { prisma } from "@/lib/prisma";
 import { apiOk, apiServerError } from "@/lib/api/response";
 import { requireAdmin } from "@/lib/api/auth";
@@ -35,6 +36,12 @@ export async function GET(request: Request) {
 
   try {
     const params = new URL(request.url).searchParams;
+    if (params.get("picker") === "1" && !hasAdminPermission(auth.user, "users")) {
+      const parsed = adminListQuerySchema.safeParse(Object.fromEntries(params));
+      if (!parsed.success) return validationError(parsed.error);
+      const result = await readWithRetry(() => readAdminUserPage({ ...parsed.data, sort: "createdAt" }));
+      return apiOk({ ...result, users: result.users.map(user => ({ id: user.id, name: user.name, username: user.username, profiles: user.profiles.map(profile => ({ firstName: profile.firstName, lastName: profile.lastName, phone: profile.phone })) })) });
+    }
     if (params.has("limit")) {
       const parsed = adminListQuerySchema.safeParse(Object.fromEntries(params));
       if (!parsed.success) return validationError(parsed.error);
@@ -49,6 +56,7 @@ export async function GET(request: Request) {
           username: true,
           email: true,
           role: true,
+          adminPermissions: true,
           walletBalance: true,
           createdAt: true,
           profiles: {
@@ -108,6 +116,7 @@ export async function GET(request: Request) {
           username: user.username,
           email: user.email,
           role: user.role,
+          adminPermissions: user.adminPermissions,
           walletBalance: user.walletBalance,
           createdAt: user.createdAt.toISOString(),
           profiles: user.profiles,

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { catalogPageLimit } from "@/lib/catalog-page-limit";
 import { useParams } from "next/navigation";
 import {
   EMPTY_PRODUCT_FILTERS,
@@ -23,6 +24,7 @@ export default function BrandProductsPage() {
   const normalizedSearchQuery = deferredSearchQuery.trim();
   const [sort, setSort] = useState("newest");
   const [filters, setFilters] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
+  const queryClient = useQueryClient();
   const [pageSize, setPageSize] = useState(0);
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
@@ -34,10 +36,10 @@ export default function BrandProductsPage() {
   });
 
   const brandProductsQuery = useInfiniteQuery({
-    queryKey: ["catalog", "brand", slug, "products", sort, normalizedSearchQuery, filterParams, pageSize],
-    queryFn: ({ pageParam }) => getBrandProducts(slug, {
+    queryKey: ["catalog", "brand", slug, "products", sort, normalizedSearchQuery, filterParams],
+    queryFn: ({ pageParam, queryKey }) => getBrandProducts(slug, {
       page: Number(pageParam),
-      limit: Math.max(1, pageSize),
+      limit: catalogPageLimit(queryClient, queryKey, pageSize),
       sort,
       q: normalizedSearchQuery,
       ...filterParams,
@@ -60,7 +62,7 @@ export default function BrandProductsPage() {
   const lastPage = pages[pages.length - 1];
   const brand = structureQuery.data?.page.brands[0] ?? firstPage?.section;
   const brandProductCount = Number(brand?.productCount);
-  const productLoading = pageSize === 0 || (brandProductsQuery.isLoading && !brandProductsQuery.data);
+  const productLoading = (!brandProductsQuery.data && pageSize === 0) || (brandProductsQuery.isLoading && !brandProductsQuery.data);
   const initialPageLoading = structureQuery.isLoading && !brand && !brandProductsQuery.data;
   useStructureRouteLoading(structureQuery.isLoading && !structureQuery.data);
 

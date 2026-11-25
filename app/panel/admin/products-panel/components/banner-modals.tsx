@@ -1,5 +1,7 @@
 "use client";
 
+import { HorizontalRail } from "@/app/design-system/components/ui/horizontal-rail";
+
 import { CustomFileUpload } from "@/app/design-system/components/ui/file-upload";
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
@@ -227,7 +229,7 @@ function BannerModal({
               </CustomButton>
             </div>
             <CustomFileUpload label="بارگذاری تصاویر WebP" accept={WEBP_IMAGE_ACCEPT} multiple onSelectFiles={(files) => onUpload(files)} />
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <HorizontalRail className="flex gap-2 overflow-x-auto pb-2">
               {banner.imageUrls.length === 0 && emptyPreviewLabel ? <span className="text-sm text-secondary-text">{emptyPreviewLabel}</span> : null}
               {banner.imageUrls.map((item, index) => (
                 <div key={`${item}-${index}`} className="flex min-w-40 flex-col gap-2">
@@ -239,7 +241,7 @@ function BannerModal({
                   </CustomButton>
                 </div>
               ))}
-            </div>
+            </HorizontalRail>
           </CustomModalSection>
 
           <CustomModalSection title="وضعیت" status="optional" meta={banner.active ? "فعال" : "مخفی"}>

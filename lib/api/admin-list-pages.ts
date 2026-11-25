@@ -33,7 +33,7 @@ export async function readAdminUserPage(query: ListQuery) {
   ]);
   const users = await prisma.user.findMany({
     where: { id: { in: rows.map((row) => row.id) } },
-    select: { id: true, name: true, username: true, email: true, role: true, walletBalance: true, createdAt: true, profiles: { orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 1, select: { firstName: true, lastName: true, phone: true, email: true } } },
+    select: { id: true, name: true, username: true, email: true, role: true, adminPermissions: true, walletBalance: true, createdAt: true, profiles: { orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 1, select: { firstName: true, lastName: true, phone: true, email: true } } },
   });
   const byId = new Map(users.map((user) => [user.id, user]));
   return { users: rows.flatMap((row) => {

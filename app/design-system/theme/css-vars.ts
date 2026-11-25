@@ -1,5 +1,6 @@
 import {
   elementTones,
+  resolveActionColor,
   resolveColor,
   semanticThemeMap,
   Theme,
@@ -37,7 +38,7 @@ export function generateCSSVariables(theme: Theme) {
 
   const buildVariantTokens = (variant: VariantName) => {
     const colorKey = getVariantColorKey(variant);
-    const action = resolveColor(colorKey, adminStyle, elementTones.action);
+    const action = resolveActionColor(colorKey, adminStyle);
     const base = resolveColor(colorKey, adminStyle, elementTones.base[modeKey]);
     const text = resolveColor(colorKey, adminStyle, elementTones.text[modeKey]);
     const mutedText = resolveColor(colorKey, adminStyle, elementTones.mutedText[modeKey]);

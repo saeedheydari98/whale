@@ -21,11 +21,16 @@ export async function GET(request: Request) {
 }
 export async function POST(request: Request) {
  const auth = await guard(request); if (!auth.ok) return auth.response;
+ if (request.headers.has("x-account-id") && request.headers.get("x-account-id") !== String(auth.user.id)) return apiFail("حساب کاربری تغییر کرده است.", 409);
  const parsed = await parseJsonBody(request, subscriptionSchema); if (!parsed.ok) return parsed.response;
  if (!pushConfiguration().privateKey) return apiFail("پوش هنوز پیکربندی نشده است.", 503);
  try {
  const { endpoint, keys } = parsed.data;
  await prisma.$transaction(async tx => {
+ // Serialize restoration with logout, which updates and locks the same user row.
+ await tx.$queryRaw`SELECT "id" FROM "users" WHERE "id" = ${auth.user.id} FOR UPDATE`;
+ const current = await requireUser(request);
+ if (!current.ok || current.user.id !== auth.user.id) throw new Error("Session changed during push restoration");
  await tx.pushSubscription.deleteMany({ where: { endpoint, userId: { not: auth.user.id } } });
  await tx.pushSubscription.upsert({ where: { endpoint }, create: { endpoint, userId: auth.user.id, ...keys }, update: keys });
  });

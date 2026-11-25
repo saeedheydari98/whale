@@ -1,5 +1,7 @@
 "use client";
 
+import { HorizontalRail } from "@/app/design-system/components/ui/horizontal-rail";
+
 import { CustomFileUpload } from "@/app/design-system/components/ui/file-upload";
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
@@ -284,7 +286,7 @@ function ProductModal({
               </CustomButton>
             </div>
             <CustomFileUpload label="بارگذاری تصاویر WebP" accept={WEBP_IMAGE_ACCEPT} multiple onSelectFiles={(files) => onImageUpload(files)} />
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <HorizontalRail className="flex gap-2 overflow-x-auto pb-2">
               {productImages.length === 0 ? <span className="text-sm text-secondary-text">پیش‌نمایش تصویر</span> : null}
               {productImages.map((item, index) => (
                 <div key={`${item}-${index}`} className="flex min-w-40 flex-col gap-2">
@@ -299,7 +301,7 @@ function ProductModal({
                   </div>
                 </div>
               ))}
-            </div>
+            </HorizontalRail>
           </CustomModalSection>
 
           <div className="flex flex-col gap-2 sm:flex-row">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { useHorizontalRail } from "@/hooks/use-horizontal-rail";
 import { CustomActionButton } from "./action";
 import { CustomSelectionButton } from "./selection";
 import { colorLabel, getStockColorValue, normalizeStockEntries } from "./color-stock-dots";
@@ -13,12 +14,14 @@ export function ColorQuantityPicker({ colorStock, selection, stockQuantity, disa
 }) {
   const [activeColor, setActiveColor] = useState<string | null>(null);
   const activeGroup = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLDivElement>(null);
+  useHorizontalRail(railRef, layout === "inline");
   const total = colorSelectionTotal(selection);
   useLayoutEffect(() => {
     activeGroup.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [activeColor]);
 
-  return <div role="group" aria-label="رنگ و تعداد" data-color-quantity-picker className={layout === "rows" ? "flex w-full flex-col gap-2 p-0.5" : "flex h-8 w-full shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"}>
+  return <div ref={railRef} role="group" aria-label="رنگ و تعداد" data-color-quantity-picker className={layout === "rows" ? "flex w-full flex-col gap-2 p-0.5" : "flex h-8 w-full shrink-0 flex-nowrap items-center gap-1.5 overflow-x-auto overscroll-x-contain p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"}>
     {normalizeStockEntries(colorStock).map(({ color, count }) => {
       const selected = selection[color] ?? 0;
       const maximum = Math.max(0, Math.min(count, stockQuantity - total + selected));

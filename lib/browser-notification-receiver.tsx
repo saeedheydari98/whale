@@ -1,5 +1,6 @@
 "use client";
 
+import { restoreBrowserPush, resetPushRestore, browserPushDisabled } from "@/lib/notification-client";
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateFetchCache } from "@/lib/fetch-json";
@@ -19,14 +20,17 @@ export function BrowserNotificationReceiver() {
     const controller = new AbortController();
     const invalidate = () => {
       invalidateFetchCache(USER_STRUCTURE_URL);
-      void queryClient.invalidateQueries({ queryKey: ["user-structure", userId] });
-      void queryClient.invalidateQueries({ queryKey: ["admin-list", "/api/user/notifications"] });
-      void queryClient.invalidateQueries({ queryKey: ["collection-structure", "/api/user/notifications?structure=1"] });
+      void queryClient.invalidateQueries({ queryKey: ["user-structure", userId] }, { cancelRefetch: false });
+      void queryClient.invalidateQueries({ queryKey: ["admin-list", "/api/user/notifications"] }, { cancelRefetch: false });
+      void queryClient.invalidateQueries({ queryKey: ["collection-structure", "/api/user/notifications?structure=1"] }, { cancelRefetch: false });
     };
     const poll = async () => {
       if (stopped || pending || document.hidden || Notification.permission !== "granted") return;
       pending = true;
       try {
+        if (browserPushDisabled()) return;
+        await restoreBrowserPush(userId);
+        if (stopped) return;
         const registration = await navigator.serviceWorker.getRegistration("/");
         const subscription = await registration?.pushManager.getSubscription();
         if (!subscription) return;
@@ -67,7 +71,7 @@ export function BrowserNotificationReceiver() {
     window.addEventListener("focus", poll);
     document.addEventListener("visibilitychange", poll);
     navigator.serviceWorker.addEventListener("message", onPush);
-    return () => { stopped = true; controller.abort(); clearInterval(timer); window.removeEventListener("focus", poll); document.removeEventListener("visibilitychange", poll); navigator.serviceWorker.removeEventListener("message", onPush); };
+    return () => { stopped = true; resetPushRestore(); controller.abort(); clearInterval(timer); window.removeEventListener("focus", poll); document.removeEventListener("visibilitychange", poll); navigator.serviceWorker.removeEventListener("message", onPush); };
   }, [queryClient, userId]);
   return null;
 }

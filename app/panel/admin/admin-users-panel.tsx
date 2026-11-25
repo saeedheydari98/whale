@@ -2,7 +2,7 @@
 
 import { CustomTable, CustomTableRow, CustomSortHeader as SortHeaderButton } from "@/app/design-system/components/ui/table";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useAdminPagedCollection } from "@/hooks/use-admin-paged-collection";
 import { IoSearchOutline } from "react-icons/io5";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
@@ -26,6 +26,7 @@ export type AdminUser = {
   username?: string | null;
   email?: string | null;
   role: string;
+  adminPermissions?: import("@/lib/admin-permissions").AdminPermissions;
   walletBalance: number;
   createdAt: string;
   orderCount: number;
@@ -69,12 +70,14 @@ function UserTableRow({
   isLoading = false,
   selectionLabel = "انتخاب",
   canSelectUser,
+  renderActions,
 }: {
   user: AdminUser;
   onSelectUser?: (user: AdminUser) => void;
   isLoading?: boolean;
   selectionLabel?: string;
   canSelectUser?: (user: AdminUser) => boolean;
+  renderActions?: (user: AdminUser, isLoading: boolean) => ReactNode;
 }) {
   return (
     <CustomTableRow>
@@ -86,29 +89,29 @@ function UserTableRow({
       </div>
       <div className="w-24 shrink-0">
         <CustomTag variant={roleVariant(user.role)} size="xs" rounded="full">
-          {roleLabel(user.role)}
+          {user.role ? roleLabel(user.role) : "—"}
         </CustomTag>
       </div>
       <span className="w-28 shrink-0 truncate text-xs tabular-nums text-secondary-text">
-        {formatPersianDate(user.createdAt) || "—"}
+        {user.createdAt ? formatPersianDate(user.createdAt) : "—"}
       </span>
       <span className="w-20 shrink-0 truncate text-xs font-bold tabular-nums text-primary-text">
-        {user.orderCount.toLocaleString("fa-IR")}
+        {user.orderCount?.toLocaleString("fa-IR") ?? "—"}
       </span>
       <span className="w-28 shrink-0 truncate text-xs font-bold tabular-nums text-primary">
-        {formatAmount(user.orderTotal)}
+        {user.orderTotal == null ? "—" : formatAmount(user.orderTotal)}
       </span>
       <span className="w-28 shrink-0 truncate text-xs tabular-nums text-secondary-text">
         {user.lastOrderAt ? formatPersianDate(user.lastOrderAt) : "—"}
       </span>
       <span className="w-28 shrink-0 truncate text-xs font-bold tabular-nums text-primary">
-        {formatAmount(user.walletBalance)}
+        {user.walletBalance == null ? "—" : formatAmount(user.walletBalance)}
       </span>
       {onSelectUser ? (
-        <div className="w-24 shrink-0">
-          <CustomButton size="sm" variant="neutral" disabled={isLoading || (canSelectUser ? !canSelectUser(user) : false)} onClick={() => onSelectUser(user)}>
+        <div className="flex w-24 shrink-0 flex-col gap-2">
+          {renderActions ? renderActions(user, isLoading) : <CustomButton size="sm" variant="neutral" disabled={isLoading || (canSelectUser ? !canSelectUser(user) : false)} onClick={() => onSelectUser(user)}>
             <span>{selectionLabel}</span>
-          </CustomButton>
+          </CustomButton>}
         </div>
       ) : null}
     </CustomTableRow>
@@ -120,15 +123,17 @@ type AdminUsersPanelProps = {
   onSelectUser?: (user: AdminUser) => void;
   selectionLabel?: string;
   canSelectUser?: (user: AdminUser) => boolean;
+  renderActions?: (user: AdminUser, isLoading: boolean) => ReactNode;
 };
 
-export function AdminUsersPanel({ totalCount, onSelectUser, selectionLabel, canSelectUser }: AdminUsersPanelProps) {
+export function AdminUsersPanel({ totalCount, onSelectUser, selectionLabel, canSelectUser, renderActions }: AdminUsersPanelProps) {
   const [tableOpen, setTableOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const params = new URLSearchParams({ q: searchQuery.trim(), sort: sortKey ?? "createdAt", direction: sortDirection });
-  const page = useAdminPagedCollection<AdminUser>({ endpoint: "/api/admin/users", itemKey: "users", params: params.toString(), totalCount: searchQuery.trim() ? undefined : totalCount, structureEndpoint: "/api/admin/collections/structure?collection=users", enabled: tableOpen });
+  if (onSelectUser) params.set("picker", "1");
+  const page = useAdminPagedCollection<AdminUser>({ endpoint: "/api/admin/users", itemKey: "users", params: params.toString(), totalCount: searchQuery.trim() ? undefined : totalCount, structureEndpoint: `/api/admin/collections/structure?collection=users${onSelectUser ? "&picker=1" : ""}`, enabled: tableOpen });
   const { items: users, loading } = page;
   const visibleUsers = users;
   const matchingUserCount = page.total ?? users.length;
@@ -245,10 +250,10 @@ export function AdminUsersPanel({ totalCount, onSelectUser, selectionLabel, canS
           containerProps={{ "aria-live": "polite" }}
           getKey={(user) => user.id}
           lazy
-          renderItem={(user) => <UserTableRow user={user} onSelectUser={onSelectUser} selectionLabel={selectionLabel} canSelectUser={canSelectUser} />}
+          renderItem={(user) => <UserTableRow user={user} onSelectUser={onSelectUser} selectionLabel={selectionLabel} canSelectUser={canSelectUser} renderActions={renderActions} />}
           renderSkeleton={() => (
             <Loading loading="skeleton-structure" isLoading>
-              <UserTableRow user={loadingUser} onSelectUser={onSelectUser} isLoading />
+              <UserTableRow user={loadingUser} onSelectUser={onSelectUser} renderActions={renderActions} isLoading />
             </Loading>
           )}
         />

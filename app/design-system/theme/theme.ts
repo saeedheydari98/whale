@@ -284,10 +284,9 @@ export function createTheme(
     const adminStyle = admin?.style ?? style;
     const modeKey = mode === "dark" ? "dark" : "light";
     const resolveVariantColor = (variant: SemanticColor) =>
-        resolveColor(
+        resolveActionColor(
             variant === "primary" ? adminColor : semanticThemeMap[variant],
-            adminStyle,
-            elementTones.action
+            adminStyle
         );
 
     return {
@@ -348,4 +347,9 @@ export function createTheme(
             }
         },
     };
+}
+
+/** Filled yellow controls use a deeper tone so their light foreground stays readable. */
+export function resolveActionColor(color: ThemeColorKey, style: ThemeStyle) {
+  return resolveColor(color, style, color === "yellow" ? (style === "fantasy" ? 800 : 700) : elementTones.action);
 }

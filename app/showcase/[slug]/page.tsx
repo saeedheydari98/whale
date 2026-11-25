@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useDeferredValue, useMemo, useState } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { catalogPageLimit } from "@/lib/catalog-page-limit";
 import { useParams } from "next/navigation";
 import { CustomEmptyState } from "@/app/design-system/components/ui/empty-state";
 import { useTransientAppMessage } from "@/app/design-system/components/feedback/notification-provider";
@@ -86,6 +87,7 @@ export default function ShowcasePage() {
   const normalizedSearchQuery = deferredSearchQuery.trim();
   const [sort, setSort] = useState("newest");
   const [filters, setFilters] = useState<ProductFilterState>(EMPTY_PRODUCT_FILTERS);
+  const queryClient = useQueryClient();
   const [pageSize, setPageSize] = useState(0);
   const filterParams = useMemo(() => productFilterParams(filters), [filters]);
   const filtersActive = hasProductFilters(filters);
@@ -103,10 +105,10 @@ export default function ShowcasePage() {
   const banners = pageStructure?.banners ?? [];
 
   const showcaseProductsQuery = useInfiniteQuery({
-    queryKey: ["catalog", "showcase", showcaseId, "products", "page", sort, normalizedSearchQuery, filterParams, pageSize],
-    queryFn: ({ pageParam }) => getShowcaseProducts(showcaseId, {
+    queryKey: ["catalog", "showcase", showcaseId, "products", "page", sort, normalizedSearchQuery, filterParams],
+    queryFn: ({ pageParam, queryKey }) => getShowcaseProducts(showcaseId, {
       page: Number(pageParam),
-      limit: Math.max(1, pageSize),
+      limit: catalogPageLimit(queryClient, queryKey, pageSize),
       sort,
       q: normalizedSearchQuery,
       ...filterParams,
@@ -128,7 +130,7 @@ export default function ShowcasePage() {
   const firstPage = pages[0];
   const lastPage = pages[pages.length - 1];
   const showcase = firstPage?.section ?? structureShowcase;
-  const productLoading = pageSize === 0 || (showcaseProductsQuery.isLoading && !showcaseProductsQuery.data);
+  const productLoading = (!showcaseProductsQuery.data && pageSize === 0) || (showcaseProductsQuery.isLoading && !showcaseProductsQuery.data);
   const loading = productLoading;
   const headerLoading = structureQuery.isLoading && !showcase;
   useStructureRouteLoading(structureQuery.isLoading && !structureQuery.data);

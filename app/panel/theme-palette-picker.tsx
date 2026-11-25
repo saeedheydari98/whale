@@ -6,7 +6,7 @@ import { ReactNode, useState } from "react";
 import { IoCheckmark } from "react-icons/io5";
 import { CustomAccordion } from "@/app/design-system/components/ui/accordion";
 import { getContrastColor } from "@/app/design-system/theme/color-utils";
-import { resolveColor, ThemeColorKey, ThemeStyle, ThemeTone } from "@/app/design-system/theme/theme";
+import { resolveActionColor, resolveColor, ThemeColorKey, ThemeStyle, ThemeTone } from "@/app/design-system/theme/theme";
 
 const colorOptions: ThemeColorKey[] = [
   "green",
@@ -140,7 +140,7 @@ export function ThemePalettePicker({
     styles: false,
   });
   const selectedThemeLabel = `${colorLabels[selectedColor]} / ${styleLabels[selectedStyle]}`;
-  const selectedPreviewColor = resolveColor(selectedColor, selectedStyle, staticTone);
+  const selectedPreviewColor = resolveActionColor(selectedColor, selectedStyle);
   const scopeClasses = paletteScopeClasses[scope];
 
   const toggleSection = (section: PaletteSection) => {
@@ -188,7 +188,7 @@ export function ThemePalettePicker({
           }
         >
           {colorOptions.map((color) => {
-            const background = resolveColor(color, selectedStyle, staticTone);
+            const background = resolveActionColor(color, selectedStyle);
             const selected = selectedColor === color;
             const textColor = getThemeContrastColor(background, color, selectedStyle);
 
@@ -229,14 +229,14 @@ export function ThemePalettePicker({
                 <span
                   key={style}
                   className="h-8 w-2.5 rounded-full"
-                  style={{ backgroundColor: resolveColor(selectedColor, style, staticTone) }}
+                  style={{ backgroundColor: resolveActionColor(selectedColor, style) }}
                 />
               ))}
             </span>
           }
         >
           {styleOptions.map((item) => {
-            const background = resolveColor(selectedColor, item, staticTone);
+            const background = resolveActionColor(selectedColor, item);
             const selected = selectedStyle === item;
             const textColor = getThemeContrastColor(background, selectedColor, item);
 

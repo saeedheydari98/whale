@@ -59,7 +59,6 @@ export function ProductsCatalogProvider({ children, eager = false }: { children:
   const tree = catalog?.tree ?? EMPTY_TREE;
 
   const refresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ["catalog"] });
     window.dispatchEvent(new Event(PRODUCTS_CATALOG_UPDATED_EVENT));
   }, [queryClient]);
 

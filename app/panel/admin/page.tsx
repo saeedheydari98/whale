@@ -31,10 +31,13 @@ import { useTransientAppMessage } from "@/app/design-system/components/feedback/
 import { getAdminPanelStructure } from "@/lib/admin-structure";
 import { useAppUser } from "@/lib/app-user-context";
 import { subscribeAdminAccess } from "@/lib/admin-access";
-import { fetchCurrentUser, hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
+import { hasAdminRole, subscribeAuthUser } from "@/lib/auth-client";
 import { SUPERADMIN_PHONE } from "@/lib/auth-constants";
 
+import { hasAdminPermission } from "@/lib/admin-permissions";
+
 type AdminPanelUser = {
+  adminPermissions?: unknown;
   username?: string | null;
   role?: string | null;
 };
@@ -48,9 +51,9 @@ export default function AdminPanelPage() {
     appUserData ? hasAdminRole(appUserData.user) : null
   );
   const [authUser, setAuthUser] = useState<AdminPanelUser | null>(() => appUser);
-  const [activeTab, setActiveTab] = useState<AdminPanelTab>("theme");
+  const [selectedTab, setActiveTab] = useState<AdminPanelTab>("theme");
   const structureQuery = useQuery({
-    queryKey: ["admin-structure", appUser?.id, authUser?.role],
+    queryKey: ["admin-structure", appUser?.id, authUser?.role, authUser?.adminPermissions],
     queryFn: () => getAdminPanelStructure({ force: true }),
     enabled: hasAdminAccess === true,
     staleTime: 30_000, refetchOnWindowFocus: false, retry: false,
@@ -71,9 +74,8 @@ export default function AdminPanelPage() {
     let cancelled = false;
 
     const syncAccessFromApi = async () => {
-      setHasAdminAccess(null);
-      await refreshAppUser({ force: true });
-      const user = await fetchCurrentUser({ force: true, allowStaleOnError: false });
+      const refreshed = await refreshAppUser({ force: true });
+      const user = refreshed.user;
       if (cancelled) return;
       const access = hasAdminRole(user);
       setAuthUser(user);
@@ -98,21 +100,19 @@ export default function AdminPanelPage() {
       });
     });
 
+    const refreshPermissions = () => { void syncAccessFromApi().catch(() => { setAuthUser(null); setHasAdminAccess(false); }); };
+    window.addEventListener("focus", refreshPermissions);
+    refreshPermissions();
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", refreshPermissions);
       unsubscribeAdminAccess();
       unsubscribeAuthUser();
     };
   }, [refreshAppUser]);
 
-  useEffect(() => {
-    if (authUser?.role !== "superadmin" && activeTab === "security") {
-      setActiveTab("products");
-    }
-  }, [activeTab, authUser?.role]);
-
   const isSuperadmin = authUser?.role === "superadmin" && authUser?.username === SUPERADMIN_PHONE;
-  const tabs: Array<CustomTabItem<AdminPanelTab>> = [
+  const allTabs: Array<CustomTabItem<AdminPanelTab>> = [
     { id: "theme", label: "ظاهر", icon: <IoColorPaletteOutline /> },
     ...(isSuperadmin ? [{ id: "security" as const, label: "دسترسی‌ها", icon: <IoShieldCheckmarkOutline /> }] : []),
     { id: "products", label: "محصولات", icon: <IoCubeOutline /> },
@@ -127,6 +127,8 @@ export default function AdminPanelPage() {
     { id: "storefront", label: "چیدمان", icon: <IoLayersOutline /> },
   ];
 
+  const tabs = allTabs.filter(tab => tab.id === "security" ? isSuperadmin : hasAdminPermission(authUser, tab.id));
+  const activeTab = tabs.find(tab => tab.id === selectedTab)?.id ?? tabs[0]?.id;
   return (
     <main className="min-h-full bg-primary-base p-3 text-primary-text sm:p-4">
       {hasAdminAccess === null ? (
@@ -134,7 +136,7 @@ export default function AdminPanelPage() {
           <div className="flex w-full flex-col gap-3">
             <section className="flex flex-col gap-4">
               <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
-              <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
+              <CustomTabs compactMobile items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
             </section>
           </div>
         </Loading>
@@ -142,9 +144,10 @@ export default function AdminPanelPage() {
         <div className="flex w-full flex-col gap-3">
           <section className="flex flex-col gap-4">
             <AppHeading level={1} className="text-primary text-2xl font-bold">پنل مدیریت</AppHeading>
-            <CustomTabs items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
+            <CustomTabs compactMobile items={tabs} value={activeTab} onChange={setActiveTab} ariaLabel="بخش‌های پنل مدیریت" />
           </section>
 
+          {tabs.length === 0 ? <div className="text-sm text-secondary-text">هنوز دسترسی بخشی برای شما تعیین نشده است.</div> : null}
           {activeTab === "theme" ? <AdminThemePanel /> : null}
           {activeTab === "security" && isSuperadmin ? <AdminSecurityPanel counts={structure?.accessRequests} usersCount={structure?.users} /> : null}
           {activeTab === "orders" ? (
@@ -158,7 +161,7 @@ export default function AdminPanelPage() {
           {activeTab === "users" ? <AdminUsersPanel totalCount={structure?.users} /> : null}
           {activeTab === "notifications" ? <NotificationsPanel admin usersCount={structure?.users} /> : null}
           {activeTab === "discounts" ? <AdminDiscountsPanel totalUsersCount={structure?.users} rulesCount={structure?.discountRules} /> : null}
-          {activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" && activeTab !== "notifications" ? (
+          {activeTab && activeTab !== "theme" && activeTab !== "security" && activeTab !== "orders" && activeTab !== "users" && activeTab !== "discounts" && activeTab !== "notifications" ? (
             <AdminProductsPanel key={activeTab} section={activeTab} storefrontCounts={structure?.storefront} />
           ) : null}
         </div>

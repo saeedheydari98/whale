@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useAppUser } from "@/lib/app-user-context";
 import { useStructurePagedCollection } from "@/hooks/use-structure-paged-collection";
@@ -14,16 +14,11 @@ import { AppHeading } from "@/app/design-system/components/ui/text";
 import Loading, { DynamicLoadingCollection } from "@/app/design-system/components/loading/loading";
 import { AdminUsersPanel, type AdminUser } from "@/app/panel/admin/admin-users-panel";
 
+import { notificationRequest as request, restoreBrowserPush, browserPushDisabled, setBrowserPushDisabled, rememberBrowserPush } from "@/lib/notification-client";
+
 type Entry = { id: string; name?: string; title: string; body: string; url: string; active?: boolean; readAt?: string | null; createdAt?: string; _count?: { notifications: number } };
 const empty: Entry = { id: "", title: "عنوان اعلان", body: "متن پیام", url: "/" };
 const audiences = [["all","همه کاربران"],["new_users","کاربران جدید"],["purchase_count","حداقل تعداد خرید"],["purchase_amount","حداقل مبلغ خرید"],["no_purchase","بدون خرید در بازه"]] as const;
-async function request(url: string, method = "GET", body?: unknown) {
- const response = await fetch(url, { method, headers: { "content-type": "application/json" }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
- const json = await response.json();
- if (!response.ok || !json.ok) throw new Error(json.showMessage || "عملیات انجام نشد.");
- return json.data;
-}
-
 export function NotificationsPanel({ admin = false, usersCount, unreadCount = 0 }: { admin?: boolean; usersCount?: number; unreadCount?: number }) {
  const endpoint = admin ? "/api/admin/notifications" : "/api/user/notifications";
  const [messagesOpen, setMessagesOpen] = useState(false);
@@ -73,21 +68,23 @@ export function NotificationsPanel({ admin = false, usersCount, unreadCount = 0 
    const refreshInbox = () => {
      if (document.hidden) return;
      invalidateFetchCache(USER_STRUCTURE_URL);
-     void queryClient.invalidateQueries({ queryKey: ["user-structure"] });
-     void queryClient.invalidateQueries({ queryKey: ["collection-structure", endpoint + "?structure=1"] });
-     void queryClient.invalidateQueries({ queryKey: ["admin-list", endpoint] });
+     void queryClient.invalidateQueries({ queryKey: ["user-structure"] }, { cancelRefetch: false });
+     void queryClient.invalidateQueries({ queryKey: ["collection-structure", endpoint + "?structure=1"] }, { cancelRefetch: false });
+     void queryClient.invalidateQueries({ queryKey: ["admin-list", endpoint] }, { cancelRefetch: false });
    };
    const timer = window.setInterval(refreshInbox, 30000);
    window.addEventListener("focus", refreshInbox);
-   const onPush = (event: MessageEvent) => { if (event.data?.type === "notification-received") refreshInbox(); };
-   navigator.serviceWorker?.addEventListener("message", onPush);
-   return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshInbox); navigator.serviceWorker?.removeEventListener("message", onPush); };
+
+   return () => { window.clearInterval(timer); window.removeEventListener("focus", refreshInbox); };
  }, [admin, endpoint, messagesOpen, queryClient]);
  const [draft, setDraft] = useState({ name: "", title: "", body: "", url: "/", audienceType: "all", minimumValue: 1, lookbackDays: 30 });
  const [view, setView] = useState<"individual" | "create">("individual");
  const [selected, setSelected] = useState<AdminUser[]>([]);
- const refresh = async () => { invalidateFetchCache(USER_STRUCTURE_URL); await queryClient.invalidateQueries({ queryKey: ["user-structure"] }); await queryClient.invalidateQueries({ queryKey: ["admin-list", endpoint] }); await page.refresh(); };
+ const refresh = async () => { invalidateFetchCache(USER_STRUCTURE_URL); await queryClient.invalidateQueries({ queryKey: ["user-structure"] }); await page.refresh(); };
+ const mutationLock = useRef(false);
  const mutate = async (method: string, body: unknown, send = false) => {
+ if (mutationLock.current) return;
+ mutationLock.current = true;
  setBusy(true); setMessage("");
  try { let result = pendingSend && send && pendingSend.body === JSON.stringify(body) ? { rule: { id: pendingSend.id } } : await request(endpoint, method, body);
  if (send) {
@@ -101,7 +98,7 @@ export function NotificationsPanel({ admin = false, usersCount, unreadCount = 0 
  }
  setMessage(result.created !== undefined ? `${result.created} اعلان جدید در صندوق کاربران ثبت شد.${result.pushWarning ? ` ${result.pushWarning}` : ""}` : "ذخیره شد."); await refresh(); }
  catch (e) { setMessage(e instanceof Error ? e.message : "عملیات انجام نشد."); }
- finally { setBusy(false); }
+ finally { mutationLock.current = false; setBusy(false); }
  };
  const row = (item: Entry) => <div className="flex min-w-0 flex-col gap-2 border-b border-primary-border p-2 text-primary-text">
    <div className="flex min-w-0 items-center gap-2">
@@ -138,7 +135,7 @@ export function NotificationsPanel({ admin = false, usersCount, unreadCount = 0 
  <CustomInput label="عنوان اعلان" placeholder="عنوان اعلان" value={draft.title} required maxLength={100} disabled={busy} onChange={e => setDraft({ ...draft, title: e.target.value })} />
  <CustomInput label="متن اعلان" placeholder="متن اعلان" multiline value={draft.body} required maxLength={1000} disabled={busy} onChange={e => setDraft({ ...draft, body: e.target.value })} />
  <CustomButton type="submit" disabled={busy || (view === "individual" && selected.length === 0)} isLoading={busy}>{view === "individual" ? "ارسال اعلان" : "ساخت و ارسال اعلان"}</CustomButton>
- </form> : <PushSettings />}
+ </form> : <PushSettings key={String(accountId)} />}
  {message || page.error ? <div role="status" className="text-sm text-primary-text">{message || page.error}</div> : null}
  <CustomAccordion title={messagesOpen ? "بستن پیام‌ها" : "نمایش پیام‌ها"} open={messagesOpen} onOpenChange={setMessagesOpen} showStatusLabel={false}
  heading={<div className="flex flex-wrap items-center gap-2 p-2"><AppHeading level={2} className="text-sm font-semibold text-primary-text">{admin ? "پیام‌های ارسال‌شده" : "پیام‌های دریافتی"}</AppHeading>{!admin && unreadCount > 0 ? <span role="status" className="rounded-full bg-primary-soft p-1 text-xs font-medium text-primary">{unreadCount.toLocaleString("fa-IR")} پیام جدید</span> : null}</div>} contentClassName="p-2">
@@ -149,27 +146,42 @@ export function NotificationsPanel({ admin = false, usersCount, unreadCount = 0 
 }
 
 function PushSettings() {
+ const { data: appUser } = useAppUser();
+ const accountId = appUser?.user?.id;
+ const operationLock = useRef(false);
+ const loadLock = useRef<Promise<void> | null>(null);
  const [state, setState] = useState({ loading: true, supported: false, enabled: false, configured: false });
  const [busy, setBusy] = useState(false), [error, setError] = useState("");
  const [notice, setNotice] = useState("");
  const supported = () => window.isSecureContext && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
- async function load() {
+ function load(): Promise<void> {
+ if (loadLock.current) return loadLock.current;
+ const task = loadStatus().finally(() => { if (loadLock.current === task) loadLock.current = null; });
+ loadLock.current = task;
+ return task;
+ }
+ async function loadStatus() {
  if (!supported()) { setState({ loading: false, supported: false, enabled: false, configured: false }); return; }
  try {
+ if (accountId) await restoreBrowserPush(accountId);
  const reg = await navigator.serviceWorker.getRegistration("/");
  const subscription = await reg?.pushManager.getSubscription();
  const status = await request("/api/user/push" + (subscription ? "?endpoint=" + encodeURIComponent(subscription.endpoint) : ""));
- setState({ loading: false, supported: true, configured: status.configured, enabled: !!subscription && status.enabled && Notification.permission === "granted" });
+ setState({ loading: false, supported: true, configured: status.configured, enabled: !browserPushDisabled() && !!subscription && status.enabled && Notification.permission === "granted" });
  } catch (e) { setError(e instanceof Error ? e.message : "دریافت تنظیمات انجام نشد."); setState(s => ({ ...s, loading: false })); }
  }
- useEffect(() => { void load(); const visible = () => { if (!document.hidden) void load(); }; window.addEventListener("focus", visible); document.addEventListener("visibilitychange", visible); return () => { window.removeEventListener("focus", visible); document.removeEventListener("visibilitychange", visible); }; }, []);
+ useEffect(() => { void load(); const visible = () => { if (!document.hidden && !operationLock.current) void load(); }; window.addEventListener("focus", visible); document.addEventListener("visibilitychange", visible); return () => { window.removeEventListener("focus", visible); document.removeEventListener("visibilitychange", visible); }; }, []);
  async function toggle() {
+ if (operationLock.current) return;
+ operationLock.current = true;
+ await loadLock.current;
  setBusy(true); setError(""); setNotice("");
  try {
  if (state.enabled) {
  const reg = await navigator.serviceWorker.getRegistration("/");
  const subscription = await reg?.pushManager.getSubscription();
- if (subscription) { await request("/api/user/push", "DELETE", { endpoint: subscription.endpoint }); await subscription.unsubscribe(); }
+ if (subscription) { await request("/api/user/push", "DELETE", { endpoint: subscription.endpoint }); if (!await subscription.unsubscribe()) throw new Error("حذف اشتراک مرورگر انجام نشد."); }
+ setBrowserPushDisabled(true);
  } else {
  const permission = Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
  if (permission !== "granted") throw new Error("مجوز اعلان را از تنظیمات مرورگر فعال کنید.");
@@ -189,11 +201,13 @@ function PushSettings() {
  }
  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey });
  await request("/api/user/push", "POST", sub.toJSON());
+ setBrowserPushDisabled(false);
+ if (accountId) rememberBrowserPush(accountId, sub.endpoint);
  setNotice("اعلان‌های این مرورگر فعال شد. پیام‌های مدیر به صورت اعلان مرورگر نمایش داده می‌شوند.");
  }
  await load();
  } catch (e) { setError(e instanceof Error ? e.message : "عملیات انجام نشد."); }
- finally { setBusy(false); }
+ finally { operationLock.current = false; setBusy(false); }
  }
  return <Loading loading="skeleton-structure" isLoading={state.loading}><div className="flex flex-col gap-3">
  <div className="text-sm text-secondary-text">صندوق اعلان همیشه در دسترس است. پوش برای همین مرورگر فعال می‌شود. در آیفون ابتدا سایت را به صفحه اصلی اضافه کنید.</div>

@@ -199,3 +199,63 @@ assert.equal(cookieOptions.get("refreshToken").maxAge, 2592000);
 assert.equal(user.refreshTokenHash, auth.hashToken(cookieValues.get("refreshToken")));
 assert.equal((await auth.getAuthUser(cookieRequest()))?.id, user.id);
 console.log("PASS: OTP login, cookie-only credentials, production cookie flags and OTP secrecy");
+
+const permissions = load("lib/admin-permissions.ts");
+const admin = { role: "admin", adminPermissions: { orders: true } };
+for (const method of ["GET", "POST", "PATCH", "PUT", "DELETE"]) {
+  assert.equal(permissions.canAccessAdminApi(admin, new URL("https://store.example/api/admin/orders/123"), method), true);
+  for (const endpoint of ["users", "products", "discounts", "notifications", "banners", "security/requests", "unknown"]) {
+    assert.equal(permissions.canAccessAdminApi(admin, new URL("https://store.example/api/admin/" + endpoint), method), false, endpoint);
+  }
+}
+for (const value of [null, [], { products: "true" }, { products: 1 }, { unknown: true }, Object.create({ products: true })]) {
+  assert.equal(permissions.hasAdminPermission({ role: "admin", adminPermissions: value }, "products"), false);
+}
+assert.equal(permissions.hasAdminPermission({ role: "user", adminPermissions: { products: true } }, "products"), false);
+assert.equal(permissions.hasAdminPermission({ role: "superadmin", username: "fake" }, "products"), false);
+assert.equal(permissions.hasAdminPermission({ role: "superadmin", username: load("lib/auth-constants.ts").SUPERADMIN_PHONE }, "products"), true);
+const discountAdmin = { role: "admin", adminPermissions: { discounts: true } };
+assert.equal(permissions.canAccessAdminApi(discountAdmin, new URL("https://store.example/api/admin/users?picker=1"), "GET"), true);
+assert.equal(permissions.canAccessAdminApi(discountAdmin, new URL("https://store.example/api/admin/users?picker=1"), "PATCH"), false);
+assert.equal(permissions.canAccessAdminApi(discountAdmin, new URL("https://store.example/api/admin/users"), "GET"), false);
+user.role = "admin";
+user.adminPermissions = { orders: true };
+const adminRequest = () => new Request("https://store.example/api/admin/orders");
+assert.equal((await auth.requireAdmin(adminRequest())).ok, true);
+user.adminPermissions = {};
+assert.equal((await auth.requireAdmin(adminRequest())).response.status, 403, "Revocation must take effect with the same session token");
+assert.equal((await auth.getAuthUser(cookieRequest())).role, "admin", "Empty permissions must not remove panel membership");
+console.log("PASS: section isolation, unknown/malformed permission denial, restricted pickers and immediate permission revocation");
+
+// Execute the catalog write handler against an isolated database double.
+const catalogWrites = [];
+for (const model of ["product", "showcase", "category", "categoryGroup", "brand", "brandGroup", "banner"]) {
+  db[model] = {
+    findMany: async () => [],
+    deleteMany: async () => { catalogWrites.push(model); return { count: 0 }; },
+    upsert: async () => { catalogWrites.push(model); return {}; },
+    create: async () => { catalogWrites.push(model); return {}; },
+    update: async () => { catalogWrites.push(model); return {}; },
+  };
+}
+mocks["@/lib/api/catalog-cache"] = { invalidateCatalogCache: async () => undefined };
+mocks["@/lib/api/catalog-layer-service"] = {};
+mocks["@/lib/api/catalog-service"] = { normalizeProductData: value => value };
+mocks["@/lib/image-upload"] = { findInvalidWebpImageValue: () => null };
+const catalogRoute = load("app/api/products/route.ts");
+const saveCatalog = body => catalogRoute.POST(new Request("https://store.example/api/products", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
+for (const section of ["products", "categories", "brands", "showcases", "banners"]) {
+  user.adminPermissions = { [section]: true };
+  catalogWrites.length = 0;
+  const response = await saveCatalog({ section, products: [], categories: [], brands: [], showcases: [], banners: [] });
+  assert.equal(response.status, 200, section + ": " + await response.text());
+  const allowed = { products: ["product"], categories: ["category", "categoryGroup"], brands: ["brand", "brandGroup"], showcases: ["showcase"], banners: ["banner"] }[section];
+  assert.ok(catalogWrites.length > 0, section + " must actually save");
+  assert.ok(catalogWrites.every(model => allowed.includes(model)), section + " must not write other sections: " + catalogWrites);
+}
+user.adminPermissions = {};
+catalogWrites.length = 0;
+assert.equal((await saveCatalog({ section: "products" })).status, 403);
+assert.equal((await saveCatalog({ section: "security" })).status, 422);
+assert.equal(catalogWrites.length, 0);
+console.log("PASS: catalog mutations stay within the granted section and denied requests perform no writes");

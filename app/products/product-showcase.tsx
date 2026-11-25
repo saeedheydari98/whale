@@ -128,12 +128,12 @@ function LazyShowcaseSection({
     1,
     Number(showcase.productCount)
       || Number(showcase.limit)
-      || (showcase.id === "all-products" ? products.length : 8)
+      || products.length
   );
   const showcaseProductsQuery = useQuery({
     queryKey: ["catalog", "showcase", showcase.id, "products", "lazy", productLimit],
     queryFn: () => getShowcaseProducts(showcase.id, { limit: productLimit }),
-    enabled: Boolean(showcase.id) && showcase.id !== "all-products" && !hasInitialProducts,
+    enabled: Boolean(showcase.id) && showcase.id !== "all-products" && !hasInitialProducts && Number(showcase.productCount ?? showcase.limit ?? 0) > 0,
     placeholderData: (previous) => previous,
   });
 
@@ -405,7 +405,7 @@ export function ProductShowcase({ mode = "storefront", root = "main" }: ProductS
                     getDiscountPercent={getDiscountPercent}
                     hideShowcaseLink={mode === "products"}
                     isLoading
-                    totalCount={Number(section.item.productCount) || Number(section.item.limit) || 8}
+                    totalCount={Number(section.item.productCount ?? section.item.limit)}
                   />
                 }
               >

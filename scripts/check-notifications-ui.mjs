@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-const browser = await chromium.launch({channel:"chrome",headless:true});
+const browser = await chromium.launch({channel:process.env.TEST_BROWSER_CHANNEL || "chrome",headless:true});
 try {
  for (const width of [390,1280]) for (const count of [0,1,2,30]) {
  const context=await browser.newContext({viewport:{width,height:850}});
@@ -17,7 +17,12 @@ try {
  });
  let measuredLimit=0, structureReady=false;
  const readIds = new Set();
+ const activeRequests = new Set(), duplicateRequests = [];
  await context.route("**/api/**", async route => {
+ const requestKey = route.request().method() + " " + route.request().url() + " " + (route.request().postData() || "");
+ if (activeRequests.has(requestKey)) duplicateRequests.push(requestKey);
+ activeRequests.add(requestKey);
+ try {
  const u=new URL(route.request().url()),p=u.pathname;
  const json=data=>route.fulfill({json:{ok:true,data}});
  if(p==="/api/theme") return json({theme:{primary:"blue",style:"light"}});
@@ -48,8 +53,9 @@ try {
  return json({items,total:count,nextOffset:offset+items.length<count?offset+items.length:null});
  }
  return json({});
+ } finally { activeRequests.delete(requestKey); }
  });
- const page=await context.newPage();page.setDefaultTimeout(10000);page.on("pageerror",e=>console.log("PAGE ERROR",e.message));await page.goto("http://localhost:3100/panel/user");
+ const page=await context.newPage();page.setDefaultTimeout(10000);page.on("pageerror",e=>console.log("PAGE ERROR",e.message));await page.goto((process.env.TEST_BASE_URL || "http://localhost:3100") + "/panel/user");
  await page.getByRole("button",{name:/اعلان/}).first().click();
  await page.getByRole("button",{name:"نمایش پیام‌ها",exact:true}).waitFor();
  if(count) await page.getByText(`${count.toLocaleString("fa-IR")} پیام جدید`,{exact:true}).waitFor();
@@ -102,6 +108,7 @@ try {
  await page.getByRole("button",{name:"نمایش پیام‌ها",exact:true}).click();
  await messageBody.first().waitFor({state:"visible"});
  }
+ assert.deepEqual(duplicateRequests, [], "Identical API requests must not overlap");
  await context.close();
  console.log("PASS: notification inbox",width,count);
  }

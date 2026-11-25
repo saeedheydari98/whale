@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
+import { canAccessAdminApi, normalizeAdminPermissions } from "@/lib/admin-permissions";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { apiFail } from "@/lib/api/response";
@@ -11,6 +12,7 @@ export type AuthUser = {
   username: string | null;
   name: string | null;
   role: string;
+  adminPermissions?: unknown;
   avatarUrl: string | null;
   themeMode?: string | null;
 };
@@ -117,6 +119,7 @@ export function publicUser(user: AuthUser) {
     username: user.username,
     name: user.name,
     role: user.role,
+    adminPermissions: normalizeAdminPermissions(user.adminPermissions),
     avatarUrl: user.avatarUrl,
     themeMode: user.themeMode === "dark" ? "dark" : "light",
   };
@@ -136,7 +139,7 @@ async function normalizeRole(user: AuthUser) {
 
 async function findSessionUser(id: number) {
   const users = await prisma.$queryRaw<Array<AuthUser & { refreshTokenHash: string | null }>>`
-    SELECT "id", "email", "username", "name", "role", "avatarUrl", "themeMode", "refreshTokenHash"
+    SELECT "id", "email", "username", "name", "role", "avatarUrl", "themeMode", "adminPermissions", "refreshTokenHash"
     FROM "users"
     WHERE "id" = ${id}
     LIMIT 1
@@ -205,6 +208,9 @@ export async function requireAdmin(request: Request) {
   if (!auth.ok) return auth;
   if (auth.user.role !== "admin" && auth.user.role !== "superadmin") {
     return { ok: false as const, response: apiFail("دسترسی شما برای این بخش کافی نیست.", 403) };
+  }
+  if (!canAccessAdminApi(auth.user, new URL(request.url), request.method)) {
+    return { ok: false as const, response: apiFail("دسترسی این بخش برای شما فعال نیست.", 403) };
   }
   return auth;
 }

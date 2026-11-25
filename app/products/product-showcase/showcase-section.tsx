@@ -10,7 +10,6 @@ import Loading, { DynamicLoadingCollection } from "@/app/design-system/component
 import ProductLink from "@/app/design-system/components/ui/ProductLink";
 import ProductRatingSummary from "@/app/design-system/components/ui/product-rating-summary";
 import { ProductCardBadge } from "@/app/design-system/components/ui/product-card-badge";
-import { useHorizontalDrag } from "@/hooks/use-horizontal-drag";
 import { CustomButton } from "../../design-system/components/ui/button";
 import { AppImage } from "../../design-system/components/ui/app-image";
 import ShowcaseLink from "../../design-system/components/ui/ShowcaseLink";
@@ -164,7 +163,6 @@ export function ShowcaseSection({
   totalCount,
   hideShowcaseLink = false,
 }: ShowcaseSectionProps) {
-  const railDrag = useHorizontalDrag<HTMLDivElement>();
 
   return (
     <section
@@ -199,11 +197,7 @@ export function ShowcaseSection({
         isLoading={isLoading}
         totalCount={Number.isFinite(Number(totalCount)) ? Number(totalCount) : undefined}
         structure={Number.isFinite(Number(totalCount)) ? { count: Number(totalCount) } : undefined}
-        containerRef={railDrag.ref}
-        containerProps={railDrag.dragHandlers}
-        className={`flex flex-nowrap items-start gap-3 overflow-x-auto overscroll-x-contain py-2 ${
-          railDrag.isDragging ? "cursor-grabbing" : "cursor-grab"
-        }`}
+        className="flex flex-nowrap items-start gap-3 overflow-x-auto overscroll-x-contain py-2"
         renderSkeleton={() => (
           <Loading loading="skeleton-structure" isLoading>
             <ProductShowcaseCard

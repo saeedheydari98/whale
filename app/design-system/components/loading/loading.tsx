@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useHorizontalRail } from "@/hooks/use-horizontal-rail";
 import { usePathname, useSearchParams } from "next/navigation";
 import { motion } from "motion/react";
 import { GiSpermWhale } from "react-icons/gi";
@@ -304,7 +305,7 @@ function viewportBottom() {
 function laidOutCollectionItems(container: HTMLElement) {
   return Array.from(container.children).filter((child): child is HTMLElement => (
     child instanceof HTMLElement && child.getAttribute("data-loading-probe") !== "true"
-      && !child.hasAttribute("data-loading-sentinel")
+      && !child.hasAttribute("data-loading-sentinel") && !child.hasAttribute("data-rail-copy")
   ));
 }
 
@@ -479,12 +480,18 @@ export function LazyViewport({
   React.useLayoutEffect(() => {
     const node = ref.current;
     if (!node || visible) return;
+    const bounds = node.getBoundingClientRect();
+    const root = scrollRoot()?.getBoundingClientRect();
+    if (bounds.width > 0 && bounds.height > 0 && bounds.bottom > (root?.top ?? 0) && bounds.top < (root?.bottom ?? window.innerHeight) && bounds.right > (root?.left ?? 0) && bounds.left < (root?.right ?? window.innerWidth)) {
+      setVisible(true);
+      return;
+    }
     return observeUntilVisible(node, () => setVisible(true), rootMargin);
   }, [rootMargin, visible]);
 
   return (
     <div ref={ref} className={className}>
-      {visible ? children : <div className="invisible" inert>{fallback ?? children}</div>}
+      {visible ? children : <div className={fallback ? undefined : "invisible"} inert>{fallback ?? children}</div>}
     </div>
   );
 }
@@ -508,6 +515,7 @@ export function DynamicLoadingCollection<T>({
   structure,
 }: DynamicLoadingCollectionProps<T>) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  useHorizontalRail(containerRef, /\boverflow-x-auto\b/.test(className ?? "") && !isLoading && !onLoadMore);
   const probeRef = React.useRef<HTMLDivElement | null>(null);
   const sentinelRef = React.useRef<HTMLDivElement | null>(null);
   const [capacity, setCapacity] = React.useState(0);
@@ -582,7 +590,7 @@ export function DynamicLoadingCollection<T>({
               <LazyViewport
                 key={getKey?.(item, index) ?? index}
                 className={itemShellClass}
-                fallback={<div className="invisible" inert>{renderSkeleton(index)}</div>}
+                fallback={renderSkeleton(index)}
               >
                 {renderItem(item, index)}
               </LazyViewport>

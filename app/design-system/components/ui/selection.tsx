@@ -2,10 +2,11 @@
 
 import { CustomActionButton } from "@/app/design-system/components/ui/action";
 
-import { type ButtonHTMLAttributes, type HTMLAttributes } from "react";
+import { useRef, type ButtonHTMLAttributes, type HTMLAttributes } from "react";
 import { IoCheckmarkSharp } from "react-icons/io5";
 import { cx } from "../../variants/shared.variant";
 import { selectionGroupClasses, selectionItemClasses, type SelectionLevel, type SelectionVariant } from "../../variants/selection.variant";
+import { useHorizontalRail } from "@/hooks/use-horizontal-rail";
 import { AppImage } from "./app-image";
 
 type CustomSelectionButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -14,7 +15,9 @@ type CustomSelectionButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 export function CustomSelectionGroup({ variant = "tertiary", className, ...props }: HTMLAttributes<HTMLDivElement> & { variant?: SelectionLevel | "filter" }) {
-  return <div role="group" {...props} data-selection-level={variant} className={cx(selectionGroupClasses[variant], className)} />;
+  const ref = useRef<HTMLDivElement>(null);
+  useHorizontalRail(ref, variant !== "tertiary");
+  return <div ref={ref} role="group" {...props} data-selection-level={variant} className={cx(selectionGroupClasses[variant], className)} />;
 }
 
 export function CustomSelectionButton({ selected, variant = "tertiary", role, className, ...props }: CustomSelectionButtonProps) {

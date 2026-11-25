@@ -1053,6 +1053,7 @@ export function useAdminProductsPanel(activeSection: AdminCatalogSection = "prod
       let res: Response | null = null;
       const maxAttempts = 3;
       const bodyPayload = JSON.stringify({
+        section: activeSection,
         preserveProducts: preserveExistingProducts,
         products: preserveExistingProducts ? [] : validProducts,
         showcases: showcasesToPersist.map((showcase) => ({

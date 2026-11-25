@@ -43,6 +43,7 @@ function appUserPayload(user: AuthUser, profile: AppUserProfile | null) {
     username: user.username,
     name: user.name,
     role: user.role,
+    adminPermissions: user.adminPermissions,
     themeMode: normalizeThemeMode(user.themeMode),
     profile,
   };

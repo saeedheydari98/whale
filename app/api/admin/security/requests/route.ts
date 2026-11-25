@@ -1,3 +1,4 @@
+import { ADMIN_SECTIONS, normalizeAdminPermissions } from "@/lib/admin-permissions";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
@@ -12,15 +13,18 @@ import { prisma } from "@/lib/prisma";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const permissionsSchema = z.object(Object.fromEntries(Object.keys(ADMIN_SECTIONS).map(key => [key, z.boolean().optional()]))).strict();
 const reviewSchema = z.union([
   z.object({
     userId: z.coerce.number().int().positive(),
-    action: z.literal("grant"),
+    action: z.enum(["grant", "revoke"]),
+    adminPermissions: permissionsSchema.default({}),
   }),
   z.object({
     id: z.string().min(1),
     action: z.enum(["approve", "reject", "revoke"]).optional(),
     approved: z.boolean().optional(),
+    adminPermissions: permissionsSchema.default({}),
   }),
 ]);
 
@@ -52,6 +56,7 @@ async function readAdminRequest(id: string) {
           username: true,
           name: true,
           role: true,
+          adminPermissions: true,
           profiles: {
             orderBy: { updatedAt: "desc" },
             take: 1,
@@ -85,6 +90,7 @@ function toPublicRequest(request: NonNullable<AdminRequestWithUser>) {
       username: request.user.username,
       name: request.user.name,
       role: request.user.role,
+      adminPermissions: normalizeAdminPermissions(request.user.adminPermissions),
       profile,
     },
   };
@@ -123,6 +129,7 @@ export async function GET(request: Request) {
             username: true,
             name: true,
             role: true,
+          adminPermissions: true,
             profiles: {
               orderBy: { updatedAt: "desc" },
               take: 1,
@@ -223,6 +230,7 @@ export async function PATCH(request: Request) {
           id: true,
           username: true,
           role: true,
+          adminPermissions: true,
           profiles: {
             orderBy: { updatedAt: "desc" },
             take: 1,
@@ -235,6 +243,15 @@ export async function PATCH(request: Request) {
         return apiFail("دسترسی مدیر ارشد قابل تغییر نیست.", 400);
       }
 
+      if (parsed.data.action === "revoke") {
+        await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+          await tx.adminPermissionAudit.create({ data: { actorId: auth.user.id, userId: targetUser.id, action: "revoke", before: { role: targetUser.role, permissions: targetUser.adminPermissions }, after: { role: "user", permissions: {} } } });
+          await tx.user.update({ where: { id: targetUser.id }, data: { role: "user", adminPermissions: {} } });
+          await tx.adminAccessRequest.updateMany({ where: { userId: targetUser.id, status: { in: ["approved", "pending"] } }, data: { status: "revoked" } });
+        });
+        return apiOk({ request: null }, { message: "ADMIN_ACCESS_REVOKED", showMessage: "دسترسی مدیریت لغو شد." });
+      }
+
       const phone = String(targetUser.profiles[0]?.phone || targetUser.username || "").trim();
       if (!phone) return apiFail("شماره موبایل این کاربر ثبت نشده است.", 400);
 
@@ -243,9 +260,10 @@ export async function PATCH(request: Request) {
         orderBy: { updatedAt: "desc" },
       });
       const accessRequest = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        await tx.adminPermissionAudit.create({ data: { actorId: auth.user.id, userId: targetUser.id, action: "grant", before: { role: targetUser.role, permissions: targetUser.adminPermissions }, after: { role: "admin", permissions: normalizeAdminPermissions(parsed.data.adminPermissions) } } });
         await tx.user.update({
           where: { id: targetUser.id },
-          data: { role: "admin" },
+          data: { role: "admin", adminPermissions: normalizeAdminPermissions(parsed.data.adminPermissions) },
         });
 
         return existingRequest
@@ -279,6 +297,7 @@ export async function PATCH(request: Request) {
     const nextStatus = action === "approve" ? "approved" : action === "revoke" ? "revoked" : "rejected";
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.adminPermissionAudit.create({ data: { actorId: auth.user.id, userId: targetRequest.userId, action, before: { role: targetRequest.user.role, permissions: targetRequest.user.adminPermissions }, after: { role: action === "approve" ? "admin" : action === "revoke" ? "user" : targetRequest.user.role, permissions: action === "approve" ? normalizeAdminPermissions(parsed.data.adminPermissions) : action === "revoke" ? {} : targetRequest.user.adminPermissions } } });
       await tx.adminAccessRequest.update({
         where: { id: targetRequest.id },
         data: { status: nextStatus },
@@ -287,14 +306,14 @@ export async function PATCH(request: Request) {
       if (action === "approve") {
         await tx.user.update({
           where: { id: targetRequest.userId },
-          data: { role: "admin" },
+          data: { role: "admin", adminPermissions: normalizeAdminPermissions(parsed.data.adminPermissions) },
         });
       }
 
       if (action === "revoke") {
         await tx.user.updateMany({
           where: { id: targetRequest.userId, role: "admin" },
-          data: { role: "user" },
+          data: { role: "user", adminPermissions: {} },
         });
       }
     });

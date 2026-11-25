@@ -6,7 +6,7 @@ import { type ReactNode } from "react";
 
 export function CustomTable({ columns = 7, children }: { columns?: 7 | 8; children: ReactNode }) {
   return (
-    <div className="w-full overflow-x-auto overscroll-x-contain">
+    <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain" tabIndex={0} role="region" aria-label="جدول اطلاعات؛ برای دیدن ستون‌های دیگر افقی پیمایش کنید">
       <div data-app-table data-app-table-columns={columns} className="flex min-w-230 flex-col gap-1.5">{children}</div>
     </div>
   );
@@ -28,7 +28,7 @@ export function CustomSortHeader({ label, active, direction, onClick }: {
       onClick={onClick}
       className={`flex w-full min-w-0 items-center justify-center gap-1 text-center text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-border ${active ? "text-primary" : "text-secondary-text hover:text-primary-text"}`}
     >
-      <span className="truncate">{label}</span>
+      <span className="whitespace-normal sm:truncate">{label}</span>
       <span aria-hidden="true" className="shrink-0 tabular-nums">{active ? direction === "asc" ? "↑" : "↓" : "↕"}</span>
     </CustomActionButton>
   );

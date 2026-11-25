@@ -3,21 +3,18 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { useCatalogSync } from "@/lib/catalog-sync-client";
-import { invalidateFetchCache } from "@/lib/fetch-json";
-import { clearCachedPageStructures, PRODUCTS_CATALOG_UPDATED_EVENT } from "@/lib/products-client";
+import { clearCatalogDataCache, PRODUCTS_CATALOG_UPDATED_EVENT } from "@/lib/products-client";
 
 function CatalogSyncBridge() {
   const queryClient = useQueryClient();
   const resetCatalogClientCache = useCallback(() => {
-    invalidateFetchCache();
-    clearCachedPageStructures();
-    void queryClient.invalidateQueries({ queryKey: ["catalog"] });
+    clearCatalogDataCache();
+    void queryClient.invalidateQueries({ queryKey: ["catalog"] }, { cancelRefetch: false });
   }, [queryClient]);
 
   const invalidateCatalog = useCallback(() => {
-    resetCatalogClientCache();
     window.dispatchEvent(new Event(PRODUCTS_CATALOG_UPDATED_EVENT));
-  }, [resetCatalogClientCache]);
+  }, []);
 
   useCatalogSync(invalidateCatalog);
 

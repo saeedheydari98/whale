@@ -1,3 +1,7 @@
+import { requireUser } from "@/lib/api/auth";
+import { z } from "zod";
+import { parseJsonBody } from "@/lib/api/validation";
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { rateLimit } from "@/lib/api/rate-limit";
@@ -804,7 +808,15 @@ export async function POST(request: Request) {
   const limited = rateLimit(request);
   if (limited) return limited;
 
-  const body = await request.json().catch(() => ({}));
+  const auth = await requireUser(request);
+  if (!auth.ok) return auth.response;
+  const parsed = await parseJsonBody(request, z.object({
+    section: z.enum(["products", "categories", "brands", "banners", "showcases"]),
+  }).passthrough());
+  if (!parsed.ok) return parsed.response;
+  const body = parsed.data;
+  const section = body.section;
+  if (!["products", "categories", "brands", "banners", "showcases"].includes(section) || !hasAdminPermission(auth.user, section)) return apiFail("دسترسی این بخش برای شما فعال نیست.", 403);
   const treePayload =
     body.tree && typeof body.tree === "object"
       ? (body.tree as CatalogTreePayload)
@@ -934,11 +946,11 @@ export async function POST(request: Request) {
     );
 
     // Execute operations sequentially (avoid long interactive transaction)
-    if ((prisma as any).banner && typeof (prisma as any).banner?.deleteMany === "function") {
+    if (section === "banners" && (prisma as any).banner && typeof (prisma as any).banner?.deleteMany === "function") {
       await (prisma as any).banner.deleteMany();
     }
 
-    if (!preserveProducts) {
+    if (section === "products" && !preserveProducts) {
       const existingProductIds = normalized
         .map(getExistingProductId)
         .filter((id): id is number => id !== null);
@@ -950,7 +962,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if ((prisma as any).category && typeof (prisma as any).category?.deleteMany === "function") {
+    if (section === "categories" && (prisma as any).category && typeof (prisma as any).category?.deleteMany === "function") {
       if ((prisma as any).categoryGroup && typeof (prisma as any).categoryGroup?.upsert === "function") {
         for (const group of normalizedCategoryGroups) {
           await (prisma as any).categoryGroup.upsert({
@@ -996,7 +1008,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if ((prisma as any).brand && typeof (prisma as any).brand?.deleteMany === "function") {
+    if (section === "brands" && (prisma as any).brand && typeof (prisma as any).brand?.deleteMany === "function") {
       if ((prisma as any).brandGroup && typeof (prisma as any).brandGroup?.upsert === "function") {
         for (const group of normalizedBrandGroups) {
           await (prisma as any).brandGroup.upsert({
@@ -1042,7 +1054,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (hasShowcaseModel) {
+    if (section === "showcases" && hasShowcaseModel) {
       for (const showcaseId of showcaseIds) {
         const meta = showcaseById.get(showcaseId);
         await prisma.showcase.upsert({
@@ -1076,7 +1088,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!preserveProducts) {
+    if (section === "products" && !preserveProducts) {
       // Upsert products sequentially to avoid a long-running interactive transaction
       for (const item of sortProducts(normalized)) {
         const itemShowcaseId = String(item.showcaseId ?? "").trim();
@@ -1112,7 +1124,7 @@ export async function POST(request: Request) {
       }
     }
 
-    if (hasShowcaseModel) {
+    if (section === "showcases" && hasShowcaseModel) {
       await prisma.showcase.deleteMany({
         where: {
           id: { notIn: showcaseIds },
@@ -1120,7 +1132,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if ((prisma as any).banner && typeof (prisma as any).banner?.create === "function") {
+    if (section === "banners" && (prisma as any).banner && typeof (prisma as any).banner?.create === "function") {
       for (const item of sortByOrder(banners)) {
         const bannerId = String(item.id ?? "").trim();
         const imageUrls = getImageUrls(item);

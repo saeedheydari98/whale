@@ -1,3 +1,4 @@
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import { prisma } from "@/lib/prisma";
 import { apiFail, apiOk, apiServerError } from "@/lib/api/response";
 import { rateLimit } from "@/lib/api/rate-limit";
@@ -15,7 +16,7 @@ async function canEdit(request: Request, commentId: string) {
   if (!auth.ok) return auth;
   const comment = await prisma.comment.findUnique({ where: { id: commentId } });
   if (!comment) return { ok: false as const, response: apiFail("دیدگاه پیدا نشد.", 404) };
-  if (auth.user.role !== "admin" && comment.userId !== auth.user.id) {
+  if (!hasAdminPermission(auth.user, "products") && comment.userId !== auth.user.id) {
     return { ok: false as const, response: apiFail("دسترسی شما برای ویرایش این دیدگاه کافی نیست.", 403) };
   }
   return { ok: true as const, user: auth.user, comment };

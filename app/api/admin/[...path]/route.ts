@@ -1,3 +1,4 @@
+import { hasAdminPermission } from "@/lib/admin-permissions";
 import { compareStorefrontEntries } from "@/lib/storefront-order";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -870,11 +871,30 @@ export async function GET(request: Request, context: Context) {
     }
 
     if (path[0] === "catalog" && path[1] === "structure") {
-      return apiOk({ structure: await readAdminCatalogStructure(auth.user.role === "superadmin" && auth.user.username === SUPERADMIN_PHONE) });
+      const structure = await readAdminCatalogStructure(auth.user.role === "superadmin" && auth.user.username === SUPERADMIN_PHONE);
+      const can = (section: string) => hasAdminPermission(auth.user, section);
+      return apiOk({ structure: { ...structure,
+        products: can("products") || can("orders") ? structure.products : 0,
+        users: can("users") || can("orders") || can("discounts") || can("notifications") ? structure.users : 0,
+        orders: can("orders") ? structure.orders : 0, inPersonOrders: can("orders") ? structure.inPersonOrders : 0,
+        banners: can("banners") ? structure.banners : 0,
+        showcases: can("showcases") ? structure.showcases : [],
+        categoryGroups: can("categories") ? structure.categoryGroups : [],
+        brandGroups: can("brands") ? structure.brandGroups : [],
+        discountRules: can("discounts") ? structure.discountRules : 0,
+        storefront: can("storefront") ? structure.storefront : { home: 0, categories: 0, products: 0 },
+      } });
     }
 
     if (path[0] === "catalog" && path[1]) {
       const catalog = await readAdminCatalogSection(path[1], parseCatalogPaging(new URL(request.url).searchParams));
+      if (catalog && path[1] === "all") {
+        if (!hasAdminPermission(auth.user, "products")) catalog.products = [];
+        if (!hasAdminPermission(auth.user, "banners")) catalog.banners = [];
+        if (!hasAdminPermission(auth.user, "showcases") && !hasAdminPermission(auth.user, "products")) catalog.showcases = [];
+        if (!hasAdminPermission(auth.user, "categories") && !hasAdminPermission(auth.user, "products")) { catalog.categories = []; catalog.categoryGroups = []; }
+        if (!hasAdminPermission(auth.user, "brands") && !hasAdminPermission(auth.user, "products")) { catalog.brands = []; catalog.brandGroups = []; }
+      }
       return catalog ? apiOk({ catalog }) : apiFail("مسیر پیدا نشد.", 404);
     }
 

@@ -20,6 +20,7 @@ type CustomTabsProps<TValue extends string = string> = {
   className?: string;
   variant?: SelectionLevel;
   ariaLabel?: string;
+  compactMobile?: boolean;
   disabled?: boolean;
 };
 
@@ -31,15 +32,16 @@ export function CustomTabs<TValue extends string = string>({
   variant = "primary",
   ariaLabel,
   disabled = false,
+  compactMobile = false,
 }: CustomTabsProps<TValue>) {
   return (
     <CustomSelectionGroup
       aria-label={ariaLabel}
       variant={variant}
-      className={className}
+      className={cx(className, compactMobile && "max-sm:[&>button]:h-9 max-sm:[&>button]:basis-auto max-sm:[&>button]:gap-1 max-sm:[&>button]:px-2 max-sm:[&>button]:text-[11px] max-sm:[&>button>span[aria-hidden]]:text-sm")}
       onKeyDown={(event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button[aria-pressed]:not(:disabled)"));
+        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button[aria-pressed]:not(:disabled)" )).filter(button => !button.closest("[data-rail-copy]"));
         const index = buttons.indexOf(event.target as HTMLButtonElement);
         if (index < 0 || buttons.length === 0) return;
         event.preventDefault();

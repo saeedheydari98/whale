@@ -323,7 +323,7 @@ async function fetchJsonWithBootstrapRetry<T>(url: string, options?: { force?: b
 
   for (let attempt = 0; attempt <= CATALOG_BOOTSTRAP_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
-      const json = await fetchJsonDeduped<T>(url, { force: options?.force || attempt > 0 });
+      const json = await fetchJsonDeduped<T>(url, { force: options?.force || attempt > 0, staleMs: Infinity });
       if (isApiFailure(json)) throw new Error("دریافت اطلاعات فروشگاه ناموفق بود.");
       return json;
     } catch (error) {
@@ -1357,7 +1357,7 @@ export function findShowcaseById(
   };
 }
 
-export function clearProductsCache() {
+export function clearCatalogDataCache() {
   invalidateFetchCache("/api/products");
   invalidateFetchCache("/api/catalog");
   invalidateFetchCache("/api/home");
@@ -1367,10 +1367,12 @@ export function clearProductsCache() {
   invalidateFetchCache("/api/category");
   invalidateFetchCache("/api/category-group");
   invalidateFetchCache("/api/brand");
-  if (typeof window !== "undefined") {
-    clearCachedPageStructures();
-    window.dispatchEvent(new Event(PRODUCTS_CATALOG_UPDATED_EVENT));
-  }
+  clearCachedPageStructures();
+}
+
+export function clearProductsCache() {
+  clearCatalogDataCache();
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(PRODUCTS_CATALOG_UPDATED_EVENT));
 }
 
 export default { getProducts, getCatalogStructure, getHomePageStructure, getCategoriesPageStructure, getProductsPageStructure, getCategoryPageStructure, getCategoryGroupPageStructure, getBrandPageStructure, getShowcasePageStructure, getProductDetailPageStructure, getCatalogSectionData, getProductPage, getShowcaseProducts, getCategoryProducts, getCategoryGroupProducts, getBrandProducts, getProductDetail, findProductById, findShowcaseById, clearProductsCache, clearCachedPageStructures };
